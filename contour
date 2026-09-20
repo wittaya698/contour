@@ -137,6 +137,7 @@ def main(argv):
 
 SCAFFOLD = ("CLAUDE.md", ".claude/settings.json",
             ".claude/skills/build-model/SKILL.md",
+            ".claude/skills/build-model/references/bpy-recipes.md",
             ".claude/skills/release-model/SKILL.md")
 
 
