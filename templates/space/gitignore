@@ -1,0 +1,18 @@
+# The marker must stay tracked: without it, a fresh clone is not a model space.
+.contour/*
+!.contour/project
+
+# Generated, derivable from build.py. The tracked copy of a deliverable is
+# release/v<N>/, which these patterns must not catch (ADR 0013).
+out/
+exports/
+
+# Your personal working file: links the generated asset, holds materials/lights/camera
+work/
+
+# Blender + Python noise
+*.blend1
+*.blend2
+__pycache__/
+*.pyc
+.DS_Store

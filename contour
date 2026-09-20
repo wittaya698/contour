@@ -15,6 +15,8 @@ prints only its terse `lines`. Stdlib only: no venv, no yaml.
     contour api <symbol>...       real signature from the installed Blender
     contour selftest              fixture pipeline test
     contour install-hooks         install the pre-push guard (ADR 0011)
+    contour init <name>           create a model space here
+    contour doctor                is this space in step with the toolkit
     contour hook <name>           run a guard; for hooks to call, not you
 """
 import json
@@ -122,8 +124,111 @@ def main(argv):
         return emit(install_hooks())
     if cmd == "hook" and rest:
         return run_hook(rest[0], rest[1:])
+    if cmd == "init" and len(rest) == 1:
+        return emit(init(rest[0]))
+    if cmd == "doctor" and not rest:
+        if not PROJECT:
+            return need_project(cmd)
+        return emit(doctor())
     print(USAGE, file=sys.stderr)
     return 2
+
+
+SCAFFOLD = ("CLAUDE.md", ".claude/settings.json",
+            ".claude/skills/build-model/SKILL.md",
+            ".claude/skills/release-model/SKILL.md")
+
+
+def toolkit_commit():
+    r = subprocess.run(["git", "-C", str(ROOT), "rev-parse", "--short", "HEAD"],
+                       capture_output=True, text=True, timeout=10)
+    return r.stdout.strip() if r.returncode == 0 else "unknown"
+
+
+def init(name):
+    """Create a model space (ADR 0015): its own directory, its own git repo.
+
+    Copies only what the agent must read from the working directory. The
+    guards are never copied — settings.json and the pre-push stub call the
+    installed toolkit, so there is one implementation and nothing to drift.
+    """
+    space = (Path.cwd() / name).resolve()
+    if (space / MARKER).exists():
+        return {"ok": False, "lines": [f"FAIL {space} is already a model space"]}
+    tpl = ROOT / "templates" / "space"
+    (space / ".contour").mkdir(parents=True, exist_ok=True)
+    (space / "refs").mkdir(exist_ok=True)
+    kept = []
+    for rel in SCAFFOLD:
+        dst = space / rel
+        if dst.exists():                  # adopting a directory: never clobber
+            kept.append(rel)
+            continue
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        dst.write_text((tpl / rel).read_text().replace("<NAME>", space.name))
+    if not (space / ".gitignore").exists():
+        (space / ".gitignore").write_text((tpl / "gitignore").read_text())
+    else:
+        kept.append(".gitignore")
+    (space / ".contour" / "project").write_text(
+        "# Contour model space (ADR 0015). This file is the marker: keep it tracked.\n"
+        f"toolkit: {toolkit_commit()}\n"
+        f"toolkit_path: {ROOT}\n"
+        f"created: {time.strftime('%Y-%m-%d')}\n")
+    lines = [f"ok   {space}"]
+    r = subprocess.run(["git", "init", "-q", str(space)], capture_output=True, text=True)
+    if r.returncode != 0:
+        return {"ok": False, "lines": [f"FAIL git init: {r.stderr.strip()}"]}
+    hooks = subprocess.run(["git", "-C", str(space), "rev-parse", "--git-path", "hooks"],
+                           capture_output=True, text=True).stdout.strip()
+    dst = (space / hooks).resolve()
+    dst.mkdir(parents=True, exist_ok=True)
+    (dst / "pre-push").write_bytes((tpl / "pre-push").read_bytes())
+    (dst / "pre-push").chmod(0o755)
+    lines += ["ok   git init, pre-push stub installed (this space is never pushed)",
+              f"ok   scaffolding copied from toolkit {toolkit_commit()}"]
+    if kept:
+        lines.append(f"kept {len(kept)} existing file(s) untouched: {', '.join(kept)}")
+    lines += [
+              "",
+              "next: write spec.yaml (schema: %s)" % (ROOT / "schema" / "spec.schema.yaml"),
+              "      put the user's reference images in refs/",
+              "      write build.py, then run: contour check"]
+    return {"ok": True, "lines": lines}
+
+
+def doctor():
+    """Is this space still in step with the toolkit, and still unpushable."""
+    tpl = ROOT / "templates" / "space"
+    lines, ok = [], True
+    for rel in SCAFFOLD:
+        here, there = PROJECT / rel, tpl / rel
+        if not here.exists():
+            lines.append(f"MISS {rel} — run contour init in a fresh dir to see it")
+            ok = False
+        elif here.read_text() != there.read_text().replace("<NAME>", PROJECT.name):
+            lines.append(f"DRIFT {rel} — differs from the toolkit's template")
+            ok = False
+        else:
+            lines.append(f"ok   {rel}")
+    marker = (PROJECT / ".contour" / "project").read_text()
+    was = next((l.split(":", 1)[1].strip() for l in marker.splitlines()
+                if l.startswith("toolkit:")), "unknown")
+    now = toolkit_commit()
+    lines.append(f"{'ok  ' if was == now else 'NOTE'} toolkit {was}"
+                 + ("" if was == now else f" -> {now} since this space was created"))
+    remotes = subprocess.run(["git", "-C", str(PROJECT), "remote"],
+                             capture_output=True, text=True).stdout.split()
+    if remotes:
+        lines.append(f"WARN this space has a remote ({', '.join(remotes)}); it is never pushed")
+        ok = False
+    hooks = subprocess.run(["git", "-C", str(PROJECT), "rev-parse", "--git-path", "hooks"],
+                           capture_output=True, text=True).stdout.strip()
+    if not (PROJECT / hooks / "pre-push").exists():
+        lines.append("WARN no pre-push stub — nothing stops a push from here")
+        ok = False
+    lines.append(f"     toolkit at {ROOT}")
+    return {"ok": ok, "lines": lines}
 
 
 def run_hook(name, rest):

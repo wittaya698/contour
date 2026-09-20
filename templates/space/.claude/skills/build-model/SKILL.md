@@ -9,8 +9,8 @@ description: The iterate loop for building or changing a Contour model — build
 
 1. Confirm you are on the variant's branch: `git branch --show-current` must
    match the `model:` field of the spec you are about to satisfy.
-2. Read `models/<variant>/spec.yaml`, and look at `models/<variant>/refs/`. It is the definition of done. **Do not edit it.**
-3. Read `models/<variant>/build.py` if it exists.
+2. Read `spec.yaml`, and look at `refs/`. It is the definition of done. **Do not edit it.**
+3. Read `build.py` if it exists.
 
 Do **not** read `docs/` or the ADRs unless a decision is genuinely in question —
 `CLAUDE.md` already carries the rules.
@@ -18,7 +18,7 @@ Do **not** read `docs/` or the ADRs unless a decision is genuinely in question �
 ## The loop
 
 ```
-./contour check <variant>
+contour check
 ```
 
 That is build + verify in one command, reporting in ~10 lines. Repeat it after
@@ -35,11 +35,11 @@ pass. If you believe the spec is wrong, say so and stop; that is the user's call
 
 - `bmesh` and the data API. `bpy.ops` only from `lib/ops_whitelist.py`, and only
   via `lib.ctx_override` (ADR 0004).
-- **Check unfamiliar calls before writing them:** `./contour api bmesh.ops.inset_region`.
+- **Check unfamiliar calls before writing them:** `contour api bmesh.ops.inset_region`.
   This Blender postdates your knowledge cutoff; a recalled signature is a guess
   and a guess-fail-retry costs ~100x what the lookup costs.
 - Consult `references/bpy-recipes.md` for patterns already proven here. Anything
-  marked UNVERIFIED must be confirmed with `./contour api` before use.
+  marked UNVERIFIED must be confirmed with `contour api` before use.
 - Build from an empty scene every time. Never rely on existing scene state.
 - Name every object exactly as `parts:` in the spec names it. Naming is checked.
 
@@ -48,7 +48,7 @@ pass. If you believe the spec is wrong, say so and stop; that is the user's call
 When verify is green, or when you are stuck and need to see what you built:
 
 ```
-./contour render <variant>
+contour render
 ```
 
 Look at the 4-view sheet. Check specifically for what measurement cannot catch:
@@ -62,7 +62,7 @@ Then show the user the verify report and the sheet, and say what changed.
 Only after the user explicitly approves. Then:
 
 ```sh
-git add models/<variant>
+git add -A
 git commit
 ```
 
@@ -74,12 +74,16 @@ Message:
 verify 8/8 | tris 4,210 | height 900mm
 ```
 
-Never commit `models/<v>/out/`, `models/<v>/exports/` or `work/` — they are
+Never commit `out/`, `exports/` or `work/` — they are
 ignored by design (ADR 0007, ADR 0012).
 
 ## When a fix belongs to the toolkit
 
-If the bug is in `verify.py`, `lib/`, `schema/` or `./contour` — **stop**. Do
-not fix it on the variant branch; that breaks the no-conflict rule (ADR 0003).
-Tell the user, switch to `master`, fix it there, run `./contour selftest`, then
-merge `master` into the variant.
+If the bug is in `verify.py`, `lib/`, `schema/` or `contour` — **stop**. None
+of that is in this repository, and it is not yours to patch from here
+(ADR 0015). Tell the user. The fix belongs in the toolkit checkout, where
+`contour selftest` must pass before it is committed; `contour doctor` prints
+the path.
+
+Never work around a toolkit bug by changing the model. A wrong check that
+passes is worse than one that fails.

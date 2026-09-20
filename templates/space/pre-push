@@ -1,0 +1,4 @@
+#!/bin/sh
+# A model space is never pushed (ADR 0011, ADR 0015). The logic lives in the
+# toolkit, not here, so this stub cannot drift from it.
+exec contour hook pre-push "$@"

@@ -5,26 +5,27 @@ description: Export, verify and tag a finished Contour variant as a deliverable.
 
 # Release a variant
 
-## 1. Take the current toolkit
+## 1. Check you are on the current toolkit
 
-A variant that has not merged `master` recently is being judged by old checks.
+A space built against an old toolkit is being judged by old checks.
 
 ```sh
-git checkout <variant>
-git merge master
-./contour check <variant>
+contour doctor      # toolkit commit, and whether the rules here have drifted
+contour check
 ```
 
-If the merge conflicts, the no-shared-files rule was broken somewhere — resolve
-by moving the shared change to `master`, not by editing it here (ADR 0003).
+`doctor` reporting a newer toolkit is not itself a problem — record which
+commit the release was verified against (step 4). Drift in `CLAUDE.md` or the
+skills is a problem: those are copies, and a stale copy is a rule you are no
+longer following (ADR 0015).
 
 ## 2. Export and prove it
 
 ```sh
-./contour export <variant>
+contour export
 ```
 
-This writes `models/<variant>/exports/<variant>.glb`, re-imports it into a clean headless
+This writes `exports/<variant>.glb`, re-imports it into a clean headless
 Blender, and re-measures dimensions, up axis, handedness and origin there. The
 in-Blender scene passing verify proves nothing about the exported file — only
 the round-trip does (ADR 0006).
@@ -35,7 +36,7 @@ model to compensate.
 ## 3. Final look
 
 ```sh
-./contour render <variant>
+contour render
 ```
 
 Show the user the sheet and the full verify report. Releasing is their decision.
@@ -47,11 +48,11 @@ overwritten by v2 (ADR 0013). N is one past the highest existing tag *and*
 folder; if those two disagree, stop and say so rather than picking one.
 
 ```sh
-mkdir -p models/<variant>/release/v<N>
-cp models/<variant>/out/<variant>.blend      models/<variant>/release/v<N>/
-cp models/<variant>/exports/<variant>.glb    models/<variant>/release/v<N>/
-cp models/<variant>/sheet.png                models/<variant>/release/v<N>/
-git add models/<variant>/release/v<N> models/<variant>/sheet.png
+mkdir -p release/v<N>
+cp out/<variant>.blend      release/v<N>/
+cp exports/<variant>.glb    release/v<N>/
+cp sheet.png                release/v<N>/
+git add release/v<N> sheet.png
 git commit -m "<variant>: release v<N>
 
 verify 8/8 | tris 4,210 | glb round-trip ok"
@@ -63,13 +64,13 @@ package is the one deliberate copy of a derivable file (ADR 0013). Record the
 toolkit commit the release was verified against — `git rev-parse --short
 master` — in the commit message.
 
-ADR 0013 specifies `./contour release <variant>` to do all of this and refuse
+ADR 0013 specifies `contour release` to do all of this and refuse
 when tags and folders disagree. It is **not built yet**; until it is, the steps
 above are manual and the disagreement check is yours to make.
 
 ## 5. Tell the user what to do with it
 
-- `models/<variant>/release/v<N>/<variant>.glb` is the engine file.
+- `release/v<N>/<variant>.glb` is the engine file.
 - The `.blend` beside it is the archived source asset; their `work/scene.blend`
   links its collection and is unaffected.
 - State the conventions the export used (Y-up, metres for `web`) so the import
