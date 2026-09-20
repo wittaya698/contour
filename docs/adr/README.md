@@ -19,3 +19,4 @@ works — the alternative you are about to suggest is probably here with a reaso
 | [0011](0011-model-content-stays-local.md) | Model content stays local; git carries the toolkit |
 | [0012](0012-one-directory-per-model.md) | One directory per model |
 | [0013](0013-releases-are-versioned-folders.md) | Releases are versioned folders, prepared by the tool |
+| [0014](0014-toolkit-is-a-tool-a-model-is-a-project.md) | The toolkit is a tool; a model is a project |
