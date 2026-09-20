@@ -1,18 +1,24 @@
 #!/usr/bin/env python3
-"""PreToolUse guard: the user's intent is read-only once accepted (ADR 0002).
+"""PreToolUse guard: the user's references are read-only, always (ADR 0012).
 
-Rule 1 has always been prose. ADR 0002 states its mechanical form — *"a spec
-git already tracks is never written again"* — and this implements exactly that
-predicate, no more. In a model space (ADR 0015) those are at the root:
+This guard once covered `spec.yaml` too, denying every write to a tracked one.
+ADR 0016 ended that: a spec may be revised once the user has confirmed the
+change, so a blanket deny would now refuse the sanctioned path. The spec is
+still guarded, but by a different mechanism in a different place — `contour
+check` compares it against HEAD and fails when the content moved and
+`revision:` did not. Prevention became detection, knowingly.
 
-    spec.yaml   and   refs/**
+What is left here is the half that has no sanctioned write at all. In a model
+space (ADR 0015) it sits at the root:
 
-    tracked   -> deny.  It is the contract; propose changes in chat.
-    untracked -> allow. Creation is not mutation (ADR 0002, amended).
+    refs/**
+
+    tracked   -> deny.  Photographs the user supplied; no measurement argument
+                        justifies the agent rewriting one.
+    untracked -> allow. Saving new references is how a space starts.
 
 Anything else is none of this guard's business and is allowed without asking
-git anything. In the toolkit checkout nothing matches, which is correct: the
-only spec there belongs to the fixture and is the toolkit's own test asset.
+git anything.
 
 A model space never copies this file. Its settings.json runs `contour hook
 spec`, so the guard is always the installed version (ADR 0015).
@@ -25,7 +31,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-PROTECTED = ("spec.yaml", "refs")
+PROTECTED = ("refs",)
 
 
 def tracked(root, rel):
@@ -55,10 +61,10 @@ def main():
         return 0
     if rel.parts[0] not in PROTECTED or not tracked(root, rel):
         return 0
-    kind = "spec" if rel.parts[0] == "spec.yaml" else "reference image"
-    print(f"refused: {rel} is the user's {kind} and git tracks it (rule 1, ADR 0002).\n"
-          f"  It states what the model must be; it is not yours to adjust to what it is.\n"
-          f"  Propose the change in chat and let the user make it.", file=sys.stderr)
+    print(f"refused: {rel} is one of the user's reference images and git tracks it\n"
+          f"  (rule 1, ADR 0012). It states what the model must be, in pictures.\n"
+          f"  Unlike spec.yaml, there is no confirmed path to rewriting one:\n"
+          f"  measure it and propose a spec revision instead.", file=sys.stderr)
     return 2
 
 

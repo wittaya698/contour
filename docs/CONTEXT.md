@@ -10,8 +10,12 @@ message, or a conversation, it means what this file says it means.
 | **model space** | One model's own directory and its own git repository, found by walking up from the working directory for `.contour/project`. Never pushed (ADR 0011, ADR 0015). Spaces coexist; a variation of a model is a new space. |
 | **variant** | The old word for a model space, from when each model lived on a long-lived branch of this repo (ADR 0003, retired by ADR 0015). It survives in older ADRs and in some code identifiers. |
 | **spec** | `spec.yaml` at the root of a model space. The user's intent, expressed in numbers. Agent-read-only. The definition of correct. |
+| **reference** | An image the user supplies, stored in `refs/` at original fidelity: their intent in pictures, in the spec's trust class (ADR 0012). Say *reference*, not "model picture" — and never *sheet*, which is Contour's own render. |
+| **anchor** | The one real-world dimension the user states for a set of references, in millimetres. Every other size read off those images is a pixel ratio against it. Pictures carry proportion, never scale, so without an anchor the agent does not draft `dimensions` — it asks. |
 | **build** | Running the space's `build.py` under headless Blender to produce `out/<name>.blend` from an empty scene. |
 | **verify** | Running `verify.py` against a build, judged by its spec. Produces a pass/fail line per check. |
+| **green** | A verify report in which every check passed — `PASS`, and `contour` exits 0. The word the code itself uses (ADR 0005 budgets ~50 tokens on green). |
+| **red** | A report in which any check failed — `FAIL n/total`, one line per failure, exit 1. A build that dies before verify runs is red too. Rule 2: red is a finding, never something to be made to go away by changing what was asked. |
 | **checkpoint** | A moment the agent believes it is done or is stuck. Triggers a render sheet and a request for approval. |
 | **sheet** | The 4-view orthographic Workbench render (front / right / top / persp) at 1024², with a 1 m grid and scale bar. The agent's only eyes. |
 | **round-trip** | Re-importing an exported file into a clean Blender and re-measuring it there. The only proof an export is correct. |

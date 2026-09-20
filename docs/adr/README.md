@@ -7,7 +7,7 @@ works — the alternative you are about to suggest is probably here with a reaso
 | # | Decision |
 |---|---|
 | [0001](0001-headless-build-is-source-of-truth.md) | Headless build; `build.py` is the source of truth |
-| [0002](0002-spec-is-agent-read-only-contract.md) | The spec is an agent-read-only contract |
+| [0002](0002-spec-is-agent-read-only-contract.md) | The spec is an agent-read-only contract — amended by [0016](0016-specs-from-references-and-revision.md) |
 | [0003](0003-toolkit-master-variant-branches.md) | `master` is a toolkit; variants are long-lived branches — superseded in part by [0014](0014-toolkit-is-a-tool-a-model-is-a-project.md), [0015](0015-model-spaces.md) |
 | [0004](0004-bmesh-over-bpy-ops.md) | `bmesh` and the data API over `bpy.ops` |
 | [0005](0005-tiered-verification.md) | Tiered verification: asserts always, renders at checkpoints |
@@ -21,3 +21,4 @@ works — the alternative you are about to suggest is probably here with a reaso
 | [0013](0013-releases-are-versioned-folders.md) | Releases are versioned folders, prepared by the tool — superseded in part by [0015](0015-model-spaces.md) |
 | [0014](0014-toolkit-is-a-tool-a-model-is-a-project.md) | The toolkit is a tool; a model is a project — superseded in part by [0015](0015-model-spaces.md) |
 | [0015](0015-model-spaces.md) | Model spaces: how the tool/project split actually works |
+| [0016](0016-specs-from-references-and-revision.md) | Specs drawn from references, and revised under a counter |

@@ -18,12 +18,14 @@ Full Blender output goes to `.contour/last-build.log`. Read it **only on failure
 
 ## Hard rules
 
-1. **Never change a `spec.yaml`, or anything under `refs/`, that exists.** It is the user's intent, not
-   yours. Propose changes in chat; never write them. A *new* spec may be drafted
-   when the user asks, with every number you chose flagged as yours — tolerances
-   loudest, since a loose one at birth moves the goalposts just as surely.
-   A `PreToolUse` hook enforces the tracked case; it is a backstop, not
-   permission to try.
+1. **Never change anything under `refs/`** — the user's intent in pictures.
+   Measure them; never rewrite one. **A `spec.yaml` changes only as: propose →
+   user confirms → write, bumping `revision:` in that same write.** Never
+   propose one while a check is red; fix `build.py` or report the failure.
+   `contour check` fails if the spec moved and `revision:` did not (ADR 0016).
+   A *new* spec may be drafted when the user asks — scale needs an anchor they
+   give you, every number you chose flagged as yours, tolerances loudest, since
+   a loose one at birth moves the goalposts just as surely.
 2. **Never weaken a check to make it pass.** A red check is a finding. Report it.
 3. **Never hand-edit a generated `.blend`.** All change goes through
    `build.py`. `out/` is regenerated from zero every build.

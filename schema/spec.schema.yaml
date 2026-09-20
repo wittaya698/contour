@@ -1,12 +1,26 @@
 # Contour spec schema — the shape of a model space's spec.yaml
 #
-# THE SPEC IS THE USER'S INTENT. Agents read it and never write it (ADR 0002).
+# THE SPEC IS THE USER'S INTENT. An agent drafts one when asked, and may revise
+# one only after the user confirms the change (ADR 0002, ADR 0016).
 # verify.py reads this file's structure to know what to enforce.
 #
 # Every field below is annotated with: who sets it, whether verify.py can check
 # it mechanically, and what a violation means.
 
 model: <name>                # must equal the model space's directory name
+
+# ---------------------------------------------------------------- revision
+# Optional. Counts accepted changes to this contract; absent means 0, so a spec
+# written before ADR 0016 needs nothing until its first revision.
+#
+# `contour check` compares this file against HEAD's copy: changed content with
+# no increment is a HARD FAIL. That is the whole mechanism behind "the agent
+# may revise the spec, but never quietly" — bump it only when the user has
+# confirmed the change, in the same write that makes it.
+#
+# NOT a release version. The release is a folder and a tag (ADR 0013); the two
+# move at different rates and fusing them makes one of them lie.
+# revision: 1
 description: >               # prose. NOT machine-checkable; judged by the human at the gate.
   One or two sentences of what this thing is.
 

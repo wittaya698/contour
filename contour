@@ -22,6 +22,7 @@ prints only its terse `lines`. Stdlib only: no venv, no yaml.
 """
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -102,6 +103,46 @@ def need_project(cmd):
     return 2
 
 
+REVISION = re.compile(r"^revision:\s*(\d+)\s*$", re.M)
+
+
+def spec_revision(text):
+    """The contract's revision number. Absent means 0, so a spec written before
+    ADR 0016 is revision 0 and its first correction is 1. Anchored at column 0,
+    so the word inside an indented block scalar is not mistaken for the field."""
+    m = REVISION.search(text or "")
+    return int(m.group(1)) if m else 0
+
+
+def check_revision():
+    """A spec may change; it may not change silently (ADR 0016).
+
+    Rule 1 used to make an unapproved spec edit impossible. Now it makes one
+    noisy, and this is the noise: content that differs from HEAD without a bump
+    is the one case where a change nobody approved looks different from a
+    change that was. Returns None when there is nothing to say — this runs on
+    every model command, so it is silent on success and costs nothing.
+    """
+    spec = PROJECT / "spec.yaml"
+    if not spec.exists():
+        return None
+    head = subprocess.run(["git", "-C", str(PROJECT), "show", "HEAD:spec.yaml"],
+                          capture_output=True, text=True)
+    if head.returncode != 0:      # untracked, or no commit yet: creation is not mutation
+        return None
+    now = spec.read_text(encoding="utf-8")
+    if now == head.stdout:
+        return None
+    was, is_ = spec_revision(head.stdout), spec_revision(now)
+    if is_ > was:
+        return None
+    return {"ok": False, "lines": [
+        f"FAIL revision  spec.yaml differs from HEAD, revision still {is_}",
+        "  The spec is the user's intent. It may be revised once they have",
+        "  confirmed the change, never quietly (rule 1, ADR 0016).",
+        f"  confirmed -> set revision: {was + 1}   not confirmed -> git checkout -- spec.yaml"]}
+
+
 def main(argv):
     if not argv or argv[0] in ("-h", "--help", "help"):
         print(USAGE)
@@ -110,6 +151,9 @@ def main(argv):
     if cmd in ("check", "render", "export") and not rest:
         if not PROJECT:
             return need_project(cmd)
+        drifted = check_revision()
+        if drifted:
+            return emit(drifted)
         if cmd != "export":
             return emit(stage(["build" if cmd == "check" else cmd]))
         rep = stage(["export"])

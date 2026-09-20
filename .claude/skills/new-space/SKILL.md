@@ -14,7 +14,13 @@ existing model is a new space, not a branch of that one.
 Do not write anything until you have, from the user:
 
 - **What the object is** — concrete, not a category.
-- **Overall dimensions in millimetres**, with a tolerance each.
+- **Overall dimensions in millimetres**, with a tolerance each. If they are
+  working from reference images rather than numbers, what you need instead is
+  **one anchor** — a single real-world dimension for that set of images. Ask
+  for it; never guess it. Pictures carry proportion, never scale, and a guessed
+  scale is wrong on every dimension at once, so verify goes green on a model
+  that is uniformly the wrong size and only the user at the gate would see it
+  (ADR 0016). With no anchor, do not draft `dimensions` at all.
 - **A triangle budget.** If the user has no number, propose one from the object
   class and the engine target, and say what you assumed.
 - **Named parts** the model must contain.
@@ -79,8 +85,22 @@ placeholder.
 Start `NOTES.md` for deferred refinements and open questions, in the format of
 the toolkit's `docs/OPEN-QUESTIONS.md`.
 
-Writing a spec is the one time hard rule 1 permits creating one, and only at the
-user's request. List back every number you chose rather than they did, and
+**Measure the images; never recall them.** Work mm-per-pixel out from the
+anchor, then read every other dimension off the pixels. `beaky`'s `NOTES.md`
+records three claims made by eye, all wrong, all caught only by measuring:
+legs called bowed that are straight, a toon render pass read as geometry, and a
+beak called too long that was merely thin.
+
+**Propose each measured number with its error bar.** `depth 620 ±6 measured,
+proposing tol 15` is something the user can argue with; `tol: 20` alone is not.
+A tolerance says how far the build may stray from intent — it is not a place to
+hide how roughly you measured. State both; only the tolerance reaches the spec
+(ADR 0016).
+
+Drafting a spec is invited here, at the user's request. *Revising* one later is
+a different act with its own gate — propose, wait for confirmation, then write
+it with `revision:` bumped in the same edit. List back every number you chose
+rather than they did, and
 **call out the tolerances first**: the user can check a dimension they gave you,
 but a `tol` you invented is a goalpost they have no way to judge. Numbers carried
 over from an existing model's spec are theirs; every one you changed or added is

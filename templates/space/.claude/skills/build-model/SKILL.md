@@ -7,7 +7,8 @@ description: The iterate loop for building or changing a Contour model — build
 
 ## Before you start
 
-1. Read `spec.yaml`, and look at `refs/`. It is the definition of done. **Do not edit it.**
+1. Read `spec.yaml`, and look at `refs/`. It is the definition of done. `refs/`
+   is never yours to edit; `spec.yaml` only by the route below, never casually.
 2. Read `build.py` if it exists.
 
 Do **not** read the toolkit's `docs/` or the ADRs unless a decision is genuinely
@@ -27,7 +28,16 @@ every change. Do not render, do not export, do not commit inside this loop.
 traceback or a Blender-level error.
 
 **Never** relax a tolerance, widen a budget, or edit the spec to make a check
-pass. If you believe the spec is wrong, say so and stop; that is the user's call.
+pass. While a check is red the spec is not on the table at all: fix `build.py`,
+or report the failure and stop.
+
+**When the spec itself is wrong**, and the check is *green*, say so — and bring
+the measurement that shows it. `beaky` sat at `depth 612.4` inside a tolerance
+of 600 ±20, for a reference that measures about 620: the build was right and
+the contract was not. That is the case this route exists for. Propose the
+change, wait for the user to confirm it, then write it with `revision:` bumped
+in the same edit. `contour check` goes red if the spec moved and the number did
+not (ADR 0016).
 
 ## Writing geometry
 

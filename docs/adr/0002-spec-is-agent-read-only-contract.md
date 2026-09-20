@@ -1,6 +1,18 @@
 # 0002 — The spec is an agent-read-only contract
 
-**Status:** Accepted · 2026-09-20
+**Status:** Accepted · 2026-09-20 · **amended by [ADR 0016](0016-specs-from-references-and-revision.md)**
+
+> **Amended 2026-09-21.** The reasoning below stands entirely: the agent must
+> not be able to relax a goal to turn a red check green, and that failure is
+> still the reason for every gate here. What ADR 0016 changed is the remedy.
+> A tracked `spec.yaml` is no longer never-written-again — it may be revised
+> once the user has confirmed the change, and never while a check is red, which
+> is precisely the state this ADR was written about. The mechanical form quoted
+> below is superseded: enforcement moved out of the `PreToolUse` guard, which
+> now covers `refs/` alone, and into `contour check`, which fails when the spec
+> differs from `HEAD` and `revision:` has not been incremented. Prevention
+> became detection, knowingly and at a cost that ADR 0016 records. The text
+> below is left as decided.
 
 ## Context
 

@@ -9,6 +9,15 @@
 > the space. The tag keeps its form, `<variant>-v<N>`, with the space's name as
 > `<variant>`. `contour release` is still not built; `release-model` does the
 > assembly by hand.
+>
+> **One rejection reopened, 2026-09-21.** "A `version:` field in the spec" was
+> rejected below as *structurally impossible*, because bumping it is a write to
+> a tracked spec. [ADR 0016](0016-specs-from-references-and-revision.md) removed
+> that ground, and a spec now carries an optional `revision:`. The decision
+> here is **unchanged**: `revision:` counts accepted changes to the contract,
+> not releases. A release stays a folder and a tag, for the reason given below
+> that ADR 0016 does not touch — those are readable from backup media with no
+> git at all, which a field inside a tracked file can never be.
 
 ## Context
 

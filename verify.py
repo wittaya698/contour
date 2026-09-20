@@ -12,8 +12,8 @@ import bmesh
 import bpy
 
 
-TOP = {"model", "description", "targets", "dimensions", "parts", "topology", "uv",
-       "materials", "transform", "render", "notes"}
+TOP = {"model", "revision", "description", "targets", "dimensions", "parts",
+       "topology", "uv", "materials", "transform", "render", "notes"}
 SECTIONS = {
     "topology": {"tri_budget", "quads_min_pct", "ngons_allowed", "manifold",
                  "loose_geometry", "normals", "doubles_tolerance_mm"},
