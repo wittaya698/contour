@@ -29,7 +29,7 @@ file that was edited on the variant and move that change to `master`.
 **New variant**
 ```sh
 git checkout master && git checkout -b <variant>
-# add spec/<variant>.yaml and models/<variant>/build.py only
+# add models/<variant>/ only — spec.yaml, refs/, build.py (ADR 0012)
 ```
 
 **Fixing shared code**
@@ -51,7 +51,7 @@ running old checks. Merge forward before any release.
 - A commit lands only after the user has seen the verify report and the render
   sheet and approved it. Every commit on a variant branch is therefore a state
   a human looked at.
-- A commit carries source **and** the updated `renders/<variant>.png` thumbnail,
+- A commit carries source **and** the updated `models/<variant>/sheet.png`,
   so history is visually scannable.
 - Commit message format:
   ```

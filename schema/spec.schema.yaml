@@ -1,4 +1,4 @@
-# Contour spec schema — the shape of spec/<variant>.yaml
+# Contour spec schema — the shape of models/<variant>/spec.yaml
 #
 # THE SPEC IS THE USER'S INTENT. Agents read it and never write it (ADR 0002).
 # verify.py reads this file's structure to know what to enforce.
