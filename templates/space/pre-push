@@ -1,4 +1,10 @@
 #!/bin/sh
-# A model space is never pushed (ADR 0011, ADR 0015). The logic lives in the
-# toolkit, not here, so this stub cannot drift from it.
-exec contour hook pre-push "$@"
+# A model space is never pushed (ADR 0011, ADR 0015).
+#
+# Self-contained on purpose. Every other guard delegates to the toolkit so its
+# logic cannot drift, but this one has no logic to drift: the answer is always
+# no. Delegating would make the guard depend on `contour` being on PATH, and a
+# push guard that fails when the toolkit is missing is the wrong failure.
+echo "refused: a model space is never pushed (ADR 0011, ADR 0015)." >&2
+echo "  to share this model: contour export, then hand over the .glb" >&2
+exit 1

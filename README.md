@@ -18,7 +18,7 @@ git clone <this repo> Contour
 cd Contour
 ./contour install-hooks              # required, see below
 ./contour selftest                   # proves the install works end to end
-ln -s "$PWD/contour" ~/bin/contour   # so you can run it from a model space
+ln -s "$PWD/contour" ~/.local/bin/   # so you can run it from a model space
 ```
 
 `selftest` builds a fixture, verifies it, renders it, exports a `.glb` and

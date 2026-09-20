@@ -21,6 +21,7 @@ prints only its terse `lines`. Stdlib only: no venv, no yaml.
 """
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -85,7 +86,7 @@ def stage(args, first=True):
 
 def emit(rep):
     print("\n".join(rep["lines"]))
-    if not rep["ok"]:
+    if not rep["ok"] and "secs" in rep:   # only Blender stages write that log
         print(f"(full log: {LOG})")
     return 0 if rep["ok"] else 1
 
@@ -226,6 +227,12 @@ def doctor():
                            capture_output=True, text=True).stdout.strip()
     if not (PROJECT / hooks / "pre-push").exists():
         lines.append("WARN no pre-push stub — nothing stops a push from here")
+        ok = False
+    if not shutil.which("contour"):
+        lines.append("WARN `contour` is not on PATH: the spec guard in "
+                     ".claude/settings.json cannot run,")
+        lines.append(f"     so rule 1 is unenforced here. Fix, into any dir on PATH:")
+        lines.append(f"       ln -s {ROOT / 'contour'} ~/.local/bin/contour")
         ok = False
     lines.append(f"     toolkit at {ROOT}")
     return {"ok": ok, "lines": lines}
