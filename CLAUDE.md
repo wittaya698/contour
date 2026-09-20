@@ -22,6 +22,8 @@ Full Blender output goes to `.contour/last-build.log`. Read it **only on failure
    yours. Propose changes in chat; never write them. A *new* spec may be drafted
    when the user asks, with every number you chose flagged as yours — tolerances
    loudest, since a loose one at birth moves the goalposts just as surely.
+   A `PreToolUse` hook enforces the tracked case; it is a backstop, not
+   permission to try.
 2. **Never weaken a check to make it pass.** A red check is a finding. Report it.
 3. **Never hand-edit a generated `.blend`.** All change goes through
    `build.py`. `models/<v>/out/` is regenerated from zero every build.
@@ -54,3 +56,4 @@ Never modify shared files from a variant branch — fix on `master`, then
 - Vocabulary and pipeline stages: `docs/CONTEXT.md`
 - Undecided, and what it blocks: `docs/OPEN-QUESTIONS.md`
 - Push guard: `tools/hooks/pre-push`, installed by `./contour install-hooks`
+- Spec guard: `tools/hooks/guard-spec.py`, wired by `.claude/settings.json`
