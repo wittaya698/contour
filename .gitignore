@@ -1,8 +1,12 @@
 # CLI scratch: last-build.log and report.json, written for every command (ADR 0012)
 .contour/
 
-# The fixture's build output. Models do not live in this repo at all (ADR 0015);
-# a model space carries its own ignore rules.
+# Models do not live in this repo at all (ADR 0015). This is belt and braces:
+# a stray models/ on disk was once swept in by `git add -A` and had to be
+# rewritten out, so the path stays ignored even though nothing should create it.
+models/
+
+# The fixture's build output. A model space carries its own ignore rules.
 fixtures/*/out/
 
 # Your personal working file: links the generated asset, holds materials/lights/camera
