@@ -14,3 +14,5 @@ works — the alternative you are about to suggest is probably here with a reaso
 | [0006](0006-glb-only-with-round-trip.md) | `.glb` only for now, proven by round-trip |
 | [0007](0007-tracked-artifacts-and-commit-gate.md) | What git tracks, and who commits |
 | [0008](0008-contour-cli-and-doc-layers.md) | One CLI wrapper, three documentation layers |
+| [0009](0009-verifier-proves-its-own-teeth.md) | The verifier proves it can fail, and refuses what it cannot check |
+| [0010](0010-miniyaml-no-dependencies.md) | A small in-repo YAML reader instead of PyYAML |

@@ -17,8 +17,10 @@ Full Blender output goes to `out/last-build.log`. Read it **only on failure**.
 
 ## Hard rules
 
-1. **Never edit `spec/*.yaml`.** It is the user's intent, not yours. Propose
-   changes in chat; never write them.
+1. **Never change a `spec/*.yaml` that exists.** It is the user's intent, not
+   yours. Propose changes in chat; never write them. A *new* spec may be drafted
+   when the user asks, with every number you chose flagged as yours — tolerances
+   loudest, since a loose one at birth moves the goalposts just as surely.
 2. **Never weaken a check to make it pass.** A red check is a finding. Report it.
 3. **Never hand-edit `out/*.blend` or `work/*.blend`.** All change goes through
    `build.py`. `out/` is regenerated from zero every build.

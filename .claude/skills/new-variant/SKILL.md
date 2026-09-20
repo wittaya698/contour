@@ -48,6 +48,12 @@ not apply and leaving nothing at a placeholder value. Then hand the spec to the
 user to confirm **before** writing geometry — it is the contract, and the agent
 does not get to author it alone.
 
+Writing a spec is the one time hard rule 1 permits touching `spec/`, and only at
+the user's request. List back every number you chose rather than they did, and
+**call out the tolerances first**: the user can check a dimension they gave you,
+but a `tol` you invented is a goalpost they have no way to judge. From its first
+commit the file is theirs, and rule 1 applies to it in full.
+
 ## 4. First build
 
 Start with the crudest thing that satisfies the dimensions and the parts list —

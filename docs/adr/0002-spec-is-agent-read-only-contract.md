@@ -18,6 +18,20 @@ mechanically; `build.py` never reads tolerances to satisfy them cheaply.
 
 Spec changes are proposed in chat and made by the user.
 
+**Amended 2026-09-20 — creation is not a change.** The failure above is mutation:
+relaxing a goal that already exists to turn a red check green. At creation there is
+no red check yet, and requiring the user to hand-write ~60 lines of YAML from a
+schema front-loads exactly the cost this ADR already admits under Consequences. So
+the agent may draft a *new* spec when asked, for the user to accept; from its first
+commit rule 1 applies to it in full.
+
+This moves one risk rather than removing it: a tolerance the agent invents at birth
+is as loose a goalpost as one it widens later, and the user has no independent
+reading to judge it against. Hence the obligation to list back every
+agent-chosen number, tolerances first — the guard is disclosure, not the gate.
+The mechanical form of the rule is: a `spec/*.yaml` git already tracks is
+never written again.
+
 ## Consequences
 
 - The goalposts cannot move without a human moving them.

@@ -1,0 +1,40 @@
+model: smoke
+description: >
+  Pipeline fixture: a plinth, a pillar and a sphere. It exists only to exercise
+  every stage of ./contour in seconds. Never a deliverable. Deliberately
+  asymmetric (120 wide, 100 deep) so an axis swap in export shows up.
+
+targets:
+  - web
+
+dimensions:
+  height: { value: 200, tol: 1 }
+  width:  { value: 120, tol: 1 }
+  depth:  { value: 100, tol: 1 }
+
+parts:
+  - { name: plinth, count: 1 }
+  - { name: pillar, count: 1 }
+  - { name: cap,    count: 1 }
+
+topology:
+  tri_budget: 2000
+  quads_min_pct: 90
+  ngons_allowed: false
+  manifold: required
+  loose_geometry: forbidden
+  normals: outward
+  doubles_tolerance_mm: 0.01
+
+uv:
+  required: false
+
+materials:
+  max_slots: 2
+  names: [stone, accent]
+
+transform:
+  origin: base_center
+  scale_applied: true
+  rotation_applied: true
+  up_axis: Z

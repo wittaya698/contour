@@ -1,0 +1,84 @@
+"""Small helpers for build.py files. bmesh and the data API only (ADR 0004).
+
+Units: author in millimetres, Blender stores metres. Helpers take mm.
+Every builder returns a fresh bmesh centred on the origin; `add` turns it into an
+object placed at `at_mm`.
+"""
+import bmesh
+import bpy
+from mathutils import Matrix
+
+MM = 0.001
+
+
+def mm(*v):
+    """mm(50) -> 0.05 ; mm(1, 2, 3) -> (0.001, 0.002, 0.003)"""
+    return v[0] * MM if len(v) == 1 else tuple(x * MM for x in v)
+
+
+def _srgb_to_linear(c):
+    return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+
+
+def material(name, hex_colour, roughness=0.9):
+    """A matte material. The viewport colour drives Workbench renders; the
+    Principled base colour is what the glTF exporter reads."""
+    m = bpy.data.materials.get(name)
+    if m:
+        return m
+    h = hex_colour.lstrip("#")
+    lin = [_srgb_to_linear(int(h[i:i + 2], 16) / 255) for i in (0, 2, 4)]
+    m = bpy.data.materials.new(name)
+    m.diffuse_color = (*lin, 1.0)
+    m.use_nodes = True
+    bsdf = m.node_tree.nodes["Principled BSDF"]
+    bsdf.inputs["Base Color"].default_value = (*lin, 1.0)
+    bsdf.inputs["Roughness"].default_value = roughness
+    return m
+
+
+def box_bm(size_mm):
+    bm = bmesh.new()
+    bmesh.ops.create_cube(bm, size=1.0)
+    bmesh.ops.scale(bm, vec=mm(*size_mm), verts=bm.verts)
+    return bm
+
+
+def sphere_bm(radius_mm, segments=32, rings=24):
+    bm = bmesh.new()
+    bmesh.ops.create_uvsphere(bm, u_segments=segments, v_segments=rings, radius=mm(radius_mm))
+    return bm
+
+
+def cylinder_bm(radius_mm, depth_mm, segments=32, cap_tris=False):
+    """Axis along Z. cap_tris=False leaves n-gon caps; True fans them into triangles."""
+    bm = bmesh.new()
+    bmesh.ops.create_cone(bm, cap_ends=True, cap_tris=cap_tris, segments=segments,
+                          radius1=mm(radius_mm), radius2=mm(radius_mm), depth=mm(depth_mm))
+    return bm
+
+
+def add(name, bm, at_mm=(0, 0, 0), mat=None, smooth=False):
+    """bmesh -> linked object named `name`. Frees the bmesh."""
+    for f in bm.faces:
+        f.smooth = smooth
+    me = bpy.data.meshes.new(name)
+    bm.to_mesh(me)
+    bm.free()
+    if mat:
+        me.materials.append(mat)
+    obj = bpy.data.objects.new(name, me)
+    obj.location = mm(*at_mm)
+    bpy.context.scene.collection.objects.link(obj)
+    return obj
+
+
+def bake_transform(obj):
+    """Fold obj.matrix_world into its vertices and reset it: scale and rotation
+    applied without an operator."""
+    me, m = obj.data, obj.matrix_world.copy()
+    loc = Matrix.Translation(m.to_translation())
+    linear = loc.inverted() @ m
+    me.transform(linear)
+    obj.matrix_world = loc
+    return obj

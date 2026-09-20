@@ -3,15 +3,10 @@
 Decisions deliberately deferred. Each says what is blocked by it and what
 happens by default if nobody decides.
 
-## 1. What the first model is — BLOCKING
+## 1. What the first model is — RESOLVED 2026-09-20
 
-Nothing exists under `spec/` or `models/` yet because the object has not been
-named. Needed: what the thing is, overall dimensions in mm with tolerances, a
-triangle budget, and a named parts list.
-
-**Blocks:** the first variant branch, and the realism of `fixtures/smoke/`.
-**Default if undecided:** `master` stands as a toolkit with a trivial fixture;
-no deliverable is produced.
+`beaky`: a 1.7 m stylised character of 14 separate parts, target `web`, rigged later.
+Its spec lives on the `beaky` branch, not here, because `master` builds no model.
 
 ## 2. Target engine — deferred on purpose
 
@@ -47,3 +42,31 @@ silently changes geometry output.
 ## 6. Remote
 
 No remote is configured. Nothing is backed up off this machine.
+
+## 7. Sheet size versus "512px thumbnail"
+
+ADR 0007 tracks a 512px thumbnail per accepted commit at `renders/<variant>.png`, but
+`./contour render` writes the 1024² sheet to that path (the spec's
+`render.sheet_resolution`). With dithering off it is ~100 KB, which is tolerable, but
+it is not the 512px file the ADR describes.
+
+**Blocks:** nothing. **Default if undecided:** commit the 1024² sheet as is.
+
+## 8. What `materials.max_slots` limits
+
+Implemented as the number of distinct materials in use across the whole model. The
+schema comment says "engine draw-call budget", which fits, but a per-object reading
+is also plausible. Decide before a spec depends on the difference.
+
+## 9. Spec fields `verify.py` rejects as unsupported
+
+Deliberately failing, not skipped (ADR 0009): named `dimensions` sub-measurements
+(the schema's `seat_height`/`part:` example has no defined measurement), `origin:
+world_origin` (no defined meaning for a whole model), UV overlap checking (question 4)
+and `udim`. Each needs a definition before it can be enforced.
+
+## 10. `base_center` is the bounding box footprint centre
+
+`verify.py` reads `origin: base_center` as: bounding box minimum Z at 0, and the centre
+of its X/Y extent at the origin. For an asymmetric model, such as one with a beak, that
+centre is not the midpoint between the feet. Say so if a rig needs the feet centre.
