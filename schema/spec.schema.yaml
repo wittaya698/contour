@@ -1,0 +1,80 @@
+# Contour spec schema — the shape of spec/<variant>.yaml
+#
+# THE SPEC IS THE USER'S INTENT. Agents read it and never write it (ADR 0002).
+# verify.py reads this file's structure to know what to enforce.
+#
+# Every field below is annotated with: who sets it, whether verify.py can check
+# it mechanically, and what a violation means.
+
+model: <variant-name>        # must equal the branch name and the directory under models/
+description: >               # prose. NOT machine-checkable; judged by the human at the gate.
+  One or two sentences of what this thing is.
+
+# ---------------------------------------------------------------- engine target
+# Which engines this asset must import cleanly into. Only `web` is implemented
+# (ADR 0006). Adding a target = adding an entry here plus its transform in lib/.
+targets:
+  - web                      # glTF 2.0 .glb — Y-up, right-handed, metres
+  # - unity                  # FBX — Y-up, left-handed, 1 unit = 1 m
+  # - ue                     # FBX — Z-up, left-handed, 1 uu = 1 cm (scale x100)
+
+# ---------------------------------------------------------------- dimensions
+# Millimetres, always. Measured on the built mesh's bounding box, and again on
+# the round-tripped export. A miss is a HARD FAIL.
+dimensions:
+  height:  { value: 0, tol: 2 }
+  width:   { value: 0, tol: 2 }
+  depth:   { value: 0, tol: 2 }
+  # Named sub-measurements are optional and measured per named part:
+  # seat_height: { value: 450, tol: 3, part: seat }
+
+# ---------------------------------------------------------------- parts
+# Every object the build must produce, by exact name. verify.py fails on a
+# missing part, an unexpected extra part, or a naming mismatch.
+parts:
+  - name: <part-name>
+    count: 1                 # e.g. 4 for legs; verify counts instances
+    # notes: prose, human-judged only
+
+# ---------------------------------------------------------------- topology
+# The game-asset constraints. All mechanically checkable.
+topology:
+  tri_budget: 0              # HARD FAIL above this triangle count
+  quads_min_pct: 90          # % of faces that must be quads (subdiv/deform friendliness)
+  ngons_allowed: false       # faces with >4 verts
+  manifold: required         # required | not_required
+  loose_geometry: forbidden  # stray verts/edges not belonging to a face
+  normals: outward           # verify recomputes and compares
+  doubles_tolerance_mm: 0.01 # verts closer than this are a fail (unwelded geometry)
+
+# ---------------------------------------------------------------- uv
+uv:
+  required: true
+  overlap_allowed: false     # overlapping islands break lightmaps/baking
+  # udim: false
+
+# ---------------------------------------------------------------- materials
+materials:
+  max_slots: 2               # engine draw-call budget
+  names: []                  # optional exact slot names to enforce
+
+# ---------------------------------------------------------------- transform
+# The commonest source of "the model is broken in my engine".
+transform:
+  origin: base_center        # base_center | world_origin | bbox_center
+  scale_applied: true        # object scale must be 1,1,1 on export
+  rotation_applied: true     # object rotation must be 0,0,0 on export
+  up_axis: Z                 # Blender-native; per-target conversion happens at export
+
+# ---------------------------------------------------------------- render
+# Checkpoint sheet settings. Defaults live in lib/ — override only if the
+# subject needs it (e.g. a very tall object needs a different framing).
+render:
+  grid_metres: 1
+  sheet_resolution: 1024
+
+# ---------------------------------------------------------------- notes
+# Prose intent that cannot be measured. verify.py ignores these; the human
+# approval gate is where they are judged. Keep them short and specific.
+notes:
+  - ""
