@@ -96,6 +96,9 @@ lines; `models/beaky/build.py` on the `beaky` branch is a real one.
 | `contour export` | `.glb`, re-imported into a clean Blender and re-measured |
 | `contour api <symbol>` | the real signature from the installed Blender |
 | `contour selftest` | the fixture through every stage, plus 19 mutants |
+| `contour init <name>` | create a model space |
+| `contour doctor` | is this space still in step with the toolkit |
+| `contour spaces [name]` | list model spaces, or print one's path |
 | `contour install-hooks` | install the push guard into this clone |
 
 The first three run inside a model space and take no model name. Outside one

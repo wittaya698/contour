@@ -136,6 +136,20 @@ and accepted before any geometry.
 - **A registry of spaces in the toolkit**, so `contour check beaky` keeps
   working from anywhere. Rejected: global mutable state outside either
   repository, stale the moment a directory moves, and covered by no backup.
+
+  *Revisited 2026-09-20.* All three objections stand, and all three are
+  objections to **storing** a list. The need behind the registry — "where are
+  my spaces?" — was dismissed along with the mechanism, and it was a real
+  need. `contour spaces` answers it by **deriving** the list: every space
+  already carries `.contour/project`, so the markers are a registry that is
+  distributed, moves with the directory, cannot go stale and needs no backup.
+  `$CONTOUR_SPACES` names where to look, not what exists, so it cannot drift
+  either. The scan is bounded because it has to be: one workspace of 21
+  entries resolves in under a second, while `$HOME` at depth 4 did not finish
+  in two minutes. It lists and it warns — notably about a space that has
+  acquired a remote, which nothing else would catch without visiting each one.
+  It deliberately does **not** restore `contour check <name>`: commands take
+  no model name so that exactly one model can be meant.
 - **An explicit path or `CONTOUR_PROJECT`** on every invocation. Rejected as
   correct but tiring; it becomes an undocumented shell alias within a day.
 - **A launcher stub in each space**, preserving `./contour check`. Rejected: it

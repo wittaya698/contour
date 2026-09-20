@@ -17,6 +17,7 @@ prints only its terse `lines`. Stdlib only: no venv, no yaml.
     contour install-hooks         install the pre-push guard (ADR 0011)
     contour init <name>           create a model space here
     contour doctor                is this space in step with the toolkit
+    contour spaces [name]         list model spaces, or print one's path
     contour hook <name>           run a guard; for hooks to call, not you
 """
 import json
@@ -131,6 +132,8 @@ def main(argv):
         if not PROJECT:
             return need_project(cmd)
         return emit(doctor())
+    if cmd == "spaces" and len(rest) <= 1:
+        return emit(spaces(rest[0] if rest else None))
     print(USAGE, file=sys.stderr)
     return 2
 
@@ -290,6 +293,74 @@ def install_hooks():
         lines.append(f"WARN core.hooksPath={override} overrides these; unset it")
     lines.append(f"installed {len(hooks)} hook(s) in {dst}")
     return {"ok": not override, "lines": lines}
+
+
+SKIP = {"node_modules", "venv", ".venv", "target", "Library", "Pictures", "Music"}
+
+
+def space_roots():
+    """Where to look for spaces. $CONTOUR_SPACES overrides; otherwise the
+    directory holding the toolkit, which is where spaces live by convention.
+
+    This names where to look, not what exists — so unlike a registry it cannot
+    go stale, and a space moved within a root is still found (ADR 0015).
+    """
+    env = os.environ.get("CONTOUR_SPACES")
+    return [Path(p).expanduser() for p in env.split(":") if p] if env else [ROOT.parent]
+
+
+def find_spaces(depth=4):
+    """Every model space under the roots, by its marker. Bounded on purpose: a
+    scan of $HOME does not finish in a usable time, a scan of one workspace is
+    instant."""
+    found = []
+    for root in space_roots():
+        if not root.is_dir():
+            continue
+        base = len(root.parts)
+        for here, dirs, _ in os.walk(root):
+            d = Path(here)
+            if (d / MARKER).is_file():
+                found.append(d)
+                dirs[:] = []                      # spaces do not nest
+                continue
+            if len(d.parts) - base >= depth:
+                dirs[:] = []
+                continue
+            dirs[:] = [x for x in dirs if not x.startswith(".") and x not in SKIP]
+    return sorted(found)
+
+
+def git_out(repo, *args):
+    r = subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True)
+    return r.stdout.strip() if r.returncode == 0 else ""
+
+
+def spaces(name=None):
+    """List the model spaces, or print one's path for `cd $(contour spaces x)`."""
+    found = find_spaces()
+    if name:
+        hits = [s for s in found if s.name == name]
+        if len(hits) != 1:
+            return {"ok": False, "lines": [f"FAIL {len(hits)} spaces named {name!r}"
+                                           + (": " + ", ".join(str(h) for h in hits) if hits else "")]}
+        return {"ok": True, "lines": [str(hits[0])]}
+    if not found:
+        return {"ok": True, "lines": [f"no model spaces under {', '.join(str(r) for r in space_roots())}",
+                                      "(set $CONTOUR_SPACES to look elsewhere)"]}
+    now, lines, ok = toolkit_commit(), [], True
+    for s in found:
+        marker = (s / MARKER).read_text()
+        was = next((l.split(":", 1)[1].strip() for l in marker.splitlines()
+                    if l.startswith("toolkit:")), "?")
+        n = git_out(s, "rev-list", "--count", "HEAD") or "0"
+        home = str(s).replace(str(Path.home()), "~")
+        state = "(unknown)" if was == "?" else "(current)" if was == now else "(behind)"
+        lines.append(f"  {s.name:<12} {home:<34} toolkit {was} {state:<10} {n:>4} commits")
+        for r in git_out(s, "remote").split():
+            lines.append(f"  WARN {s.name} has a remote ({r}) — a model space is never pushed")
+            ok = False
+    return {"ok": ok, "lines": lines}
 
 
 def stage_selftest():
