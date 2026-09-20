@@ -8,6 +8,20 @@ No remote is configured (open question 6), so nothing has leaked because
 nothing can. This ADR is not fixing a live leak; it is pre-committing a rule
 before the day a remote exists and the question is decided by reflex instead.
 
+**Amended 2026-09-20 — that day arrived.** A private repository at
+`github.com/wittaya698/contour.git` is now configured as `origin`, so the
+paragraph above no longer describes this repo: the guard is live rather than
+anticipatory. It was exercised the hour the remote was added, by feeding the
+hook the stdin git supplies and making no connection at all — pushing `beaky`
+refused, `--all` refused because one ref failed, `beaky`'s content aimed at
+`master`'s ref refused with all three files named, a branch deletion allowed,
+and `master` allowed. Nothing has been pushed.
+
+One consequence for ADR 0012: when `BLOCKED` narrows to `^models/`, the
+retired prefixes stay in the pattern. A path that used to carry model content
+should stay blocked forever, or the second ground stops catching any commit
+still holding the old layout.
+
 The layout already segregates along the line that matters. Diffing the branches
 on 2026-09-20, the only files `beaky` adds to `master` are exactly:
 

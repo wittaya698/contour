@@ -50,12 +50,22 @@ working directory including `.git`, to external media. No `git push` involved,
 so the rule above stays absolute. **Not yet set up — this is the live risk.**
 `beaky`'s spec and `build.py` exist on one disk today.
 
-**Still deferred: whether to have a remote at all.** Nothing needs one. If one
-is added it will be for the toolkit, and the hook already decides what it may
-take.
+**Resolved 2026-09-20: there is a remote.** A *private* repository at
+`github.com/wittaya698/contour.git`, configured as `origin`, holding the
+toolkit and nothing else. The intent behind it is to share the toolkit with
+other people while no model — mine or theirs — ever appears in it. ADR 0014
+records the architecture that eventually makes that structural instead of
+guarded; until it is built, the hook is what enforces it, and it was verified
+against this remote the day it was added.
 
-**Blocks:** nothing. **Default if nobody decides:** no remote, and no backup
-either — which is the part worth deciding on purpose rather than by drift.
+**Still open: the backup, and it is now the only live risk here.** Pushing
+`master` protects the half of this repo that is replaceable. The half that is
+not — `beaky`'s spec, its `build.py` and the four reference images that came
+from outside this machine — can never be pushed, by design. It exists on one
+disk.
+
+**Blocks:** nothing. **Default if nobody decides:** the work survives exactly
+as long as this working directory does.
 
 ## 7. Sheet size versus "512px thumbnail" — RESOLVED 2026-09-20
 
