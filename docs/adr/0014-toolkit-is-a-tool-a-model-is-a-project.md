@@ -1,6 +1,14 @@
 # 0014 — The toolkit is a tool; a model is a project
 
-**Status:** Accepted · 2026-09-20 · **direction only, implementation deferred**
+**Status:** Accepted · 2026-09-20 · **superseded in part by [ADR 0015](0015-model-spaces.md)**
+
+> **Amended 2026-09-20 — the deferral was overtaken.** This ADR deferred
+> implementation "to the first time a second model space is wanted", so the
+> scaffolding would be designed against a real second model. It is being built
+> now, with one model. The reasoning for deferring stands and is not withdrawn;
+> it was simply outweighed. ADR 0015 carries the design, and its evidence
+> section confirms both failure modes named below were real — the copied guards
+> turned out to be wrong on arrival, not merely at risk of drifting.
 
 ## Context
 
