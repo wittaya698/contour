@@ -1,16 +1,21 @@
 #!/usr/bin/env python3
-"""Contour CLI: the only sanctioned way to run Blender in this repo (ADR 0008).
+"""Contour CLI: the only sanctioned way to run Blender (ADR 0008).
+
+Run the model commands from inside a model space — the directory holding
+spec.yaml, found by walking up for .contour/project (ADR 0015). A model is
+never named on the command line: you are standing in it.
 
 Blender's stdout (~2-5k tokens of banner and chatter per run) goes to
 .contour/last-build.log. The Blender side writes a JSON report; this wrapper
 prints only its terse `lines`. Stdlib only: no venv, no yaml.
 
-    ./contour check <variant>     build + verify
-    ./contour render <variant>    4-view sheet -> models/<variant>/sheet.png
-    ./contour export <variant>    .glb + round-trip re-measure
-    ./contour api <symbol>...     real signature from the installed Blender
-    ./contour selftest            fixture pipeline test
-    ./contour install-hooks       install the pre-push guard (ADR 0011)
+    contour check                 build + verify
+    contour render                4-view sheet -> sheet.png
+    contour export                .glb + round-trip re-measure
+    contour api <symbol>...       real signature from the installed Blender
+    contour selftest              fixture pipeline test
+    contour install-hooks         install the pre-push guard (ADR 0011)
+    contour hook <name>           run a guard; for hooks to call, not you
 """
 import json
 import os
@@ -21,30 +26,41 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 BLENDER = os.environ.get("BLENDER", "/Applications/Blender.app/Contents/MacOS/Blender")
-OUT = ROOT / ".contour"          # CLI scratch: written for every command, ADR 0012
+MARKER = Path(".contour") / "project"
+TIMEOUT_S = 300
+USAGE = __doc__.split("\n\n", 2)[2].rstrip()
+
+
+def find_project(start=None):
+    """The model space containing `start`, or None. Walks up for
+    .contour/project, the way git walks up for .git.
+
+    The marker is that file and not the .contour/ directory: the toolkit has a
+    .contour/ too, for its own logs, and must never be mistaken for a space.
+    """
+    here = (Path(start) if start else Path.cwd()).resolve()
+    for d in (here, *here.parents):
+        if (d / MARKER).is_file():
+            return d
+    return None
+
+
+PROJECT = find_project()
+OUT = (PROJECT or ROOT) / ".contour"     # logs sit with whatever the command is about
 LOG = OUT / "last-build.log"
 REPORT = OUT / "report.json"
-TIMEOUT_S = 300
-USAGE = __doc__.split("\n\n", 1)[1].rstrip()
-
-
-def branch():
-    try:
-        r = subprocess.run(["git", "-C", str(ROOT), "branch", "--show-current"],
-                           capture_output=True, text=True, timeout=10)
-        return r.stdout.strip()
-    except Exception:
-        return ""
 
 
 def stage(args, first=True):
     """Run one Blender process. Returns its report dict, never raises."""
-    OUT.mkdir(exist_ok=True)
+    OUT.mkdir(parents=True, exist_ok=True)
     REPORT.unlink(missing_ok=True)
     cmd = [BLENDER, "--background", "--factory-startup", "--python-exit-code", "1",
            "--python", str(ROOT / "lib" / "entry.py"), "--", *args]
     env = dict(os.environ, CONTOUR_ROOT=str(ROOT), CONTOUR_REPORT=str(REPORT),
-               CONTOUR_BRANCH=branch(), PYTHONDONTWRITEBYTECODE="1")
+               PYTHONDONTWRITEBYTECODE="1")
+    if PROJECT:
+        env["CONTOUR_PROJECT"] = str(PROJECT)
     t0 = time.time()
     with open(LOG, "w" if first else "a") as log:
         log.write(f"$ {' '.join(args)}\n")
@@ -68,8 +84,18 @@ def stage(args, first=True):
 def emit(rep):
     print("\n".join(rep["lines"]))
     if not rep["ok"]:
-        print(f"(full log: {LOG.relative_to(ROOT)})")
+        print(f"(full log: {LOG})")
     return 0 if rep["ok"] else 1
+
+
+def need_project(cmd):
+    """Say so plainly. Never fall back to the toolkit's own directory: a stray
+    `contour check` elsewhere would then build something unexpected (ADR 0015)."""
+    print(f"contour {cmd}: not in a model space.\n"
+          f"  No {MARKER} found here or above {Path.cwd()}.\n"
+          f"  cd into a model space — the directory holding spec.yaml.",
+          file=sys.stderr)
+    return 2
 
 
 def main(argv):
@@ -77,13 +103,15 @@ def main(argv):
         print(USAGE)
         return 0
     cmd, rest = argv[0], argv[1:]
-    if cmd in ("check", "render") and len(rest) == 1:
-        return emit(stage(["build" if cmd == "check" else cmd, rest[0]]))
-    if cmd == "export" and len(rest) == 1:
-        rep = stage(["export", rest[0]])
+    if cmd in ("check", "render", "export") and not rest:
+        if not PROJECT:
+            return need_project(cmd)
+        if cmd != "export":
+            return emit(stage(["build" if cmd == "check" else cmd]))
+        rep = stage(["export"])
         if not rep["ok"]:
             return emit(rep)
-        rt = stage(["roundtrip", rest[0]], first=False)
+        rt = stage(["roundtrip"], first=False)
         rt["lines"] = rep["lines"] + rt["lines"]
         return emit(rt)
     if cmd == "api" and rest:
@@ -92,8 +120,31 @@ def main(argv):
         return emit(stage_selftest())
     if cmd == "install-hooks" and not rest:
         return emit(install_hooks())
+    if cmd == "hook" and rest:
+        return run_hook(rest[0], rest[1:])
     print(USAGE, file=sys.stderr)
     return 2
+
+
+def run_hook(name, rest):
+    """Run a guard out of tools/hooks/ (ADR 0015).
+
+    A model space never copies these; its settings.json and its pre-push stub
+    call this, so the guard is always the installed version and there is
+    nothing to drift. exec, so stdin, stdout and the exit code pass straight
+    through to whatever invoked the hook.
+    """
+    if name == "pre-push" and PROJECT:
+        print("refused: a model space is never pushed (ADR 0011, ADR 0015).\n"
+              "  to share a model: contour export, then hand over the .glb",
+              file=sys.stderr)
+        return 1
+    script = {"spec": "guards/spec.py", "pre-push": "hooks/pre-push"}.get(name)
+    if not script:
+        print(f"contour hook: no guard named {name!r}", file=sys.stderr)
+        return 2
+    os.execv(str(ROOT / "tools" / script), [script, *rest])
+    return 2                                          # unreachable; exec replaces us
 
 
 def install_hooks():

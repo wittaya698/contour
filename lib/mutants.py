@@ -107,7 +107,7 @@ def attach(rep, spec, P, variant):
         s = copy.deepcopy(spec)
         if edit_spec:
             edit_spec(s)
-        failed = {r["id"] for r in verify.run(s, variant, None) if not r["ok"]}
+        failed = {r["id"] for r in verify.run(s, variant) if not r["ok"]}
         # mat_names and mat_slots are alternatives: either one flags the mutant
         if name == "extra material":
             caught = bool(failed & expect)
@@ -156,7 +156,7 @@ def attach_roundtrip(rep, spec, P, variant):
     glb.write(path, glb.wrapped(doc, rotation=[0.70710678, 0.0, 0.0, 0.70710678]), blob)
     scene.reset()
     ctx_override.call("import_scene.gltf", filepath=str(path))
-    failed = {r["id"] for r in verify.run(spec, variant, None, only=cmd_roundtrip.RE_CHECKS)
+    failed = {r["id"] for r in verify.run(spec, variant, only=cmd_roundtrip.RE_CHECKS)
               if not r["ok"]}
     n += 1
     if not ({"height", "depth", "width"} & failed):

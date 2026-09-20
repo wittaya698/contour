@@ -133,7 +133,7 @@ def run(args):
     variant, fixture = paths.parse(args)
     P = paths.resolve(variant, fixture)
     if not P["blend"].exists():
-        return {"ok": False, "lines": [f"FAIL no build at {P['blend'].relative_to(paths.ROOT)}"
+        return {"ok": False, "lines": [f"FAIL no build at {paths.display(P['blend'])}"
                                        f": run ./contour check {variant} first"]}
     spec = miniyaml.load(P["spec"])
     res = int((spec.get("render") or {}).get("sheet_resolution", 1024))
@@ -189,5 +189,5 @@ def run(args):
     out.save()
     kb = P["sheet"].stat().st_size / 1024
     return {"ok": True, "lines": [f"{variant} sheet {res}x{res} {kb:.0f}KB -> "
-                                  f"{P['sheet'].relative_to(paths.ROOT)}"
+                                  f"{paths.display(P['sheet'])}"
                                   "  (front|right / top|persp)"]}

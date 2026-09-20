@@ -1,31 +1,50 @@
-"""Where a variant's files live (ADR 0012: one directory per model).
+"""Where a model's files live (ADR 0015: the toolkit is a tool, a model is a
+space).
 
-    models/<v>/     spec.yaml  refs/  build.py  sheet.png  NOTES.md   tracked
+A **model space** is its own directory and its own git repository, flat:
+
+    <space>/        spec.yaml  refs/  build.py  sheet.png  NOTES.md   tracked
                     out/  exports/                                    ignored
                     release/v<N>/                                     tracked
+                    .contour/project                                  the marker
 
-The fixture has the same shape under `fixtures/`, with one difference: it has
-no tracked sheet or export, because nothing about it is a deliverable, so
-those land in its `out/` with the rest of its scratch. That also keeps the
-selftest from ever dirtying a tracked file.
+The launcher finds the space by walking up from the working directory and
+passes it in as CONTOUR_PROJECT. The **fixture** is the one exception: it lives
+inside the toolkit and is addressed by name, because the selftest has no space
+to stand in. It has no tracked sheet or export -- nothing about it is a
+deliverable -- so those land in its out/ and the selftest can never dirty a
+tracked file.
 """
 import os
 from pathlib import Path
 
 ROOT = Path(os.environ.get("CONTOUR_ROOT") or Path(__file__).resolve().parent.parent)
+_p = os.environ.get("CONTOUR_PROJECT")
+PROJECT = Path(_p) if _p else None
 
 
 def parse(args):
-    """['smoke', '--fixture'] -> ('smoke', True)"""
-    fixture = "--fixture" in args
-    names = [a for a in args if not a.startswith("--")]
-    if len(names) != 1:
-        raise SystemExit(f"expected exactly one variant name, got {names}")
-    return names[0], fixture
+    """['smoke', '--fixture'] -> ('smoke', True);  [] -> (<space name>, False).
+
+    A model is never named on the command line: you are standing in it.
+    """
+    if "--fixture" in args:
+        names = [a for a in args if not a.startswith("--")]
+        if len(names) != 1:
+            raise SystemExit(f"--fixture takes exactly one name, got {names}")
+        return names[0], True
+    extra = [a for a in args if not a.startswith("--")]
+    if extra:
+        raise SystemExit(f"this command takes no model name, got {extra}: "
+                         f"cd into the model space and run it there (ADR 0015)")
+    if PROJECT is None:
+        raise SystemExit("not in a model space: no .contour/project found here "
+                         "or above (ADR 0015)")
+    return PROJECT.name, False
 
 
 def resolve(variant, fixture=False):
-    base = ROOT / ("fixtures" if fixture else "models") / variant
+    base = ROOT / "fixtures" / variant if fixture else PROJECT
     out = base / "out"
     return {"spec": base / "spec.yaml",
             "build": base / "build.py",
@@ -35,3 +54,14 @@ def resolve(variant, fixture=False):
             "sheet": out / "sheet.png" if fixture else base / "sheet.png",
             "glb": out / f"{variant}.glb" if fixture else base / "exports" / f"{variant}.glb",
             "release": base / "release"}
+
+
+def display(path):
+    """A path as a human should read it: relative to whichever root owns it."""
+    for root in (PROJECT, ROOT):
+        if root:
+            try:
+                return str(path.relative_to(root))
+            except ValueError:
+                pass
+    return str(path)

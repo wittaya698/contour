@@ -57,7 +57,7 @@ def run(args):
     variant, fixture = paths.parse(args)
     P = paths.resolve(variant, fixture)
     if not P["glb"].exists():
-        return {"ok": False, "lines": [f"FAIL no {P['glb'].relative_to(paths.ROOT)}: "
+        return {"ok": False, "lines": [f"FAIL no {paths.display(P['glb'])}: "
                                        f"run ./contour export {variant} first"]}
     spec = miniyaml.load(P["spec"])
     g = glb.measure(P["glb"])
@@ -68,7 +68,7 @@ def run(args):
     built_tris = _tris_now(verify)
     scene.reset()
     ctx_override.call("import_scene.gltf", filepath=str(P["glb"]))
-    results += [dict(r, id=f"re_{r['id']}") for r in verify.run(spec, variant, None, only=RE_CHECKS)]
+    results += [dict(r, id=f"re_{r['id']}") for r in verify.run(spec, variant, only=RE_CHECKS)]
     got_tris = _tris_now(verify)
     results.append(_res("tris_kept", got_tris == built_tris == g["tris"], f"{got_tris:,}",
                         f"triangles: built {built_tris:,}, file {g['tris']:,}, "

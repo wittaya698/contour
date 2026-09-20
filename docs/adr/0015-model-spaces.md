@@ -79,8 +79,14 @@ block all legitimate work. It is deleted in the same commit that removes
 in-repo model support, not merged forward.
 
 **In-repo models are removed entirely, with no dual mode.** `models/`
-disappears from `paths.py`, `.gitignore`, the push guard's `BLOCKED` list and
-the docs. There is deliberately no fallback to branch-per-variant.
+disappears from `paths.py`, `.gitignore` and the docs. There is deliberately no
+fallback to branch-per-variant.
+
+*Corrected during implementation:* `models/` **stays** in the push guard's
+`BLOCKED` list. An earlier draft of this ADR said it should be removed, which
+contradicts ADR 0011's amendment that a path which ever carried model content
+stays blocked forever. The guard's job is to catch content arriving where it
+should not be, so the retired prefix is exactly the one worth keeping.
 
 **Migration order, and the one irreversible step.** Extract, verify the space
 builds green, **bundle the branch**, then delete it:

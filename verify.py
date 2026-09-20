@@ -77,7 +77,7 @@ def _mm(v):
 
 # --------------------------------------------------------------------- checks
 
-def check_spec(spec, variant, branch):
+def check_spec(spec, variant):
     bad = []
     if not isinstance(spec, dict):
         return [_res("spec", False, msg="spec is not a mapping")]
@@ -97,8 +97,6 @@ def check_spec(spec, variant, branch):
             bad.append(f"part entry {p!r}: needs name; unknown {sorted(extra)}")
     if spec.get("model") != variant:
         bad.append(f"model {spec.get('model')!r} != variant {variant!r}")
-    if branch is not None and branch != variant:
-        bad.append(f"branch {branch!r} != model {variant!r} (ADR 0003)")
     unsupported = set(spec.get("targets") or []) - IMPLEMENTED_TARGETS
     bad += [f"target {t!r} not implemented (ADR 0006)" for t in sorted(unsupported)]
     return [_res("spec", not bad, "spec ok", "; ".join(bad))]
@@ -287,7 +285,7 @@ CHECKS = (check_dimensions, check_parts, check_topology, check_uv, check_materia
           check_transform)
 
 
-def run(spec, variant, branch=None, only=None):
+def run(spec, variant, only=None):
     """All checks against the current scene -> list of results.
 
     `only` narrows to a set of check ids (the export round-trip re-measures a subset;
@@ -295,7 +293,7 @@ def run(spec, variant, branch=None, only=None):
     """
     m = measure()
     try:
-        results = check_spec(spec, variant, branch)
+        results = check_spec(spec, variant)
         for fn in CHECKS:
             results += fn(spec, m)
     finally:

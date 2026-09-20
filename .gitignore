@@ -1,10 +1,8 @@
 # CLI scratch: last-build.log and report.json, written for every command (ADR 0012)
 .contour/
 
-# Generated output — derivable from build.py. The tracked copy of a deliverable
-# is models/<v>/release/v<N>/, which these patterns must not catch (ADR 0013).
-models/*/out/
-models/*/exports/
+# The fixture's build output. Models do not live in this repo at all (ADR 0015);
+# a model space carries its own ignore rules.
 fixtures/*/out/
 
 # Your personal working file: links the generated asset, holds materials/lights/camera

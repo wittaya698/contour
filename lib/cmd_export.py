@@ -9,7 +9,7 @@ def run(args):
     variant, fixture = paths.parse(args)
     P = paths.resolve(variant, fixture)
     if not P["blend"].exists():
-        return {"ok": False, "lines": [f"FAIL no build at {P['blend'].relative_to(paths.ROOT)}"
+        return {"ok": False, "lines": [f"FAIL no build at {paths.display(P['blend'])}"
                                        f": run ./contour check {variant} first"]}
     scene.reset()
     scene.load_collections(P["blend"])
@@ -22,4 +22,4 @@ def run(args):
     if not P["glb"].exists():
         return {"ok": False, "lines": [f"FAIL exporter wrote nothing to {P['glb']}"]}
     kb = P["glb"].stat().st_size / 1024
-    return {"ok": True, "lines": [f"{variant} glb {kb:.0f}KB -> {P['glb'].relative_to(paths.ROOT)}"]}
+    return {"ok": True, "lines": [f"{variant} glb {kb:.0f}KB -> {paths.display(P['glb'])}"]}

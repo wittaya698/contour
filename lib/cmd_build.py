@@ -1,7 +1,5 @@
 """./contour check <variant>: build from an empty scene, save, verify."""
 import runpy
-import sys
-import os
 
 import bpy
 
@@ -22,12 +20,11 @@ def run(args):
     P = paths.resolve(variant, fixture)
     for key in ("spec", "build"):
         if not P[key].exists():
-            return {"ok": False, "lines": [f"FAIL {variant}: missing {P[key].relative_to(paths.ROOT)}"]}
+            return {"ok": False, "lines": [f"FAIL {variant}: missing {paths.display(P[key])}"]}
     spec = miniyaml.load(P["spec"])
     coll = build(P, variant)
     scene.save_collection(coll, P["blend"])
-    branch = None if fixture else os.environ.get("CONTOUR_BRANCH", "")
-    results = verify.run(spec, variant, branch)
+    results = verify.run(spec, variant)
     rep = {"ok": all(r["ok"] for r in results), "lines": verify.report(variant, results),
            "results": results}
     if fixture:

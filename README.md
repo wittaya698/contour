@@ -16,8 +16,9 @@ out to Blender and runs everything inside Blender's own bundled Python.
 ```sh
 git clone <this repo> Contour
 cd Contour
-./contour install-hooks     # required, see below
-./contour selftest          # proves the install works end to end
+./contour install-hooks              # required, see below
+./contour selftest                   # proves the install works end to end
+ln -s "$PWD/contour" ~/bin/contour   # so you can run it from a model space
 ```
 
 `selftest` builds a fixture, verifies it, renders it, exports a `.glb` and
@@ -43,29 +44,27 @@ Developed against **Blender 5.2.1 LTS**. Other versions may work, but the
 toolkit assumes API signatures it can check at runtime rather than recall —
 see `./contour api` below. A build that takes longer than 300 s is killed.
 
-### Running it from elsewhere
+### Why the symlink
 
-`./contour` resolves its own location, so an absolute path works from any
-directory:
-
-```sh
-/path/to/Contour/contour check <variant>
-```
-
-There is no global install yet. ADR 0014 records the intent to make the
-toolkit something you install once and point at model projects elsewhere; it
-is decided but not built.
+Models do not live in this repository (ADR 0015). You work inside a *model
+space* — its own directory, its own git repo — and run `contour` there, so the
+launcher needs to be on `PATH`. It resolves its own location through the
+symlink, so the toolkit can be moved later and only the link needs relinking.
 
 ## Make a model
 
+A model is a directory of its own, anywhere you like, with its own git
+history. It is never pushed.
+
 ```sh
-git checkout -b chair              # one model, one long-lived branch
-mkdir -p models/chair/refs
-cp ~/photos/*.jpg models/chair/refs/          # whatever you are working from
-cp schema/spec.schema.yaml models/chair/spec.yaml
-$EDITOR models/chair/spec.yaml     # dimensions + tolerances, parts, budgets
-$EDITOR models/chair/build.py      # bmesh + the data API, authored in mm
-./contour check chair
+mkdir -p ~/Workspace/chair/{refs,.contour} && cd ~/Workspace/chair
+git init
+touch .contour/project             # the marker contour walks up to find
+cp ~/photos/*.jpg refs/            # whatever you are working from
+cp /path/to/Contour/schema/spec.schema.yaml spec.yaml
+$EDITOR spec.yaml                  # dimensions + tolerances, parts, budgets
+$EDITOR build.py                   # bmesh + the data API, authored in mm
+contour check                      # no model name: you are standing in it
 ```
 
 `check` prints one line per failure and a two-line report when it passes:
@@ -78,9 +77,9 @@ chair PASS  verify 17/17 | tris 4,210 | height 900mm
 Then look at it, and ship it when it is right:
 
 ```sh
-./contour render chair             # 4-view sheet -> models/chair/sheet.png
-./contour export chair             # .glb, re-imported and re-measured to prove it
-git add models/chair && git commit
+contour render                     # 4-view sheet -> sheet.png
+contour export                     # .glb, re-imported and re-measured to prove it
+git add -A && git commit
 ```
 
 `lib/kit.py` has the helpers a `build.py` uses — millimetre conversion,
@@ -92,12 +91,15 @@ lines; `models/beaky/build.py` on the `beaky` branch is a real one.
 
 | Command | Does |
 |---|---|
-| `./contour check <variant>` | build from an empty scene, verify against the spec |
-| `./contour render <variant>` | 4-view orthographic sheet with a 1 m grid and rulers |
-| `./contour export <variant>` | `.glb`, re-imported into a clean Blender and re-measured |
-| `./contour api <symbol>` | the real signature from the installed Blender |
-| `./contour selftest` | the fixture through every stage, plus 19 mutants |
-| `./contour install-hooks` | install the push guard into this clone |
+| `contour check` | build from an empty scene, verify against the spec |
+| `contour render` | 4-view orthographic sheet with a 1 m grid and rulers |
+| `contour export` | `.glb`, re-imported into a clean Blender and re-measured |
+| `contour api <symbol>` | the real signature from the installed Blender |
+| `contour selftest` | the fixture through every stage, plus 19 mutants |
+| `contour install-hooks` | install the push guard into this clone |
+
+The first three run inside a model space and take no model name. Outside one
+they refuse and say so, rather than guessing.
 
 Blender's stdout is 2–5k tokens of banner per run, so it goes to
 `.contour/last-build.log` and only a terse report is printed. Read the log on
@@ -113,18 +115,20 @@ bmesh.ops.create_cube: BMeshOpFunc bmesh.ops.create_cube(bmesh, size=0.0,
 
 ## Layout
 
+A model space, anywhere on disk, its own git repository:
+
 ```
-models/<variant>/
+<space>/
     spec.yaml     your intent, in numbers    (the agent reads, never writes)
     refs/         your intent, in pictures   (the agent reads, never writes)
     build.py      the attempt                (rebuilt from an empty scene)
     sheet.png     the 4-view render you approved
     NOTES.md      what is deferred, and what is undecided
+    .contour/     the marker, plus logs               (git-ignored)
     out/          generated .blend and scratch        (git-ignored)
     exports/      generated .glb                      (git-ignored)
     release/v<N>/ archived .blend + .glb + sheet      (tracked, at a tag)
-verify.py         reads the spec, judges the build
-work/scene.blend  YOUR file — materials, lights, camera (git-ignored)
+    work/scene.blend  YOUR file — materials, lights, camera (git-ignored)
 ```
 
 Rebuild the asset and your scene file picks up the new geometry, because you
@@ -132,14 +136,15 @@ never worked inside the generated file.
 
 ## Branches
 
-`master` is the toolkit — `lib/`, `verify.py`, `schema/`, `.claude/`,
-`fixtures/`, `tools/`. It builds no deliverable of its own.
+This repository is the toolkit — `lib/`, `verify.py`, `schema/`, `fixtures/`,
+`tools/`. It builds no deliverable of its own and carries no model content on
+any branch, which is what makes it shareable (ADR 0015).
 
-Each model is a long-lived branch adding only its own `models/<variant>/`
-(ADR 0012). Shared fixes land on `master` and travel outward with
-`git merge master`. Variants never merge back, and they never collide, because
-no two of them touch the same path. See
-[docs/git-branch-strategy.md](docs/git-branch-strategy.md).
+Models are not branches here. Each one is its own repository somewhere else,
+with its own history, and it is never pushed. Earlier versions of Contour kept
+models on long-lived branches; see
+[docs/git-branch-strategy.md](docs/git-branch-strategy.md) for that history and
+ADR 0015 for why it changed.
 
 ## What git tracks, and what never leaves
 

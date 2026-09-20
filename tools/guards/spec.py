@@ -3,15 +3,19 @@
 
 Rule 1 has always been prose. ADR 0002 states its mechanical form — *"a spec
 git already tracks is never written again"* — and this implements exactly that
-predicate, no more:
+predicate, no more. In a model space (ADR 0015) those are at the root:
 
-    models/*/spec.yaml   and   models/*/refs/**
+    spec.yaml   and   refs/**
 
     tracked   -> deny.  It is the contract; propose changes in chat.
     untracked -> allow. Creation is not mutation (ADR 0002, amended).
 
-Anything outside those two patterns is none of this hook's business and is
-allowed without asking git anything.
+Anything else is none of this guard's business and is allowed without asking
+git anything. In the toolkit checkout nothing matches, which is correct: the
+only spec there belongs to the fixture and is the toolkit's own test asset.
+
+A model space never copies this file. Its settings.json runs `contour hook
+spec`, so the guard is always the installed version (ADR 0015).
 
 stdin: the PreToolUse JSON. Exit 2 denies and shows stderr to the agent.
 """
@@ -22,12 +26,6 @@ import sys
 from pathlib import Path
 
 PROTECTED = ("spec.yaml", "refs")
-
-
-def protected(rel):
-    """models/<v>/spec.yaml or models/<v>/refs/... — and nothing else."""
-    parts = rel.parts
-    return len(parts) >= 3 and parts[0] == "models" and parts[2] in PROTECTED
 
 
 def tracked(root, rel):
@@ -55,11 +53,9 @@ def main():
         rel = Path(path).resolve().relative_to(root)
     except ValueError:
         return 0
-    if not protected(rel):
+    if rel.parts[0] not in PROTECTED or not tracked(root, rel):
         return 0
-    if not tracked(root, rel):
-        return 0
-    kind = "spec" if rel.parts[2] == "spec.yaml" else "reference image"
+    kind = "spec" if rel.parts[0] == "spec.yaml" else "reference image"
     print(f"refused: {rel} is the user's {kind} and git tracks it (rule 1, ADR 0002).\n"
           f"  It states what the model must be; it is not yours to adjust to what it is.\n"
           f"  Propose the change in chat and let the user make it.", file=sys.stderr)

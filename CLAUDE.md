@@ -7,18 +7,17 @@ truth; `.blend` files are disposable output, rebuilt from an empty scene.
 
 | Command | Does | Cost |
 |---|---|---|
-| `./contour check <variant>` | build + verify, terse report | ~60 tok |
-| `./contour api <symbol>` | real signature from the installed Blender | ~15 tok |
-| `./contour render <variant>` | 4-view sheet → `models/<variant>/sheet.png` | ~1400 tok |
-| `./contour export <variant>` | `.glb` + round-trip re-measure | ~80 tok |
-| `./contour selftest` | fixture pipeline test | ~60 tok |
+| `contour check` | build + verify, terse report | ~60 tok |
+| `contour api <symbol>` | real signature from the installed Blender | ~15 tok |
+| `contour render` | 4-view sheet → `sheet.png` | ~1400 tok |
+| `contour export` | `.glb` + round-trip re-measure | ~80 tok |
+| `contour selftest` | fixture pipeline test | ~60 tok |
 
 Full Blender output goes to `.contour/last-build.log`. Read it **only on failure**.
 
 ## Hard rules
 
-1. **Never change a `models/*/spec.yaml`, or anything under `models/*/refs/`,
-   that exists.** It is the user's intent, not
+1. **Never change a `spec.yaml`, or anything under `refs/`, that exists.** It is the user's intent, not
    yours. Propose changes in chat; never write them. A *new* spec may be drafted
    when the user asks, with every number you chose flagged as yours — tolerances
    loudest, since a loose one at birth moves the goalposts just as surely.
@@ -26,7 +25,7 @@ Full Blender output goes to `.contour/last-build.log`. Read it **only on failure
    permission to try.
 2. **Never weaken a check to make it pass.** A red check is a finding. Report it.
 3. **Never hand-edit a generated `.blend`.** All change goes through
-   `build.py`. `models/<v>/out/` is regenerated from zero every build.
+   `build.py`. `out/` is regenerated from zero every build.
 4. **Never use `bpy.ops.*`** unless the call is in `lib/ops_whitelist.py`, and
    then only via `lib.ctx_override`. Build geometry with `bmesh` + the data API.
 5. **Never commit or push without explicit approval.** Show the verify report
@@ -36,17 +35,20 @@ Full Blender output goes to `.contour/last-build.log`. Read it **only on failure
 7. **Verify unfamiliar API calls with `./contour api`** instead of recalling
    them. This Blender (5.2.1, built 2026-08-25) postdates the model cutoff, so
    recalled signatures are guesses.
-8. **Model content never leaves via git.** `models/` stays on this machine;
-   only `master` — the toolkit — is ever pushed (ADR 0011). To share a model, `./contour export <variant>` and hand over the
+8. **Model content never leaves via git.** A model space is never pushed at
+   all, and the toolkit repo carries no model content to push (ADR 0011,
+   ADR 0015). To share a model, `./contour export <variant>` and hand over the
    `.glb`. A `pre-push` hook enforces this; never bypass it with `--no-verify`,
    and never propose an exception to it.
 
 ## Repo shape
 
-`master` is the toolkit and builds no model of its own. Each variant is a
-long-lived branch adding **only** `models/<v>/` (ADR 0012).
-Never modify shared files from a variant branch — fix on `master`, then
-`git merge master` into the variant.
+This repository is the **toolkit** and builds no model of its own. A model
+lives in its own directory and its own git repository — a *model space* —
+found by walking up from the working directory for `.contour/project`
+(ADR 0015). Run the model commands from inside one; they take no model name.
+
+The toolkit is shared and pushable. A model space is neither.
 
 ## Where to look
 
@@ -55,7 +57,6 @@ Never modify shared files from a variant branch — fix on `master`, then
 - Decisions + rationale: `docs/adr/`
 - Vocabulary and pipeline stages: `docs/CONTEXT.md`
 - Undecided, and what it blocks: `docs/OPEN-QUESTIONS.md`
-- Push guard: `tools/hooks/pre-push`, installed by `./contour install-hooks`
-- Spec guard: `tools/hooks/guard-spec.py`, wired by `.claude/settings.json`
-- Branch guard: `tools/hooks/guard-branch.py`, same wiring — shared files
-  are edited on `master` only
+- Push guard: `tools/hooks/pre-push`, installed by `contour install-hooks`
+- Spec guard: `tools/guards/spec.py`, which a space runs as `contour hook spec`
+  and never copies (ADR 0015)
