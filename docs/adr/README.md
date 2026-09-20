@@ -16,3 +16,4 @@ works — the alternative you are about to suggest is probably here with a reaso
 | [0008](0008-contour-cli-and-doc-layers.md) | One CLI wrapper, three documentation layers |
 | [0009](0009-verifier-proves-its-own-teeth.md) | The verifier proves it can fail, and refuses what it cannot check |
 | [0010](0010-miniyaml-no-dependencies.md) | A small in-repo YAML reader instead of PyYAML |
+| [0011](0011-model-content-stays-local.md) | Model content stays local; git carries the toolkit |

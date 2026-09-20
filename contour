@@ -10,6 +10,7 @@ only its terse `lines`. Stdlib only: no venv, no yaml.
     ./contour export <variant>    .glb + round-trip re-measure
     ./contour api <symbol>...     real signature from the installed Blender
     ./contour selftest            fixture pipeline test
+    ./contour install-hooks       install the pre-push guard (ADR 0011)
 """
 import json
 import os
@@ -89,8 +90,42 @@ def main(argv):
         return emit(stage(["api", *rest]))
     if cmd == "selftest" and not rest:
         return emit(stage_selftest())
+    if cmd == "install-hooks" and not rest:
+        return emit(install_hooks())
     print(USAGE, file=sys.stderr)
     return 2
+
+
+def install_hooks():
+    """Copy tools/hooks/* into this checkout's hooks dir (ADR 0011).
+
+    Deliberately not core.hooksPath: that resolves inside the working tree, so
+    checking out a variant branch that predates the hook would remove it from
+    disk and the guard would silently cease to exist.
+    """
+    src = ROOT / "tools" / "hooks"
+    hooks = [h for h in sorted(src.glob("*")) if h.is_file()]
+    if not hooks:
+        return {"ok": False, "lines": [f"FAIL no hooks in {src.relative_to(ROOT)}"]}
+    try:
+        r = subprocess.run(["git", "-C", str(ROOT), "rev-parse", "--git-path", "hooks"],
+                           capture_output=True, text=True, timeout=10, check=True)
+    except Exception as e:
+        return {"ok": False, "lines": [f"FAIL not a git checkout ({e})"]}
+    dst = (ROOT / r.stdout.strip()).resolve()
+    dst.mkdir(parents=True, exist_ok=True)
+    lines = []
+    for h in hooks:
+        t = dst / h.name
+        t.write_bytes(h.read_bytes())
+        t.chmod(0o755)
+        lines.append(f"ok   {h.name}")
+    override = subprocess.run(["git", "-C", str(ROOT), "config", "--get", "core.hooksPath"],
+                              capture_output=True, text=True, timeout=10).stdout.strip()
+    if override:
+        lines.append(f"WARN core.hooksPath={override} overrides these; unset it")
+    lines.append(f"installed {len(hooks)} hook(s) in {dst}")
+    return {"ok": not override, "lines": lines}
 
 
 def stage_selftest():

@@ -1,0 +1,74 @@
+#!/bin/sh
+# pre-push — ADR 0011: model content stays local; git carries the toolkit.
+#
+# Refuses a push on two independent grounds, either one sufficient:
+#   1. the ref being pushed is not master;
+#   2. the commits being pushed, or the tip being pushed, touch
+#      spec/ models/ or renders/.
+#
+# Ground 2 is not redundant: it catches model content that reached master by
+# mistake, which ground 1 would let past.
+#
+# Fails closed — a ref whose contents cannot be resolved is refused, never
+# waved through. The threat model is accident, not an adversary (ADR 0011),
+# so `--no-verify` bypasses this hook and is meant to.
+#
+# stdin: <local ref> <local sha> <remote ref> <remote sha>, one line per ref.
+
+remote="$1"
+ALLOWED='refs/heads/master'
+BLOCKED='^\(spec\|models\|renders\)/'
+
+# All-zero sha of any length: deletion (local) or a ref new to the remote.
+is_zero() {
+	case "$1" in
+	*[!0]*) return 1 ;;
+	*) return 0 ;;
+	esac
+}
+
+# Every path this push would send. Without a remote-side base, ask which
+# commits the remote does not already have rather than assuming none.
+sent_paths() {
+	if is_zero "$2"; then
+		git log --format='' --name-only -m "$1" --not --remotes="$remote" || return 1
+	else
+		git log --format='' --name-only -m "$2..$1" || return 1
+	fi
+	# The tip tree too: history that added and later removed a file is still
+	# history being sent, and the reverse is caught here.
+	git ls-tree -r --name-only "$1" || return 1
+}
+
+status=0
+while read -r local_ref local_sha remote_ref remote_sha; do
+	[ -z "$local_ref" ] && continue
+
+	# Deleting a remote ref transmits no content.
+	is_zero "$local_sha" && continue
+
+	if [ "$remote_ref" != "$ALLOWED" ]; then
+		echo "refused: only master may be pushed (ADR 0011)" >&2
+		echo "  $remote_ref is a variant branch and carries model content" >&2
+		echo "  to share a model: ./contour export <variant>" >&2
+		status=1
+		continue
+	fi
+
+	if ! paths=$(sent_paths "$local_sha" "$remote_sha"); then
+		echo "refused: cannot determine what $remote_ref would send (ADR 0011)" >&2
+		status=1
+		continue
+	fi
+
+	offenders=$(printf '%s\n' "$paths" | grep "$BLOCKED" | sort -u)
+	if [ -n "$offenders" ]; then
+		echo "refused: this push carries model content (ADR 0011)" >&2
+		printf '  %s\n' $offenders >&2
+		echo "  model content stays local; to share: ./contour export <variant>" >&2
+		status=1
+	fi
+done
+
+[ "$status" -ne 0 ] && echo "(deliberate override: git push --no-verify)" >&2
+exit "$status"

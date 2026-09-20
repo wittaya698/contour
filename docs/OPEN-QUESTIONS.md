@@ -39,9 +39,23 @@ linked working file and drop the check. Decide only when a model needs UVs.
 Rejected for now (ADR 0005) as brittle. Revisit if a Blender update ever
 silently changes geometry output.
 
-## 6. Remote
+## 6. Remote and backup — PARTLY RESOLVED 2026-09-20
 
-No remote is configured. Nothing is backed up off this machine.
+**Resolved: what a remote may ever receive.** Only `master`, the toolkit. Model
+content — `spec/`, `models/`, `renders/` — never leaves via git, enforced by
+`tools/hooks/pre-push` (ADR 0011). Sharing a model means `./contour export`.
+
+**Resolved: how work survives the disk.** File-level backup of the whole
+working directory including `.git`, to external media. No `git push` involved,
+so the rule above stays absolute. **Not yet set up — this is the live risk.**
+`beaky`'s spec and `build.py` exist on one disk today.
+
+**Still deferred: whether to have a remote at all.** Nothing needs one. If one
+is added it will be for the toolkit, and the hook already decides what it may
+take.
+
+**Blocks:** nothing. **Default if nobody decides:** no remote, and no backup
+either — which is the part worth deciding on purpose rather than by drift.
 
 ## 7. Sheet size versus "512px thumbnail" — RESOLVED 2026-09-20
 
