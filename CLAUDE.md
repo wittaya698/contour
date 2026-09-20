@@ -57,3 +57,5 @@ Never modify shared files from a variant branch — fix on `master`, then
 - Undecided, and what it blocks: `docs/OPEN-QUESTIONS.md`
 - Push guard: `tools/hooks/pre-push`, installed by `./contour install-hooks`
 - Spec guard: `tools/hooks/guard-spec.py`, wired by `.claude/settings.json`
+- Branch guard: `tools/hooks/guard-branch.py`, same wiring — shared files
+  are edited on `master` only
