@@ -17,7 +17,11 @@
 
 remote="$1"
 ALLOWED='refs/heads/master'
-BLOCKED='^\(spec\|models\|renders\)/'
+# models/ is where model content lives (ADR 0012). spec/ and renders/ are the
+# layout it replaced, and out/ is where the release archive used to be forced
+# in: a path that ever carried model content stays blocked forever, or this
+# ground stops catching a commit that still holds the old layout.
+BLOCKED='^\(models\|spec\|renders\|out\|exports\)/'
 
 # All-zero sha of any length: deletion (local) or a ref new to the remote.
 is_zero() {

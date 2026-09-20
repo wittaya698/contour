@@ -33,22 +33,31 @@ git checkout -b <variant>
 The branch name, the `model:` field, and the directory under `models/` must all
 be the same string.
 
-## 3. Write exactly two files
+## 3. Write one directory
 
 ```
-spec/<variant>.yaml          from schema/spec.schema.yaml
-models/<variant>/build.py
+models/<variant>/
+    spec.yaml     from schema/spec.schema.yaml
+    refs/         whatever images the user gave you, at original fidelity
+    build.py
+    NOTES.md      deferred refinements, and open questions in the
+                  docs/OPEN-QUESTIONS.md format
 ```
 
-**Nothing else.** A variant branch that touches `lib/`, `verify.py`, `schema/`,
-`.claude/` or `docs/` breaks the conflict-free merge guarantee.
+**Nothing outside it.** A variant branch that touches `lib/`, `verify.py`,
+`schema/`, `.claude/` or `docs/` breaks the conflict-free merge guarantee
+(ADR 0012).
+
+If the user supplied reference images, save them into `refs/` *before* writing
+geometry. They usually arrive in a chat log, which is not storage, and they are
+the one input nothing can regenerate.
 
 Fill the spec from `schema/spec.schema.yaml`, deleting fields that genuinely do
 not apply and leaving nothing at a placeholder value. Then hand the spec to the
 user to confirm **before** writing geometry — it is the contract, and the agent
 does not get to author it alone.
 
-Writing a spec is the one time hard rule 1 permits touching `spec/`, and only at
+Writing a spec is the one time hard rule 1 permits creating one, and only at
 the user's request. List back every number you chose rather than they did, and
 **call out the tolerances first**: the user can check a dimension they gave you,
 but a `tol` you invented is a goalpost they have no way to judge. From its first

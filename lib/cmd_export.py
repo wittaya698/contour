@@ -1,4 +1,4 @@
-"""./contour export <variant>: build -> exports/<variant>.glb (web target, ADR 0006).
+"""./contour export <variant>: build -> models/<variant>/exports/<variant>.glb (web target, ADR 0006).
 
 The round-trip that proves the file runs as a second, clean process (cmd_roundtrip).
 """

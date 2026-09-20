@@ -9,7 +9,7 @@ description: The iterate loop for building or changing a Contour model — build
 
 1. Confirm you are on the variant's branch: `git branch --show-current` must
    match the `model:` field of the spec you are about to satisfy.
-2. Read `spec/<variant>.yaml`. It is the definition of done. **Do not edit it.**
+2. Read `models/<variant>/spec.yaml`, and look at `models/<variant>/refs/`. It is the definition of done. **Do not edit it.**
 3. Read `models/<variant>/build.py` if it exists.
 
 Do **not** read `docs/` or the ADRs unless a decision is genuinely in question —
@@ -25,7 +25,7 @@ That is build + verify in one command, reporting in ~10 lines. Repeat it after
 every change. Do not render, do not export, do not commit inside this loop.
 
 **On failure:** the report names the failing check and the actual value. Fix
-`build.py`. Only read `out/last-build.log` if the report is not enough — for a
+`build.py`. Only read `.contour/last-build.log` if the report is not enough — for a
 traceback or a Blender-level error.
 
 **Never** relax a tolerance, widen a budget, or edit the spec to make a check
@@ -62,7 +62,7 @@ Then show the user the verify report and the sheet, and say what changed.
 Only after the user explicitly approves. Then:
 
 ```sh
-git add spec models lib renders/<variant>.png
+git add models/<variant>
 git commit
 ```
 
@@ -74,7 +74,8 @@ Message:
 verify 8/8 | tris 4,210 | height 900mm
 ```
 
-Never commit `out/`, `work/` or `exports/` — they are ignored by design (ADR 0007).
+Never commit `models/<v>/out/`, `models/<v>/exports/` or `work/` — they are
+ignored by design (ADR 0007, ADR 0012).
 
 ## When a fix belongs to the toolkit
 

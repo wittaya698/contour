@@ -2,11 +2,11 @@
 """Contour CLI: the only sanctioned way to run Blender in this repo (ADR 0008).
 
 Blender's stdout (~2-5k tokens of banner and chatter per run) goes to
-out/last-build.log. The Blender side writes a JSON report; this wrapper prints
-only its terse `lines`. Stdlib only: no venv, no yaml.
+.contour/last-build.log. The Blender side writes a JSON report; this wrapper
+prints only its terse `lines`. Stdlib only: no venv, no yaml.
 
     ./contour check <variant>     build + verify
-    ./contour render <variant>    4-view sheet -> renders/<variant>.png
+    ./contour render <variant>    4-view sheet -> models/<variant>/sheet.png
     ./contour export <variant>    .glb + round-trip re-measure
     ./contour api <symbol>...     real signature from the installed Blender
     ./contour selftest            fixture pipeline test
@@ -21,7 +21,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 BLENDER = os.environ.get("BLENDER", "/Applications/Blender.app/Contents/MacOS/Blender")
-OUT = ROOT / "out"
+OUT = ROOT / ".contour"          # CLI scratch: written for every command, ADR 0012
 LOG = OUT / "last-build.log"
 REPORT = OUT / "report.json"
 TIMEOUT_S = 300

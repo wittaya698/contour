@@ -1,5 +1,14 @@
-"""Where a variant's files live. The fixture gets its own out/ so selftest never
-overwrites a real build or a tracked render."""
+"""Where a variant's files live (ADR 0012: one directory per model).
+
+    models/<v>/     spec.yaml  refs/  build.py  sheet.png  NOTES.md   tracked
+                    out/  exports/                                    ignored
+                    release/v<N>/                                     tracked
+
+The fixture has the same shape under `fixtures/`, with one difference: it has
+no tracked sheet or export, because nothing about it is a deliverable, so
+those land in its `out/` with the rest of its scratch. That also keeps the
+selftest from ever dirtying a tracked file.
+"""
 import os
 from pathlib import Path
 
@@ -16,13 +25,13 @@ def parse(args):
 
 
 def resolve(variant, fixture=False):
-    if fixture:
-        base, out = ROOT / "fixtures" / variant, ROOT / "out" / "selftest"
-        return {"spec": base / "spec.yaml", "build": base / "build.py", "out": out,
-                "blend": out / f"{variant}.blend", "sheet": out / f"{variant}.png",
-                "glb": out / f"{variant}.glb"}
-    out = ROOT / "out"
-    return {"spec": ROOT / "spec" / f"{variant}.yaml",
-            "build": ROOT / "models" / variant / "build.py", "out": out,
-            "blend": out / f"{variant}.blend", "sheet": ROOT / "renders" / f"{variant}.png",
-            "glb": ROOT / "exports" / f"{variant}.glb"}
+    base = ROOT / ("fixtures" if fixture else "models") / variant
+    out = base / "out"
+    return {"spec": base / "spec.yaml",
+            "build": base / "build.py",
+            "refs": base / "refs",
+            "out": out,
+            "blend": out / f"{variant}.blend",
+            "sheet": out / "sheet.png" if fixture else base / "sheet.png",
+            "glb": out / f"{variant}.glb" if fixture else base / "exports" / f"{variant}.glb",
+            "release": base / "release"}
