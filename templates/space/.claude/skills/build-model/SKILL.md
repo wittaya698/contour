@@ -7,13 +7,11 @@ description: The iterate loop for building or changing a Contour model — build
 
 ## Before you start
 
-1. Confirm you are on the variant's branch: `git branch --show-current` must
-   match the `model:` field of the spec you are about to satisfy.
-2. Read `spec.yaml`, and look at `refs/`. It is the definition of done. **Do not edit it.**
-3. Read `build.py` if it exists.
+1. Read `spec.yaml`, and look at `refs/`. It is the definition of done. **Do not edit it.**
+2. Read `build.py` if it exists.
 
-Do **not** read `docs/` or the ADRs unless a decision is genuinely in question —
-`CLAUDE.md` already carries the rules.
+Do **not** read the toolkit's `docs/` or the ADRs unless a decision is genuinely
+in question — `CLAUDE.md` already carries the rules.
 
 ## The loop
 
@@ -33,8 +31,8 @@ pass. If you believe the spec is wrong, say so and stop; that is the user's call
 
 ## Writing geometry
 
-- `bmesh` and the data API. `bpy.ops` only from `lib/ops_whitelist.py`, and only
-  via `lib.ctx_override` (ADR 0004).
+- `bmesh` and the data API. `bpy.ops` only from the toolkit's
+  `lib/ops_whitelist.py`, and only via `lib.ctx_override` (ADR 0004).
 - **Check unfamiliar calls before writing them:** `contour api bmesh.ops.inset_region`.
   This Blender postdates your knowledge cutoff; a recalled signature is a guess
   and a guess-fail-retry costs ~100x what the lookup costs.
@@ -69,7 +67,7 @@ git commit
 Message:
 
 ```
-<variant>: <what changed>
+<NAME>: <what changed>
 
 verify 8/8 | tris 4,210 | height 900mm
 ```

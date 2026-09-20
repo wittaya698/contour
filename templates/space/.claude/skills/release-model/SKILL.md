@@ -1,9 +1,9 @@
 ---
 name: release-model
-description: Export, verify and tag a finished Contour variant as a deliverable. Use when a model is done and needs to leave the repo for an engine, or when the user asks to release, tag or archive a model.
+description: Export, verify and tag a finished Contour model as a deliverable. Use when a model is done and needs to leave the repo for an engine, or when the user asks to release, tag or archive a model.
 ---
 
-# Release a variant
+# Release a model
 
 ## 1. Check you are on the current toolkit
 
@@ -25,7 +25,7 @@ longer following (ADR 0015).
 contour export
 ```
 
-This writes `exports/<variant>.glb`, re-imports it into a clean headless
+This writes `exports/<NAME>.glb`, re-imports it into a clean headless
 Blender, and re-measures dimensions, up axis, handedness and origin there. The
 in-Blender scene passing verify proves nothing about the exported file — only
 the round-trip does (ADR 0006).
@@ -49,20 +49,20 @@ folder; if those two disagree, stop and say so rather than picking one.
 
 ```sh
 mkdir -p release/v<N>
-cp out/<variant>.blend      release/v<N>/
-cp exports/<variant>.glb    release/v<N>/
-cp sheet.png                release/v<N>/
+cp out/<NAME>.blend      release/v<N>/
+cp exports/<NAME>.glb    release/v<N>/
+cp sheet.png             release/v<N>/
 git add release/v<N> sheet.png
-git commit -m "<variant>: release v<N>
+git commit -m "<NAME>: release v<N>
 
-verify 8/8 | tris 4,210 | glb round-trip ok"
-git tag -a <variant>-v<N> -m "<variant> v<N>"
+verify 8/8 | tris 4,210 | glb round-trip ok | toolkit <commit>"
+git tag -a <NAME>-v<N> -m "<NAME> v<N>"
 ```
 
 `release/` is tracked although `out/` and `exports/` beside it are not: the
 package is the one deliberate copy of a derivable file (ADR 0013). Record the
-toolkit commit the release was verified against — `git rev-parse --short
-master` — in the commit message.
+toolkit commit the release was verified against in the commit message — the one
+`doctor` printed in step 1, or the newer of the two if it printed both.
 
 ADR 0013 specifies `contour release` to do all of this and refuse
 when tags and folders disagree. It is **not built yet**; until it is, the steps
@@ -70,7 +70,7 @@ above are manual and the disagreement check is yours to make.
 
 ## 5. Tell the user what to do with it
 
-- `release/v<N>/<variant>.glb` is the engine file.
+- `release/v<N>/<NAME>.glb` is the engine file.
 - The `.blend` beside it is the archived source asset; their `work/scene.blend`
   links its collection and is unaffected.
 - State the conventions the export used (Y-up, metres for `web`) so the import

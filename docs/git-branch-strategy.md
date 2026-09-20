@@ -1,5 +1,12 @@
 # Branch strategy
 
+> **Historical — no longer in force.** This is the branch-per-variant policy
+> Contour used until [ADR 0015](adr/0015-model-spaces.md) (2026-09-20), kept as a
+> record. Models are no longer branches of this repository: each is its own
+> repository, a *model space*, and nothing is merged forward. To start and work
+> on a model now, see the README and the `new-space` skill. Only the rule that
+> `master` holds the toolkit and builds no model still applies.
+
 ## Model
 
 ```

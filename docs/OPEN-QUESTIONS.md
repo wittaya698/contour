@@ -6,7 +6,8 @@ happens by default if nobody decides.
 ## 1. What the first model is — RESOLVED 2026-09-20
 
 `beaky`: a 1.7 m stylised character of 14 separate parts, target `web`, rigged later.
-Its spec lives on the `beaky` branch, not here, because `master` builds no model.
+Its spec lives in its own model space, not here, because this repository is the
+toolkit and builds no model (ADR 0015).
 
 ## 2. Target engine — deferred on purpose
 
@@ -16,9 +17,9 @@ plus a transform when wanted.
 **Blocks:** nothing today. Engine-specific spec fields — origin convention,
 unit scale, material slot budget — stay at glTF defaults until a target lands.
 
-## 3. Triangle budget and UV rules per variant
+## 3. Triangle budget and UV rules per model
 
-`schema/spec.schema.yaml` carries the fields; the values are per-variant and
+`schema/spec.schema.yaml` carries the fields; the values are per-model and
 come from the user or from a proposed-and-flagged assumption.
 
 **Blocks:** meaningful `verify.py` output — a budget of 0 fails everything.
@@ -42,8 +43,9 @@ silently changes geometry output.
 ## 6. Remote and backup — PARTLY RESOLVED 2026-09-20
 
 **Resolved: what a remote may ever receive.** Only `master`, the toolkit. Model
-content — `spec/`, `models/`, `renders/` — never leaves via git, enforced by
-`tools/hooks/pre-push` (ADR 0011). Sharing a model means `./contour export`.
+content never leaves via git: a model space is never pushed at all, and
+`tools/hooks/pre-push` refuses any push that is not `master` or that carries
+model paths (ADR 0011, ADR 0015). Sharing a model means `contour export`.
 
 **Resolved: how work survives the disk.** File-level backup of the whole
 working directory including `.git`, to external media. No `git push` involved,
@@ -54,15 +56,16 @@ so the rule above stays absolute. **Not yet set up — this is the live risk.**
 `github.com/wittaya698/contour.git`, configured as `origin`, holding the
 toolkit and nothing else. The intent behind it is to share the toolkit with
 other people while no model — mine or theirs — ever appears in it. ADR 0014
-records the architecture that eventually makes that structural instead of
-guarded; until it is built, the hook is what enforces it, and it was verified
-against this remote the day it was added.
+decided the architecture that makes that structural instead of guarded, and ADR
+0015 built it: a model space is a repository of its own and is never pushed. The
+hook is now the backstop rather than the control; it was verified against this
+remote the day it was added.
 
 **Still open: the backup, and it is now the only live risk here.** Pushing
-`master` protects the half of this repo that is replaceable. The half that is
-not — `beaky`'s spec, its `build.py` and the four reference images that came
-from outside this machine — can never be pushed, by design. It exists on one
-disk.
+`master` protects the toolkit, which is replaceable. What is not — `beaky`'s
+spec, its `build.py` and the four reference images that came from outside this
+machine, all in its model space — can never be pushed, by design. It exists on
+one disk.
 
 **Blocks:** nothing. **Default if nobody decides:** the work survives exactly
 as long as this working directory does.

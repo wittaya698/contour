@@ -1,6 +1,13 @@
 # 0003 — `master` is a toolkit; variants are long-lived branches
 
-**Status:** Accepted · 2026-09-20
+**Status:** Accepted · 2026-09-20 · **superseded in part by [ADR 0014](0014-toolkit-is-a-tool-a-model-is-a-project.md) and [ADR 0015](0015-model-spaces.md)**
+
+> **Superseded in part 2026-09-20.** The first half of the decision stands:
+> `master` holds only shared machinery and builds no model. The second half —
+> each variant a long-lived branch, and `git merge master` into variants — is
+> retired by ADR 0014 and was implemented by ADR 0015. Each model is now its own
+> repository, a *model space*, so there is no branch to merge `master` into. The
+> text below is left as it was decided, as the record of what was chosen and why.
 
 ## Context
 

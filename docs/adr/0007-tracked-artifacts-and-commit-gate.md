@@ -1,6 +1,19 @@
 # 0007 — What git tracks, and who commits
 
-**Status:** Accepted · 2026-09-20
+**Status:** Accepted · 2026-09-20 · **superseded in part by [ADR 0012](0012-one-directory-per-model.md), [ADR 0013](0013-releases-are-versioned-folders.md) and [ADR 0015](0015-model-spaces.md)**
+
+> **Superseded in part 2026-09-20.** The decision stands: the render sheet is
+> committed with each accepted commit, `.blend` output is ignored, and the agent
+> commits only on the user's explicit approval. What later ADRs changed is where
+> things are tracked. `spec/` and `renders/` ceased to exist (ADR 0012), and
+> model content now lives in a model space's own repository (ADR 0015):
+> `spec.yaml`, `refs/`, `build.py`, `NOTES.md` and `sheet.png` at its root, so
+> the sheet is `sheet.png`, not `renders/<variant>.png`. The toolkit's tracked
+> paths (`lib/`, `verify.py`, `schema/`, `.claude/`, `docs/`) belong to the
+> toolkit repository, and `models/` no longer exists in it. The archive is the
+> whole `release/v<N>/` package, not the `.blend` alone (ADR 0013). In the
+> commit message, `<variant>` is the space's name. The text below is left as
+> decided.
 
 ## Context
 

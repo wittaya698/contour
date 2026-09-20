@@ -1,6 +1,14 @@
 # 0013 — Releases are versioned folders, prepared by the tool
 
-**Status:** Accepted · 2026-09-20
+**Status:** Accepted · 2026-09-20 · **superseded in part by [ADR 0015](0015-model-spaces.md)**
+
+> **Superseded in part 2026-09-20.** The decision stands; only two literals
+> changed under ADR 0015. The release folder is `release/v<N>/` at the root of
+> the model space, not `models/<v>/release/v<N>/`, and the command takes no
+> model name, so `./contour release <variant>` is `contour release` run inside
+> the space. The tag keeps its form, `<variant>-v<N>`, with the space's name as
+> `<variant>`. `contour release` is still not built; `release-model` does the
+> assembly by hand.
 
 ## Context
 

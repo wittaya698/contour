@@ -62,14 +62,20 @@ with `mv`.
 If you keep them under the toolkit, note that `git clean -xdff` there deletes
 them. Plain `git clean -xdf` does not — it skips nested repositories.
 
+`contour init` makes the directory in the current one, runs `git init`, writes
+the `.contour/project` marker and copies in the agent's rules: a `CLAUDE.md`,
+the spec guard's settings, and the `build-model` and `release-model` skills. It
+also installs a pre-push stub that refuses every push. It never overwrites a
+file that already exists, so it can adopt a directory you have started.
+
 ```sh
-mkdir -p ~/Workspace/chair/{refs,.contour} && cd ~/Workspace/chair
-git init
-touch .contour/project             # the marker contour walks up to find
+cd ~/Workspace                     # or project/ under the toolkit, or anywhere
+contour init chair && cd chair
 cp ~/photos/*.jpg refs/            # whatever you are working from
 cp /path/to/Contour/schema/spec.schema.yaml spec.yaml
 $EDITOR spec.yaml                  # dimensions + tolerances, parts, budgets
 $EDITOR build.py                   # bmesh + the data API, authored in mm
+contour doctor                     # is the space in step with the toolkit
 contour check                      # no model name: you are standing in it
 ```
 
@@ -91,7 +97,7 @@ git add -A && git commit
 `lib/kit.py` has the helpers a `build.py` uses — millimetre conversion,
 materials from hex, boxes, spheres, cylinders, and `add()` to turn a bmesh
 into a placed object. `fixtures/smoke/build.py` is a complete example in ten
-lines; `models/beaky/build.py` on the `beaky` branch is a real one.
+lines.
 
 ## Commands
 
@@ -133,6 +139,8 @@ A model space, anywhere on disk, its own git repository:
     build.py      the attempt                (rebuilt from an empty scene)
     sheet.png     the 4-view render you approved
     NOTES.md      what is deferred, and what is undecided
+    CLAUDE.md     the agent's rules          (copied from the toolkit; `contour doctor` flags drift)
+    .claude/      the spec guard's settings, and the build and release skills
     .contour/     the marker, plus logs               (git-ignored)
     out/          generated .blend and scratch        (git-ignored)
     exports/      generated .glb                      (git-ignored)
@@ -176,13 +184,15 @@ to external media. A push will never protect the part that matters.
 `CLAUDE.md` holds the operating rules an agent must follow here — always the
 `./contour` commands and never raw `blender`, never `bpy.ops` outside a
 whitelist, never weaken a check to make it pass, and never commit or push
-without being asked to. `.claude/skills/` has the workflows for starting a
-variant, iterating on one, and releasing one.
+without being asked to. `.claude/skills/new-space` is the workflow for starting
+a model. The iterate and release workflows are in `templates/space/.claude/skills/`,
+and `contour init` copies them into each model space.
 
 Two of those rules are enforced rather than trusted: `tools/hooks/pre-push`
-blocks model content leaving via git, and `tools/hooks/guard-spec.py` refuses
-writes to a spec or a reference image that git already tracks — a spec is the
-definition of correct, so it is not the agent's to adjust.
+blocks model content leaving via git, and `tools/guards/spec.py` — which a space
+runs as `contour hook spec` — refuses writes to a spec or a reference image that
+git already tracks. A spec is the definition of correct, so it is not the
+agent's to adjust.
 
 ## Decisions
 

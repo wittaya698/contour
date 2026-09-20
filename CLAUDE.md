@@ -38,8 +38,8 @@ Full Blender output goes to `.contour/last-build.log`. Read it **only on failure
    recalled signatures are guesses.
 8. **Model content never leaves via git.** A model space is never pushed at
    all, and the toolkit repo carries no model content to push (ADR 0011,
-   ADR 0015). To share a model, `./contour export <variant>` and hand over the
-   `.glb`. A `pre-push` hook enforces this; never bypass it with `--no-verify`,
+   ADR 0015). To share a model, run `contour export` inside its space and hand
+   over the `.glb`. A `pre-push` hook enforces this; never bypass it with `--no-verify`,
    and never propose an exception to it.
 
 ## Repo shape
@@ -59,8 +59,10 @@ it and the reference images with it.
 
 ## Where to look
 
-- Workflow: `.claude/skills/` — `build-model`, `new-variant`, `release-model`
-- bpy patterns: `.claude/skills/build-model/references/bpy-recipes.md`
+- Workflow: `.claude/skills/new-space` here. `build-model` and `release-model`
+  live in `templates/space/.claude/skills/`; `contour init` copies them into
+  each model space (ADR 0015)
+- bpy patterns: `templates/space/.claude/skills/build-model/references/bpy-recipes.md`
 - Decisions + rationale: `docs/adr/`
 - Vocabulary and pipeline stages: `docs/CONTEXT.md`
 - Undecided, and what it blocks: `docs/OPEN-QUESTIONS.md`

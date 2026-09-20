@@ -1,6 +1,20 @@
 # 0011 — Model content stays local; git carries the toolkit
 
-**Status:** Accepted · 2026-09-20
+**Status:** Accepted · 2026-09-20 · **superseded in part by [ADR 0014](0014-toolkit-is-a-tool-a-model-is-a-project.md) and [ADR 0015](0015-model-spaces.md)**
+
+> **Superseded in part 2026-09-20.** The invariant stands and was strengthened:
+> model content never leaves via git, and `tools/hooks/pre-push` still refuses
+> any ref but `master` and any push carrying model paths. What ADR 0014 and ADR
+> 0015 changed is the arrangement underneath. Models are no longer variant
+> branches of this repository; each is a model space, a repository of its own
+> that is never pushed at all, and every space's pre-push stub refuses every
+> push. So "the boundary is the branch", `verify.py`'s branch check and
+> `./contour export <variant>` below describe the old arrangement — export now
+> takes no name and runs inside the space. The *two repositories* option
+> rejected below is the one that was adopted, once the `git merge master`
+> mechanism it broke had been retired. A space is backed up as a git bundle
+> rather than a copy of the working tree (ADR 0015). The text below is left as
+> decided.
 
 ## Context
 

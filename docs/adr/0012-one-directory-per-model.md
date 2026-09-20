@@ -1,6 +1,18 @@
 # 0012 — One directory per model
 
-**Status:** Accepted · 2026-09-20
+**Status:** Accepted · 2026-09-20 · **superseded in part by [ADR 0015](0015-model-spaces.md)**
+
+> **Superseded in part 2026-09-20.** The shape stands: one directory holds
+> everything about one model, references share the spec's trust class, and run
+> plumbing lives in `.contour/`. What ADR 0015 changed is where that directory
+> is. It is no longer `models/<v>/` on a variant branch of this repository but
+> the root of a model space, a repository of its own — so read every path below
+> without its `models/<v>/` prefix. Retired with it: the variant-branch
+> invariant, the merge-based migration, the `^models/` push-guard pattern (the
+> blocked list is now `models`, `spec`, `renders`, `out`, `exports` and
+> `project`), and the guard's `models/*/` paths (the spec guard is now
+> `tools/guards/spec.py`, run in a space as `contour hook spec`, protecting
+> `spec.yaml` and `refs/` at the root). The text below is left as decided.
 
 ## Context
 
