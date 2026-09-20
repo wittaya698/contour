@@ -21,7 +21,11 @@ ALLOWED='refs/heads/master'
 # layout it replaced, and out/ is where the release archive used to be forced
 # in: a path that ever carried model content stays blocked forever, or this
 # ground stops catching a commit that still holds the old layout.
-BLOCKED='^\(models\|spec\|renders\|out\|exports\)/'
+#
+# project/ holds model spaces sited under the toolkit (ADR 0015, amended).
+# Nothing there is toolkit content, and a gitlink to a space is still a path
+# into a model, so the prefix is blocked like the rest.
+BLOCKED='^\(models\|spec\|renders\|out\|exports\|project\)/'
 
 # All-zero sha of any length: deletion (local) or a ref new to the remote.
 is_zero() {

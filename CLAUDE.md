@@ -51,6 +51,12 @@ found by walking up from the working directory for `.contour/project`
 
 The toolkit is shared and pushable. A model space is neither.
 
+Spaces on this machine live under `project/` — a directory this repo ignores
+and the push guard blocks, because each one is a separate git repository and
+none of it may ever reach a remote. Treat `project/` as somebody else's repo:
+never `git add` it, and never `git clean -xdff` in the toolkit, which deletes
+it and the reference images with it.
+
 ## Where to look
 
 - Workflow: `.claude/skills/` — `build-model`, `new-variant`, `release-model`

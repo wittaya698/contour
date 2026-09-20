@@ -6,6 +6,11 @@
 # rewritten out, so the path stays ignored even though nothing should create it.
 models/
 
+# Model spaces sited under the toolkit (ADR 0015, amended). Each is its own git
+# repository, so `git add -A` would record it as a gitlink rather than content —
+# a path to a model in a repo that must carry none. Ignored so it cannot.
+project/
+
 # The fixture's build output. A model space carries its own ignore rules.
 fixtures/*/out/
 

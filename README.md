@@ -54,7 +54,13 @@ symlink, so the toolkit can be moved later and only the link needs relinking.
 ## Make a model
 
 A model is a directory of its own, anywhere you like, with its own git
-history. It is never pushed.
+history. It is never pushed. Spaces are found by their marker, not their
+path, so the location is yours to choose — `project/` under the toolkit and a
+sibling directory both work, and a space can be moved between them at any time
+with `mv`.
+
+If you keep them under the toolkit, note that `git clean -xdff` there deletes
+them. Plain `git clean -xdf` does not — it skips nested repositories.
 
 ```sh
 mkdir -p ~/Workspace/chair/{refs,.contour} && cd ~/Workspace/chair
@@ -143,8 +149,9 @@ This repository is the toolkit — `lib/`, `verify.py`, `schema/`, `fixtures/`,
 `tools/`. It builds no deliverable of its own and carries no model content on
 any branch, which is what makes it shareable (ADR 0015).
 
-Models are not branches here. Each one is its own repository somewhere else,
-with its own history, and it is never pushed. Earlier versions of Contour kept
+Models are not branches here. Each one is its own repository — under
+`project/`, which this repo ignores and the push guard blocks, or anywhere
+else you like — with its own history, and it is never pushed. Earlier versions of Contour kept
 models on long-lived branches; see
 [docs/git-branch-strategy.md](docs/git-branch-strategy.md) for that history and
 ADR 0015 for why it changed.

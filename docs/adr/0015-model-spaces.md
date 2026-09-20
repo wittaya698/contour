@@ -58,6 +58,36 @@ branch-per-variant.
 **Installation is a symlink on `PATH`.** Nothing is pinned inside a space, so
 the toolkit can be moved or renamed and only the link is relinked.
 
+### Amended 2026-09-20: spaces may be sited under the toolkit
+
+`beaky` was moved from `~/Workspace/beaky` to
+`~/Workspace/Contour/project/beaky` at the user's request. A space is found by
+walking up for its marker, so this needed no code change: discovery, `contour
+check`, `doctor` and `spaces` all worked at the new path unmodified. That is
+the design working as intended — location was never load-bearing.
+
+Two guards were added, because nesting puts a model repository inside a repo
+that must carry no model content:
+
+- `project/` is ignored by the toolkit, so `git add -A` cannot record the
+  space as a gitlink — a path into a model in a repo meant to hold none.
+- `project/` joins the `pre-push` `BLOCKED` prefixes, as a backstop for a
+  gitlink that reached a commit some other way. Verified by pushing a crafted
+  commit against a throwaway clone: refused, exit 1, naming the path.
+
+**The accepted cost is `git clean -xdff`.** Measured rather than assumed:
+
+| command | ignored nested repo |
+|---|---|
+| `git clean -xdf` | `Skipping repository project/inner` — survives |
+| `git clean -xdff` | `Removing project/` — gone |
+
+One extra `f` during a routine toolkit cleanup destroys `spec.yaml` and the
+reference images, which nothing can regenerate. Ignoring the directory neither
+helps nor hurts this; the nested `.git` is what earns the single-`f` reprieve.
+Siblings are not exposed to it at all. The user chose nesting knowing this, and
+the mitigation is backup, not layout.
+
 **Scaffolding splits by what has to be local.** `CLAUDE.md` and
 `.claude/skills/` are copied, because the agent reads them from the working
 directory; they are therefore the only things that can drift, and
@@ -126,6 +156,14 @@ and accepted before any geometry.
 - A space with no `.contour/` is not a space. Discovery failing must say so
   plainly rather than falling back to the toolkit's own directory, or a stray
   `contour check` in the wrong place will build something unexpected.
+- **A copy of a space is a space.** Taking a `cp -a` backup of `beaky` into
+  `~/Workspace/contour-backup/` made `contour spaces` list it twice, both
+  entries equally live-looking. Nothing on disk distinguishes a backup tree
+  from a working one, and inventing a marker for it would be the registry
+  mistake again. The fix belongs in the backup convention, not the tool:
+  **back a space up as a bundle, never as a tree.** A bundle is one file, is
+  not walked into, and restores byte-identically — checked by cloning
+  `beaky-20260920.bundle` and diffing, including the four image checksums.
 
 ## Rejected
 
