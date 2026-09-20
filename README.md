@@ -38,7 +38,7 @@ Variants never merge back. See [docs/git-branch-strategy.md](docs/git-branch-str
 
 ## What git tracks
 
-Source, specs, and one 512px thumbnail per accepted commit — so `git log`
+Source, specs, and the render sheet (1024², ~170 KB) per accepted commit — so `git log`
 doubles as a visual timeline. The `.blend` is derivable and stays ignored,
 except at a release tag where it is committed once as the archived deliverable.
 

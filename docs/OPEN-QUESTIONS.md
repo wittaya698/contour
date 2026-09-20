@@ -43,14 +43,14 @@ silently changes geometry output.
 
 No remote is configured. Nothing is backed up off this machine.
 
-## 7. Sheet size versus "512px thumbnail"
+## 7. Sheet size versus "512px thumbnail" — RESOLVED 2026-09-20
 
-ADR 0007 tracks a 512px thumbnail per accepted commit at `renders/<variant>.png`, but
-`./contour render` writes the 1024² sheet to that path (the spec's
-`render.sheet_resolution`). With dithering off it is ~100 KB, which is tolerable, but
-it is not the 512px file the ADR describes.
+Kept the single 1024² sheet. Measured at 93 KB (fixture) and 169 KB (`beaky`), about
+34 MB over 200 commits, so the size constraint that motivated 512px did not bind. ADR
+0007 and the README now describe what `./contour render` writes.
 
-**Blocks:** nothing. **Default if undecided:** commit the 1024² sheet as is.
+**Revisit if:** a model's sheet passes ~400 KB. `lib/cmd_render.py` already holds the
+pixels as an array, so writing a second, downscaled file to `renders/` is a few lines.
 
 ## 8. What `materials.max_slots` limits
 

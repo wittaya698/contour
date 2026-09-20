@@ -9,12 +9,19 @@ meaningless, merges impossible. But it is also the deliverable. Because ADR 0001
 makes builds deterministic, a `.blend` is *derivable* — committing one is
 storing a build artifact.
 
-Scale: a simple prop `.blend` is 1–5 MB per commit forever; a 512² PNG is ~150 KB.
+Scale: a simple prop `.blend` is 1–5 MB per commit forever. The render sheet is a 1024²
+PNG, measured on this machine (2026-09-20) at 93 KB for the fixture and 169 KB for the
+first real model, `beaky`. The fixture is flat grey and compresses well; `beaky` is
+smooth-shaded with gradients, so it is the more representative figure. At 169 KB that is
+~34 MB over 200 commits. Two samples, not a bound: a busier model will weigh more.
 
 ## Decision
 
 **Tracked:** `spec/`, `models/`, `lib/`, `verify.py`, `schema/`, `.claude/`,
-`docs/`, and one 512px thumbnail per accepted commit at `renders/<variant>.png`.
+`docs/`, and the render sheet per accepted commit at `renders/<variant>.png`: the
+same 4-view 1024² image the agent and the user looked at (ADR 0005), not a
+separate downscaled thumbnail. One file, so what is tracked is exactly what was
+approved.
 
 **Ignored:** `out/`, `work/`, `exports/`.
 
