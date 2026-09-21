@@ -16,6 +16,7 @@ Run `contour doctor` to find out whether that copy has gone stale.
 | `contour api <symbol>` | real signature from the installed Blender | ~15 tok |
 | `contour render` | 4-view sheet → `sheet.png` | ~1400 tok |
 | `contour export` | `.glb` + round-trip re-measure | ~80 tok |
+| `contour canvas` | the sheet in a browser, to mark on; waits for you | ~20 tok |
 | `contour doctor` | is this space still in step with the toolkit | ~20 tok |
 
 Run them from inside this directory; they take no model name. Full Blender
@@ -54,6 +55,7 @@ spec.yaml       the user's intent, in numbers     (read, never write)
 refs/           the user's intent, in pictures    (read, never write)
 build.py        yours
 sheet.png       the 4-view render the user approved
+marks.json      located comments on that sheet, from both sides (ADR 0018)
 NOTES.md        deferred refinements, and open questions
 release/v<N>/   archived .blend + .glb + sheet, at a tag
 .contour/       the marker, provenance, and logs

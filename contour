@@ -14,6 +14,7 @@ prints only its terse `lines`. Stdlib only: no venv, no yaml.
     contour export                .glb + round-trip re-measure
     contour api <symbol>...       real signature from the installed Blender
     contour measure <ref> ...     real pixel geometry from a reference image
+    contour canvas                the sheet in a browser, to mark on
     contour selftest              fixture pipeline test
     contour install-hooks         install the pre-push guard (ADR 0011)
     contour init <name>           create a model space here
@@ -144,6 +145,22 @@ def check_revision():
         f"  confirmed -> set revision: {was + 1}   not confirmed -> git checkout -- spec.yaml"]}
 
 
+def say_marks(code):
+    """What the canvas has to say, after the check has said its piece (ADR 0018).
+
+    Never red and never part of the exit code: red means the build violates the
+    spec, and a mark exists precisely because the spec did not catch the thing.
+    Silent at zero, so it costs nothing on the command run dozens of times a
+    session.
+    """
+    sys.path.insert(0, str(ROOT))
+    from lib import marks
+    line = marks.status_line(PROJECT / marks.NAME)
+    if line:
+        print(line)
+    return code
+
+
 def main(argv):
     if not argv or argv[0] in ("-h", "--help", "help"):
         print(USAGE)
@@ -156,7 +173,8 @@ def main(argv):
         if drifted:
             return emit(drifted)
         if cmd != "export":
-            return emit(stage(["build" if cmd == "check" else cmd]))
+            code = emit(stage(["build" if cmd == "check" else cmd]))
+            return say_marks(code) if cmd == "check" else code
         rep = stage(["export"])
         if not rep["ok"]:
             return emit(rep)
@@ -165,6 +183,12 @@ def main(argv):
         return emit(rt)
     if cmd == "api" and rest:
         return emit(stage(["api", *rest]))
+    if cmd == "canvas" and not rest:
+        if not PROJECT:
+            return need_project(cmd)
+        sys.path.insert(0, str(ROOT))
+        from lib import canvas, marks
+        return emit(canvas.serve(PROJECT / "sheet.png", PROJECT / marks.NAME))
     if cmd == "measure" and rest:
         if not PROJECT:
             return need_project(cmd)
@@ -412,6 +436,22 @@ def spaces(name=None):
     return {"ok": ok, "lines": lines}
 
 
+def unit_tests():
+    """The toolkit's own tests: stdlib unittest, no Blender, under a second.
+
+    They cover what runs outside Blender — the mark store, the canvas server,
+    the launcher's own behaviour around a stubbed Blender. Geometry is not
+    testable this way and is not tested this way; that is what the fixture and
+    the mutants below are for (ADR 0009).
+    """
+    r = subprocess.run([sys.executable, "-m", "unittest", "discover", "-s", "tests"],
+                       cwd=str(ROOT), capture_output=True, text=True, timeout=TIMEOUT_S)
+    tail = (r.stderr or r.stdout).strip().splitlines()
+    ran = next((l for l in tail if l.startswith("Ran ")), "ran ?")
+    return {"ok": r.returncode == 0,
+            "lines": [ran] if r.returncode == 0 else tail[-12:]}
+
+
 def stage_selftest():
     """Fixture through every stage, plus proof that verify can actually fail."""
     steps = [["build", "smoke", "--fixture"],
@@ -419,6 +459,13 @@ def stage_selftest():
              ["export", "smoke", "--fixture"],
              ["roundtrip", "smoke", "--fixture"]]
     lines, ok, t0 = [], True, time.time()
+    units = unit_tests()
+    ok &= units["ok"]
+    lines.append(f"{'ok  ' if units['ok'] else 'FAIL'} {'units':<10}"
+                 + " | ".join(units["lines"]))
+    if not units["ok"]:
+        lines.insert(0, "selftest FAIL (%.1fs)" % (time.time() - t0))
+        return {"ok": False, "lines": lines}
     for i, args in enumerate(steps):
         rep = stage(args, first=(i == 0))
         ok &= rep["ok"]
