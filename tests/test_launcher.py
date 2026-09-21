@@ -72,6 +72,16 @@ class LauncherTest(unittest.TestCase):
         self.assertEqual(red.returncode, 1)
         self.assertIn("1 mark open", red.stdout)
 
+    def test_a_green_check_leaves_every_mark_exactly_as_it_was(self):
+        """Only the user closes a mark. Green does not dispose of a finding —
+        a mark exists precisely because the spec did not catch the thing."""
+        self.mark()
+        self.mark(status="closed")
+        before = (self.space / "marks.json").read_bytes()
+        r = self.run_contour("check")
+        self.assertEqual(r.returncode, 0)
+        self.assertEqual((self.space / "marks.json").read_bytes(), before)
+
 
 if __name__ == "__main__":
     unittest.main()

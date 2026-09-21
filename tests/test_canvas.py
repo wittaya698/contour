@@ -14,7 +14,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from lib import marks as marks_store
 from lib.canvas import Canvas
+
+
+def get(url):
+    with urllib.request.urlopen(url, timeout=5) as r:
+        return r.status, json.loads(r.read() or b"null")
 
 
 def post(url, payload):
@@ -66,6 +72,38 @@ class CanvasTest(unittest.TestCase):
             page = r.read().decode()
         for smell in ("http://", "https://", "//cdn", "<script src", "<link"):
             self.assertNotIn(smell, page.replace("http://127.0.0.1", ""))
+
+    def test_closing_a_mark_takes_it_out_of_the_open_count(self):
+        """Only the user closes a mark, and this is the action they take."""
+        _, mark = post(self.canvas.url + "/marks",
+                       {"view": "front", "pixel": [1, 2], "text": "beak short"})
+        status, closed = post(self.canvas.url + "/close", {"id": mark["id"]})
+        self.assertEqual(status, 200)
+        self.assertEqual(closed["status"], "closed")
+        on_disk = json.loads(self.marks.read_text())
+        self.assertEqual([m["status"] for m in on_disk], ["closed"])
+        self.assertIsNone(marks_store.status_line(self.marks))
+
+    def test_marks_from_an_earlier_session_are_served_and_closable(self):
+        """A mark outlives its session, so the page must be able to see one
+        it did not place — otherwise closing reaches almost nothing."""
+        marks_store.append(self.marks, {"view": "top", "pixel": [9, 9],
+                                        "text": "legs too close"})
+        status, served = get(self.canvas.url + "/marks")
+        self.assertEqual(status, 200)
+        self.assertEqual([m["text"] for m in served], ["legs too close"])
+        post(self.canvas.url + "/close", {"id": served[0]["id"]})
+        self.assertIsNone(marks_store.status_line(self.marks))
+
+    def test_the_page_loads_the_marks_on_file_and_offers_to_close_one(self):
+        """No JS runs here, so this proves only the page's half of the
+        contract: it asks for the marks on file, and it has a close action
+        that needs no typing. What a closed one looks like is a HITL check."""
+        with urllib.request.urlopen(self.canvas.url + "/", timeout=5) as r:
+            page = r.read().decode()
+        self.assertIn("fetch('/marks')", page)
+        self.assertIn("'/close'", page)
+        self.assertIn(".closed", page)
 
     def test_done_stops_the_server_and_reports_what_was_captured(self):
         post(self.canvas.url + "/marks",

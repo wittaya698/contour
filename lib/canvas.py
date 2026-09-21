@@ -22,6 +22,8 @@ class _Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/" or self.path.startswith("/?"):
             return self._bytes(PAGE.read_bytes(), "text/html; charset=utf-8")
+        if self.path.split("?")[0] == "/marks":
+            return self._json(self.server.canvas.listing())
         if self.path.split("?")[0] == "/sheet.png":
             return self._bytes(self.server.canvas.sheet.read_bytes(), "image/png")
         self.send_error(404)
@@ -31,6 +33,9 @@ class _Handler(BaseHTTPRequestHandler):
         body = json.loads(self.rfile.read(n) or b"{}")
         if self.path == "/marks":
             return self._json(self.server.canvas.record(body))
+        if self.path == "/close":
+            closed = self.server.canvas.close(body.get("id"))
+            return self._json(closed) if closed else self.send_error(404)
         if self.path == "/done":
             self._json({"done": True})
             return self.server.canvas.finish()
@@ -55,6 +60,7 @@ class Canvas:
         self.sheet = Path(sheet)
         self.marks = Path(marks)
         self.captured = []
+        self.pruned = None
         self._lock = threading.Lock()         # two posts can land at once
         self._done = threading.Event()
         self._server = None
@@ -68,6 +74,7 @@ class Canvas:
         return f"http://{host}:{port}"
 
     def start(self):
+        self.pruned = marks_store.prune(self.marks)   # before the page reads
         self._server = ThreadingHTTPServer(("127.0.0.1", 0), _Handler)
         self._server.canvas = self
         self._addr = self._server.server_address
@@ -86,6 +93,19 @@ class Canvas:
             self.captured.append(stored)
         return stored
 
+    def listing(self):
+        """Every mark on file, not just this session's: a mark outlives the
+        session that made it, and the page has to show one before it can
+        close it."""
+        with self._lock:
+            return marks_store.load(self.marks)
+
+    def close(self, mark_id):
+        """Close one mark. Only ever reached from the page: nothing else in
+        the pipeline may move a mark to closed (ADR 0018)."""
+        with self._lock:
+            return marks_store.close(self.marks, mark_id)
+
     def finish(self):
         """The page says it is done. The port closes from `wait`, on the
         caller's thread: shutting a server down from inside one of its own
@@ -97,9 +117,16 @@ class Canvas:
         self._done.wait()
         self.stop()
         n = len(self.captured)
-        return {"ok": True, "lines": [
-            f"ok   canvas  {marks_store.phrase(n)} captured" if n
-            else "ok   canvas  no marks captured"]}
+        return self.report(f"{marks_store.phrase(n)} captured" if n
+                           else "no marks captured")
+
+    def report(self, headline):
+        """The session in two lines at most. Pruning gets its own, because it
+        deleted from a tracked file and should not do that quietly."""
+        lines = [f"ok   canvas  {headline}"]
+        if self.pruned:
+            lines.append(f"ok   canvas  {self.pruned}")
+        return {"ok": True, "lines": lines}
 
     def stop(self):
         if self._server is None:
@@ -129,5 +156,5 @@ def serve(sheet, marks, open_browser=True):
         return canvas.wait()
     except KeyboardInterrupt:
         canvas.stop()
-        return {"ok": True, "lines": [
-            f"ok   canvas  interrupted, {marks_store.phrase(len(canvas.captured))} kept"]}
+        return canvas.report(
+            f"interrupted, {marks_store.phrase(len(canvas.captured))} kept")

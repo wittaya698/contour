@@ -17,6 +17,7 @@
   h1 { font-size: 13px; letter-spacing: .08em; text-transform: uppercase; margin: 0; opacity: .6; }
   ol { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; }
   li::marker { color: var(--pin); font-weight: 700; }
+  li.closed::marker { color: var(--line); }
   .view { opacity: .55; font-size: 12px; }
   form { display: flex; flex-direction: column; gap: 8px; }
   input, button { font: inherit; padding: 7px 9px; border: 1px solid var(--line);
@@ -27,6 +28,10 @@
   .pin { position: absolute; width: 20px; height: 20px; margin: -10px 0 0 -10px;
          border-radius: 50%; background: var(--pin); color: #fff; font-size: 11px;
          font-weight: 700; display: grid; place-items: center; pointer-events: none; }
+  /* A closed mark stays on the sheet and stops shouting: hollow, not gone. */
+  .pin.closed { background: transparent; border: 1.5px solid var(--line); color: var(--line); }
+  li.closed { opacity: .45; text-decoration: line-through; }
+  .shut { border: 0; padding: 0 0 0 6px; font-size: 12px; opacity: .6; text-decoration: underline; }
 </style>
 <div id="stage"><div id="wrap"><canvas id="sheet"></canvas></div></div>
 <aside>
@@ -45,16 +50,55 @@ const cv = document.getElementById('sheet'), ctx = cv.getContext('2d');
 const wrap = document.getElementById('wrap'), list = document.getElementById('list');
 const entry = document.getElementById('entry'), text = document.getElementById('text');
 const where = document.getElementById('where');
-let pending = null, n = 0;
+let marks = [], pending = null, added = 0;
 
 const img = new Image();
-img.onload = () => { cv.width = img.width; cv.height = img.height; ctx.drawImage(img, 0, 0); };
+img.onload = () => { cv.width = img.width; cv.height = img.height; ctx.drawImage(img, 0, 0); draw(); };
 img.src = '/sheet.png?' + Date.now();
+
+// Marks outlive the session that made them, so the page starts from the file.
+fetch('/marks').then(r => r.json()).then(on => { marks = on; draw(); });
 
 // Sheet layout, from contour render: front | right over top | persp.
 function viewAt(x, y) {
   const left = x < cv.width / 2, upper = y < cv.height / 2;
   return upper ? (left ? 'front' : 'right') : (left ? 'top' : 'persp');
+}
+
+function draw() {
+  for (const old of wrap.querySelectorAll('.pin')) old.remove();
+  list.replaceChildren();
+  marks.forEach((mark, i) => {
+    const closed = mark.status === 'closed';
+    if (cv.width && mark.pixel) {
+      const pin = document.createElement('div');
+      pin.className = closed ? 'pin closed' : 'pin';
+      pin.textContent = closed ? '✓' : i + 1;
+      pin.style.left = (mark.pixel[0] / cv.width * 100) + '%';
+      pin.style.top = (mark.pixel[1] / cv.height * 100) + '%';
+      wrap.appendChild(pin);
+    }
+    const li = document.createElement('li');
+    if (closed) li.className = 'closed';
+    const view = document.createElement('span');
+    view.className = 'view';
+    view.textContent = mark.view || '';
+    li.append(view, document.createElement('br'), mark.text || '');
+    if (!closed) {
+      const shut = document.createElement('button');
+      shut.className = 'shut';
+      shut.textContent = 'close';
+      shut.addEventListener('click', () => shutMark(mark));
+      li.append(shut);
+    }
+    list.appendChild(li);
+  });
+}
+
+// One click, no typing: only the user ever closes a mark.
+async function shutMark(mark) {
+  const res = await fetch('/close', { method: 'POST', body: JSON.stringify({ id: mark.id }) });
+  if (res.ok) { mark.status = 'closed'; draw(); }
 }
 
 cv.addEventListener('click', e => {
@@ -73,27 +117,16 @@ entry.addEventListener('submit', async e => {
   if (!pending || !text.value.trim()) return;
   const body = { ...pending, text: text.value.trim() };
   const res = await fetch('/marks', { method: 'POST', body: JSON.stringify(body) });
-  const mark = await res.json();
-  n++;
-  const r = cv.getBoundingClientRect();
-  const pin = document.createElement('div');
-  pin.className = 'pin';
-  pin.textContent = n;
-  pin.style.left = (mark.pixel[0] * r.width / cv.width) + 'px';
-  pin.style.top = (mark.pixel[1] * r.height / cv.height) + 'px';
-  wrap.appendChild(pin);
-  const li = document.createElement('li');
-  li.innerHTML = '<span class="view"></span><br>';
-  li.querySelector('.view').textContent = mark.view;
-  li.append(mark.text);
-  list.appendChild(li);
+  marks.push(await res.json());
+  added++;
   pending = null;
   entry.hidden = true;
+  draw();
 });
 
 document.getElementById('done').addEventListener('click', async () => {
   await fetch('/done', { method: 'POST', body: '{}' });
   document.body.innerHTML = '<p style="margin:40px">Canvas closed — '
-    + n + ' mark' + (n === 1 ? '' : 's') + ' captured. You can close this tab.</p>';
+    + added + ' mark' + (added === 1 ? '' : 's') + ' captured. You can close this tab.</p>';
 });
 </script>
