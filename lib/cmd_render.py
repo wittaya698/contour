@@ -10,6 +10,7 @@ finished pixels: world points are projected through the real camera and painted
 only where the render is still background, so the model occludes what is behind
 it. Ruler ticks are 0.1 m, taller at 0.5 m and 1 m.
 """
+import json
 import math
 
 import bpy
@@ -17,7 +18,7 @@ import numpy as np
 from bpy_extras.object_utils import world_to_camera_view
 from mathutils import Vector
 
-from . import ctx_override, miniyaml, paths, scene
+from . import ctx_override, mask, miniyaml, paths, scene
 
 BG = (0.93, 0.93, 0.94)
 GRID = (0.72, 0.74, 0.78)
@@ -119,8 +120,44 @@ def setup(res):
     return sc
 
 
-def read(path):
+def index_parts(sc):
+    """One index per mesh object, 1..n, in a stable order. The index is written
+    into the object colour as i/255 in all three channels, so the rendered pixel
+    carries it literally and comes back as the integer it went in as.
+
+    Names are sorted so a rebuild that adds a part does not renumber the rest
+    for no reason. 255 is the ceiling, and a build past it is told so rather
+    than quietly wrapping onto another part's index.
+    """
+    parts = sorted((o for o in sc.objects if o.type == "MESH"), key=lambda o: o.name)
+    if len(parts) > 255:
+        raise ValueError(f"{len(parts)} parts: the identity mask holds 255")
+    for i, o in enumerate(parts, start=1):
+        o.color = (i / 255, i / 255, i / 255, 1.0)
+    return {str(i): o.name for i, o in enumerate(parts, start=1)}
+
+
+def mask_setup(sc):
+    """Turn the sheet pass into an identity pass.
+
+    Everything that makes a render readable makes it lie about identity:
+    antialiasing averages two indices into a third part's number, cavity and
+    outline darken pixels a part does own, and a view transform bends the value
+    away from the index. All four go off. Background is black, which is index 0
+    and owns nothing.
+    """
+    sh = sc.display.shading
+    sh.light, sh.color_type = "FLAT", "OBJECT"
+    sh.show_cavity = sh.show_object_outline = False
+    sc.display.render_aa = "OFF"
+    sc.view_settings.view_transform = "Raw"
+    sc.world.color = (0, 0, 0)
+
+
+def read(path, raw=False):
     img = bpy.data.images.load(str(path))
+    if raw:  # the mask is data, not a picture: no sRGB on the way back in
+        img.colorspace_settings.name = "Non-Color"
     w, h = img.size
     buf = np.empty(w * h * 4, dtype=np.float32)
     img.pixels.foreach_get(buf)
@@ -158,9 +195,10 @@ def run(args):
     segs = world_segments(lo, hi)
     t = res // 2
     P["out"].mkdir(parents=True, exist_ok=True)
-    tiles = []
+    tiles, cams = [], []
     for label, loc, orth, down in views:
         cam = add_camera(label, loc, ctr, orth, down)
+        cams.append((label, cam))
         sc.camera = cam
         tmp = P["out"] / f"_view_{label}.png"
         sc.render.filepath = str(tmp)
@@ -176,6 +214,23 @@ def run(args):
         text(tile, 8, t - 22, f"{label}   grid 1 m")
         tiles.append(tile)
 
+    # Second pass, same cameras, same process: a pixel is a part number.
+    parts = index_parts(sc)
+    mask_setup(sc)
+    mtiles = []
+    for label, cam in cams:
+        sc.camera = cam
+        tmp = P["out"] / f"_mask_{label}.png"
+        sc.render.filepath = str(tmp)
+        ctx_override.call("render.render", write_still=True)
+        mtiles.append(np.round(read(tmp, raw=True)[..., 0] * 255).astype(np.uint8))
+        tmp.unlink()
+    idx = np.zeros((res, res), dtype=np.uint8)
+    for (row, col), tile in zip([(1, 0), (1, 1), (0, 0), (0, 1)], mtiles):
+        idx[row * t:(row + 1) * t, col * t:(col + 1) * t] = tile
+    mask.write(P["mask"], np.flipud(idx))   # Blender reads bottom-up, PNG top-down
+    P["parts"].write_text(json.dumps(parts, indent=2) + "\n", encoding="utf-8")
+
     sheet = np.ones((res, res, 4), dtype=np.float32)
     for (row, col), tile in zip([(1, 0), (1, 1), (0, 0), (0, 1)], tiles):
         sheet[row * t:(row + 1) * t, col * t:(col + 1) * t] = tile
@@ -190,4 +245,6 @@ def run(args):
     kb = P["sheet"].stat().st_size / 1024
     return {"ok": True, "lines": [f"{variant} sheet {res}x{res} {kb:.0f}KB -> "
                                   f"{paths.display(P['sheet'])}"
-                                  "  (front|right / top|persp)"]}
+                                  "  (front|right / top|persp)",
+                                  f"{variant} mask {len(parts)} parts -> "
+                                  f"{paths.display(P['mask'])}"]}

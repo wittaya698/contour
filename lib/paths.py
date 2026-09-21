@@ -52,6 +52,8 @@ def resolve(variant, fixture=False):
             "out": out,
             "blend": out / f"{variant}.blend",
             "sheet": out / "sheet.png" if fixture else base / "sheet.png",
+            "mask": out / "mask.png",
+            "parts": out / "parts.json",
             "glb": out / f"{variant}.glb" if fixture else base / "exports" / f"{variant}.glb",
             "release": base / "release"}
 

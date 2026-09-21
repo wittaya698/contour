@@ -10,11 +10,11 @@ Blender's stdout (~2-5k tokens of banner and chatter per run) goes to
 prints only its terse `lines`. Stdlib only: no venv, no yaml.
 
     contour check                 build + verify
-    contour render                4-view sheet -> sheet.png
+    contour render                4-view sheet -> sheet.png, + identity mask
     contour export                .glb + round-trip re-measure
     contour api <symbol>...       real signature from the installed Blender
     contour measure <ref> ...     real pixel geometry from a reference image
-    contour canvas                the sheet in a browser, to mark on
+    contour canvas                the sheet in a browser, to mark on (names parts)
     contour selftest              fixture pipeline test
     contour install-hooks         install the pre-push guard (ADR 0011)
     contour init <name>           create a model space here
@@ -188,7 +188,9 @@ def main(argv):
             return need_project(cmd)
         sys.path.insert(0, str(ROOT))
         from lib import canvas, marks
-        return emit(canvas.serve(PROJECT / "sheet.png", PROJECT / marks.NAME))
+        out = PROJECT / "out"
+        return emit(canvas.serve(PROJECT / "sheet.png", PROJECT / marks.NAME,
+                                 out / "mask.png", out / "parts.json"))
     if cmd == "measure" and rest:
         if not PROJECT:
             return need_project(cmd)
@@ -437,10 +439,12 @@ def spaces(name=None):
 
 
 def unit_tests():
-    """The toolkit's own tests: stdlib unittest, no Blender, under a second.
+    """The toolkit's own tests: stdlib unittest, no Blender, under ten seconds.
 
     They cover what runs outside Blender — the mark store, the canvas server,
-    the launcher's own behaviour around a stubbed Blender. Geometry is not
+    part identity as the canvas reads it, the launcher's own behaviour around a
+    stubbed Blender. What the mask *contains* is geometry, so it is checked
+    against the fixture instead, in `mask_check` below. Geometry is not
     testable this way and is not tested this way; that is what the fixture and
     the mutants below are for (ADR 0009).
     """
@@ -450,6 +454,42 @@ def unit_tests():
     ran = next((l for l in tail if l.startswith("Ran ")), "ran ?")
     return {"ok": r.returncode == 0,
             "lines": [ran] if r.returncode == 0 else tail[-12:]}
+
+
+def mask_check():
+    """The identity mask, read back from the fixture's own render.
+
+    This is the one part of ADR 0018 that geometry decides, so it is checked
+    where geometry is checked: against the fixture, after the render step that
+    just ran, paying no second Blender startup. plinth / pillar / cap stack,
+    and the cap overhangs the pillar, so the centre column is a real occlusion
+    test — each pixel must name its nearest owner and nothing else.
+    """
+    sys.path.insert(0, str(ROOT))
+    from lib import mask as mask_store
+    out = ROOT / "fixtures" / "smoke" / "out"
+    mpath, ppath = out / "mask.png", out / "parts.json"
+    if not (mpath.exists() and ppath.exists()):
+        return {"ok": False, "lines": ["no mask.png / parts.json beside the sheet"]}
+    parts = json.loads(ppath.read_text())
+    w, h, data = mask_store.read(mpath)
+    if sorted(parts.values()) != ["cap", "pillar", "plinth"]:
+        return {"ok": False, "lines": [f"parts table is {sorted(parts.values())}"]}
+    if len(set(parts)) != len(parts.values()):
+        return {"ok": False, "lines": ["two parts share one index"]}
+    if data[0] != 0:
+        return {"ok": False, "lines": [f"corner pixel is {data[0]}, not background"]}
+    # Front view is the top-left quadrant; walk its centre column top to bottom.
+    x, seen = w // 4, []
+    for y in range(h // 2):
+        name = parts.get(str(data[y * w + x]))
+        if name and (not seen or seen[-1] != name):
+            seen.append(name)
+    if seen != ["cap", "pillar", "plinth"]:
+        return {"ok": False, "lines": [f"centre column reads {seen}, "
+                                       "not cap over pillar over plinth"]}
+    return {"ok": True, "lines": [f"{len(parts)} parts, {w}x{h}, "
+                                  f"centre column {' / '.join(seen)}"]}
 
 
 def stage_selftest():
@@ -474,6 +514,13 @@ def stage_selftest():
         lines.append(f"{'ok  ' if rep['ok'] else 'FAIL'} {args[0]:<10}{shown}")
         if not rep["ok"]:
             break
+        if args[0] == "render":
+            mk = mask_check()
+            ok &= mk["ok"]
+            lines.append(f"{'ok  ' if mk['ok'] else 'FAIL'} {'mask':<10}"
+                         + " | ".join(mk["lines"]))
+            if not mk["ok"]:
+                break
     lines.insert(0, f"selftest {'PASS' if ok else 'FAIL'} ({time.time() - t0:.1f}s)")
     return {"ok": ok, "lines": lines}
 

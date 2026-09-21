@@ -1,8 +1,13 @@
 """`contour canvas`: the sheet, in a browser, with somewhere to point (ADR 0018).
 
-Runs launcher-side, never inside Blender. Serves one page and the sheet from
-the standard library on localhost, takes marks from it, and stops when the page
-says done — the first Contour command that waits rather than shoots.
+Runs launcher-side, never inside Blender. Serves one page, the sheet and the
+identity mask from the standard library on localhost, takes marks from it, and
+stops when the page says done — the first Contour command that waits rather
+than shoots.
+
+The page keeps its own copy of the mask so hover costs no request, but what a
+mark *records* is resolved here, from the mask on disk. Hover is a convenience;
+the record is evidence, and it has one source.
 """
 import json
 import threading
@@ -11,6 +16,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from lib import marks as marks_store
+from lib import mask as mask_store
 
 PAGE = Path(__file__).resolve().parent / "canvas.html"
 
@@ -24,6 +30,11 @@ class _Handler(BaseHTTPRequestHandler):
             return self._bytes(PAGE.read_bytes(), "text/html; charset=utf-8")
         if self.path.split("?")[0] == "/marks":
             return self._json(self.server.canvas.listing())
+        if self.path.split("?")[0] == "/mask.png":
+            blob = self.server.canvas.mask_bytes()
+            return self._bytes(blob, "image/png") if blob else self.send_error(404)
+        if self.path.split("?")[0] == "/parts.json":
+            return self._json(self.server.canvas.parts_table())
         if self.path.split("?")[0] == "/sheet.png":
             return self._bytes(self.server.canvas.sheet.read_bytes(), "image/png")
         self.send_error(404)
@@ -56,9 +67,11 @@ class _Handler(BaseHTTPRequestHandler):
 class Canvas:
     """One canvas session. `start` binds and serves; `stop` releases the port."""
 
-    def __init__(self, sheet, marks):
+    def __init__(self, sheet, marks, mask=None, parts=None):
         self.sheet = Path(sheet)
         self.marks = Path(marks)
+        self.mask = Path(mask) if mask else None
+        self.parts = Path(parts) if parts else None
         self.captured = []
         self.pruned = None
         self._lock = threading.Lock()         # two posts can land at once
@@ -85,13 +98,33 @@ class Canvas:
     def record(self, body):
         """Store one mark as it arrives, not at the end: an interrupted
         session then still leaves behind everything the user had said."""
-        with self._lock:
-            stored = marks_store.append(self.marks, {
-                "view": body.get("view"),
+        mark = {"view": body.get("view"),
                 "pixel": body.get("pixel"),
-                "text": body.get("text", "")})
+                "text": body.get("text", "")}
+        part = self.part_at(body.get("pixel"))
+        if part:
+            mark["part"] = part
+        with self._lock:
+            stored = marks_store.append(self.marks, mark)
             self.captured.append(stored)
         return stored
+
+    def part_at(self, pixel):
+        """What the mask says is at this pixel. The page's own answer is never
+        taken on trust: hover is a convenience, the record is evidence."""
+        if not (self.mask and self.parts and pixel):
+            return None
+        return mask_store.part_at(self.mask, self.parts, pixel[0], pixel[1])
+
+    def mask_bytes(self):
+        """The mask itself, for the page's local copy. None when the space was
+        rendered before masks existed — the page then simply does not hover."""
+        return self.mask.read_bytes() if self.mask and self.mask.exists() else None
+
+    def parts_table(self):
+        """index -> part name, `{}` when there is no mask to index into."""
+        return (json.loads(self.parts.read_text())
+                if self.parts and self.parts.exists() else {})
 
     def listing(self):
         """Every mark on file, not just this session's: a mark outlives the
@@ -137,7 +170,7 @@ class Canvas:
         self._server = None
 
 
-def serve(sheet, marks, open_browser=True):
+def serve(sheet, marks, mask=None, parts=None, open_browser=True):
     """One canvas session, start to report. Blocks until the page says done.
 
     The first Contour command that waits rather than shoots, so it is also the
@@ -147,7 +180,7 @@ def serve(sheet, marks, open_browser=True):
     sheet = Path(sheet)
     if not sheet.exists():
         return {"ok": False, "lines": [f"FAIL no sheet at {sheet} — run contour render first"]}
-    canvas = Canvas(sheet, marks)
+    canvas = Canvas(sheet, marks, mask, parts)
     url = canvas.start()
     print(f"canvas at {url}  —  click the sheet, then press Done", flush=True)
     if open_browser:

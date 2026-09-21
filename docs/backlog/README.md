@@ -15,13 +15,10 @@ what is still outstanding.
 
 | Slice | Type | Blocked by |
 |---|---|---|
-| [0018-1](0018-1-tracer-a-mark-lands-and-check-reports-it.md) — Tracer: click the sheet, a mark lands, `check` reports it | **HITL** | — |
-| [0018-2](0018-2-close-a-mark-and-prune.md) — Close a mark from the page, and prune closed ones | AFK | 0018-1 |
-| [0018-3](0018-3-a-click-knows-its-part.md) — A click knows its part: the ID mask and hover | AFK | 0018-1 |
-| [0018-4](0018-4-anchor-in-part-local-space-and-reproject.md) — Anchor marks in part-local space, and re-project them | **HITL** | 0018-3 |
-| [0018-5](0018-5-ref-marks.md) — Ref marks: annotate the references | AFK | 0018-1 |
-| [0018-6](0018-6-agent-authored-marks.md) — Agent-authored marks | AFK | 0018-1, 0018-2 |
+| [0018-4](0018-4-anchor-in-part-local-space-and-reproject.md) — Anchor marks in part-local space, and re-project them | **HITL** | — |
+| [0018-5](0018-5-ref-marks.md) — Ref marks: annotate the references | AFK | — |
+| [0018-6](0018-6-agent-authored-marks.md) — Agent-authored marks | AFK | — |
 | [0018-7](0018-7-a-ref-mark-aims-contour-measure.md) — A ref mark aims `contour measure` | AFK | 0018-5, 0018-6 |
 
-0018-1 is the tracer bullet. Once it lands, 0018-2, 0018-3 and 0018-5 are all
-unblocked at the same time.
+0018-1 (the tracer), 0018-2 (close and prune) and 0018-3 (the ID mask) have
+shipped; git holds them. Everything left but 0018-7 can start now.

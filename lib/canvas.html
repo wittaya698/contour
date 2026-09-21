@@ -31,6 +31,7 @@
   /* A closed mark stays on the sheet and stops shouting: hollow, not gone. */
   .pin.closed { background: transparent; border: 1.5px solid var(--line); color: var(--line); }
   li.closed { opacity: .45; text-decoration: line-through; }
+  .part { opacity: .8; font-size: 12px; font-weight: 600; }
   .shut { border: 0; padding: 0 0 0 6px; font-size: 12px; opacity: .6; text-decoration: underline; }
 </style>
 <div id="stage"><div id="wrap"><canvas id="sheet"></canvas></div></div>
@@ -49,8 +50,20 @@
 const cv = document.getElementById('sheet'), ctx = cv.getContext('2d');
 const wrap = document.getElementById('wrap'), list = document.getElementById('list');
 const entry = document.getElementById('entry'), text = document.getElementById('text');
-const where = document.getElementById('where');
-let marks = [], pending = null, added = 0;
+const where = document.getElementById('where'), hint = document.getElementById('hint');
+let marks = [], pending = null, added = 0, parts = {};
+
+// The mask is read here, never fetched per mouse move: hover has to be instant.
+// It is the same size and the same four-tile layout as the sheet, so a sheet
+// pixel and a mask pixel are the same pixel.
+const mk = document.createElement('canvas');
+const mctx = mk.getContext('2d', { willReadFrequently: true });
+const maskImg = new Image();
+maskImg.onload = () => { mk.width = maskImg.width; mk.height = maskImg.height;
+                         mctx.drawImage(maskImg, 0, 0); };
+maskImg.onerror = () => {};   // a space rendered before masks existed: no hover
+maskImg.src = '/mask.png?' + Date.now();
+fetch('/parts.json').then(r => r.json()).then(t => parts = t);
 
 const img = new Image();
 img.onload = () => { cv.width = img.width; cv.height = img.height; ctx.drawImage(img, 0, 0); draw(); };
@@ -63,6 +76,19 @@ fetch('/marks').then(r => r.json()).then(on => { marks = on; draw(); });
 function viewAt(x, y) {
   const left = x < cv.width / 2, upper = y < cv.height / 2;
   return upper ? (left ? 'front' : 'right') : (left ? 'top' : 'persp');
+}
+
+// Index 0 is background, and background is not a part: a click on the gap is a
+// remark about the gap, never about whatever happens to be beside it.
+function partAt(x, y) {
+  if (!mk.width) return null;
+  return parts[mctx.getImageData(x, y, 1, 1).data[0]] || null;
+}
+
+function at(e) {
+  const r = cv.getBoundingClientRect();
+  return [Math.round((e.clientX - r.left) * cv.width / r.width),
+          Math.round((e.clientY - r.top) * cv.height / r.height)];
 }
 
 function draw() {
@@ -83,7 +109,10 @@ function draw() {
     const view = document.createElement('span');
     view.className = 'view';
     view.textContent = mark.view || '';
-    li.append(view, document.createElement('br'), mark.text || '');
+    const part = document.createElement('span');
+    part.className = 'part';
+    part.textContent = mark.part || '';     // marks made before parts existed
+    li.append(view, ' ', part, document.createElement('br'), mark.text || '');
     if (!closed) {
       const shut = document.createElement('button');
       shut.className = 'shut';
@@ -101,12 +130,17 @@ async function shutMark(mark) {
   if (res.ok) { mark.status = 'closed'; draw(); }
 }
 
+cv.addEventListener('mousemove', e => {
+  const [x, y] = at(e);
+  const part = partAt(x, y);
+  hint.textContent = part ? part : 'Click the sheet, then type one line.';
+});
+
 cv.addEventListener('click', e => {
-  const r = cv.getBoundingClientRect();
-  const x = Math.round((e.clientX - r.left) * cv.width / r.width);
-  const y = Math.round((e.clientY - r.top) * cv.height / r.height);
+  const [x, y] = at(e);
   pending = { view: viewAt(x, y), pixel: [x, y] };
-  where.textContent = pending.view + '  ' + x + ', ' + y;
+  const part = partAt(x, y);
+  where.textContent = pending.view + (part ? '  ' + part : '') + '  ' + x + ', ' + y;
   entry.hidden = false;
   text.value = '';
   text.focus();
