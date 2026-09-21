@@ -13,6 +13,7 @@ prints only its terse `lines`. Stdlib only: no venv, no yaml.
     contour render                4-view sheet -> sheet.png
     contour export                .glb + round-trip re-measure
     contour api <symbol>...       real signature from the installed Blender
+    contour measure <ref> ...     real pixel geometry from a reference image
     contour selftest              fixture pipeline test
     contour install-hooks         install the pre-push guard (ADR 0011)
     contour init <name>           create a model space here
@@ -164,6 +165,10 @@ def main(argv):
         return emit(rt)
     if cmd == "api" and rest:
         return emit(stage(["api", *rest]))
+    if cmd == "measure" and rest:
+        if not PROJECT:
+            return need_project(cmd)
+        return emit(stage(["measure", *rest]))
     if cmd == "selftest" and not rest:
         return emit(stage_selftest())
     if cmd == "install-hooks" and not rest:

@@ -21,4 +21,5 @@ works — the alternative you are about to suggest is probably here with a reaso
 | [0013](0013-releases-are-versioned-folders.md) | Releases are versioned folders, prepared by the tool — superseded in part by [0015](0015-model-spaces.md) |
 | [0014](0014-toolkit-is-a-tool-a-model-is-a-project.md) | The toolkit is a tool; a model is a project — superseded in part by [0015](0015-model-spaces.md) |
 | [0015](0015-model-spaces.md) | Model spaces: how the tool/project split actually works |
-| [0016](0016-specs-from-references-and-revision.md) | Specs drawn from references, and revised under a counter |
+| [0016](0016-specs-from-references-and-revision.md) | Specs drawn from references, and revised under a counter — worked example corrected by [0017](0017-scaffold-measured-from-references.md) |
+| [0017](0017-scaffold-measured-from-references.md) | The scaffold: what the references measure, recorded separately |

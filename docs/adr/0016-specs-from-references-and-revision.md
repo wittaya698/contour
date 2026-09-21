@@ -1,6 +1,23 @@
 # 0016 — Specs drawn from references, and revised under a counter
 
-**Status:** Accepted · 2026-09-21 · **amends [ADR 0002](0002-spec-is-agent-read-only-contract.md), reopens one rejection in [ADR 0013](0013-releases-are-versioned-folders.md)**
+**Status:** Accepted · 2026-09-21 · **amends [ADR 0002](0002-spec-is-agent-read-only-contract.md), reopens one rejection in [ADR 0013](0013-releases-are-versioned-folders.md) · worked example corrected by [ADR 0017](0017-scaffold-measured-from-references.md)**
+
+> **The depth example below is wrong, found 2026-09-21 by measuring it
+> mechanically.** `refs/side.jpg` gives **597 mm**, not "about 620". The spec's
+> `depth: 600 ±20` matches the references within 3 mm — it is very nearly the
+> best number available — and the build's 612 is what drifted. So the
+> conclusion "the contract is what is wrong" is inverted.
+>
+> **The decision this ADR makes stands unchanged**, and one part of it is
+> strengthened rather than weakened. Tolerance conflating measurement error with
+> intent, the `revision:` counter, propose-confirm-write, never-from-red, and
+> *measure the image, do not recall it* are all untouched — a spec still needs a
+> sanctioned way to be corrected, and `beaky`'s depth now turns out to need one
+> *less* than this ADR believed. What the example actually demonstrates, better
+> than it meant to, is this ADR's own last consequence: **nothing measures a
+> reference image.** The number that motivated the argument was produced by the
+> instrument the argument was written to distrust. ADR 0017 builds the
+> instrument.
 
 ## Context
 
@@ -23,7 +40,8 @@ do not recall it.*
 
 **One wrong number cannot be corrected at all.** The spec says
 `depth: 600 ±20`. Measured properly on 2026-09-20, `refs/side.jpg` gives about
-620 mm. The build sits at 612, passing, on 60% of a tolerance the agent
+620 mm. *(Corrected 2026-09-21: it gives 597 mm. See the note at the head of
+this file — the premise of this paragraph does not hold.)* The build sits at 612, passing, on 60% of a tolerance the agent
 invented rather than the user. `NOTES.md` open question 1 concludes: *"There is
 no change to `build.py` that improves this."* The contract is what is wrong,
 and rule 1 freezes it. The defect is recorded, permanently, in the one file
