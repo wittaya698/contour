@@ -16,6 +16,7 @@ message, or a conversation, it means what this file says it means.
 | **pin** | Where a sheet mark actually is, once a ray has resolved it: a point in the hit part's own coordinates. Pixels lie the moment geometry moves; a pin moves with its part, and is *orphaned* — said so, in the file — if that part is deleted. |
 | **badge** | A pin drawn on the sheet: the mark's id, painted over background pixels only and leashed to its pin, so the model is never covered by a remark about it. |
 | **anchored** | Of a mark: resolved from a pixel to a pin (ADR 0018). Unrelated to **anchor** above, which is a millimetre figure about references. The sheet is anchored in parts, the references are anchored in millimetres, and nothing is both. |
+| **addressed** | What the agent may attach to a mark: *I believe this build deals with it*, stamped with that build's id. It dims the badge and is **not** a close — only the user closes a finding, because a finding is not disposed of by the party it is aimed at (ADR 0018). |
 | **build** | Running the space's `build.py` under headless Blender to produce `out/<name>.blend` from an empty scene. |
 | **verify** | Running `verify.py` against a build, judged by its spec. Produces a pass/fail line per check. |
 | **green** | A verify report in which every check passed — `PASS`, and `contour` exits 0. The word the code itself uses (ADR 0005 budgets ~50 tokens on green). |

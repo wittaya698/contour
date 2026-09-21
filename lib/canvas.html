@@ -2,7 +2,7 @@
 <meta charset="utf-8">
 <title>contour canvas</title>
 <style>
-  :root { color-scheme: light dark; --ink: #1b1b1b; --bg: #f4f4f2; --line: #c9c7c0; --pin: #d8442f; }
+  :root { color-scheme: light dark; --ink: #1b1b1b; --bg: #f4f4f2; --line: #c9c7c0; --pin: #d8442f; --agent: #2f6fd8; }
   @media (prefers-color-scheme: dark) {
     :root { --ink: #e8e6e0; --bg: #17181a; --line: #3a3c40; }
   }
@@ -32,6 +32,17 @@
      never be misread for one another. Shape, not colour: it still reads on a
      photograph of any hue, and in greyscale. */
   .pin.ref { border-radius: 2px; }
+  /* Shape says what a mark points at; colour says who wrote it. The two are
+     independent, so no combination of them is ambiguous. */
+  .pin.agent { background: var(--agent); }
+  li.agent::marker { color: var(--agent); }
+  /* Addressed: the agent believes it has done something about the question.
+     Not a close — the finding stands until the user says otherwise, so this
+     dims the badge and never removes it. */
+  .pin.done { opacity: .4; }
+  li.done .text { opacity: .55; }
+  .who { font-size: 11px; letter-spacing: .06em; text-transform: uppercase;
+         opacity: .6; color: var(--agent); }
   li.ref::marker { content: "\25A0  "; }
   /* The strip: the sheet, then the user's references. One canvas, one at a time. */
   #strip { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
@@ -137,21 +148,35 @@ function draw() {
     const here = (mark.ref || null) === showing;
     if (cv.width && mark.pixel && here) {
       const pin = document.createElement('div');
-      pin.className = 'pin' + (closed ? ' closed' : '') + (mark.ref ? ' ref' : '');
+      pin.className = 'pin' + (closed ? ' closed' : '') + (mark.ref ? ' ref' : '')
+                      + (mark.author === 'agent' ? ' agent' : '')
+                      + (mark.addressed ? ' done' : '');
       pin.textContent = closed ? '✓' : i + 1;
       pin.style.left = (mark.pixel[0] / cv.width * 100) + '%';
       pin.style.top = (mark.pixel[1] / cv.height * 100) + '%';
       wrap.appendChild(pin);
     }
     const li = document.createElement('li');
-    li.className = (closed ? 'closed ' : '') + (mark.ref ? 'ref' : '');
+    li.className = [closed && 'closed', mark.ref && 'ref',
+                    mark.author === 'agent' && 'agent',
+                    mark.addressed && 'done'].filter(Boolean).join(' ');
     const view = document.createElement('span');
     view.className = 'view';
     view.textContent = mark.ref || mark.view || '';
     const part = document.createElement('span');
     part.className = 'part';
     part.textContent = mark.part || '';     // marks made before parts existed
-    li.append(view, ' ', part, document.createElement('br'), mark.text || '');
+    const body = document.createElement('span');
+    body.className = 'text';
+    body.textContent = mark.text || '';
+    li.append(view, ' ', part);
+    if (mark.author === 'agent') {
+      const who = document.createElement('span');
+      who.className = 'who';
+      who.textContent = mark.addressed ? ' agent · addressed' : ' agent';
+      li.append(who);
+    }
+    li.append(document.createElement('br'), body);
     if (!closed) {
       const shut = document.createElement('button');
       shut.className = 'shut';

@@ -15,6 +15,7 @@ prints only its terse `lines`. Stdlib only: no venv, no yaml.
     contour api <symbol>...       real signature from the installed Blender
     contour measure <ref> ...     real pixel geometry from a reference image
     contour canvas                the sheet and the references in a browser, to mark on
+    contour mark --part <p> "..."  pin a finding on the sheet, for the user to see
     contour selftest              fixture pipeline test
     contour install-hooks         install the pre-push guard (ADR 0011)
     contour init <name>           create a model space here
@@ -193,6 +194,14 @@ def main(argv):
                                  out / "mask.png", out / "parts.json",
                                  resolve=lambda: stage(["resolve"]),
                                  refs=PROJECT / "refs"))
+    if cmd == "mark" and rest:
+        if not PROJECT:
+            return need_project(cmd)
+        sys.path.insert(0, str(ROOT))
+        from lib import agent, marks
+        return emit(agent.command(PROJECT / marks.NAME, rest,
+                                  PROJECT / "out" / f"{PROJECT.name}.blend",
+                                  PROJECT / "out" / "parts.json"))
     if cmd == "measure" and rest:
         if not PROJECT:
             return need_project(cmd)
@@ -566,12 +575,52 @@ def anchor_check():
     if off > 3:
         return {"ok": False, "lines": [f"{hit} was clicked at {on_cap} and "
                                        f"re-projects to {back}"]}
+    said = agent_check(marks_path, out, w, h, data, table)
     marks_path.unlink()          # the fixture keeps no marks; the sheet keeps the badge
+    if not said.startswith("agent"):
+        return {"ok": False, "lines": [said]}
     return {"ok": True, "lines": [f"{len(labels)} views, build {sheet['build']}",
                                   f"cap pixel {on_cap} -> cap, "
                                   f"{r * 1000:.1f} mm from its origin",
                                   "background unresolved",
-                                  f"badge back at {back}, {off} px out"]}
+                                  f"badge back at {back}, {off} px out", said]}
+
+
+def agent_check(marks_path, out, w, h, data, table):
+    """An agent mark lands on its part, without anyone having clicked anything.
+
+    The agent names a part and no point on it, so the badge's position is
+    decided here, against the build: the middle of the part's bounding box. The
+    fixture's cap is a sphere on top of the pillar, so the middle of the cap
+    projects to a pixel the mask must call `cap` — which is the whole claim, and
+    one the part's *origin* would not always make (ADR 0018).
+
+    Returns the line to report, or the sentence to fail with.
+    """
+    from lib import agent
+    rep = agent.command(marks_path, ["--part", "cap", "is the cap too round"],
+                        parts=out / "parts.json")
+    if not rep["ok"]:
+        return f"contour mark refused the fixture's own part: {rep['lines'][0]}"
+    mid = marks_store_id(marks_path)
+    rep = stage(["render", "smoke", "--fixture"], first=False)
+    if not rep["ok"]:
+        return "render failed with an agent mark on file"
+    drawn = " | ".join(rep["lines"])
+    seen = re.search(rf"{mid} front (\d+),(\d+)", drawn)
+    if not seen:
+        return f"no badge drawn for the agent's mark: {drawn}"
+    x, y = int(seen.group(1)), int(seen.group(2))
+    named = table.get(str(data[y * w + x]))
+    if named != "cap":
+        return (f"the agent's cap mark pinned at {[x, y]}, which the mask "
+                f"calls {named!r}, not cap")
+    return f"agent mark on cap, no click, badge at {[x, y]}"
+
+
+def marks_store_id(path):
+    """The id of the last mark on file."""
+    return json.loads(path.read_text())[-1]["id"]
 
 
 def stage_selftest():

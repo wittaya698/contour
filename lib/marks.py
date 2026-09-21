@@ -34,10 +34,15 @@ def next_id(marks):
     return f"m{max(used, default=0) + 1}"
 
 
-def append(path, mark):
-    """Store one mark, stamped with its id, author and status. Returns it."""
+def append(path, mark, author="user"):
+    """Store one mark, stamped with its id, author and status. Returns it.
+
+    Always open, whoever wrote it. There is no way to append a closed mark
+    because there is no reason to: a finding that was never outstanding is not
+    a finding, and `close` is the one door, reached only from the page.
+    """
     marks = load(path)
-    stored = {"id": next_id(marks), **mark, "author": "user", "status": "open"}
+    stored = {"id": next_id(marks), **mark, "author": author, "status": "open"}
     save(path, marks + [stored])
     return stored
 

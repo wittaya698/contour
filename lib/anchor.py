@@ -171,6 +171,27 @@ def badge_spot(clear, x, y, w, h, bounds, step=5, rings=40, taken=()):
     return None
 
 
+def nearest(points):
+    """The point nearest the middle of them all — and one of them.
+
+    Where an agent's badge goes, once the mask has said which pixels of a view
+    belong to the part it named. The obvious answer, the mean, is not always
+    one of the points: beaky's arm is an L, and the middle of its pixels falls
+    in the hole beside the torso, on the background. Taking the nearest real
+    pixel to that mean puts the badge on the part whatever shape the part is.
+
+    Two answers were tried and rejected before this one, and both failed on the
+    same arm: the part's origin, which `build.py` may leave anywhere, and the
+    centre of its bounding box.
+
+    Kept here, out of Blender, so the claim is testable without a scene — the
+    toolkit's own fixture cannot make it, having no part that is not convex.
+    """
+    mx = sum(p[0] for p in points) / len(points)
+    my = sum(p[1] for p in points) / len(points)
+    return min(points, key=lambda p: (p[0] - mx) ** 2 + (p[1] - my) ** 2)
+
+
 def place(matrix, local):
     """Where a pin is now: the part's world matrix applied to the point the
     ray stored, as 16 row-major floats and three.

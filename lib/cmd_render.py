@@ -171,6 +171,11 @@ def pins(path, sc):
     said to be orphaned, here, where the build is in front of us, and is not
     drawn anywhere: a badge somewhere plausible would be a lie with a leader
     line attached.
+
+    This is the user's half: a mark whose anchor carries a point in its part's
+    own space, from the ray that resolved their click. The agent never clicked
+    anything, so its marks name a part and no point on it and are placed from
+    the identity mask instead, in `aimless` below.
     """
     here = {o.name: o for o in sc.objects if o.type == "MESH"}
     anchor.orphan(path, set(here))
@@ -179,11 +184,43 @@ def pins(path, sc):
         a, live = mark.get("anchor"), None
         if not a or mark.get("status") != "open":
             continue
-        live = here.get(a["part"])
+        live = here.get(a["part"]) if a.get("local") else None
         if live:
             m = [c for row in live.matrix_world for c in row]
             out.append((mark["id"], Vector(anchor.place(m, a["local"]))))
     return out
+
+
+def aimless(path):
+    """`[(id, part)]` for every open mark that names a part and no point on it.
+
+    The agent's marks. It has no pixel to offer, because it never clicked, and
+    no point in the part's own space, because it never cast a ray — it knows
+    *which part* it has a question about and nothing finer. Where on that part
+    the badge goes is decided per view, against the identity mask, in `on_part`.
+    """
+    return [(m["id"], m["anchor"]["part"]) for m in marks.load(path)
+            if m.get("status") == "open" and m.get("anchor")
+            and not m["anchor"].get("local") and m["anchor"].get("part")]
+
+
+def on_part(idtile, number):
+    """A point on this part as this view actually sees it, or None.
+
+    The mean of a part's pixels is not always one of them — beaky's arm is an
+    L, and the middle of its bounding box falls in the hole beside the torso,
+    on the background. So the mean is taken and then the nearest pixel that
+    really belongs to the part is returned, which puts the badge on the part
+    for any shape at all.
+
+    None when this view cannot see the part: no badge is better than a badge
+    pointing at whatever is in front of it.
+    """
+    ys, xs = np.nonzero(idtile == number)
+    if not len(xs):
+        return None
+    return anchor.nearest(list(zip(xs.tolist(), ys.tolist())))
+
 
 
 def badge(tile, bgmask, label, at, t, taken):
@@ -284,7 +321,8 @@ def run(args):
     # Top-down tile rects, the way a click counts: front|right / top|persp.
     corners = {"front": (0, 0), "right": (t, 0), "top": (0, t), "persp": (t, t)}
     pinned, placed = pins(P["marks"], sc), {}
-    tiles, cams = [], []
+    noted = aimless(P["marks"])
+    tiles, cams, spare = [], [], []
     for label, loc, orth, down in views:
         cam = add_camera(label, loc, ctr, orth, down)
         cams.append((label, cam))
@@ -311,6 +349,7 @@ def run(args):
                 cx, cy = corners[label]
                 placed[mid] = (label, int(cx + at.x * t), int(cy + t - at.y * t))
         tiles.append(tile)
+        spare.append((bgmask, taken))    # the agent's badges go on after the mask
 
     # Second pass, same cameras, same process: a pixel is a part number.
     parts = index_parts(sc)
@@ -323,6 +362,18 @@ def run(args):
         ctx_override.call("render.render", write_still=True)
         mtiles.append(np.round(read(tmp, raw=True)[..., 0] * 255).astype(np.uint8))
         tmp.unlink()
+    # Third pass, no render: the agent's marks name a part and no point on it,
+    # so the mask that was just made is what says where on the part they go.
+    number = {name: int(i) for i, name in parts.items()}
+    for (label, _cam), tile, (bgmask, taken), idtile in zip(cams, tiles, spare,
+                                                            mtiles):
+        for mid, part in noted:
+            spot = on_part(idtile, number.get(part, -1))
+            if spot and badge(tile, bgmask, mid, spot, t, taken) \
+                    and mid not in placed:
+                cx, cy = corners[label]
+                placed[mid] = (label, int(cx + spot[0]), int(cy + t - spot[1]))
+
     idx = np.zeros((res, res), dtype=np.uint8)
     for (row, col), tile in zip([(1, 0), (1, 1), (0, 0), (0, 1)], mtiles):
         idx[row * t:(row + 1) * t, col * t:(col + 1) * t] = tile
