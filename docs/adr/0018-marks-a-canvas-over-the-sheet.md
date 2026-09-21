@@ -1,6 +1,6 @@
 # 0018 — Marks: a canvas over the sheet, and a shared way to point
 
-**Status:** Proposed · 2026-09-21 · **extends [ADR 0005](0005-tiered-verification.md) (the sheet gains a second job) and [ADR 0017](0017-scaffold-measured-from-references.md) (a mark aims `contour measure`)**
+**Status:** Accepted · 2026-09-21 · **extends [ADR 0005](0005-tiered-verification.md) (the sheet gains a second job) and [ADR 0017](0017-scaffold-measured-from-references.md) (a mark aims `contour measure`)**
 
 ## Context
 

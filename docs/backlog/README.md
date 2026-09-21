@@ -15,10 +15,10 @@ what is still outstanding.
 
 | Slice | Type | Blocked by |
 |---|---|---|
-| [0018-4](0018-4-anchor-in-part-local-space-and-reproject.md) — Anchor marks in part-local space, and re-project them | **HITL** | — |
 | [0018-5](0018-5-ref-marks.md) — Ref marks: annotate the references | AFK | — |
 | [0018-6](0018-6-agent-authored-marks.md) — Agent-authored marks | AFK | — |
 | [0018-7](0018-7-a-ref-mark-aims-contour-measure.md) — A ref mark aims `contour measure` | AFK | 0018-5, 0018-6 |
 
-0018-1 (the tracer), 0018-2 (close and prune) and 0018-3 (the ID mask) have
-shipped; git holds them. Everything left but 0018-7 can start now.
+0018-1 (the tracer), 0018-2 (close and prune), 0018-3 (the ID mask) and
+0018-4 (pins and badges) have shipped; git holds them. Everything left but
+0018-7 can start now.

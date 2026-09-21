@@ -12,6 +12,10 @@ message, or a conversation, it means what this file says it means.
 | **spec** | `spec.yaml` at the root of a model space. The user's intent, expressed in numbers. Agent-read-only. The definition of correct. |
 | **reference** | An image the user supplies, stored in `refs/` at original fidelity: their intent in pictures, in the spec's trust class (ADR 0012). Say *reference*, not "model picture" — and never *sheet*, which is Contour's own render. |
 | **anchor** | The one real-world dimension the user states for a set of references, in millimetres. Every other size read off those images is a pixel ratio against it. Pictures carry proportion, never scale, so without an anchor the agent does not draft `dimensions` — it asks. |
+| **mark** | A located comment: a position, one line of text, an author, and a status. The unit both sides use to point at a thing on the picture (ADR 0018). A **sheet mark** says *the build is wrong*; a **ref mark** says *here is what I meant*. |
+| **pin** | Where a sheet mark actually is, once a ray has resolved it: a point in the hit part's own coordinates. Pixels lie the moment geometry moves; a pin moves with its part, and is *orphaned* — said so, in the file — if that part is deleted. |
+| **badge** | A pin drawn on the sheet: the mark's id, painted over background pixels only and leashed to its pin, so the model is never covered by a remark about it. |
+| **anchored** | Of a mark: resolved from a pixel to a pin (ADR 0018). Unrelated to **anchor** above, which is a millimetre figure about references. The sheet is anchored in parts, the references are anchored in millimetres, and nothing is both. |
 | **build** | Running the space's `build.py` under headless Blender to produce `out/<name>.blend` from an empty scene. |
 | **verify** | Running `verify.py` against a build, judged by its spec. Produces a pass/fail line per check. |
 | **green** | A verify report in which every check passed — `PASS`, and `contour` exits 0. The word the code itself uses (ADR 0005 budgets ~50 tokens on green). |

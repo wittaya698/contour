@@ -54,6 +54,8 @@ def resolve(variant, fixture=False):
             "sheet": out / "sheet.png" if fixture else base / "sheet.png",
             "mask": out / "mask.png",
             "parts": out / "parts.json",
+            "views": out / "views.json",
+            "marks": out / "marks.json" if fixture else base / "marks.json",
             "glb": out / f"{variant}.glb" if fixture else base / "exports" / f"{variant}.glb",
             "release": base / "release"}
 

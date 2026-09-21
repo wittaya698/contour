@@ -15,6 +15,7 @@ import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+from lib import anchor
 from lib import marks as marks_store
 from lib import mask as mask_store
 
@@ -67,11 +68,12 @@ class _Handler(BaseHTTPRequestHandler):
 class Canvas:
     """One canvas session. `start` binds and serves; `stop` releases the port."""
 
-    def __init__(self, sheet, marks, mask=None, parts=None):
+    def __init__(self, sheet, marks, mask=None, parts=None, resolve=None):
         self.sheet = Path(sheet)
         self.marks = Path(marks)
         self.mask = Path(mask) if mask else None
         self.parts = Path(parts) if parts else None
+        self.resolve = resolve
         self.captured = []
         self.pruned = None
         self._lock = threading.Lock()         # two posts can land at once
@@ -146,20 +148,33 @@ class Canvas:
         self._done.set()
 
     def wait(self):
-        """Serve until the page says done, then stop and report."""
+        """Serve until the page says done, then stop, anchor, and report."""
         self._done.wait()
         self.stop()
         n = len(self.captured)
         return self.report(f"{marks_store.phrase(n)} captured" if n
-                           else "no marks captured")
+                           else "no marks captured", self.anchor())
 
-    def report(self, headline):
-        """The session in two lines at most. Pruning gets its own, because it
-        deleted from a tracked file and should not do that quietly."""
+    def anchor(self):
+        """Turn this session's pixels into places on parts — one Blender run,
+        at the end, and only if there is something to ask it (ADR 0018).
+
+        Here and not per click: a ray per click would pay a Blender startup
+        per mouse press, and a ray per build would be cast against geometry
+        the user never looked at.
+        """
+        if not self.resolve or not anchor.unresolved(marks_store.load(self.marks)):
+            return []
+        return self.resolve().get("lines", [])
+
+    def report(self, headline, extra=()):
+        """The session in a few lines at most. Pruning gets its own, because
+        it deleted from a tracked file and should not do that quietly, and so
+        does anchoring, which rewrote every mark it could place."""
         lines = [f"ok   canvas  {headline}"]
         if self.pruned:
             lines.append(f"ok   canvas  {self.pruned}")
-        return {"ok": True, "lines": lines}
+        return {"ok": True, "lines": lines + list(extra)}
 
     def stop(self):
         if self._server is None:
@@ -170,7 +185,7 @@ class Canvas:
         self._server = None
 
 
-def serve(sheet, marks, mask=None, parts=None, open_browser=True):
+def serve(sheet, marks, mask=None, parts=None, resolve=None, open_browser=True):
     """One canvas session, start to report. Blocks until the page says done.
 
     The first Contour command that waits rather than shoots, so it is also the
@@ -180,7 +195,7 @@ def serve(sheet, marks, mask=None, parts=None, open_browser=True):
     sheet = Path(sheet)
     if not sheet.exists():
         return {"ok": False, "lines": [f"FAIL no sheet at {sheet} — run contour render first"]}
-    canvas = Canvas(sheet, marks, mask, parts)
+    canvas = Canvas(sheet, marks, mask, parts, resolve)
     url = canvas.start()
     print(f"canvas at {url}  —  click the sheet, then press Done", flush=True)
     if open_browser:
@@ -190,4 +205,5 @@ def serve(sheet, marks, mask=None, parts=None, open_browser=True):
     except KeyboardInterrupt:
         canvas.stop()
         return canvas.report(
-            f"interrupted, {marks_store.phrase(len(canvas.captured))} kept")
+            f"interrupted, {marks_store.phrase(len(canvas.captured))} kept",
+            canvas.anchor())

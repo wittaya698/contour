@@ -18,7 +18,7 @@ import numpy as np
 from bpy_extras.object_utils import world_to_camera_view
 from mathutils import Vector
 
-from . import ctx_override, mask, miniyaml, paths, scene
+from . import anchor, ctx_override, mask, marks, miniyaml, paths, scene
 
 BG = (0.93, 0.93, 0.94)
 GRID = (0.72, 0.74, 0.78)
@@ -35,7 +35,16 @@ FONT = {
     "s": ".....|.....|.####|#....|.###.|....#|####.", "d": "....#|....#|.####|#...#|#...#|#...#|.####",
     "m": ".....|.....|##.#.|#.#.#|#.#.#|#.#.#|#.#.#", "1": "..#..|.##..|..#..|..#..|..#..|..#..|.###.",
     " ": ".....|.....|.....|.....|.....|.....|.....",
+    # A badge prints a mark id, so the digits earn their place here too
+    "0": ".###.|#...#|#..##|#.#.#|##..#|#...#|.###.", "2": ".###.|#...#|....#|...#.|..#..|.#...|#####",
+    "3": "####.|....#|....#|.###.|....#|....#|####.", "4": "...#.|..##.|.#.#.|#..#.|#####|...#.|...#.",
+    "5": "#####|#....|####.|....#|....#|#...#|.###.", "6": "..##.|.#...|#....|####.|#...#|#...#|.###.",
+    "7": "#####|....#|...#.|..#..|.#...|.#...|.#...", "8": ".###.|#...#|#...#|.###.|#...#|#...#|.###.",
+    "9": ".###.|#...#|#...#|.####|....#|...#.|.##..",
 }
+
+BADGE = 2          # glyph scale: 14 px tall on a 512 tile, and readable
+GLYPH_W, GLYPH_H = 6 * BADGE, 7 * BADGE
 
 
 def world_segments(lo, hi):
@@ -154,6 +163,70 @@ def mask_setup(sc):
     sc.world.color = (0, 0, 0)
 
 
+def pins(path, sc):
+    """`[(id, world point)]` for every open mark that knows where it is.
+
+    A mark that has never been resolved has nothing to draw — it is still just
+    a pixel on a sheet that no longer exists. A mark whose part has gone is
+    said to be orphaned, here, where the build is in front of us, and is not
+    drawn anywhere: a badge somewhere plausible would be a lie with a leader
+    line attached.
+    """
+    here = {o.name: o for o in sc.objects if o.type == "MESH"}
+    anchor.orphan(path, set(here))
+    out = []
+    for mark in marks.load(path):
+        a, live = mark.get("anchor"), None
+        if not a or mark.get("status") != "open":
+            continue
+        live = here.get(a["part"])
+        if live:
+            m = [c for row in live.matrix_world for c in row]
+            out.append((mark["id"], Vector(anchor.place(m, a["local"]))))
+    return out
+
+
+def badge(tile, bgmask, label, at, t, taken):
+    """Draw one badge near a pin, leashed to it. Returns its pixel, or None
+    when the tile is too crowded to place it without covering geometry.
+
+    The pin itself is always *on* a part, so nothing is ever drawn there; the
+    leader line is painted the same way the grid is, which makes it disappear
+    behind the model exactly where it should.
+    """
+    x, y = at
+    w, h = GLYPH_W * len(label), GLYPH_H
+    spot = anchor.badge_spot(
+        lambda bx, by, bw, bh: bool(bgmask[by:by + bh, bx:bx + bw].all()),
+        x, y, w, h, (t, t), taken=taken)
+    if spot is None:
+        return None
+    bx, by = spot
+    taken.append((bx, by, w, h))
+    paint(tile, bgmask, (x, y), (bx + w / 2, by + h / 2), INK, 1)
+    text(tile, bx, by, label, scale=BADGE)
+    return bx, by
+
+
+def view_record(label, tile, cam):
+    """What it takes to cast this view's rays again, in about 200 bytes: the
+    tile it occupies on the sheet, and the camera that drew it.
+
+    The camera is stored as its parameters rather than as a ray table, because
+    a ray per pixel is a position buffer by another name (ADR 0018) — and
+    because rebuilding the camera is the only way to be sure the ray matches
+    the projection that put the pixel there.
+    """
+    d = cam.data
+    return {"label": label, "tile": list(tile),
+            "matrix": [c for row in cam.matrix_world for c in row],
+            "type": d.type, "lens": d.lens, "ortho_scale": d.ortho_scale,
+            "sensor_fit": d.sensor_fit, "sensor_width": d.sensor_width,
+            "sensor_height": d.sensor_height,
+            "shift_x": d.shift_x, "shift_y": d.shift_y,
+            "clip": [d.clip_start, d.clip_end]}
+
+
 def read(path, raw=False):
     img = bpy.data.images.load(str(path))
     if raw:  # the mask is data, not a picture: no sRGB on the way back in
@@ -162,6 +235,19 @@ def read(path, raw=False):
     buf = np.empty(w * h * 4, dtype=np.float32)
     img.pixels.foreach_get(buf)
     return buf.reshape(h, w, 4)
+
+
+def badge_line(variant, placed):
+    """What the sheet now shows, in one line and never more — the first view
+    each pin landed in, three of them, then a count. A badge is there to be
+    looked at, not read out."""
+    if not placed:
+        return []
+    shown = [f"{mid} {label} {x},{y}" for mid, (label, x, y) in list(placed.items())[:3]]
+    if len(placed) > 3:
+        shown.append(f"+{len(placed) - 3} more")
+    n = len(placed)
+    return [f"{variant} {n} badge{'' if n == 1 else 's'}  " + "  ".join(shown)]
 
 
 def run(args):
@@ -195,6 +281,9 @@ def run(args):
     segs = world_segments(lo, hi)
     t = res // 2
     P["out"].mkdir(parents=True, exist_ok=True)
+    # Top-down tile rects, the way a click counts: front|right / top|persp.
+    corners = {"front": (0, 0), "right": (t, 0), "top": (0, t), "persp": (t, t)}
+    pinned, placed = pins(P["marks"], sc), {}
     tiles, cams = [], []
     for label, loc, orth, down in views:
         cam = add_camera(label, loc, ctr, orth, down)
@@ -212,6 +301,15 @@ def run(args):
                 continue
             paint(tile, bgmask, (pa.x * t, pa.y * t), (pb.x * t, pb.y * t), colour, width)
         text(tile, 8, t - 22, f"{label}   grid 1 m")
+        taken = []
+        for mid, world in pinned:
+            at = world_to_camera_view(sc, cam, world)
+            if at.z <= 0 or not (0 <= at.x <= 1 and 0 <= at.y <= 1):
+                continue                       # behind this camera, or off its frame
+            if badge(tile, bgmask, mid, (at.x * t, at.y * t), t, taken) \
+                    and mid not in placed:
+                cx, cy = corners[label]
+                placed[mid] = (label, int(cx + at.x * t), int(cy + t - at.y * t))
         tiles.append(tile)
 
     # Second pass, same cameras, same process: a pixel is a part number.
@@ -231,6 +329,10 @@ def run(args):
     mask.write(P["mask"], np.flipud(idx))   # Blender reads bottom-up, PNG top-down
     P["parts"].write_text(json.dumps(parts, indent=2) + "\n", encoding="utf-8")
 
+    anchor.record(P["views"], res,
+                  [view_record(label, (*corners[label], t, t), cam)
+                   for label, cam in cams], P["blend"])
+
     sheet = np.ones((res, res, 4), dtype=np.float32)
     for (row, col), tile in zip([(1, 0), (1, 1), (0, 0), (0, 1)], tiles):
         sheet[row * t:(row + 1) * t, col * t:(col + 1) * t] = tile
@@ -247,4 +349,5 @@ def run(args):
                                   f"{paths.display(P['sheet'])}"
                                   "  (front|right / top|persp)",
                                   f"{variant} mask {len(parts)} parts -> "
-                                  f"{paths.display(P['mask'])}"]}
+                                  f"{paths.display(P['mask'])}",
+                                  *badge_line(variant, placed)]}
