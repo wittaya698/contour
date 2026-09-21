@@ -43,6 +43,8 @@ def apply(path, found):
     kept = marks.load(path)
     done = []
     for mark in kept:
+        if mark.get("ref"):
+            continue          # a photograph has no parts to be anchored in
         hit = found.get(mark.get("id"))
         if hit:
             mark.pop("pixel", None)
@@ -117,6 +119,8 @@ def orphan(path, part_names):
     kept = marks.load(path)
     gone, before = [], json.dumps(kept)
     for mark in kept:
+        if mark.get("ref"):
+            continue          # no build of ours can orphan a mark on a reference
         part = (mark.get("anchor") or {}).get("part")
         if not part:
             continue

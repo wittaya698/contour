@@ -14,7 +14,7 @@ prints only its terse `lines`. Stdlib only: no venv, no yaml.
     contour export                .glb + round-trip re-measure
     contour api <symbol>...       real signature from the installed Blender
     contour measure <ref> ...     real pixel geometry from a reference image
-    contour canvas                the sheet in a browser, to mark on; anchors what it takes
+    contour canvas                the sheet and the references in a browser, to mark on
     contour selftest              fixture pipeline test
     contour install-hooks         install the pre-push guard (ADR 0011)
     contour init <name>           create a model space here
@@ -191,7 +191,8 @@ def main(argv):
         out = PROJECT / "out"
         return emit(canvas.serve(PROJECT / "sheet.png", PROJECT / marks.NAME,
                                  out / "mask.png", out / "parts.json",
-                                 resolve=lambda: stage(["resolve"])))
+                                 resolve=lambda: stage(["resolve"]),
+                                 refs=PROJECT / "refs"))
     if cmd == "measure" and rest:
         if not PROJECT:
             return need_project(cmd)

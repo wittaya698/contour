@@ -10,6 +10,7 @@ mark *records* is resolved here, from the mask on disk. Hover is a convenience;
 the record is evidence, and it has one source.
 """
 import json
+import urllib.parse
 import threading
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -18,6 +19,7 @@ from pathlib import Path
 from lib import anchor
 from lib import marks as marks_store
 from lib import mask as mask_store
+from lib import refs as refs_store
 
 PAGE = Path(__file__).resolve().parent / "canvas.html"
 
@@ -34,6 +36,13 @@ class _Handler(BaseHTTPRequestHandler):
         if self.path.split("?")[0] == "/mask.png":
             blob = self.server.canvas.mask_bytes()
             return self._bytes(blob, "image/png") if blob else self.send_error(404)
+        if self.path.split("?")[0] == "/ref":
+            asked = urllib.parse.parse_qs(
+                urllib.parse.urlparse(self.path).query).get("name", [""])[0]
+            got = refs_store.blob(self.server.canvas.refs, asked)
+            return self._bytes(*got) if got else self.send_error(404)
+        if self.path.split("?")[0] == "/refs.json":
+            return self._json(refs_store.listing(self.server.canvas.refs))
         if self.path.split("?")[0] == "/parts.json":
             return self._json(self.server.canvas.parts_table())
         if self.path.split("?")[0] == "/sheet.png":
@@ -68,12 +77,14 @@ class _Handler(BaseHTTPRequestHandler):
 class Canvas:
     """One canvas session. `start` binds and serves; `stop` releases the port."""
 
-    def __init__(self, sheet, marks, mask=None, parts=None, resolve=None):
+    def __init__(self, sheet, marks, mask=None, parts=None, resolve=None,
+                 refs=None):
         self.sheet = Path(sheet)
         self.marks = Path(marks)
         self.mask = Path(mask) if mask else None
         self.parts = Path(parts) if parts else None
         self.resolve = resolve
+        self.refs = Path(refs) if refs else None
         self.captured = []
         self.pruned = None
         self._lock = threading.Lock()         # two posts can land at once
@@ -99,13 +110,22 @@ class Canvas:
 
     def record(self, body):
         """Store one mark as it arrives, not at the end: an interrupted
-        session then still leaves behind everything the user had said."""
-        mark = {"view": body.get("view"),
-                "pixel": body.get("pixel"),
-                "text": body.get("text", "")}
-        part = self.part_at(body.get("pixel"))
-        if part:
-            mark["part"] = part
+        session then still leaves behind everything the user had said.
+
+        Two kinds land here. A **sheet mark** names one of our four views, and
+        the mask is asked what part its pixel fell on. A **ref mark** names one
+        of the user's photographs, which knows nothing about parts and was not
+        drawn by any view of ours, so it carries the image and the pixel alone
+        (ADR 0018).
+        """
+        pixel, text = body.get("pixel"), body.get("text", "")
+        if body.get("ref"):
+            mark = {"ref": body["ref"], "pixel": pixel, "text": text}
+        else:
+            mark = {"view": body.get("view"), "pixel": pixel, "text": text}
+            part = self.part_at(pixel)
+            if part:
+                mark["part"] = part
         with self._lock:
             stored = marks_store.append(self.marks, mark)
             self.captured.append(stored)
@@ -185,7 +205,8 @@ class Canvas:
         self._server = None
 
 
-def serve(sheet, marks, mask=None, parts=None, resolve=None, open_browser=True):
+def serve(sheet, marks, mask=None, parts=None, resolve=None, refs=None,
+          open_browser=True):
     """One canvas session, start to report. Blocks until the page says done.
 
     The first Contour command that waits rather than shoots, so it is also the
@@ -195,7 +216,7 @@ def serve(sheet, marks, mask=None, parts=None, resolve=None, open_browser=True):
     sheet = Path(sheet)
     if not sheet.exists():
         return {"ok": False, "lines": [f"FAIL no sheet at {sheet} — run contour render first"]}
-    canvas = Canvas(sheet, marks, mask, parts, resolve)
+    canvas = Canvas(sheet, marks, mask, parts, resolve, refs)
     url = canvas.start()
     print(f"canvas at {url}  —  click the sheet, then press Done", flush=True)
     if open_browser:

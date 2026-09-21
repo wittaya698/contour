@@ -28,13 +28,22 @@
   .pin { position: absolute; width: 20px; height: 20px; margin: -10px 0 0 -10px;
          border-radius: 50%; background: var(--pin); color: #fff; font-size: 11px;
          font-weight: 700; display: grid; place-items: center; pointer-events: none; }
+  /* A ref mark points at the user's intent, not at our build, and the two must
+     never be misread for one another. Shape, not colour: it still reads on a
+     photograph of any hue, and in greyscale. */
+  .pin.ref { border-radius: 2px; }
+  li.ref::marker { content: "\25A0  "; }
+  /* The strip: the sheet, then the user's references. One canvas, one at a time. */
+  #strip { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+  #strip button { padding: 4px 10px; font-size: 12px; opacity: .65; }
+  #strip button.on { opacity: 1; border-color: var(--pin); color: var(--pin); }
   /* A closed mark stays on the sheet and stops shouting: hollow, not gone. */
   .pin.closed { background: transparent; border: 1.5px solid var(--line); color: var(--line); }
   li.closed { opacity: .45; text-decoration: line-through; }
   .part { opacity: .8; font-size: 12px; font-weight: 600; }
   .shut { border: 0; padding: 0 0 0 6px; font-size: 12px; opacity: .6; text-decoration: underline; }
 </style>
-<div id="stage"><div id="wrap"><canvas id="sheet"></canvas></div></div>
+<div id="stage"><div id="strip"></div><div id="wrap"><canvas id="sheet"></canvas></div></div>
 <aside>
   <h1>Marks</h1>
   <ol id="list"></ol>
@@ -51,7 +60,11 @@ const cv = document.getElementById('sheet'), ctx = cv.getContext('2d');
 const wrap = document.getElementById('wrap'), list = document.getElementById('list');
 const entry = document.getElementById('entry'), text = document.getElementById('text');
 const where = document.getElementById('where'), hint = document.getElementById('hint');
+const strip = document.getElementById('strip');
 let marks = [], pending = null, added = 0, parts = {};
+// null means the sheet; otherwise the name of the reference on show. Only one
+// picture is ever displayed, so only its own marks are ever pinned to it.
+let showing = null;
 
 // The mask is read here, never fetched per mouse move: hover has to be instant.
 // It is the same size and the same four-tile layout as the sheet, so a sheet
@@ -66,8 +79,33 @@ maskImg.src = '/mask.png?' + Date.now();
 fetch('/parts.json').then(r => r.json()).then(t => parts = t);
 
 const img = new Image();
-img.onload = () => { cv.width = img.width; cv.height = img.height; ctx.drawImage(img, 0, 0); draw(); };
-img.src = '/sheet.png?' + Date.now();
+img.onload = () => { cv.width = img.width; cv.height = img.height;
+                     ctx.clearRect(0, 0, cv.width, cv.height);
+                     ctx.drawImage(img, 0, 0); draw(); };
+
+function show(name) {
+  showing = name;
+  pending = null;
+  entry.hidden = true;
+  for (const b of strip.children) b.classList.toggle('on', (b.dataset.ref || null) === name);
+  text.placeholder = name ? 'here is what I meant' : 'what is wrong here';
+  hint.textContent = name ? 'Click the reference, then type one line.'
+                          : 'Click the sheet, then type one line.';
+  img.src = name ? '/ref?name=' + encodeURIComponent(name) : '/sheet.png?' + Date.now();
+}
+
+// A space with no references gets a strip with the sheet alone, which is the
+// canvas it has always been.
+fetch('/refs.json').then(r => r.json()).then(names => {
+  for (const name of [null, ...names]) {
+    const b = document.createElement('button');
+    b.textContent = name || 'sheet';
+    if (name) b.dataset.ref = name;
+    b.addEventListener('click', () => show(name));
+    strip.appendChild(b);
+  }
+  show(null);
+});
 
 // Marks outlive the session that made them, so the page starts from the file.
 fetch('/marks').then(r => r.json()).then(on => { marks = on; draw(); });
@@ -96,19 +134,20 @@ function draw() {
   list.replaceChildren();
   marks.forEach((mark, i) => {
     const closed = mark.status === 'closed';
-    if (cv.width && mark.pixel) {
+    const here = (mark.ref || null) === showing;
+    if (cv.width && mark.pixel && here) {
       const pin = document.createElement('div');
-      pin.className = closed ? 'pin closed' : 'pin';
+      pin.className = 'pin' + (closed ? ' closed' : '') + (mark.ref ? ' ref' : '');
       pin.textContent = closed ? '✓' : i + 1;
       pin.style.left = (mark.pixel[0] / cv.width * 100) + '%';
       pin.style.top = (mark.pixel[1] / cv.height * 100) + '%';
       wrap.appendChild(pin);
     }
     const li = document.createElement('li');
-    if (closed) li.className = 'closed';
+    li.className = (closed ? 'closed ' : '') + (mark.ref ? 'ref' : '');
     const view = document.createElement('span');
     view.className = 'view';
-    view.textContent = mark.view || '';
+    view.textContent = mark.ref || mark.view || '';
     const part = document.createElement('span');
     part.className = 'part';
     part.textContent = mark.part || '';     // marks made before parts existed
@@ -131,16 +170,19 @@ async function shutMark(mark) {
 }
 
 cv.addEventListener('mousemove', e => {
+  if (showing) return;           // a photograph has no parts to name
   const [x, y] = at(e);
   const part = partAt(x, y);
-  hint.textContent = part ? part : 'Click the sheet, then type one line.';
+  hint.textContent = part || 'Click the sheet, then type one line.';
 });
 
 cv.addEventListener('click', e => {
   const [x, y] = at(e);
-  pending = { view: viewAt(x, y), pixel: [x, y] };
-  const part = partAt(x, y);
-  where.textContent = pending.view + (part ? '  ' + part : '') + '  ' + x + ', ' + y;
+  const part = showing ? null : partAt(x, y);
+  pending = showing ? { ref: showing, pixel: [x, y] }
+                    : { view: viewAt(x, y), pixel: [x, y] };
+  where.textContent = (showing || pending.view) + (part ? '  ' + part : '')
+                      + '  ' + x + ', ' + y;
   entry.hidden = false;
   text.value = '';
   text.focus();
