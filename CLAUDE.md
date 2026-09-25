@@ -69,6 +69,7 @@ it and the reference images with it.
 - Decisions + rationale: `docs/adr/`
 - Vocabulary and pipeline stages: `docs/CONTEXT.md`
 - Undecided, and what it blocks: `docs/OPEN-QUESTIONS.md`
+- Planned work, sliced and grabbable: `docs/issues/`
 - Push guard: `tools/hooks/pre-push`, installed by `contour install-hooks`
 - Spec guard: `tools/guards/spec.py`, which a space runs as `contour hook spec`
   and never copies (ADR 0015)
