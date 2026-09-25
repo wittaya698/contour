@@ -71,6 +71,29 @@
   <button id="done">Done</button>
 </aside>
 <script>
+// This session's token, from the URL the command opened (ADR 0019). Localhost
+// is not a boundary for a server that takes POSTs, so every request carries it.
+const TOKEN = new URLSearchParams(location.search).get('t') || '';
+
+// One place, so there is one place to get it wrong. A fetch sends the token as
+// a header, which makes the request non-simple and therefore unreachable from
+// another site without a preflight the server refuses; a body makes it a POST
+// and declares JSON, which is the content type the server insists on.
+function ask(path, body) {
+  const init = { headers: { 'X-Contour-Token': TOKEN } };
+  if (body !== undefined) {
+    init.method = 'POST';
+    init.headers['Content-Type'] = 'application/json';
+    init.body = JSON.stringify(body);
+  }
+  return fetch(path, init);
+}
+
+// An <img src> cannot carry a header, so a picture carries the token in the
+// query. Safe: fetching one changes nothing.
+function asset(path) {
+  return path + (path.includes('?') ? '&' : '?') + 't=' + encodeURIComponent(TOKEN);
+}
 const cv = document.getElementById('sheet'), ctx = cv.getContext('2d');
 const wrap = document.getElementById('wrap'), list = document.getElementById('list');
 const entry = document.getElementById('entry'), text = document.getElementById('text');
@@ -94,8 +117,8 @@ const maskImg = new Image();
 maskImg.onload = () => { mk.width = maskImg.width; mk.height = maskImg.height;
                          mctx.drawImage(maskImg, 0, 0); };
 maskImg.onerror = () => {};   // a space rendered before masks existed: no hover
-maskImg.src = '/mask.png?' + Date.now();
-fetch('/parts.json').then(r => r.json()).then(t => parts = t);
+maskImg.src = asset('/mask.png?' + Date.now());
+ask('/parts.json').then(r => r.json()).then(t => parts = t);
 
 const img = new Image();
 img.onload = () => { cv.width = img.width; cv.height = img.height;
@@ -110,12 +133,13 @@ function show(name) {
   text.placeholder = name ? 'here is what I meant' : 'what is wrong here';
   hint.textContent = name ? 'Click the reference, or drag across a distance.'
                           : 'Click the sheet, then type one line.';
-  img.src = name ? '/ref?name=' + encodeURIComponent(name) : '/sheet.png?' + Date.now();
+  img.src = asset(name ? '/ref?name=' + encodeURIComponent(name)
+                       : '/sheet.png?' + Date.now());
 }
 
 // A space with no references gets a strip with the sheet alone, which is the
 // canvas it has always been.
-fetch('/refs.json').then(r => r.json()).then(names => {
+ask('/refs.json').then(r => r.json()).then(names => {
   for (const name of [null, ...names]) {
     const b = document.createElement('button');
     b.textContent = name || 'sheet';
@@ -127,7 +151,7 @@ fetch('/refs.json').then(r => r.json()).then(names => {
 });
 
 // Marks outlive the session that made them, so the page starts from the file.
-fetch('/marks').then(r => r.json()).then(on => { marks = on; draw(); });
+ask('/marks').then(r => r.json()).then(on => { marks = on; draw(); });
 
 // Sheet layout, from contour render: front | right over top | persp.
 function viewAt(x, y) {
@@ -219,7 +243,7 @@ function draw() {
 
 // One click, no typing: only the user ever closes a mark.
 async function shutMark(mark) {
-  const res = await fetch('/close', { method: 'POST', body: JSON.stringify({ id: mark.id }) });
+  const res = await ask('/close', { id: mark.id });
   if (res.ok) { mark.status = 'closed'; draw(); }
 }
 
@@ -255,7 +279,7 @@ entry.addEventListener('submit', async e => {
   e.preventDefault();
   if (!pending || !text.value.trim()) return;
   const body = { ...pending, text: text.value.trim() };
-  const res = await fetch('/marks', { method: 'POST', body: JSON.stringify(body) });
+  const res = await ask('/marks', body);
   marks.push(await res.json());
   added++;
   pending = null;
@@ -264,7 +288,7 @@ entry.addEventListener('submit', async e => {
 });
 
 document.getElementById('done').addEventListener('click', async () => {
-  await fetch('/done', { method: 'POST', body: '{}' });
+  await ask('/done', {});
   document.body.innerHTML = '<p style="margin:40px">Canvas closed — '
     + added + ' mark' + (added === 1 ? '' : 's') + ' captured. You can close this tab.</p>';
 });

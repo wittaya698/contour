@@ -18,7 +18,7 @@ from lib import anchor
 from lib import marks as marks_store
 from lib.canvas import Canvas
 
-from test_canvas import post
+from client import post
 
 
 def sheet(res=1024):
@@ -180,9 +180,9 @@ class CanvasResolveTest(unittest.TestCase):
 
     def test_the_session_ends_by_anchoring_what_it_captured_once(self):
         canvas = self.open_canvas()
-        post(canvas.url + "/marks", {"view": "front", "pixel": [128, 384], "text": "a"})
-        post(canvas.url + "/marks", {"view": "top", "pixel": [10, 520], "text": "b"})
-        post(canvas.url + "/done", {})
+        post(canvas, "/marks", {"view": "front", "pixel": [128, 384], "text": "a"})
+        post(canvas, "/marks", {"view": "top", "pixel": [10, 520], "text": "b"})
+        post(canvas, "/done", {})
         report = canvas.wait()
         self.assertEqual(len(self.runs), 1)
         self.assertIn("1 mark anchored", " ".join(report["lines"]))
@@ -194,8 +194,8 @@ class CanvasResolveTest(unittest.TestCase):
                                                "text": "already placed"})
         anchor.apply(self.marks, {mark["id"]: {"part": "cap", "local": [0, 0, 0.03]}})
         canvas = self.open_canvas()
-        post(canvas.url + "/close", {"id": mark["id"]})
-        post(canvas.url + "/done", {})
+        post(canvas, "/close", {"id": mark["id"]})
+        post(canvas, "/done", {})
         canvas.wait()
         self.assertEqual(self.runs, [])
 

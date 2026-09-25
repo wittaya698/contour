@@ -10,6 +10,7 @@ mark *records* is resolved here, from the mask on disk. Hover is a convenience;
 the record is evidence, and it has one source.
 """
 import json
+import secrets
 import urllib.parse
 import threading
 import webbrowser
@@ -22,13 +23,63 @@ from lib import mask as mask_store
 from lib import refs as refs_store
 
 PAGE = Path(__file__).resolve().parent / "canvas.html"
+TOKEN_HEADER = "X-Contour-Token"
+TOKEN_PARAM = "t"
 
 
 class _Handler(BaseHTTPRequestHandler):
     def log_message(self, *a):
         pass                                  # the page is chatty; the report is not
 
+    def _authorised(self):
+        """Every request proves it belongs to this session, or gets nothing.
+
+        Two ways in, because the page has two kinds of caller. A fetch sends
+        the token as a header, which is what makes the request non-simple and
+        so unreachable from another site without a preflight. An `<img src>`
+        cannot set a header at all, so those carry it in the query — safe
+        because an image GET changes nothing.
+        """
+        header = self.headers.get(TOKEN_HEADER)
+        asked = urllib.parse.parse_qs(
+            urllib.parse.urlparse(self.path).query).get(TOKEN_PARAM, [None])[0]
+        wanted = self.server.canvas.token
+        return any(got is not None and secrets.compare_digest(got, wanted)
+                   for got in (header, asked))
+
+    def _is_json(self):
+        """A POST says JSON, or it never reaches a handler.
+
+        A form or text POST is a *simple* request: another page can send one
+        at this server with no preflight and no permission. Demanding a
+        content type that only a preflighted request can set turns that whole
+        class of request away at the door, before any body is read.
+        """
+        got = (self.headers.get("Content-Type") or "").split(";")[0].strip()
+        return got.lower() == "application/json"
+
+    def _same_origin(self):
+        """A request that says where it came from says here, or gets nothing.
+
+        The token alone is not the whole story: DNS rebinding hands another
+        site this address, so a request can arrive at the right port while
+        belonging to a page the user never opened. A browser attaches `Origin`
+        to exactly the requests that matter, and cannot be talked out of it.
+        Absent is not a failure — a non-browser caller sends none, and the
+        token is what stands behind it there.
+        """
+        origin = self.headers.get("Origin")
+        if origin is not None and origin != self.server.canvas.origin:
+            return False
+        # The browser's own account of where the request came from, which a
+        # page cannot forge. `none` is the address bar, `same-origin` is this
+        # page's own fetches; everything else is somebody else's page.
+        site = self.headers.get("Sec-Fetch-Site")
+        return site is None or site in ("none", "same-origin")
+
     def do_GET(self):
+        if not self._authorised() or not self._same_origin():
+            return self.send_error(403)
         if self.path == "/" or self.path.startswith("/?"):
             return self._bytes(PAGE.read_bytes(), "text/html; charset=utf-8")
         if self.path.split("?")[0] == "/marks":
@@ -50,6 +101,10 @@ class _Handler(BaseHTTPRequestHandler):
         self.send_error(404)
 
     def do_POST(self):
+        if not self._authorised() or not self._same_origin():
+            return self.send_error(403)
+        if not self._is_json():
+            return self.send_error(415)
         n = int(self.headers.get("Content-Length") or 0)
         body = json.loads(self.rfile.read(n) or b"{}")
         if self.path == "/marks":
@@ -85,6 +140,7 @@ class Canvas:
         self.parts = Path(parts) if parts else None
         self.resolve = resolve
         self.refs = Path(refs) if refs else None
+        self.token = secrets.token_urlsafe(32)
         self.captured = []
         self.pruned = None
         self._lock = threading.Lock()         # two posts can land at once
@@ -94,10 +150,18 @@ class Canvas:
         self._addr = None
 
     @property
-    def url(self):
-        """Stays readable after the server stops, so the report can name it."""
+    def origin(self):
+        """Where the server is. Stays readable after it stops, so the report
+        can name it."""
         host, port = self._addr
         return f"http://{host}:{port}"
+
+    @property
+    def url(self):
+        """What the browser is pointed at: the origin, carrying this session's
+        token. The page reads it back out of its own location and sends it as a
+        header from then on, so the secret stops appearing in request URLs."""
+        return f"{self.origin}/?{TOKEN_PARAM}={self.token}"
 
     def start(self):
         self.pruned = marks_store.prune(self.marks)   # before the page reads

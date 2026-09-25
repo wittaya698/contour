@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from lib import mask as mask_store
 from lib.canvas import Canvas
 
-from test_canvas import get, post
+from client import get, open_url, post
 
 
 class PartsTest(unittest.TestCase):
@@ -47,7 +47,7 @@ class PartsTest(unittest.TestCase):
                     [0, 1, 1, 0],
                     [0, 0, 0, 0]], {"1": "plinth"})
         canvas = self.open_canvas()
-        _, mark = post(canvas.url + "/marks",
+        _, mark = post(canvas, "/marks",
                        {"view": "front", "pixel": [2, 1], "text": "too tall"})
         self.assertEqual(mark["part"], "plinth")
         self.assertEqual(json.loads(self.marks.read_text())[0]["part"], "plinth")
@@ -61,7 +61,7 @@ class PartsTest(unittest.TestCase):
                     [0, 0, 0, 2],
                     [0, 0, 2, 2]], {"1": "left leg", "2": "right leg"})
         canvas = self.open_canvas()
-        _, mark = post(canvas.url + "/marks",
+        _, mark = post(canvas, "/marks",
                        {"view": "front", "pixel": [2, 1], "text": "gap too wide"})
         self.assertIsNone(mark.get("part"))
         self.assertNotIn("part", json.loads(self.marks.read_text())[0])
@@ -74,7 +74,7 @@ class PartsTest(unittest.TestCase):
                         mask=self.mask, parts=self.parts)   # neither on disk
         self.addCleanup(canvas.stop)
         canvas.start()
-        _, mark = post(canvas.url + "/marks",
+        _, mark = post(canvas, "/marks",
                        {"view": "top", "pixel": [2, 1], "text": "still works"})
         self.assertEqual(mark["text"], "still works")
         self.assertIsNone(mark.get("part"))
@@ -85,10 +85,10 @@ class PartsTest(unittest.TestCase):
         and never goes anywhere near the conversation."""
         self.paint([[0, 1], [1, 1]], {"1": "pillar"})
         canvas = self.open_canvas()
-        with urllib.request.urlopen(canvas.url + "/mask.png", timeout=5) as r:
+        with open_url(canvas, "/mask.png", timeout=5) as r:
             self.assertEqual(r.read(), self.mask.read_bytes())
             self.assertEqual(r.headers["Content-Type"], "image/png")
-        status, table = get(canvas.url + "/parts.json")
+        status, table = get(canvas, "/parts.json")
         self.assertEqual(status, 200)
         self.assertEqual(table, {"1": "pillar"})
 
@@ -99,7 +99,7 @@ class PartsTest(unittest.TestCase):
         name actually appears beside the cursor is a HITL check."""
         self.paint([[0, 1], [1, 1]], {"1": "pillar"})
         canvas = self.open_canvas()
-        with urllib.request.urlopen(canvas.url + "/", timeout=5) as r:
+        with open_url(canvas, "/", timeout=5) as r:
             page = r.read().decode()
         self.assertIn("/mask.png", page)
         self.assertIn("/parts.json", page)
