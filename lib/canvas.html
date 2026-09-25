@@ -44,6 +44,10 @@
   .who { font-size: 11px; letter-spacing: .06em; text-transform: uppercase;
          opacity: .6; color: var(--agent); }
   li.ref::marker { content: "\25A0  "; }
+  /* A span's far end: the same square, unnumbered. The line between them is
+     stroked on the canvas itself, because it has to sit under the pins and
+     scale with the picture. */
+  .pin.end { width: 12px; height: 12px; margin: -6px 0 0 -6px; }
   /* The strip: the sheet, then the user's references. One canvas, one at a time. */
   #strip { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
   #strip button { padding: 4px 10px; font-size: 12px; opacity: .65; }
@@ -73,6 +77,10 @@ const entry = document.getElementById('entry'), text = document.getElementById('
 const where = document.getElementById('where'), hint = document.getElementById('hint');
 const strip = document.getElementById('strip');
 let marks = [], pending = null, added = 0, parts = {};
+// Where a drag started, in picture pixels. A drag on a reference is a *span*:
+// two ends that mean one distance, which is the only way a picture can be
+// asked about a separation (ADR 0018).
+let down = null;
 // null means the sheet; otherwise the name of the reference on show. Only one
 // picture is ever displayed, so only its own marks are ever pinned to it.
 let showing = null;
@@ -100,7 +108,7 @@ function show(name) {
   entry.hidden = true;
   for (const b of strip.children) b.classList.toggle('on', (b.dataset.ref || null) === name);
   text.placeholder = name ? 'here is what I meant' : 'what is wrong here';
-  hint.textContent = name ? 'Click the reference, then type one line.'
+  hint.textContent = name ? 'Click the reference, or drag across a distance.'
                           : 'Click the sheet, then type one line.';
   img.src = name ? '/ref?name=' + encodeURIComponent(name) : '/sheet.png?' + Date.now();
 }
@@ -142,10 +150,31 @@ function at(e) {
 
 function draw() {
   for (const old of wrap.querySelectorAll('.pin')) old.remove();
+  // The picture goes back down first: a span is stroked onto the canvas, so
+  // last draw's lines have to be painted over rather than accumulated.
+  if (cv.width && img.complete) { ctx.clearRect(0, 0, cv.width, cv.height);
+                                  ctx.drawImage(img, 0, 0); }
   list.replaceChildren();
   marks.forEach((mark, i) => {
     const closed = mark.status === 'closed';
     const here = (mark.ref || null) === showing;
+    if (cv.width && mark.to && here) {
+      ctx.save();
+      ctx.strokeStyle = mark.author === 'agent' ? '#2f6fd8' : '#d8442f';
+      ctx.lineWidth = Math.max(2, cv.width / 400);
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(mark.pixel[0], mark.pixel[1]);
+      ctx.lineTo(mark.to[0], mark.to[1]);
+      ctx.stroke();
+      ctx.restore();
+      const far = document.createElement('div');
+      far.className = 'pin ref end' + (closed ? ' closed' : '')
+                      + (mark.author === 'agent' ? ' agent' : '');
+      far.style.left = (mark.to[0] / cv.width * 100) + '%';
+      far.style.top = (mark.to[1] / cv.height * 100) + '%';
+      wrap.appendChild(far);
+    }
     if (cv.width && mark.pixel && here) {
       const pin = document.createElement('div');
       pin.className = 'pin' + (closed ? ' closed' : '') + (mark.ref ? ' ref' : '')
@@ -201,13 +230,22 @@ cv.addEventListener('mousemove', e => {
   hint.textContent = part || 'Click the sheet, then type one line.';
 });
 
+cv.addEventListener('mousedown', e => { down = showing ? at(e) : null; });
+
 cv.addEventListener('click', e => {
   const [x, y] = at(e);
   const part = showing ? null : partAt(x, y);
-  pending = showing ? { ref: showing, pixel: [x, y] }
+  // Far enough to be meant. A hand is not steady on a click, and a span of
+  // three pixels is a slip, not a distance the user chose.
+  const drag = down && Math.hypot(x - down[0], y - down[1]) > cv.width / 100;
+  pending = showing ? { ref: showing, pixel: drag ? down : [x, y] }
                     : { view: viewAt(x, y), pixel: [x, y] };
+  if (drag) pending.to = [x, y];
   where.textContent = (showing || pending.view) + (part ? '  ' + part : '')
-                      + '  ' + x + ', ' + y;
+                      + '  ' + x + ', ' + y
+                      + (drag ? '  span ' + Math.round(Math.hypot(x - down[0],
+                                                                 y - down[1])) + 'px' : '');
+  down = null;
   entry.hidden = false;
   text.value = '';
   text.focus();

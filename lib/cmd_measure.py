@@ -14,6 +14,9 @@ what a leg is.
 Rows are indexed from the bottom of the image, so a height reads the way the
 model frame does: millimetres above the ground.
 
+    --span ID          read the distance between the two ends of one span mark
+                       and pin the answer back on the same reference (ADR 0018).
+                       Needs no <ref>: the mark names the picture it is on
     --anchor MM        the silhouette's height is MM; everything reports in mm
     --silhouette       bounding box of everything that is not background
     --region HEX       bounding box + centroid of one palette colour
@@ -31,7 +34,7 @@ import numpy as np
 
 import bpy
 
-from . import paths
+from . import marks, paths, span
 
 BG_TOL = 0.10     # distance from the sampled background colour
 DARK = 0.22       # below this mean brightness a pixel is toon outline, not colour
@@ -141,18 +144,42 @@ def flag(args, name, cast=str, default=None):
 
 
 def run(args):
-    if not args or args[0].startswith("--"):
+    named = None if not args or args[0].startswith("--") else args[0]
+    rest = args if named is None else args[1:]
+    base = paths.PROJECT or paths.ROOT
+    store = base / marks.NAME
+
+    # A span is already pinned to a reference, so it names its own: asking for
+    # the picture again means saying it twice, in two spellings -- the path
+    # this resolves and the bare name a mark records -- and getting the second
+    # one right. Every other query still has to be aimed by hand.
+    asked = flag(rest, "--span")
+    if asked:
+        aimed = span.aim(store, asked, named)
+        if not aimed["ok"]:
+            return aimed
+        # The mark's own name, never the one on the command line: a reference
+        # lives in `refs/` by its bare filename, and a name that got this far
+        # has already been checked against the mark rather than resolved.
+        name = f"refs/{aimed['ref']}"
+    elif named is None:
         return {"ok": False, "lines": ["FAIL measure: name a reference image first",
                                        "  e.g. contour measure refs/front.jpg --anchor 1700 --silhouette"]}
-    name, rest = args[0], args[1:]
-    base = paths.PROJECT or paths.ROOT
+    else:
+        name = named
     path = next((p for p in (base / name, paths.ROOT / name) if p.exists()), None)
     if path is None:
         return {"ok": False, "lines": [f"FAIL measure: no such reference {name}"]}
 
     tol = flag(rest, "--tol", float, 0.05)
     bg_tol = flag(rest, "--bg-tol", float, BG_TOL)
+    # A span reports in millimetres or not at all, so it falls back to the one
+    # real dimension the space has already stated rather than making the user
+    # retype it -- and to nothing else. Every other query keeps its old
+    # behaviour of measuring in pixels until an anchor is given.
     anchor = flag(rest, "--anchor", float)
+    if asked and anchor is None:
+        anchor = span.anchor_mm(base / "spec.yaml")
     px = load(path)
     h, w = px.shape[:2]
     bg, fg = masks(px, bg_tol)
@@ -164,6 +191,12 @@ def run(args):
     lines = [f"{name} {w}x{h}px  bg #{''.join('%02x' % int(c * 255) for c in bg)}"
              + f"  fg {100 * fg.mean():.1f}%"
              + (f"  scale {S.k:.4f}mm/px" if S.k else "  no anchor: px only")]
+
+    if asked:
+        # The scale is the only thing the image is asked for here: where the
+        # span runs was decided by the user, on the picture, with a mouse.
+        got = span.measure(store, asked, S.k)
+        return {**got, "lines": lines + got["lines"]}
 
     if "--silhouette" in rest or not any(f in rest for f in ("--region", "--scanline", "--profile")):
         lines.append(f"  silhouette  w {S.fmt(x1 - x0 + 1)}  h {S.fmt(y1 - y0 + 1)}"

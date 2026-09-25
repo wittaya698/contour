@@ -121,6 +121,8 @@ class Canvas:
         pixel, text = body.get("pixel"), body.get("text", "")
         if body.get("ref"):
             mark = {"ref": body["ref"], "pixel": pixel, "text": text}
+            if body.get("to"):
+                mark = {**mark, "to": body["to"]}
         else:
             mark = {"view": body.get("view"), "pixel": pixel, "text": text}
             part = self.part_at(pixel)

@@ -14,6 +14,7 @@ prints only its terse `lines`. Stdlib only: no venv, no yaml.
     contour export                .glb + round-trip re-measure
     contour api <symbol>...       real signature from the installed Blender
     contour measure <ref> ...     real pixel geometry from a reference image
+    contour measure --span <m>    read the distance two pins on a reference mean
     contour canvas                the sheet and the references in a browser, to mark on
     contour mark --part <p> "..."  pin a finding on the sheet, for the user to see
     contour selftest              fixture pipeline test
@@ -590,10 +591,15 @@ def agent_check(marks_path, out, w, h, data, table):
     """An agent mark lands on its part, without anyone having clicked anything.
 
     The agent names a part and no point on it, so the badge's position is
-    decided here, against the build: the middle of the part's bounding box. The
-    fixture's cap is a sphere on top of the pillar, so the middle of the cap
-    projects to a pixel the mask must call `cap` — which is the whole claim, and
-    one the part's *origin* would not always make (ADR 0018).
+    decided per view, against the identity mask: the pixel of the part nearest
+    the middle of its pixels. The fixture's cap is a sphere on top of the
+    pillar, so the badge must land on a pixel the mask calls `cap` — which is
+    the whole claim, and one the part's *origin* would not always make.
+
+    The fixture cannot witness the harder half: every part here is convex and
+    centred on its own origin, so it cannot tell this answer from the two that
+    were tried before it. That claim is made in `tests/test_agent_marks.py`
+    against `anchor.nearest`, on an L (ADR 0018).
 
     Returns the line to report, or the sentence to fail with.
     """
