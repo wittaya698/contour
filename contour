@@ -17,6 +17,7 @@ prints only its terse `lines`. Stdlib only: no venv, no yaml.
     contour measure --span <m>    read the distance two pins on a reference mean
     contour canvas                the sheet and the references in a browser, to mark on
     contour mark --part <p> "..."  pin a finding on the sheet, for the user to see
+    contour run <cmd>...          hold this space for one run, then release it
     contour selftest              fixture pipeline test
     contour install-hooks         install the pre-push guard (ADR 0011)
     contour init <name>           create a model space here
@@ -163,6 +164,79 @@ def say_marks(code):
     return code
 
 
+def held_by(rec):
+    """Who has the space, in one line the user can act on."""
+    return f"pid {rec.get('pid', '?')} running {rec.get('command', 'something')}"
+
+
+def hold(command, doing=None):
+    """Take the space for the length of this call, or refuse and say who has it.
+
+    `command` is what *this* caller is; `doing` is what goes on the record, so
+    the next caller's refusal can name a process it could go and look at.
+    """
+    sys.path.insert(0, str(ROOT))
+    from lib import lock
+    try:
+        record = lock.take(PROJECT, doing or command,
+                           run=os.environ.get("CONTOUR_RUN"))
+        if record.get("took_over"):
+            print(f"ok   lock    took over the hold left by "
+                  f"{held_by(record['took_over'])}, which is gone")
+        return record
+    except Exception as e:
+        rec = getattr(e, "record", None)
+        if rec is None:
+            raise
+        print(f"contour {command}: this space is held by {held_by(rec)}.",
+              file=sys.stderr)
+        return None
+
+
+def free(record):
+    """Release the space, whatever happened — a failed or interrupted run that
+    kept the lock would wedge the space until somebody found the file."""
+    sys.path.insert(0, str(ROOT))
+    from lib import lock
+    lock.release(PROJECT, record)
+
+
+def run_held(rest):
+    """`contour run <cmd>...`: one run, holding the space while it lasts.
+
+    The unit the lock is scoped to. What races is the `build.py` editing
+    *between* builds, so a build-scoped lock would look like a fix and not be
+    one — the holder here is the whole session, whatever it does.
+    """
+    record = hold("run", " ".join(["run", *rest]))
+    if record is None:
+        return 3
+    env = dict(os.environ, CONTOUR_RUN=record["run"])
+    try:
+        return subprocess.run(rest, env=env).returncode
+    except KeyboardInterrupt:
+        return 130
+    finally:
+        free(record)
+
+
+def build_path(cmd):
+    """check / render / export: the commands that write `out/` and read the
+    spec, and so the ones a second run may not join in on."""
+    drifted = check_revision()
+    if drifted:
+        return emit(drifted)
+    if cmd != "export":
+        code = emit(stage(["build" if cmd == "check" else cmd]))
+        return say_marks(code) if cmd == "check" else code
+    rep = stage(["export"])
+    if not rep["ok"]:
+        return emit(rep)
+    rt = stage(["roundtrip"], first=False)
+    rt["lines"] = rep["lines"] + rt["lines"]
+    return emit(rt)
+
+
 def main(argv):
     if not argv or argv[0] in ("-h", "--help", "help"):
         print(USAGE)
@@ -171,18 +245,13 @@ def main(argv):
     if cmd in ("check", "render", "export") and not rest:
         if not PROJECT:
             return need_project(cmd)
-        drifted = check_revision()
-        if drifted:
-            return emit(drifted)
-        if cmd != "export":
-            code = emit(stage(["build" if cmd == "check" else cmd]))
-            return say_marks(code) if cmd == "check" else code
-        rep = stage(["export"])
-        if not rep["ok"]:
-            return emit(rep)
-        rt = stage(["roundtrip"], first=False)
-        rt["lines"] = rep["lines"] + rt["lines"]
-        return emit(rt)
+        record = hold(cmd)
+        if record is None:
+            return 3
+        try:
+            return build_path(cmd)
+        finally:
+            free(record)
     if cmd == "api" and rest:
         return emit(stage(["api", *rest]))
     if cmd == "canvas" and not rest:
@@ -207,6 +276,10 @@ def main(argv):
         if not PROJECT:
             return need_project(cmd)
         return emit(stage(["measure", *rest]))
+    if cmd == "run" and rest:
+        if not PROJECT:
+            return need_project(cmd)
+        return run_held(rest)
     if cmd == "selftest" and not rest:
         return emit(stage_selftest())
     if cmd == "install-hooks" and not rest:
