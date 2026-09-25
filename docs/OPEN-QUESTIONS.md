@@ -97,3 +97,64 @@ and `udim`. Each needs a definition before it can be enforced.
 `verify.py` reads `origin: base_center` as: bounding box minimum Z at 0, and the centre
 of its X/Y extent at the origin. For an asymmetric model, such as one with a beak, that
 centre is not the midpoint between the feet. Say so if a rig needs the feet centre.
+
+## 11. Two agents, one space — RESOLVED 2026-09-25 by ADR 0019
+
+ADR 0019 puts the console above the launcher, which makes it and a terminal agent
+peers: both drive `./contour` over the same model space, and neither is
+privileged. `marks.json` is append-mostly and survives concurrent writers by
+luck. `build.py` does not — two agents editing it race, and the loser's work
+disappears silently into a file the other one overwrote.
+
+**Blocks:** nothing today, because the console does not exist. It blocks running
+the console and a terminal agent on the same space at the same time, which is
+the obvious thing to do the day it works.
+
+**Resolved:** a run-scoped lock in `.contour/`, taken and enforced by the
+launcher, refusing a second caller with a message. The launcher holds it, not the
+console — so it also covers terminal-versus-terminal, which raced before any of
+this existed. Scoped to a run rather than a build, because the `build.py` edits
+between builds are what actually race.
+
+## 12. A model space has no identity
+
+`.contour/project` is the marker that finds a space (ADR 0015) and carries
+`toolkit`, `toolkit_path` and `created`. Nothing in it is unique to the space, so
+the only key available to anything outside is the filesystem path.
+
+ADR 0019's per-space ask-list keys on that path and **fails closed** — an
+unrecognised space gets the strictest list — so a moved or renamed space makes
+the console ask about more than expected rather than less. The damage is
+contained; the cause is not fixed.
+
+**Blocks:** nothing. It bites when a space is renamed or moved, which has not
+happened yet across `beaky`, `beaky-lite`, `beaky-fable` and `beaky-solo`.
+
+**If nobody decides:** paths stay the key and fail-closed stays the guard. The
+durable fix is an id in `~/.contour` pointing *at* the path — not a field in
+`.contour/project`, which is tracked, inside the space and agent-writable, and
+would let the agent choose which permission set applies to it (ADR 0019 rejects
+that explicitly).
+
+## 13. The eight rules reach a space by where it happens to sit
+
+`CLAUDE.md` lives in the toolkit. A space under `project/` inherits it because
+Claude Code walks *up* from the working directory and the toolkit is a parent —
+an accident of location, not a decision. ADR 0015 defines a space as its own
+repository found by walking up for `.contour/project`, and says nothing about it
+living under the toolkit.
+
+So a space created elsewhere gets no `CLAUDE.md` and none of the eight hard rules.
+`refs/` stays protected, because the guard is wired in the space's own
+`.claude/settings.json` (ADR 0015) — but rules 2, 4, 6 and 7 quietly do not exist
+for an agent working there.
+
+**Blocks:** nothing today; every space on this machine is under `project/`.
+ADR 0019 makes it sharper rather than causing it: a console is pointed at a path
+rather than launched from a shell someone is standing in.
+
+**If nobody decides:** it stays true and stays invisible until the first space
+lives somewhere else. The candidate fixes are `contour init` writing a space-level
+`CLAUDE.md` that points at the toolkit's, or `contour doctor` reporting when a
+space cannot see the rules.
+

@@ -24,3 +24,4 @@ works — the alternative you are about to suggest is probably here with a reaso
 | [0016](0016-specs-from-references-and-revision.md) | Specs drawn from references, and revised under a counter — worked example corrected by [0017](0017-scaffold-measured-from-references.md) |
 | [0017](0017-scaffold-measured-from-references.md) | The scaffold: what the references measure, recorded separately |
 | [0018](0018-marks-a-canvas-over-the-sheet.md) | Marks: a canvas over the sheet, and a shared way to point — **Proposed** |
+| [0019](0019-console-a-driven-agent-behind-a-gate.md) | The console: a driven agent behind a gate — **Proposed**, amends [0010](0010-miniyaml-no-dependencies.md), [0018](0018-marks-a-canvas-over-the-sheet.md) |
