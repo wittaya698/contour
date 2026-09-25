@@ -157,6 +157,7 @@ INTENTLESS = {
     "doctor": "compares a space against the toolkit and writes nothing",
     "spaces": "lists spaces on this machine",
     "intents": "prints this very vocabulary",
+    "asks": "prints the ask-list; gating the audit would gate reading the gate",
     "hook": "is a guard, run by git and Claude Code rather than by an agent",
 }
 

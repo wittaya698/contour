@@ -35,7 +35,7 @@ print(" ".join(sorted({n.split(".")[0] for n in set(sys.modules) - before}
 # Runs outside Blender: the launcher, the canvas, the stores. Standard library
 # only, because `./contour` has to work on a clone with nothing installed.
 FREE = ("agent", "anchor", "canvas", "glb", "intent", "lock", "marks", "mask",
-        "miniyaml", "ops_whitelist", "paths", "refs", "span")
+        "miniyaml", "ops_whitelist", "paths", "policy", "refs", "span")
 
 # Runs inside Blender, and may import anything in FREE — the ban is one way.
 # Two of these are here by role rather than by their imports: `entry` is

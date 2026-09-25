@@ -24,6 +24,7 @@ prints only its terse `lines`. Stdlib only: no venv, no yaml.
     contour doctor                is this space in step with the toolkit
     contour spaces [name]         list model spaces, or print one's path
     contour intents               the call categories a gate can ask about
+    contour asks                  what this space lets through, and what asks
     contour hook <name>           run a guard; for hooks to call, not you
 """
 import json
@@ -289,6 +290,14 @@ def main(argv):
         sys.path.insert(0, str(ROOT))
         from lib import intent
         print("\n".join(intent.categories()))
+        return 0
+    if cmd == "asks" and not rest:
+        sys.path.insert(0, str(ROOT))
+        from lib import policy
+        try:
+            print("\n".join(policy.report(PROJECT)))
+        except policy.PolicyError as e:
+            return emit({"ok": False, "lines": [f"FAIL {e}"]})
         return 0
     if cmd == "hook" and rest:
         return run_hook(rest[0], rest[1:])
