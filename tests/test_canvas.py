@@ -5,6 +5,7 @@ here reaches inside the handler: a mark is real when it is on disk, and the
 canvas is done when the port is free.
 """
 import json
+import re
 import sys
 import tempfile
 import unittest
@@ -123,6 +124,118 @@ class CanvasTest(unittest.TestCase):
         self.assertFalse(self.canvas.done)
         with open_url(self.canvas, "/", timeout=5) as r:
             self.assertEqual(r.status, 200)
+
+    def test_the_launcher_says_it_can_mark_and_nothing_more(self):
+        """One page, two hosts, and the page asks rather than assumes (ADR 0019).
+
+        The launcher's answer is the whole of what a zero-dependency clone can
+        do, and that is marking: ADR 0018 made the sheet the surface both
+        parties point at, so a toolkit that could not mark without the console
+        would have moved an existing capability behind an install.
+        """
+        status, said = get(self.canvas, "/can")
+        self.assertEqual(status, 200)
+        self.assertEqual(said, {"can": ["marks"]})
+
+    def test_the_pages_console_surface_is_declared_not_assumed(self):
+        """Read from the source, as the no-internet tripwire above is: there is
+        no browser in this suite. What it pins is the page's side of the
+        bargain — a console-only affordance says which capability it needs, and
+        the launcher's ending says which capability it stands in for, so neither
+        host is hard-coded into markup the other one is also served.
+        """
+        with open_url(self.canvas, "/", timeout=5) as r:
+            page = r.read().decode()
+        self.assertIn('data-needs="drive"', page)
+        self.assertIn('data-unless="drive"', page)
+
+    def test_one_rule_applies_every_declaration(self):
+        """The page asks its host once and enforces the answer in one place.
+
+        Counted, not merely present: a second site that consults the answer is
+        the beginning of a page that is really two pages, which is the mistake
+        ADR 0019 named when it rejected sharing components between surfaces. A
+        new affordance should need a declaration and no new code at all.
+        """
+        with open_url(self.canvas, "/", timeout=5) as r:
+            page = r.read().decode()
+        self.assertIn("/can", page)
+        # The script alone: the stylesheet names the same attributes to keep them
+        # off screen until the answer lands, which is the same rule and not a
+        # second one. What must stay singular is the code that acts on `can`.
+        script = page.split("<script>", 1)[1]
+        self.assertEqual(script.count("[data-needs]"), 1)
+        self.assertEqual(script.count("[data-unless]"), 1)
+        self.assertIn(".remove()", script)
+
+    def test_nothing_reaches_for_an_affordance_its_host_removed(self):
+        """Every declared element may be absent, so nothing may assume it.
+
+        An unguarded `getElementById('done').addEventListener` throws under the
+        console, which the launcher's own tests would never notice: the page
+        works here and is broken there, from markup both are served. Each id
+        that carries a declaration is checked, so a new affordance cannot be
+        wired up the unsafe way either.
+        """
+        with open_url(self.canvas, "/", timeout=5) as r:
+            page = r.read().decode()
+        declared = re.findall(r'id="([^"]+)"[^>]*data-(?:needs|unless)=', page)
+        self.assertTrue(declared, "no declared affordance found to check")
+        for got in declared:
+            self.assertNotIn(f"getElementById('{got}').", page,
+                             f"#{got} can be removed by its host, so reaching "
+                             f"through it without a guard breaks the page")
+
+    def test_an_unknown_capability_changes_nothing(self):
+        """A host naming something this page has never heard of is not an error.
+
+        The page's rule removes what the host lacks, so a name it does not know
+        matches no element and does nothing — which is what makes a newer console
+        safe in front of an older page. Nothing is reported, either: `/can` is
+        written by us, and an unrecognised name there is our bug, not something
+        to put in front of the user. `lib/policy.py` says its strangers out loud
+        for the opposite reason — the user wrote that file.
+        """
+        odd = Canvas(sheet=self.sheet, marks=self.marks,
+                     can=("marks", "teleport"))
+        self.addCleanup(odd.stop)
+        odd.start()
+        status, said = get(odd, "/can")
+        self.assertEqual(status, 200)
+        self.assertEqual(said, {"can": ["marks", "teleport"]})
+        # and the surface the name has nothing to do with is untouched
+        status, _ = post(odd, "/marks", {"view": "front", "pixel": [10, 10],
+                                         "text": "still works"})
+        self.assertEqual(status, 200)
+        self.assertEqual(len(json.loads(self.marks.read_text())), 1)
+        with open_url(odd, "/", timeout=5) as r:
+            self.assertEqual(r.status, 200)
+
+    def test_there_is_one_page_and_the_console_did_not_add_a_second(self):
+        """ADR 0019 rejected two surfaces sharing components as *a bundler with
+        a delay*. The page degrading to its host is what replaced that, so a
+        second page appearing beside this one means the replacement was
+        abandoned — and the sheet stops being the one surface both parties point
+        at, which is ADR 0018's whole argument. If the page does outgrow one
+        file, the console's extra views are served beside it, not bundled in.
+        """
+        from lib import canvas as canvas_lib
+        pages = sorted(Path(canvas_lib.__file__).parent.glob("*.html"))
+        self.assertEqual([p.name for p in pages], ["canvas.html"])
+
+    def test_no_affordance_is_shown_before_the_host_has_answered(self):
+        """`/can` is a request, so there is a moment before the answer arrives.
+
+        Painted in that moment, the launcher's page shows the console's panel and
+        the console's page shows the canvas's ending — each host briefly offering
+        the other's surface, which is exactly what this slice exists to prevent.
+        So whatever depends on the answer stays hidden until there is one.
+        """
+        with open_url(self.canvas, "/", timeout=5) as r:
+            page = r.read().decode()
+        self.assertIn("body:not(.asked) [data-needs]", page)
+        self.assertIn("body:not(.asked) [data-unless]", page)
+        self.assertIn("classList.add('asked')", page)
 
 
 if __name__ == "__main__":

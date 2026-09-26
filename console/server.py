@@ -25,6 +25,15 @@ def phrase(secs):
 GRACE_S = 10          # beats are seconds apart; this is several missed ones
 IDLE_S = 60 * 60      # the tab left open on Friday, ended before Monday
 
+CAN = canvas_lib.MARKS_ONLY + ("drive",)
+"""What the page may offer when the console is the one serving it.
+
+The launcher's answer plus the run, and built from `MARKS_ONLY` rather than
+spelled out, so marking cannot come to mean one thing here and another there.
+`drive` is the console's whole difference: it owns the build, so it is the only
+host that can be asked to start or end one (ADR 0019).
+"""
+
 
 class Console:
     """One console session over one model space.
@@ -42,7 +51,7 @@ class Console:
         self.canvas = canvas_lib.Canvas(
             sheet=self.space / "sheet.png",
             marks=self.space / marks_store.NAME,
-            mask=out / "mask.png", parts=out / "parts.json")
+            mask=out / "mask.png", parts=out / "parts.json", can=CAN)
 
     def start(self):
         url = self.canvas.start()

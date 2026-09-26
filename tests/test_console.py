@@ -7,6 +7,7 @@ need it to actually serve point `$CONTOUR_CONSOLE_PYTHON` at this interpreter â€
 honest in slice 06, where the console needs nothing but the standard library and
 the environment requirement is structural.
 """
+import json
 import os
 import re
 import signal
@@ -108,6 +109,40 @@ class ServesTest(unittest.TestCase):
             proc.kill()
         if not proc.stdout.closed:
             proc.stdout.close()
+
+    def test_the_console_says_it_can_drive_as_well_as_mark(self):
+        """Same page, bigger host. The console's answer to `/can` is the
+        launcher's plus what only the console has, because the page degrades to
+        its host rather than each host carrying a page of its own (ADR 0019).
+        """
+        _, url = self.launch()
+        origin, token = url.split("/?")[0], url.split("t=")[1]
+        with urllib.request.urlopen(f"{origin}/can?t={token}", timeout=10) as r:
+            said = json.loads(r.read())
+        self.assertIn("marks", said["can"])
+        self.assertIn("drive", said["can"])
+
+    def test_every_capability_the_page_asks_for_is_one_a_host_grants(self):
+        """Page and hosts, checked against each other rather than separately.
+
+        An affordance keyed on a name no server ever answers is invisible
+        forever, and the page cannot notice: its rule removes what the host
+        lacks, so a typo reads exactly like a capability the host does not have.
+        The console's set comes over HTTP and not from an import, because from
+        slice 08 `console/` may hold a dependency and this suite has to keep
+        working on a bare clone.
+        """
+        from lib.canvas import MARKS_ONLY
+        _, url = self.launch()
+        origin, token = url.split("/?")[0], url.split("t=")[1]
+        with urllib.request.urlopen(f"{origin}/can?t={token}", timeout=10) as r:
+            granted = set(json.loads(r.read())["can"]) | set(MARKS_ONLY)
+        with urllib.request.urlopen(url, timeout=10) as r:
+            page = r.read().decode()
+        asked = set(re.findall(r'data-(?:needs|unless)="([^"]+)"', page))
+        self.assertTrue(asked, "the page declares no capability at all")
+        self.assertEqual(asked - granted, set(),
+                         "the page keys an affordance on a name no host answers")
 
     def test_the_console_serves_the_page_it_shares_with_the_canvas(self):
         """`lib/canvas.html`, not a copy: two copies of the page would drift,

@@ -27,6 +27,14 @@ PAGE = Path(__file__).resolve().parent / "canvas.html"
 TOKEN_HEADER = "X-Contour-Token"
 TOKEN_PARAM = "t"
 
+MARKS_ONLY = ("marks",)
+"""What a host with no console can do, which is what a bare clone can do.
+
+The whole of the launcher's answer to `/can`. Named here rather than defaulted
+inline so the containment is one readable line: anything a console adds is a
+name this tuple does not hold (ADR 0019).
+"""
+
 
 class _Handler(BaseHTTPRequestHandler):
     def log_message(self, *a):
@@ -84,6 +92,8 @@ class _Handler(BaseHTTPRequestHandler):
         self.server.canvas.touched()
         if self.path == "/" or self.path.startswith("/?"):
             return self._bytes(PAGE.read_bytes(), "text/html; charset=utf-8")
+        if self.path.split("?")[0] == "/can":
+            return self._json({"can": list(self.server.canvas.can)})
         if self.path.split("?")[0] == "/marks":
             return self._json(self.server.canvas.listing())
         if self.path.split("?")[0] == "/mask.png":
@@ -139,13 +149,18 @@ class Canvas:
     """One canvas session. `start` binds and serves; `stop` releases the port."""
 
     def __init__(self, sheet, marks, mask=None, parts=None, resolve=None,
-                 refs=None):
+                 refs=None, can=MARKS_ONLY):
         self.sheet = Path(sheet)
         self.marks = Path(marks)
         self.mask = Path(mask) if mask else None
         self.parts = Path(parts) if parts else None
         self.resolve = resolve
         self.refs = Path(refs) if refs else None
+        # What this host can do, for the page to ask about. The caller's to
+        # declare and not the Canvas's to infer: the console's extra surface
+        # is the console's, and a Canvas that guessed would guess wrong for
+        # every host added after this one.
+        self.can = tuple(can)
         self.token = secrets.token_urlsafe(32)
         self.last_beat = None                 # nothing has said it is watching
         self.last_touch = time.monotonic()    # opening the thing counts as use

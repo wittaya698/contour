@@ -57,6 +57,19 @@
   li.closed { opacity: .45; text-decoration: line-through; }
   .part { opacity: .8; font-size: 12px; font-weight: 600; }
   .shut { border: 0; padding: 0 0 0 6px; font-size: 12px; opacity: .6; text-decoration: underline; }
+  /* The run, when the host is one that owns a build. Above the ending, because
+     the ending is what you reach for last. */
+  #run { border-top: 1px solid var(--line); padding-top: 12px; display: flex;
+         flex-direction: column; gap: 8px; }
+  #state { opacity: .6; font-size: 12px; }
+  #end { border-color: var(--pin); color: var(--pin); }
+  /* Until the host has answered, nothing that depends on the answer is on
+     screen. `/can` is a request, and a page painted before it lands offers the
+     launcher the console's panel and the console the canvas's ending — each
+     host briefly showing the other's surface. `!important` because these
+     elements carry ids, and an id's own `display` would otherwise win. */
+  body:not(.asked) [data-needs],
+  body:not(.asked) [data-unless] { display: none !important; }
 </style>
 <div id="stage"><div id="strip"></div><div id="wrap"><canvas id="sheet"></canvas></div></div>
 <aside>
@@ -68,7 +81,17 @@
     <input id="text" placeholder="what is wrong here" autocomplete="off">
     <button type="submit">Add mark</button>
   </form>
-  <button id="done">Done</button>
+  <!-- One page, two hosts (ADR 0019). An element says which capability it
+       needs, or which one it stands in for when the host lacks it, and one rule
+       below applies every such declaration. The alternative was a page per host,
+       which is how the sheet ends up being marked on one surface and watched on
+       another. -->
+  <section id="run" data-needs="drive">
+    <h1>Run</h1>
+    <p id="state">no run yet</p>
+    <button id="end" data-closed="Run ended">End run</button>
+  </section>
+  <button id="done" data-unless="drive" data-closed="Canvas closed">Done</button>
 </aside>
 <script>
 // This session's token, from the URL the command opened (ADR 0019). Localhost
@@ -94,6 +117,24 @@ function ask(path, body) {
 function asset(path) {
   return path + (path.includes('?') ? '&' : '?') + 't=' + encodeURIComponent(TOKEN);
 }
+// What this host can do. One request, one rule: an element declaring a
+// capability the host lacks is removed, and an element declaring what it stands
+// in for is removed when the host *has* that capability. So the launcher's
+// ending is Done and the console's is End run, from the same markup.
+//
+// A name nobody knows here matches no element and does nothing. That is
+// deliberate: `/can` is written by us, so an unrecognised name in it is our bug
+// and not something to put in front of the user (`lib/policy.py` reports the
+// strangers in the ask-list for the opposite reason — the user wrote that one).
+ask('/can').then(r => r.json()).then(({ can }) => {
+  const has = new Set(can);
+  for (const el of document.querySelectorAll('[data-needs]'))
+    if (!has.has(el.dataset.needs)) el.remove();
+  for (const el of document.querySelectorAll('[data-unless]'))
+    if (has.has(el.dataset.unless)) el.remove();
+  document.body.classList.add('asked');     // what survived may now be seen
+});
+
 const cv = document.getElementById('sheet'), ctx = cv.getContext('2d');
 const wrap = document.getElementById('wrap'), list = document.getElementById('list');
 const entry = document.getElementById('entry'), text = document.getElementById('text');
@@ -295,9 +336,20 @@ entry.addEventListener('submit', async e => {
 const BEAT_MS = 3000;
 setInterval(() => { ask('/beat', {}).catch(() => {}); }, BEAT_MS);
 
-document.getElementById('done').addEventListener('click', async () => {
-  await ask('/done', {});
-  document.body.innerHTML = '<p style="margin:40px">Canvas closed — '
-    + added + ' mark' + (added === 1 ? '' : 's') + ' captured. You can close this tab.</p>';
-});
+// The ending, whichever one this host was left with. Both post `/done`, because
+// the server has one way to be told the session is over and the difference is
+// what that means: the canvas stops serving, the console ends the run it is
+// driving. Selected rather than fetched by id — the other ending is gone, and
+// reaching through a capability's element is how a page works for one host and
+// throws for the other.
+for (const ending of document.querySelectorAll('[data-closed]')) {
+  ending.addEventListener('click', async () => {
+    await ask('/done', {});
+    const said = document.createElement('p');
+    said.style.margin = '40px';
+    said.textContent = ending.dataset.closed + ' — ' + added + ' mark'
+                       + (added === 1 ? '' : 's') + ' captured. You can close this tab.';
+    document.body.replaceChildren(said);
+  });
+}
 </script>
