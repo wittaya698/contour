@@ -110,7 +110,8 @@ class _Handler(BaseHTTPRequestHandler):
             return self._json(self.server.canvas.parts_table())
         if self.path.split("?")[0] == "/sheet.png":
             return self._bytes(self.server.canvas.sheet.read_bytes(), "image/png")
-        self.send_error(404)
+        return self._extra("GET", {k: v[0] for k, v in urllib.parse.parse_qs(
+            urllib.parse.urlparse(self.path).query).items()})
 
     def do_POST(self):
         if not self._authorised() or not self._same_origin():
@@ -131,7 +132,18 @@ class _Handler(BaseHTTPRequestHandler):
         if self.path == "/done":
             self._json({"done": True})
             return self.server.canvas.finish()
-        self.send_error(404)
+        return self._extra("POST", body)
+
+    def _extra(self, verb, payload):
+        """Whatever this host added, or 404. Last, so a host cannot quietly
+        replace `/marks` — the shared endpoints are the canvas's and mean the
+        same thing under every host, which is the whole of decision 33."""
+        handler = self.server.canvas.routes.get(
+            (verb, urllib.parse.urlparse(self.path).path))
+        if handler is None:
+            return self.send_error(404)
+        answer = handler(payload)
+        return self._json(answer) if answer is not None else self.send_error(404)
 
     def _json(self, payload):
         self._bytes(json.dumps(payload).encode(), "application/json")
@@ -149,7 +161,7 @@ class Canvas:
     """One canvas session. `start` binds and serves; `stop` releases the port."""
 
     def __init__(self, sheet, marks, mask=None, parts=None, resolve=None,
-                 refs=None, can=MARKS_ONLY):
+                 refs=None, can=MARKS_ONLY, routes=None):
         self.sheet = Path(sheet)
         self.marks = Path(marks)
         self.mask = Path(mask) if mask else None
@@ -161,6 +173,14 @@ class Canvas:
         # is the console's, and a Canvas that guessed would guess wrong for
         # every host added after this one.
         self.can = tuple(can)
+        # What this host serves beyond the sheet and the marks, as
+        # {(method, path): handler}. The console's run lives here rather than in
+        # this file: the launcher is stdlib-only and knows nothing about agents,
+        # and `canvas.html` outgrowing one file was to be answered by serving
+        # the console's extra views *beside* it, never by bundling them in
+        # (ADR 0019). A capability the host declares comes with the endpoints
+        # that capability implies, and they arrive together.
+        self.routes = dict(routes or {})
         self.token = secrets.token_urlsafe(32)
         self.last_beat = None                 # nothing has said it is watching
         self.last_touch = time.monotonic()    # opening the thing counts as use

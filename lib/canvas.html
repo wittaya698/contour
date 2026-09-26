@@ -63,6 +63,31 @@
          flex-direction: column; gap: 8px; }
   #state { opacity: .6; font-size: 12px; }
   #end { border-color: var(--pin); color: var(--pin); }
+  textarea { font: inherit; padding: 7px 9px; border: 1px solid var(--line);
+             border-radius: 6px; background: transparent; color: inherit;
+             resize: vertical; }
+  /* Start and End side by side, sharing the width equally. **End run** is as
+     prominent as continue on purpose: a run that ends at a gate and starts
+     again never reaches compaction, so ending one is a thing to do often and
+     not a thing to be talked out of (ADR 0019). */
+  .pair { display: flex; gap: 8px; }
+  .pair button { flex: 1; }
+  /* The transcript: the run as it happens, which is where a decision becomes
+     visible and where a gate fires. */
+  #turns { padding-left: 0; list-style: none; gap: 6px; max-height: 40vh;
+           overflow: auto; }
+  #turns li { font-size: 12px; }
+  #turns .prompt { font-weight: 600; }
+  #turns .limit, #turns .ended, #turns .verdict { opacity: .6; }
+  /* A gate. Bordered in the colour every other *stop and look* on this page
+     uses, because it is the one line of the transcript that is waiting for you. */
+  #turns .gate { border: 1px solid var(--pin); border-radius: 6px; padding: 8px;
+                 display: flex; flex-direction: column; gap: 6px; }
+  #turns .category { font-weight: 700; text-transform: uppercase;
+                     letter-spacing: .06em; font-size: 11px; color: var(--pin); }
+  #turns .call { font-family: ui-monospace, SFMono-Regular, monospace;
+                 font-size: 11px; word-break: break-all; }
+  .why { opacity: .6; font-size: 11px; }
   /* Until the host has answered, nothing that depends on the answer is on
      screen. `/can` is a request, and a page painted before it lands offers the
      launcher the console's panel and the console the canvas's ending — each
@@ -88,8 +113,41 @@
        another. -->
   <section id="run" data-needs="drive">
     <h1>Run</h1>
+    <ol id="turns"></ol>
     <p id="state">no run yet</p>
-    <button id="end" data-closed="Run ended">End run</button>
+    <!-- Prose, not a skill chosen from a list: the space's skills self-trigger
+         on their descriptions, so picking one first moves a decision from the
+         agent, which reads it from context, to the user, who has not described
+         the task yet — and it answers nothing for a run that is neither skill. -->
+    <form id="begin">
+      <textarea id="prose" rows="3" placeholder="what should the agent do"></textarea>
+      <div class="pair">
+        <button type="submit">Start run</button>
+        <button type="button" id="end">End run</button>
+      </div>
+    </form>
+    <p class="why">A run sends this space — its spec, its build, its references —
+      to Anthropic&rsquo;s API. That is what starting one is for.</p>
+    <!-- A gate: allow, or deny with a sentence. There is deliberately no field
+         for the call. Editing it would make the user the author of a change
+         attributed to the agent, in the commit and in every later reading of why
+         two builds differ — and this repo tracks authorship everywhere else, so
+         the gate is not the one place it gets laundered. The user says a
+         sentence; the agent writes the code (ADR 0019, decision 13).
+
+         Markup and not built in script, so that what the dialog contains can be
+         read here rather than inferred from the code that assembles it. -->
+    <template id="gate">
+      <li class="gate">
+        <span class="category"></span>
+        <span class="call"></span>
+        <input class="because" placeholder="why not (a sentence)" autocomplete="off">
+        <div class="pair">
+          <button class="allow">Allow</button>
+          <button class="deny">Deny</button>
+        </div>
+      </li>
+    </template>
   </section>
   <button id="done" data-unless="drive" data-closed="Canvas closed">Done</button>
 </aside>
@@ -133,7 +191,77 @@ ask('/can').then(r => r.json()).then(({ can }) => {
   for (const el of document.querySelectorAll('[data-unless]'))
     if (has.has(el.dataset.unless)) el.remove();
   document.body.classList.add('asked');     // what survived may now be seen
+  if (has.has('drive')) drive();             // and what survived is now wired
 });
+
+// The run, and everything that only exists when the host owns a build. Reached
+// through the capability rather than run on load: `/can` is a request, so at
+// load time the launcher's page still holds this markup, and a poll started
+// then would ask a launcher forever for a route it does not have.
+function drive() {
+  const turns = document.getElementById('turns');
+  const state = document.getElementById('state');
+  let cursor = 0;
+
+  document.getElementById('begin').addEventListener('submit', async e => {
+    e.preventDefault();
+    const prose = document.getElementById('prose');
+    if (!prose.value.trim()) return;
+    const said = await ask('/run', { prompt: prose.value.trim() }).then(r => r.json());
+    state.textContent = said.started ? 'running' : said.why;
+    if (said.started) prose.value = '';
+  });
+
+  document.getElementById('end').addEventListener('click', async () => {
+    await ask('/end', {});                  // the run, not the console
+    state.textContent = 'no run';
+  });
+
+  // Polled from a cursor, so a reloaded tab gets the whole run back rather than
+  // whatever happened after it reconnected.
+  setInterval(async () => {
+    const said = await ask('/events?since=' + cursor).then(r => r.json()).catch(() => null);
+    if (!said) return;
+    cursor = said.next;
+    for (const event of said.events) turns.append(turn(event));
+    if (said.events.length) turns.scrollTop = turns.scrollHeight;
+    if (said.events.some(e => e.kind === 'ended')) state.textContent = 'no run';
+  }, 600);
+}
+
+// One line of the transcript.
+function turn(event) {
+  if (event.kind === 'gate') return gate(event);
+  const li = document.createElement('li');
+  li.className = event.kind;
+  li.textContent = event.text || '';
+  return li;
+}
+
+// The line that is waiting for you. Two answers and a sentence: the reason goes
+// back to the agent as the call's result, which makes it the cheapest correction
+// channel in the system — a sentence, at the moment it applies, instead of a
+// paragraph after the fact.
+function gate(event) {
+  const li = document.getElementById('gate').content.firstElementChild.cloneNode(true);
+  li.querySelector('.category').textContent = event.category;
+  li.querySelector('.call').textContent = called(event);
+  const because = li.querySelector('.because');
+  const answer = async allow => {
+    for (const b of li.querySelectorAll('button')) b.disabled = true;
+    await ask('/verdict', { id: event.id, allow: allow, reason: because.value.trim() });
+  };
+  li.querySelector('.allow').addEventListener('click', () => answer(true));
+  li.querySelector('.deny').addEventListener('click', () => answer(false));
+  return li;
+}
+
+// The call, as one line to read. Read is all it is: what goes back is the
+// verdict and the sentence, never this.
+function called(event) {
+  const call = event.call || {};
+  return event.tool + '  ' + (call.command || call.file_path || JSON.stringify(call));
+}
 
 const cv = document.getElementById('sheet'), ctx = cv.getContext('2d');
 const wrap = document.getElementById('wrap'), list = document.getElementById('list');
@@ -336,12 +464,12 @@ entry.addEventListener('submit', async e => {
 const BEAT_MS = 3000;
 setInterval(() => { ask('/beat', {}).catch(() => {}); }, BEAT_MS);
 
-// The ending, whichever one this host was left with. Both post `/done`, because
-// the server has one way to be told the session is over and the difference is
-// what that means: the canvas stops serving, the console ends the run it is
-// driving. Selected rather than fetched by id — the other ending is gone, and
-// reaching through a capability's element is how a page works for one host and
-// throws for the other.
+// Closing the whole thing, which under the launcher is Done and under the
+// console is the tab itself. Selected rather than fetched by id — an ending the
+// host removed is gone, and reaching through a capability's element is how a
+// page works for one host and throws for the other. **End run** is deliberately
+// not one of these: it ends the run and leaves the console standing, because a
+// run that ends and starts again never reaches compaction at all (ADR 0019).
 for (const ending of document.querySelectorAll('[data-closed]')) {
   ending.addEventListener('click', async () => {
     await ask('/done', {});

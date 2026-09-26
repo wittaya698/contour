@@ -58,9 +58,10 @@ def handover(python, project):
             return child.wait()
         except KeyboardInterrupt:
             # Forward and wait, rather than let the interpreter kill the child
-            # where it stands: the console has a port to close and, from slice
-            # 08, a run to end, and SIGKILL releases neither. A terminal Ctrl-C
-            # already reaches both, so this arrives second and changes nothing.
+            # where it stands: the console has a port to close and a run whose
+            # hold on the space has to be given back, and SIGKILL releases
+            # neither. A terminal Ctrl-C already reaches both, so this arrives
+            # second and changes nothing.
             child.send_signal(signal.SIGINT)
             try:
                 return child.wait(timeout=10)

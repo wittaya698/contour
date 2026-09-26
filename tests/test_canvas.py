@@ -149,6 +149,124 @@ class CanvasTest(unittest.TestCase):
         self.assertIn('data-needs="drive"', page)
         self.assertIn('data-unless="drive"', page)
 
+    def panel(self, name):
+        """One section of the served page, by id. Read from the source, as every
+        page test here is: there is no browser in this suite."""
+        with open_url(self.canvas, "/", timeout=5) as r:
+            page = r.read().decode()
+        self.assertIn(f'id="{name}"', page, f"no {name} on the page")
+        return page.split(f'id="{name}"', 1)[1].split("</section>", 1)[0]
+
+    def test_a_run_starts_from_prose_and_says_what_leaves_the_machine(self):
+        """Prose, because the space's skills self-trigger on their descriptions:
+        making the user pick one first moves a decision from the agent, which
+        reads it from context, to the user, who has not described the task yet —
+        and it has no answer for a run that is neither skill (ADR 0019).
+
+        And the sentence: model content reaching the API is the named purpose of
+        starting a run, said where a run is started. Rule 8 is a *git* boundary,
+        so this is not a warning about a mistake — it is what the command is for,
+        stated where somebody decides to do it."""
+        run = self.panel("run")
+        self.assertIn("<textarea", run)
+        self.assertNotIn("<select", run, "a run does not start by picking a skill")
+        self.assertRegex(run, r"(?i)anthropic")
+        self.assertRegex(run, r"(?i)\bapi\b")
+        with open_url(self.canvas, "/", timeout=5) as r:
+            self.assertIn("'/run'", r.read().decode())
+
+    def test_the_launcher_serves_no_run(self):
+        """A capability is not only a thing the page hides. `contour canvas`
+        declares `marks` and gains none of the console's endpoints, so the run is
+        absent from the server as well as from the surface — otherwise the page's
+        own restraint would be the whole of the boundary, and the page is the part
+        a user can retype (ADR 0019)."""
+        for path, body in (("/run", {"prompt": "build me a beak"}),
+                           ("/verdict", {"id": "x", "allow": True}),
+                           ("/end", {})):
+            with self.assertRaises(urllib.error.HTTPError) as caught:
+                post(self.canvas, path, body)
+            self.assertEqual(caught.exception.code, 404, path)
+        with self.assertRaises(urllib.error.HTTPError) as caught:
+            get(self.canvas, "/events?since=0")
+        self.assertEqual(caught.exception.code, 404)
+
+    def test_nothing_touches_a_capabilitys_insides_as_the_page_loads(self):
+        """The same failure as reaching for a removed affordance, one level in.
+
+        Slice 07 learned this about `#done`: an element a host removes cannot be
+        reached without a guard, or the page works for one host and throws for
+        the other. Everything inside a declaring element is removed with it, so
+        the run panel's own ids are in exactly that position — and `/can` is a
+        request, so at load time they are all still there and all about to go.
+        The rule that holds is that they are touched from a function and never as
+        the page loads, because the only thing that calls those functions is the
+        capability rule itself.
+        """
+        with open_url(self.canvas, "/", timeout=5) as r:
+            page = r.read().decode()
+        script = page.split("<script>", 1)[1]
+        inside = set(re.findall(r'id="([^"]+)"', self.panel("run"))) - {"run"}
+        self.assertTrue(inside, "the run panel declares no affordances to check")
+        depth = 0
+        for line in script.split("\n"):
+            if depth == 0:
+                for got in inside:
+                    self.assertNotIn(f"getElementById('{got}')", line,
+                                     f"#{got} is inside a capability the host may "
+                                     f"remove, and this runs before `/can` answers")
+            depth += line.count("{") - line.count("}")
+
+    def test_end_run_is_as_prominent_as_continue(self):
+        """Not a link at the bottom. A run that ends at a gate and starts again
+        never reaches compaction at all, and the spec is read from disk rather
+        than recalled for the same reason — so ending a run is the sanctioned
+        move and the page must not make it the reluctant one (ADR 0019).
+
+        Read as layout, not as a feeling: the two sit in one container that
+        divides the width between them, and nothing in the stylesheet shrinks or
+        dims the ending."""
+        with open_url(self.canvas, "/", timeout=5) as r:
+            page = r.read().decode()
+        run = self.panel("run")
+        pair = run.split('class="pair"', 1)[1].split("</div>", 1)[0]
+        self.assertIn("Start run", pair)
+        self.assertIn("End run", pair)
+        style = page.split("<style>", 1)[1].split("</style>", 1)[0]
+        self.assertRegex(style, r"\.pair button \{[^}]*flex: 1")
+        # Nothing dims or shrinks it. `#end` may be coloured — every other
+        # *stop and look* on this page is — but not made quieter than its pair.
+        for rule in re.findall(r"#end \{([^}]*)\}", style):
+            self.assertNotIn("opacity", rule)
+            self.assertNotIn("font-size", rule)
+
+    def test_the_gate_offers_no_way_to_edit_the_call(self):
+        """A gate has two answers and a sentence. Editing the call would make the
+        user the author of a change attributed to the agent — in the commit and in
+        every later reading of why two builds differ — and this repo tracks
+        authorship everywhere else: a mark carries an author, `addressed` is not a
+        close. The gate is not the one place it gets laundered (ADR 0019, 13).
+
+        A template rather than markup built in script, so that what the dialog
+        contains is readable here and not inferred from the code that assembles
+        it."""
+        with open_url(self.canvas, "/", timeout=5) as r:
+            page = r.read().decode()
+        self.assertIn('<template id="gate">', page)
+        gate = page.split('<template id="gate">', 1)[1].split("</template>", 1)[0]
+        self.assertIn('class="call"', gate, "the gate does not show the call")
+        # One field, and it is the reason: the call is shown, never offered.
+        self.assertEqual(gate.count("<input"), 1, gate)
+        self.assertEqual(gate.count("<textarea"), 0, gate)
+        self.assertIn("because", gate)
+        # And what the page sends back carries no call either, so the absence is
+        # not merely a dialog that happens to lack a field.
+        script = page.split("<script>", 1)[1]
+        body = re.search(r"ask\('/verdict', \{([^}]*)\}", script)
+        self.assertIsNotNone(script and body, "the page never answers a gate")
+        self.assertEqual(set(re.findall(r"(\w+):", body.group(1))),
+                         {"id", "allow", "reason"})
+
     def test_one_rule_applies_every_declaration(self):
         """The page asks its host once and enforces the answer in one place.
 
