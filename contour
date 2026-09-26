@@ -38,26 +38,14 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 BLENDER = os.environ.get("BLENDER", "/Applications/Blender.app/Contents/MacOS/Blender")
-MARKER = Path(".contour") / "project"
 TIMEOUT_S = 300
 USAGE = __doc__.split("\n\n", 2)[2].rstrip()
 
+sys.path.insert(0, str(ROOT))
+from lib import paths                      # stdlib-only by test (ADR 0019, 29)
 
-def find_project(start=None):
-    """The model space containing `start`, or None. Walks up for
-    .contour/project, the way git walks up for .git.
-
-    The marker is that file and not the .contour/ directory: the toolkit has a
-    .contour/ too, for its own logs, and must never be mistaken for a space.
-    """
-    here = (Path(start) if start else Path.cwd()).resolve()
-    for d in (here, *here.parents):
-        if (d / MARKER).is_file():
-            return d
-    return None
-
-
-PROJECT = find_project()
+MARKER = paths.MARKER
+PROJECT = paths.find()
 OUT = (PROJECT or ROOT) / ".contour"     # logs sit with whatever the command is about
 LOG = OUT / "last-build.log"
 REPORT = OUT / "report.json"

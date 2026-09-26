@@ -23,6 +23,25 @@ _p = os.environ.get("CONTOUR_PROJECT")
 PROJECT = Path(_p) if _p else None
 
 
+MARKER = Path(".contour") / "project"
+
+
+def find(start=None):
+    """The model space containing `start`, or None. Walks up for
+    `.contour/project`, the way git walks up for `.git`.
+
+    The marker is that file and not the `.contour/` directory: the toolkit has
+    a `.contour/` too, for its own logs, and must never be mistaken for a
+    space. Lives here because two callers now walk — the launcher and the
+    console — and what a space *is* gets one definition.
+    """
+    here = (Path(start) if start else Path.cwd()).resolve()
+    for d in (here, *here.parents):
+        if (d / MARKER).is_file():
+            return d
+    return None
+
+
 def parse(args):
     """['smoke', '--fixture'] -> ('smoke', True);  [] -> (<space name>, False).
 

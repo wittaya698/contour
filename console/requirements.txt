@@ -1,0 +1,3 @@
+# The console environment (ADR 0019, decision 4). `./contour` needs none of
+# this; `contour-console` is the reason the promise in README.md has a boundary.
+claude-agent-sdk

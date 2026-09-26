@@ -25,6 +25,22 @@ ln -s "$PWD/contour" ~/.local/bin/   # so you can run it from a model space
 re-imports it, and deliberately corrupts the build in 19 ways to prove the
 checks can actually fail. If it passes, you are installed.
 
+### The console needs an environment; `./contour` still does not
+
+Everything above is the launcher, and the launcher keeps the promise: stdlib
+only, nothing installed. `contour-console` — the browser surface a run is driven
+from (ADR 0019) — is the exception, and it is the only one. It needs its own
+interpreter, which is why it is a second name rather than a `contour`
+subcommand:
+
+```sh
+python3 -m venv .venv && .venv/bin/pip install -r console/requirements.txt
+```
+
+Run it without one and it says *no console environment* and prints that command.
+Nothing in the pipeline reads it: `contour selftest` proves a bare clone works,
+and that is still what makes this repo shareable.
+
 **`install-hooks` is not optional.** It copies `tools/hooks/pre-push` into
 `.git/hooks/`, which is what stops model content ever reaching a remote
 (ADR 0011). It is per clone, and nothing else enforces it — run it before you

@@ -17,6 +17,10 @@ fixtures/*/out/
 # Your personal working file: links the generated asset, holds materials/lights/camera
 work/
 
+# The console environment (ADR 0019). Per checkout, because the console is
+# version-bound to the `lib/` it imports; nobody else's copy is interchangeable.
+.venv/
+
 # Blender + Python noise
 *.blend1
 *.blend2

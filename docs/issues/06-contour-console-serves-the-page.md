@@ -35,16 +35,16 @@ Friday.
 
 ## Acceptance criteria
 
-- [ ] `contour-console` run in a space opens a browser on the sheet
-- [ ] Run without the environment, it prints *no console environment* and the command to create one, and exits non-zero
-- [ ] Run outside a model space, it says so
-- [ ] Closing the last tab exits the process
-- [ ] An idle run exits on the timeout
-- [ ] It serves `lib/canvas.html`, not a copy
-- [ ] It inherits slice 01's authentication; an unauthenticated request is refused
-- [ ] `./contour` still runs on a bare clone with no environment, proven by `contour selftest`
-- [ ] Slice 03's test now also asserts the console imports no `bpy`-bound module
-- [ ] Ctrl-C leaves no orphan server and no held lock
+- [x] `contour-console` run in a space opens a browser on the sheet
+- [x] Run without the environment, it prints *no console environment* and the command to create one, and exits non-zero
+- [x] Run outside a model space, it says so
+- [x] Closing the last tab exits the process
+- [x] An idle run exits on the timeout
+- [x] It serves `lib/canvas.html`, not a copy
+- [x] It inherits slice 01's authentication; an unauthenticated request is refused
+- [x] `./contour` still runs on a bare clone with no environment, proven by `contour selftest`
+- [x] Slice 03's test now also asserts the console imports no `bpy`-bound module
+- [x] Ctrl-C leaves no orphan server and no held lock
 
 ## Blocked by
 

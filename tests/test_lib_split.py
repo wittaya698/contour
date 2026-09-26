@@ -143,6 +143,26 @@ def offences(root, free, blender):
     return found
 
 
+def above_lib(root, blender, *globs):
+    """Every way a file that is not in `lib/` reaches the Blender half.
+
+    Read rather than run, and that is the whole point: the console may import
+    anything it likes from its environment, so a probe would need that
+    environment to exist and the check has to work on a bare clone. What is
+    being asked is narrower than the free half's question — not *is this
+    stdlib-only* but *does this pull Blender into the process that spawns it*.
+    """
+    found = []
+    for got in sorted(p for g in globs for p in Path(root).glob(g)):
+        rel = got.relative_to(root)
+        for name in leans_on(got):
+            if name in blender:
+                found.append(f"{rel} imports lib/{name}.py, which is in the "
+                             f"Blender half — the console spawns Blender and "
+                             f"must never contain it")
+    return found
+
+
 class LibSplitTest(unittest.TestCase):
     def fabricate(self, **modules):
         """A throwaway tree shaped like the toolkit: a `lib/` package holding
@@ -208,11 +228,30 @@ class LibSplitTest(unittest.TestCase):
         said = " ".join(offences(tree, ["shape"], ["turner"]))
         self.assertIn("lib/newcomer.py", said)
 
+    def test_a_console_module_reaching_the_blender_half_is_named(self):
+        """The console reads state by importing `lib/`'s free half. Reaching
+        into the other half would put Blender inside the process whose whole job
+        is to spawn it — and it would import cleanly right up until it ran."""
+        tree = self.fabricate(turner="import bpy\n")
+        (tree / "console").mkdir()
+        (tree / "console" / "server.py").write_text("from lib import turner\n")
+        said = " ".join(above_lib(tree, ["turner"], "console/*.py"))
+        self.assertIn("console/server.py", said)
+        self.assertIn("lib/turner.py", said)
+
     def test_the_toolkit_keeps_its_own_split(self):
         """The live check, and the reason this file is in `tests/`: selftest
         runs the unit tests before it starts Blender, so a violation surfaces
         in the command that proves a bare clone works, at no Blender cost."""
         self.assertEqual(offences(ROOT, FREE, BLENDER), [])
+
+    def test_the_console_and_its_shim_keep_out_of_the_blender_half(self):
+        """The live check on the layer above the launcher (ADR 0019, decision
+        29). `contour-console` is in it because it is the file a bare clone runs
+        to be told it needs an environment, and a Blender import there would
+        break the one message that has to survive having nothing installed."""
+        self.assertEqual(above_lib(ROOT, BLENDER, "console/*.py",
+                                   "contour-console"), [])
 
     def test_a_pip_import_hidden_in_a_function_body_is_found(self):
         """Importing the module cannot see this one: the statement never runs

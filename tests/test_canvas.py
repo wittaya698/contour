@@ -103,6 +103,27 @@ class CanvasTest(unittest.TestCase):
         with self.assertRaises(urllib.error.URLError):
             open_url(self.canvas, "/", timeout=2)
 
+    def test_the_page_beats_so_a_closed_tab_can_be_told_from_a_quiet_one(self):
+        """Read from the source, as the no-internet tripwire above is: there is
+        no browser here to run it, and a page that did not beat would leave the
+        console's whole lifetime rule waiting for a signal nobody sends."""
+        with open_url(self.canvas, "/", timeout=5) as r:
+            page = r.read().decode()
+        self.assertIn("/beat", page)
+        self.assertIn("setInterval", page)
+
+    def test_a_beat_leaves_the_canvas_serving(self):
+        """The page beats so the console can tell a closed tab from a quiet one,
+        and the same page is served to both. The canvas records the beat and acts
+        on nothing: its session ends when the user presses Done (ADR 0018), and a
+        lifetime rule that moved in here would end one because a browser was
+        slow to say anything."""
+        status, _ = post(self.canvas, "/beat", {})
+        self.assertEqual(status, 200)
+        self.assertFalse(self.canvas.done)
+        with open_url(self.canvas, "/", timeout=5) as r:
+            self.assertEqual(r.status, 200)
+
 
 if __name__ == "__main__":
     unittest.main()

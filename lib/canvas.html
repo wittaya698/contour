@@ -287,6 +287,14 @@ entry.addEventListener('submit', async e => {
   draw();
 });
 
+// Proof this tab is still on screen. The console ends a run when the beats
+// stop, because a closed tab and a tab nobody is looking at differ only in how
+// long you wait — and `beforeunload` cannot be relied on to arrive at all. The
+// canvas records the beat and acts on nothing, so this costs it a request every
+// few seconds and changes none of its behaviour.
+const BEAT_MS = 3000;
+setInterval(() => { ask('/beat', {}).catch(() => {}); }, BEAT_MS);
+
 document.getElementById('done').addEventListener('click', async () => {
   await ask('/done', {});
   document.body.innerHTML = '<p style="margin:40px">Canvas closed — '

@@ -11,6 +11,7 @@ the record is evidence, and it has one source.
 """
 import json
 import secrets
+import time
 import urllib.parse
 import threading
 import webbrowser
@@ -80,6 +81,7 @@ class _Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if not self._authorised() or not self._same_origin():
             return self.send_error(403)
+        self.server.canvas.touched()
         if self.path == "/" or self.path.startswith("/?"):
             return self._bytes(PAGE.read_bytes(), "text/html; charset=utf-8")
         if self.path.split("?")[0] == "/marks":
@@ -105,6 +107,8 @@ class _Handler(BaseHTTPRequestHandler):
             return self.send_error(403)
         if not self._is_json():
             return self.send_error(415)
+        if self.path != "/beat":
+            self.server.canvas.touched()      # a beat is not somebody being here
         n = int(self.headers.get("Content-Length") or 0)
         body = json.loads(self.rfile.read(n) or b"{}")
         if self.path == "/marks":
@@ -112,6 +116,8 @@ class _Handler(BaseHTTPRequestHandler):
         if self.path == "/close":
             closed = self.server.canvas.close(body.get("id"))
             return self._json(closed) if closed else self.send_error(404)
+        if self.path == "/beat":
+            return self._json(self.server.canvas.beat())
         if self.path == "/done":
             self._json({"done": True})
             return self.server.canvas.finish()
@@ -141,6 +147,8 @@ class Canvas:
         self.resolve = resolve
         self.refs = Path(refs) if refs else None
         self.token = secrets.token_urlsafe(32)
+        self.last_beat = None                 # nothing has said it is watching
+        self.last_touch = time.monotonic()    # opening the thing counts as use
         self.captured = []
         self.pruned = None
         self._lock = threading.Lock()         # two posts can land at once
@@ -226,6 +234,29 @@ class Canvas:
         the pipeline may move a mark to closed (ADR 0018)."""
         with self._lock:
             return marks_store.close(self.marks, mark_id)
+
+    @property
+    def done(self):
+        """Has this session ended? Asked by a caller that owns the lifetime —
+        the console watches for a silence and must stop watching when the
+        session stops."""
+        return self._done.is_set()
+
+    def touched(self):
+        """Somebody did something. Every request but a beat, because a beat is
+        the page breathing and this is the clock an idle timeout reads."""
+        self.last_touch = time.monotonic()
+
+    def beat(self):
+        """The page saying it is still on screen.
+
+        Recorded and nothing more: a server that acted on this would decide the
+        caller's lifetime for it, and the canvas's lifetime is the Done button
+        (ADR 0018). The console reads the same beat and ends when it stops,
+        because a page that went quiet is a tab that closed.
+        """
+        self.last_beat = time.monotonic()
+        return {"beat": True}
 
     def finish(self):
         """The page says it is done. The port closes from `wait`, on the
