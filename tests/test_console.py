@@ -1160,3 +1160,305 @@ class VetoTest(ConsoleCase):
             self.assertNotIn("commit", (event.get("text") or "").lower(), event)
         # and the exposure is still just a number, which is the whole offer
         self.assertEqual(self.ask(url, "/vetoes")[1]["uncommitted"], 1)
+
+
+class SeedTest(ConsoleCase):
+    """Marks seed a run (ADR 0019, decision 19).
+
+    A mark is the one place the user's intent is already located, authored and
+    tracked, so a run started from marks starts from something better than a
+    re-typed paragraph. And because the console knows which marks were in scope,
+    a mark the run never touched is visible at the end instead of silently
+    dropped — which is what makes `addressed` checkable without making it a
+    close.
+    """
+
+    def pinned(self, space, *lines):
+        """A space with marks on it, in the order given. Returns their ids."""
+        path = space / marks_store.NAME
+        return [marks_store.append(path, dict(line))["id"] for line in lines]
+
+    def test_a_run_seeded_from_a_mark_starts_from_what_the_mark_says(self):
+        """The slice's demo: select an open mark, and the prompt is composed from
+        it. The id is in there too — the agent is going to be asked whether it
+        addressed `m1`, so `m1` has to be a name it was given."""
+        space = self.space()
+        self.pinned(space,
+                    {"view": "front", "part": "neck", "text": "the neck is short"},
+                    {"view": "side", "part": "beak", "text": "the beak droops"})
+        _, url = self.driven({"say": "looking at the neck"}, space=space)
+        status, _ = self.ask(url, "/run", {"prompt": "fix these",
+                                           "marks": ["m1"]})
+        self.assertEqual(status, 200)
+        said = self.transcript(url, lambda ev: any(e["kind"] == "text" for e in ev))
+        first = said[0]
+        self.assertEqual(first["kind"], "prompt")
+        self.assertIn("fix these", first["text"])
+        self.assertIn("m1", first["text"])
+        self.assertIn("the neck is short", first["text"])
+        # Selected, not all: a page that sent every open mark would make the
+        # checkbox a decoration.
+        self.assertNotIn("the beak droops", first["text"])
+
+    def test_a_run_with_nothing_selected_starts_from_the_prose_alone(self):
+        """The base case, and it stays the base case. The page sends the
+        selection every time, so an empty one is the common shape — and prose is
+        what a run is *for*: a measurement is not a mark and not a build loop
+        (ADR 0019, decision 19)."""
+        space = self.space()
+        self.pinned(space, {"view": "front", "text": "the neck is short"})
+        _, url = self.driven({"say": "measuring"}, space=space)
+        self.ask(url, "/run", {"prompt": "why is the neck 269", "marks": []})
+        said = self.transcript(url, lambda ev: any(e["kind"] == "text" for e in ev))
+        # Byte for byte: a preamble nobody asked for is a prompt the user did
+        # not write, and the transcript would be showing them somebody else's.
+        self.assertEqual(said[0], {"n": 0, "kind": "prompt",
+                                   "text": "why is the neck 269"})
+
+    def test_a_seeded_mark_says_where_it_is_and_not_only_what_it_says(self):
+        """A mark is a *located* comment, and the location is half of what it
+        means: *too thin* about the neck and *too thin* about the beak are two
+        findings. The part is read from the anchor when a ray has already landed
+        and from the mark when one has not, because a resolved mark drops its
+        pixel and keeps its answer (ADR 0018)."""
+        space = self.space()
+        self.pinned(space,
+                    {"view": "front", "part": "neck", "pixel": [10, 10],
+                     "text": "the neck is short"},
+                    {"view": "side", "anchor": {"part": "beak", "local": [0, 0, 0]},
+                     "text": "the beak droops"})
+        _, url = self.driven({"say": "looking"}, space=space)
+        self.ask(url, "/run", {"prompt": "fix these", "marks": ["m1", "m2"]})
+        said = self.transcript(url, lambda ev: any(e["kind"] == "text" for e in ev))
+        text = said[0]["text"]
+        self.assertRegex(text, r"m1\b.*\bfront\b.*\bneck\b")
+        self.assertRegex(text, r"m2\b.*\bside\b.*\bbeak\b")
+
+    def test_a_mark_on_a_photograph_seeds_a_run_as_well_as_one_on_the_sheet(self):
+        """A ref mark is a finding about the model too — *the real beak is
+        shorter than this* — and it is the kind most likely to start a run. It
+        names the photograph, because it has no part to name: a reference knows
+        nothing about our parts and was drawn by none of our views (ADR 0018)."""
+        space = self.space()
+        self.pinned(space, {"ref": "side.png", "pixel": [40, 40],
+                            "text": "the real beak is shorter than this"})
+        _, url = self.driven({"say": "opening the reference"}, space=space)
+        self.ask(url, "/run", {"prompt": "measure it", "marks": ["m1"]})
+        said = self.transcript(url, lambda ev: any(e["kind"] == "text" for e in ev))
+        text = said[0]["text"]
+        self.assertRegex(text, r"m1\b.*\bside\.png\b")
+        self.assertIn("the real beak is shorter than this", text)
+        # And not as a view of ours, which would send the agent to a render that
+        # does not exist. `()` empty would say the console had nowhere to put it.
+        self.assertNotRegex(text, r"m1 \(\)")
+
+    def test_a_seed_the_store_cannot_honour_is_dropped_and_the_drop_is_named(self):
+        """Closed in another tab, or pruned, or never there. The run still starts
+        — a mark closed between selecting and clicking should not block work the
+        user meant — but the shortening is said out loud, because a seed list
+        silently one shorter is exactly the dropped finding this slice exists to
+        make visible."""
+        space = self.space()
+        self.pinned(space,
+                    {"view": "front", "part": "neck", "text": "the neck is short"},
+                    {"view": "side", "part": "beak", "text": "the beak droops"})
+        marks_store.close(space / marks_store.NAME, "m1")
+        _, url = self.driven({"say": "looking at the beak"}, space=space)
+        self.ask(url, "/run", {"prompt": "fix these",
+                               "marks": ["m1", "m2", "m9"]})
+        said = self.transcript(url, lambda ev: any(e["kind"] == "text" for e in ev))
+        text = said[0]["text"]
+        self.assertIn("the beak droops", text)
+        self.assertNotIn("the neck is short", text)
+        dropped = [ln for ln in text.splitlines() if "not seeded" in ln.lower()]
+        self.assertEqual(len(dropped), 1, text)
+        self.assertIn("m1", dropped[0])
+        self.assertIn("m9", dropped[0])
+
+    def ended(self, url):
+        """The transcript once the run is over, and the report in it."""
+        said = self.transcript(url, lambda ev: any(e["kind"] == "ended" for e in ev))
+        report = [e for e in said if e["kind"] == "seeds"]
+        self.assertEqual(len(report), 1, said)
+        return report[0], said
+
+    def test_at_run_end_every_seeded_mark_left_unaddressed_is_named(self):
+        """The whole reason seeding is worth building: the console knows what was
+        in scope, so a finding the run walked past is visible instead of silently
+        dropped. It is a report and nothing more — nothing here closes, dims or
+        edits a mark (ADR 0019, decision 19)."""
+        space = self.space()
+        self.pinned(space,
+                    {"view": "front", "part": "neck", "text": "the neck is short"},
+                    {"view": "side", "part": "beak", "text": "the beak droops"})
+        _, url = self.driven({"say": "I looked at neither"}, space=space)
+        self.ask(url, "/run", {"prompt": "fix these", "marks": ["m1", "m2"]})
+        report, said = self.ended(url)
+        self.assertRegex(report["text"], r"(?s)m1.*unaddressed")
+        self.assertRegex(report["text"], r"(?s)m2.*unaddressed")
+        # Before the run is declared over: the last line of a conversation is
+        # *ended*, and a report after it reads as something that came in later.
+        kinds = [e["kind"] for e in said]
+        self.assertLess(kinds.index("seeds"), kinds.index("ended"))
+
+    def built(self, space):
+        """A build on disk, so `addressed` has a build to name: the stamp is a
+        fingerprint of the `.blend` and an empty one would say *no build*."""
+        out = space / "out"
+        out.mkdir(exist_ok=True)
+        blend = out / f"{space.name}.blend"
+        blend.write_bytes(b"a blend")
+        return anchor.fingerprint(blend)
+
+    def test_a_mark_the_run_addressed_reads_addressed_and_stays_open(self):
+        """`addressed` is a claim, not a disposal. The agent attaches it and the
+        badge dims; the finding is still outstanding until the user says
+        otherwise, because a finding is not disposed of by the party it is aimed
+        at (ADR 0018)."""
+        space = self.space()
+        build = self.built(space)
+        self.pinned(space, {"view": "front", "part": "neck",
+                            "text": "the neck is short"})
+        _, url = self.driven({"mark": ["--addressed", "m1"]},
+                             {"say": "lengthened the neck"}, space=space)
+        self.ask(url, "/run", {"prompt": "fix it", "marks": ["m1"]})
+        report, _ = self.ended(url)
+        self.assertIn(f"addressed in build {build}", report["text"])
+        self.assertNotIn("unaddressed", report["text"])
+        stored, = json.loads((space / marks_store.NAME).read_text())
+        self.assertEqual(stored["status"], "open")
+        self.assertEqual(stored["addressed"], build)
+
+    def test_a_stamp_from_an_earlier_build_does_not_count_as_this_runs_work(self):
+        """*Addressed* here means addressed by **this** run. A mark the agent
+        claimed two builds ago, seeded again and walked past, would otherwise
+        report itself dealt with — the check passing exactly when there is nothing
+        behind it, which is worse than not checking."""
+        space = self.space()
+        self.pinned(space, {"view": "front", "part": "neck", "addressed": "0ldbu1ld",
+                            "text": "the neck is still short"})
+        _, url = self.driven({"say": "I did nothing about it"}, space=space)
+        self.ask(url, "/run", {"prompt": "have another look", "marks": ["m1"]})
+        report, _ = self.ended(url)
+        self.assertIn("unaddressed", report["text"])
+        self.assertNotIn("0ldbu1ld", report["text"])
+
+    def test_a_seeded_mark_whose_part_the_run_deleted_reads_orphaned(self):
+        """Deleting a part does not answer the question that was asked about it.
+        The pin is homeless, so the report says so rather than accepting the
+        agent's claim over the top of it — an *addressed* on a mark with nowhere
+        left to point is a finding that looks dealt with and cannot be checked
+        (ADR 0018)."""
+        space = self.space()
+        self.built(space)
+        self.pinned(space, {"view": "front", "anchor": {"part": "neck",
+                                                        "local": [0, 0, 0]},
+                            "text": "the neck is short"})
+        _, url = self.driven({"mark": ["--addressed", "m1"]},
+                             {"rebuilt": ["torso", "beak"]},
+                             {"say": "replaced the neck with a torso taper"},
+                             space=space)
+        self.ask(url, "/run", {"prompt": "fix it", "marks": ["m1"]})
+        report, _ = self.ended(url)
+        self.assertIn("orphaned", report["text"])
+        self.assertNotIn("addressed in build", report["text"])
+
+    def test_ending_the_run_early_still_says_what_became_of_the_seeds(self):
+        """The ending a seeded run is most likely to get: the user has seen enough
+        at a gate and stops it. That is exactly when the scope report matters — the
+        run is over with work outstanding — so it cannot be the ending that skips
+        it (ADR 0019, decision 19)."""
+        space = self.space()
+        self.pinned(space, {"view": "front", "part": "neck",
+                            "text": "the neck is short"})
+        _, url = self.driven({"call": {"tool": "Bash", "command": "./contour check"}},
+                             space=space)
+        self.ask(url, "/run", {"prompt": "fix it", "marks": ["m1"]})
+        self.gate(url)
+        self.ask(url, "/end", {})
+        report, said = self.ended(url)
+        self.assertIn("unaddressed", report["text"])
+        kinds = [e["kind"] for e in said]
+        self.assertLess(kinds.index("seeds"), kinds.index("ended"))
+
+    def test_a_whole_seeded_run_leaves_every_marks_status_alone(self):
+        """Only the user closes a mark, and seeding does not make the console a
+        party to that. The run knows the scope, addresses one, walks past the
+        other and ends — and the store comes out of it with two open findings and
+        one claim (ADR 0018, ADR 0019, decision 19)."""
+        space = self.space()
+        build = self.built(space)
+        self.pinned(space,
+                    {"view": "front", "part": "neck", "text": "the neck is short"},
+                    {"view": "side", "part": "beak", "text": "the beak droops"})
+        before = json.loads((space / marks_store.NAME).read_text())
+        _, url = self.driven({"mark": ["--addressed", "m1"]},
+                             {"say": "the beak will have to wait"}, space=space)
+        self.ask(url, "/run", {"prompt": "fix these", "marks": ["m1", "m2"]})
+        self.ended(url)
+        after = json.loads((space / marks_store.NAME).read_text())
+        self.assertEqual([m["status"] for m in after], ["open", "open"])
+        # One claim, and otherwise the same two findings: the report read the
+        # store and wrote nothing back to it.
+        self.assertEqual([{**m, "addressed": build} if m["id"] == "m1" else m
+                          for m in before], after)
+
+    def test_the_console_names_no_way_to_close_a_mark(self):
+        """Read rather than provoked. `marks.close` is one import away from every
+        file in `console/`, and the console is the layer with a live reason to
+        reach for it — it knows which marks a run was about and when the run
+        stopped being about them. So the ban is on the vocabulary: a `close` on
+        the mark store, or the word `closed` a status write would need.
+
+        The structural half of this is elsewhere and stronger: `contour mark` has
+        no `--close`, so the agent cannot close one either (ADR 0018).
+        """
+        store = ("marks", "marks_store", "store", "seed", "vetoes", "veto_store")
+        for f in sorted((ROOT / "console").glob("*.py")):
+            tree = ast.parse(f.read_text())
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Call):
+                    func = ast.unparse(node.func)
+                    self.assertFalse(
+                        func.endswith(".close") and func.split(".")[0] in store,
+                        f"{f.name} calls {func}")
+                if isinstance(node, ast.Constant) and node.value == "closed":
+                    self.fail(f"{f.name} spells out a closed status")
+
+    def test_the_seeding_surface_is_declared_against_the_host_that_runs(self):
+        """One page, two hosts (ADR 0019, decision 33). Only a console runs an
+        agent, so only a console can seed one — and the page carries the
+        affordance anyway, removed under the launcher by the same rule that
+        removes the transcript.
+
+        Checked in the markup, where the declaration is: a selection offered by
+        `contour canvas` would be a promise to start something that host cannot
+        start, and `/can` makes `drive` a name the console really answers.
+        """
+        page = (ROOT / "lib" / "canvas.html").read_text()
+        markup = re.sub(r"<script.*?</script>|<style.*?</style>|<!--.*?-->", "",
+                        page, flags=re.S)
+        for found in re.finditer(r"<[^>]*\bseed[^>]*>", markup, re.I):
+            self.assertIn('data-needs="drive"', found.group(0),
+                          "a seeding affordance does not declare the host it "
+                          f"needs: {found.group(0)}")
+        self.assertRegex(markup, r'<[^>]*id="seeds"[^>]*data-needs="drive"',
+                         "the page offers no way to see what a run is seeded with")
+
+    def test_a_selection_on_its_own_is_enough_to_start_a_run(self):
+        """A mark is already a sentence about the model, written where it applies.
+        Making the user restate it in prose to be allowed to start would ask them
+        to type the thing they pointed at — and *these two* is a complete request
+        (ADR 0019, decision 19)."""
+        space = self.space()
+        self.pinned(space, {"view": "front", "part": "neck",
+                            "text": "the neck is short"})
+        _, url = self.driven({"say": "on it"}, space=space)
+        status, said = self.ask(url, "/run", {"prompt": "", "marks": ["m1"]})
+        self.assertEqual((status, said["started"]), (200, True))
+        first = self.transcript(url,
+                                lambda ev: any(e["kind"] == "text" for e in ev))[0]
+        self.assertIn("the neck is short", first["text"])
+        # No empty last turn where the prose would have been: the transcript is a
+        # conversation, and a blank line in it reads as something not yet said.
+        self.assertEqual(first["text"], first["text"].strip())

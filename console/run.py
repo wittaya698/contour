@@ -12,7 +12,7 @@ import secrets
 import threading
 from pathlib import Path
 
-from console import launcher, vetoes
+from console import launcher, seed, vetoes
 from lib import anchor, intent, lock, marks, policy
 
 
@@ -99,12 +99,16 @@ class Run:
         self.pending = None                   # the gate waiting for a verdict
         self.record = None                    # the hold on the space, while live
         self.stopped = False                  # the user said the run is over
+        self.seeded = []                      # the marks this run was started from
         self._lock = threading.Lock()
         self._thread = None
 
-    def start(self, prompt):
+    def start(self, prompt, marks_selected=()):
         """Begin. The prompt is the transcript's first line, because it is the
-        first turn and the page is showing a conversation."""
+        first turn and the page is showing a conversation — so what is said there
+        is the composed prompt and not the prose, because the composed one is
+        what the agent was actually given (ADR 0019, decision 19)."""
+        prompt, self.seeded = seed.compose(self.space, prompt, marks_selected)
         # Hold the space first: a run whose transcript had started and whose
         # hold had been refused would be a run the user was watching happen
         # somewhere they had been told it would not.
@@ -137,6 +141,7 @@ class Run:
         try:
             (self.drive or driver())(prompt, options(self.space, self.record),
                                      self.gate, self.say)
+            self.told()
             self.say("ended", text="the agent stopped")
         except Stopped:
             pass                              # `end` already said so, once
@@ -144,6 +149,17 @@ class Run:
             self.say("ended", text=f"the run failed: {e}")
         finally:
             self.stop()
+
+    def told(self):
+        """Say what became of the marks this run was seeded with, if any.
+
+        Before the run is declared over, on every way of being over: the last
+        line of a conversation is *ended*, and a report arriving after it reads
+        as something that happened later.
+        """
+        lines = seed.report(self.space, self.seeded)
+        if lines:
+            self.say("seeds", text=lines)
 
     def end(self):
         """The user ends the run. Not the console: a run that ends and starts
@@ -154,6 +170,10 @@ class Run:
         agent's words are dropped and its calls refused, and the space is given
         back at once rather than when a thread notices.
         """
+        # Before `stopped`, because after it the transcript takes nothing but
+        # the ending itself — and this ending is the one where the report matters
+        # most, the run stopped with work still outstanding.
+        self.told()
         self.stopped = True
         self.say("ended", text="you ended the run")
         waiting, self.pending = self.pending, None

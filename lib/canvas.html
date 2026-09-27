@@ -61,6 +61,11 @@
   .pin.closed { background: transparent; border: 1.5px solid var(--line); color: var(--line); }
   li.closed { opacity: .45; text-decoration: line-through; }
   .part { opacity: .8; font-size: 12px; font-weight: 600; }
+  /* The checkbox that puts a mark in a run's scope. In the list rather than in
+     the run form: the marks are already here, and a second list of them to pick
+     from would be the same findings in two places. */
+  #list .seed { margin-right: 4px; }
+  #seeds { font-size: 11px; opacity: .6; margin: 0 0 4px; }
   .shut { border: 0; padding: 0 0 0 6px; font-size: 12px; opacity: .6; text-decoration: underline; }
   /* A veto: the sentence is the point, so it is the part that reads normally.
      Bordered like nothing — it is a record and not a thing waiting for you. */
@@ -103,6 +108,10 @@
   #turns .prompt { font-weight: 600; }
   #turns .limit, #turns .ended, #turns .verdict,
   #turns .resolved { opacity: .6; }
+  /* One line per seeded mark, so the report reads as a list and not a paragraph:
+     it is answering *what happened to each of these*. */
+  #turns .seeds { white-space: pre-line; border-left: 2px solid currentColor;
+                  padding-left: 6px; opacity: .8; }
   /* A gate. Bordered in the colour every other *stop and look* on this page
      uses, because it is the one line of the transcript that is waiting for you. */
   #turns .gate { border: 1px solid var(--pin); border-radius: 6px; padding: 8px;
@@ -149,6 +158,7 @@
          agent, which reads it from context, to the user, who has not described
          the task yet — and it answers nothing for a run that is neither skill. -->
     <form id="begin">
+      <p id="seeds" data-needs="drive"></p>
       <textarea id="prose" rows="3" placeholder="what should the agent do"></textarea>
       <div class="pair">
         <button type="submit">Start run</button>
@@ -232,6 +242,11 @@ ask('/can').then(r => r.json()).then(({ can }) => {
   for (const el of document.querySelectorAll('[data-unless]'))
     if (has.has(el.dataset.unless)) el.remove();
   document.body.classList.add('asked');     // what survived may now be seen
+  // Remembered rather than re-asked: `draw()` is the same function under both
+  // hosts, and the checkbox that puts a mark in a run's scope only means
+  // something under the one that has a run to put it in.
+  seeding = has.has('drive');
+  if (seeding) draw();
   if (has.has('drive')) drive();             // and what survived is now wired
 });
 
@@ -249,10 +264,21 @@ function drive() {
   document.getElementById('begin').addEventListener('submit', async e => {
     e.preventDefault();
     const prose = document.getElementById('prose');
-    if (!prose.value.trim()) return;
-    const said = await ask('/run', { prompt: prose.value.trim() }).then(r => r.json());
+    // Either will do. A selection is a request the user has already written
+    // down, in the place it applies.
+    if (!prose.value.trim() && !chosen.size) return;
+    const said = await ask('/run', { prompt: prose.value.trim(),
+                                     marks: [...chosen] }).then(r => r.json());
     state.textContent = said.started ? 'running' : said.why;
-    if (said.started) prose.value = '';
+    if (said.started) {
+      // The scope belonged to that run. Kept ticked, it would quietly seed the
+      // next one too, and the report at the end would be about marks the user
+      // had not chosen this time.
+      prose.value = '';
+      chosen.clear();
+      seedLine();
+      draw();
+    }
   });
 
   document.getElementById('end').addEventListener('click', async () => {
@@ -382,6 +408,11 @@ const entry = document.getElementById('entry'), text = document.getElementById('
 const where = document.getElementById('where'), hint = document.getElementById('hint');
 const strip = document.getElementById('strip');
 let marks = [], pending = null, added = 0, parts = {};
+// Whether this host can run an agent, and which open marks the next run is to be
+// seeded with. Ids and not marks: `draw()` rebuilds the list from scratch, and a
+// selection held as objects would survive as a copy of a mark that has moved on.
+let seeding = false;
+const chosen = new Set();
 // Where a drag started, in picture pixels. A drag on a reference is a *span*:
 // two ends that mean one distance, which is the only way a picture can be
 // asked about a separation (ADR 0018).
@@ -546,6 +577,19 @@ function draw() {
       li.append(who);
     }
     li.append(document.createElement('br'), body);
+    if (!closed && seeding) {
+      // Selectable only while open: a closed finding is not what a run is about,
+      // and the server drops one anyway and says that it did.
+      const pick = document.createElement('input');
+      pick.type = 'checkbox';
+      pick.className = 'seed';
+      pick.checked = chosen.has(mark.id);
+      pick.addEventListener('change', () => {
+        pick.checked ? chosen.add(mark.id) : chosen.delete(mark.id);
+        seedLine();
+      });
+      li.prepend(pick);
+    }
     if (!closed) {
       const shut = document.createElement('button');
       shut.className = 'shut';
@@ -555,6 +599,18 @@ function draw() {
     }
     list.appendChild(li);
   });
+}
+
+// What the next run will be seeded with, said above the box the prose goes in.
+// Said as a count and not as a list: the marks themselves are on screen with
+// their boxes ticked, and repeating them here would be the same findings twice.
+function seedLine() {
+  const line = document.getElementById('seeds');
+  if (!line) return;                       // the launcher's page; no run to seed
+  line.textContent = chosen.size
+    ? chosen.size + (chosen.size === 1 ? ' mark' : ' marks')
+      + ' selected — they go into the prompt'
+    : '';
 }
 
 // One click, no typing: only the user ever closes a mark.

@@ -75,7 +75,7 @@ class Console:
         `drive` is a capability and not a second page."""
         if self.run.live:
             return {"started": False, "why": "a run is already under way"}
-        self.run.start(body.get("prompt", ""))
+        self.run.start(body.get("prompt", ""), body.get("marks") or ())
         return {"started": True}
 
     def transcript(self, query):

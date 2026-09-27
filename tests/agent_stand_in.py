@@ -13,6 +13,13 @@ rehearsal of one.
 """
 import json
 import os
+import subprocess
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from lib import anchor, marks
 
 
 def drive(prompt, options, gate, say):
@@ -24,6 +31,22 @@ def drive(prompt, options, gate, say):
             # limit the user did not choose must not interrupt work they were
             # watching (ADR 0019), which is the same reason a timeout does not.
             say("limit", text=step["limit"])
+        if "mark" in step:
+            # The agent's own return path, run for real: `contour mark` is on
+            # `PATH` because `options` put the toolkit there, and it is the way an
+            # agent attaches *addressed in this build* to a finding (ADR 0018).
+            # Not gated and not routed through the gate, which is the point — the
+            # console has to read the store to know what the run did to it.
+            subprocess.run(["contour", "mark", *step["mark"]],
+                           cwd=options["cwd"], env=options["env"],
+                           capture_output=True, text=True)
+        if "rebuilt" in step:
+            # The build the run produced, as far as the marks are concerned: these
+            # are the parts it has. `contour render` does this from inside Blender
+            # with the build in front of it, which is the one thing the suite
+            # cannot run — so the effect on the store is produced here instead,
+            # and what is under test stays the console's reading of it.
+            anchor.orphan(Path(options["cwd"]) / marks.NAME, set(step["rebuilt"]))
         if "call" in step:
             # Asked for, then reported — the two halves an agent actually has.
             # What comes back from the gate is a verdict and a sentence, never an
