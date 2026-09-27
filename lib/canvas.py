@@ -332,9 +332,12 @@ class Canvas:
         """Turn this session's pixels into places on parts — one Blender run,
         at the end, and only if there is something to ask it (ADR 0018).
 
-        Here and not per click: a ray per click would pay a Blender startup
-        per mouse press, and a ray per build would be cast against geometry
-        the user never looked at.
+        Here and not per click: a ray per click would pay a Blender startup per
+        mouse press. And here rather than at a build, for this host, because
+        this host has no build to hang it off: `contour canvas` shows a sheet and
+        cannot know when the next build is coming, so Done is the last moment it
+        knows about. A console can do better, and does — it owns the build, so it
+        resolves the instant it approves one (ADR 0019, decisions 8 and 14).
         """
         if not self.resolve or not anchor.unresolved(marks_store.load(self.marks)):
             return []

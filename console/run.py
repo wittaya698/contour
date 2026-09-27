@@ -12,7 +12,8 @@ import secrets
 import threading
 from pathlib import Path
 
-from lib import intent, lock, policy
+from console import launcher
+from lib import anchor, intent, lock, marks, policy
 
 
 class Stopped(Exception):
@@ -188,7 +189,10 @@ class Run:
         if category is None:
             return True, None
         if not policy.gated(category, self.space):
-            return True, None                 # the user allowed this in advance
+            # The user allowed this in advance. Allowed, not unsupervised: it
+            # leaves by the same door an answered gate leaves by, so what has to
+            # happen before an approved call still happens.
+            return self.approved(True, None, category)
         # The gate carries its own id rather than its place in the transcript.
         # The page can only learn it from the event, so a verdict cannot arrive
         # before there is something to receive it, and a stale one from a
@@ -203,7 +207,46 @@ class Run:
         self.say("gate", id=waiting["id"], category=category, tool=tool,
                  call=dict(payload))
         waiting["answered"].wait()
-        return waiting["allow"], waiting["reason"]
+        return self.approved(waiting["allow"], waiting["reason"], category)
+
+    def approved(self, allow, reason, category):
+        """The one way out of the gate for a call that is about to happen.
+
+        Both allows leave by here — the one the user just clicked and the one
+        they granted in advance in the ask-list — because the ask-list buys not
+        being *asked*, and never permission for a rebuild to invalidate a mark
+        mid-typing (ADR 0019, decision 14).
+        """
+        if allow:
+            self.before(category)
+        return allow, reason
+
+    def before(self, category):
+        """What has to happen before a call the user approved actually runs.
+
+        One thing so far, and it is the reason a build is gated at all: a mark
+        carries the pixel it was clicked on, and a ray through that pixel must
+        hit the geometry the sheet was drawn from. The console owns the build, so
+        this is the instant before geometry changes — a strictly better place to
+        cast rays than session close, which is where ADR 0018 had to put them
+        (ADR 0019, decisions 8 and 14).
+        """
+        if category != "build":
+            return
+        # Asked here rather than paid for blindly: most approvals have no new pin
+        # waiting, and a Blender startup on every one of them would add a second
+        # to the most-pressured gate in the system for nothing. Read by importing
+        # `lib/`, which is the half of decision 28 this process may do itself.
+        if not anchor.unresolved(marks.load(self.space / marks.NAME)):
+            return
+        _ok, lines = launcher.run(self.space, "resolve",
+                                  held_by=self.record["run"])
+        # On the transcript, in the launcher's own words. A mark changes shape at
+        # this moment — its pixel is spent and an anchor takes its place — and
+        # the transcript is the only place a run is visible, so this is where the
+        # reason a later pin sits where it does gets recorded.
+        for line in lines:
+            self.say("resolved", text=line)
 
     def answer(self, at, allow, reason=None):
         """The user's verdict on the gate that is waiting, or None if none is.

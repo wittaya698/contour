@@ -16,6 +16,7 @@ prints only its terse `lines`. Stdlib only: no venv, no yaml.
     contour measure <ref> ...     real pixel geometry from a reference image
     contour measure --span <m>    read the distance two pins on a reference mean
     contour canvas                the sheet and the references in a browser, to mark on
+    contour resolve               anchor marks against this build, before it changes
     contour mark --part <p> "..."  pin a finding on the sheet, for the user to see
     contour run <cmd>...          hold this space for one run, then release it
     contour selftest              fixture pipeline test
@@ -288,6 +289,26 @@ def main(argv):
                                  views=out / "views.json",
                                  blend=out / f"{PROJECT.name}.blend",
                                  verdict=OUT / panel.NAME))
+    if cmd == "resolve" and not rest:
+        if not PROJECT:
+            return need_project(cmd)
+        # One ray per unresolved mark, against the build the sheet was drawn
+        # from. ADR 0018 ran this at canvas close because that was the last
+        # moment before geometry could change; the console knows a better one —
+        # the instant a build is approved — and reaches it by typing this
+        # (ADR 0019, decisions 8 and 14).
+        #
+        # Held like a build, because it reads the build: rays cast while another
+        # terminal is rebuilding would land in geometry that is being replaced
+        # underneath them. The console's own resolve carries `$CONTOUR_RUN`, so
+        # the hold its run already took is one it is inside of (slice 02).
+        record = hold(cmd)
+        if record is None:
+            return 3
+        try:
+            return emit(stage(["resolve"]))
+        finally:
+            free(record)
     if cmd == "mark" and rest:
         if not PROJECT:
             return need_project(cmd)

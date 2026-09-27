@@ -7,14 +7,26 @@ not Blender's.
 """
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
 import unittest
+import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 CONTOUR = ROOT / "contour"
+
+
+def stages(dirpath):
+    """Which stages a stubbed Blender was asked for, in order — one process
+    each. Read from the trace `stub_blender` leaves, and shared with the console
+    tests, which watch for a stage the console spawned rather than ran."""
+    trace = Path(dirpath) / "stages"
+    return [line.rsplit(" -- ", 1)[-1].split()[0]
+            for line in trace.read_text().splitlines()] \
+        if trace.exists() else []
 
 
 def stub_blender(dirpath, ok=True, crash=False):
@@ -57,18 +69,17 @@ class LauncherTest(unittest.TestCase):
         (self.space / ".contour").mkdir(parents=True)
         (self.space / ".contour" / "project").write_text("toolkit: stub\n")
 
-    def run_contour(self, *args, cwd=None, blender=None):
+    def run_contour(self, *args, cwd=None, blender=None, run=None):
         env = dict(os.environ, BLENDER=str(blender or stub_blender(self.tmp)))
+        if run:
+            env["CONTOUR_RUN"] = run          # this call belongs to that run
         return subprocess.run([sys.executable, str(CONTOUR), *args],
                               cwd=str(cwd or self.space), env=env,
                               capture_output=True, text=True, timeout=60)
 
     def stages(self):
         """Which stages the launcher ran, in order — one Blender process each."""
-        trace = self.tmp / "stages"
-        return [line.rsplit(" -- ", 1)[-1].split()[0]
-                for line in trace.read_text().splitlines()] \
-            if trace.exists() else []
+        return stages(self.tmp)
 
     def mark(self, status="open"):
         path = self.space / "marks.json"
@@ -80,6 +91,16 @@ class LauncherTest(unittest.TestCase):
 
     def test_canvas_outside_a_model_space_says_so_and_fails(self):
         r = self.run_contour("canvas", cwd=self.tmp)
+        self.assertEqual(r.returncode, 2)
+        self.assertIn("not in a model space", r.stderr)
+
+    def test_resolve_outside_a_model_space_says_so_and_fails(self):
+        """Resolution is about one space's marks and one space's build, so being
+        in a space is the whole of what makes it meaningful. The console always
+        passes one; a person who typed it in the wrong directory gets the
+        launcher's own sentence rather than a stage that quietly anchors nothing.
+        """
+        r = self.run_contour("resolve", cwd=self.tmp)
         self.assertEqual(r.returncode, 2)
         self.assertIn("not in a model space", r.stderr)
 
@@ -141,6 +162,57 @@ class LauncherTest(unittest.TestCase):
         self.assertIn("stub ran build", r.stdout)
         self.assertNotIn("render", r.stdout)
         self.assertNotIn("sheet", r.stdout)
+
+    def test_resolving_waits_for_whoever_is_holding_the_space(self):
+        """Resolution reads the build and rewrites `marks.json`, so a build
+        running underneath it would move the geometry its rays are aimed at. It
+        takes the same hold every other stage takes rather than a lock of its
+        own — and the console's own resolve is not refused by the run that asked
+        for it, because a run's hold is re-entrant within that run (slice 02).
+        """
+        sys.path.insert(0, str(ROOT))
+        from lib import lock
+        held = lock.take(self.space, "another terminal's check")
+        refused = self.run_contour("resolve")
+        self.assertEqual(refused.returncode, 3, refused.stdout + refused.stderr)
+        self.assertIn("is held by", refused.stderr)
+        self.assertEqual(self.stages(), [], "it cast rays into a live build")
+        mine = self.run_contour("resolve", run=held["run"])
+        self.assertEqual(mine.returncode, 0, mine.stdout + mine.stderr)
+        self.assertEqual(self.stages(), ["resolve"])
+
+    def test_the_canvas_still_resolves_at_session_close_without_a_console(self):
+        """ADR 0018's trigger, kept for the host that has no better one.
+
+        The console resolves at the instant it approves a build, because it owns
+        the build and so knows when geometry is about to change (ADR 0019,
+        decision 8). `contour canvas` owns no build and cannot know that, so for
+        it the last moment before anything can change is still the moment the
+        user says Done.
+        """
+        (self.space / "sheet.png").write_bytes(b"\x89PNG\r\n\x1a\npixels")
+        self.mark()
+        quiet = self.tmp / "no-browser"
+        quiet.write_text("#!/bin/sh\nexit 0\n")     # $BROWSER, so none opens
+        quiet.chmod(0o755)
+        proc = subprocess.Popen(
+            [sys.executable, str(CONTOUR), "canvas"], cwd=str(self.space),
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+            env=dict(os.environ, BLENDER=str(stub_blender(self.tmp)),
+                     BROWSER=str(quiet)))
+        self.addCleanup(proc.stdout.close)     # a pipe is a file, and it is ours
+        self.addCleanup(proc.kill)
+        url = re.search(r"http://\S+", proc.stdout.readline()).group(0)
+        origin, token = url.split("/?")[0], url.split("t=")[1]
+        done = urllib.request.Request(
+            origin + "/done", data=b"{}", method="POST",
+            headers={"X-Contour-Token": token,
+                     "Content-Type": "application/json"})
+        with urllib.request.urlopen(done, timeout=10) as r:
+            r.read()
+        said = proc.stdout.read()
+        self.assertEqual(proc.wait(timeout=30), 0, said)
+        self.assertEqual(self.stages(), ["resolve"], said)
 
     def test_a_build_that_never_finished_renders_nothing(self):
         """The most dangerous option available, refused: a picture of a model

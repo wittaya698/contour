@@ -26,7 +26,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from lib import anchor, panel
+from lib import anchor, marks as marks_store, panel
+
+from test_launcher import stages, stub_blender
 
 CONSOLE = ROOT / "contour-console"
 STAND_IN = Path(__file__).resolve().parent / "agent_stand_in.py"
@@ -449,6 +451,157 @@ class RunTest(ConsoleCase):
                                    "reason": "measure it first"})
         self.assertEqual(proc.wait(timeout=40), 0)
         self.assertIn("idle", proc.stdout.read())
+
+    def marked(self, space):
+        """A space the user has marked and has not resolved: a build on disk, a
+        sheet drawn from that build, and a pin still carrying the pixel it was
+        born with (ADR 0018)."""
+        out = space / "out"
+        out.mkdir(exist_ok=True)
+        blend = out / f"{space.name}.blend"
+        blend.write_bytes(b"a blend")
+        anchor.record(out / "views.json", [1024, 1024],
+                      [{"label": "front", "tile": [0, 0, 512, 512]}], blend)
+        marks_store.append(space / marks_store.NAME,
+                           {"view": "front", "pixel": [10, 10],
+                            "text": "the neck is short"})
+        return space
+
+    def test_an_approved_build_casts_the_rays_before_the_agent_is_let_through(self):
+        """ADR 0019, decision 14, and the whole of this slice. The sheet is
+        always on screen, so it can always be clicked, and a rebuild would
+        otherwise invalidate a mark mid-typing. The console owns the build, so it
+        knows the instant before geometry changes — a strictly better place to
+        cast rays than session close ever was (decision 8).
+
+        Ordering is the claim: the agent is holding a verdict it cannot act on
+        until the gate returns, so a resolve that has happened by the time the
+        call has a result is a resolve that happened before the build.
+        """
+        space = self.marked(self.space())
+        _, url = self.driven({"call": {"tool": "Bash", "command": "./contour check"}},
+                             space=space, BLENDER=str(stub_blender(space)))
+        self.ask(url, "/run", {"prompt": "the neck is short — fix it"})
+        gate, _ = self.gate(url)
+        self.ask(url, "/verdict", {"id": gate["id"], "allow": True})
+        self.transcript(url, lambda ev: any(e["kind"] == "result" for e in ev))
+        self.assertEqual(stages(space), ["resolve"])
+
+    def test_a_build_the_ask_list_allows_still_resolves_first(self):
+        """The cost of decision 14 is a click per build, and the sanctioned
+        relief is this — a deliberate per-space ask-list entry. What it buys is
+        not being asked; it is not permission for a rebuild to invalidate a mark
+        mid-typing. So resolution hangs off the *allow*, not off the dialog, and a
+        user who widened the list keeps their pins.
+        """
+        space, home = self.marked(self.space()), Path(tempfile.mkdtemp())
+        (home / "ask-list.yaml").write_text(
+            f"spaces:\n  {space}:\n    allow:\n      - build\n")
+        _, url = self.driven({"call": {"tool": "Bash", "command": "./contour check"}},
+                             space=space, CONTOUR_HOME=str(home),
+                             BLENDER=str(stub_blender(space)))
+        self.ask(url, "/run", {"prompt": "check the build"})
+        said = self.transcript(url, lambda ev: any(e["kind"] == "result" for e in ev))
+        self.assertEqual([e for e in said if e["kind"] == "gate"], [],
+                         "the ask-list did not let the build through")
+        self.assertEqual(stages(space), ["resolve"])
+
+    def test_a_build_with_nothing_to_anchor_pays_for_no_blender(self):
+        """The gate is the most-pressured one in the system, and most builds have
+        no new pin waiting: a Blender startup on every approval would be a second
+        a click long, paid for nothing. The same question `contour canvas` asks
+        before it resolves at close, asked by importing `lib/` — which is the half
+        of decision 28 this file may do in its own process.
+        """
+        space = self.space()
+        _, url = self.driven({"call": {"tool": "Bash", "command": "./contour check"}},
+                             space=space, BLENDER=str(stub_blender(space)))
+        self.ask(url, "/run", {"prompt": "check the build"})
+        gate, _ = self.gate(url)
+        self.ask(url, "/verdict", {"id": gate["id"], "allow": True})
+        self.transcript(url, lambda ev: any(e["kind"] == "result" for e in ev))
+        self.assertEqual(stages(space), [])
+
+    def test_a_denied_build_casts_no_rays(self):
+        """Resolution is not a side effect of asking — it is what happens
+        immediately before geometry changes. A denial means nothing is about to
+        change, and the pixel is still the best thing the mark has: rays cast now
+        would spend a Blender startup to reach exactly the same answer they will
+        reach at the build the user eventually allows.
+        """
+        space = self.marked(self.space())
+        _, url = self.driven({"call": {"tool": "Bash", "command": "./contour check"}},
+                             space=space, BLENDER=str(stub_blender(space)))
+        self.ask(url, "/run", {"prompt": "check the build"})
+        gate, _ = self.gate(url)
+        self.ask(url, "/verdict", {"id": gate["id"], "allow": False,
+                                   "reason": "measure the neck first"})
+        self.transcript(url, lambda ev: any(e["kind"] == "result" for e in ev))
+        self.assertEqual(stages(space), [])
+        # And the pin is untouched: it still carries the pixel it was born with.
+        self.assertTrue(anchor.unresolved(marks_store.load(space / marks_store.NAME)))
+
+    def test_approving_something_that_is_not_a_build_casts_no_rays(self):
+        """Resolution is tied to the *build* category and not to approval itself.
+        A spec write is approved at a gate too, and it changes no geometry — so
+        rays cast on it would anchor the pins the user is still placing against a
+        sheet that is about to stay exactly as it is, and drop the pixels that
+        let them be cast again later.
+        """
+        space = self.marked(self.space())
+        _, url = self.driven({"call": {"tool": "Bash",
+                                       "command": "python3 -c \"open('spec.yaml','w')\""}},
+                             space=space, BLENDER=str(stub_blender(space)))
+        self.ask(url, "/run", {"prompt": "the neck should be 280"})
+        gate, _ = self.gate(url)
+        self.assertEqual(gate["category"], "spec-write")
+        self.ask(url, "/verdict", {"id": gate["id"], "allow": True})
+        self.transcript(url, lambda ev: any(e["kind"] == "result" for e in ev))
+        self.assertEqual(stages(space), [])
+
+    def test_the_transcript_says_what_resolution_came_to_and_when(self):
+        """A mark the user placed changes shape at this moment — its pixel is
+        spent and an anchor takes its place — and the transcript is where the run
+        is visible. Said in the run's own words, before the call it went ahead of,
+        so the order on screen is the order it happened in: this is why a later
+        pin sits where it does, and there is nowhere else that records it.
+        """
+        space = self.marked(self.space())
+        _, url = self.driven({"call": {"tool": "Bash", "command": "./contour check"}},
+                             space=space, BLENDER=str(stub_blender(space)))
+        self.ask(url, "/run", {"prompt": "the neck is short — fix it"})
+        gate, _ = self.gate(url)
+        self.ask(url, "/verdict", {"id": gate["id"], "allow": True})
+        said = self.transcript(url, lambda ev: any(e["kind"] == "result" for e in ev))
+        kinds = [e["kind"] for e in said]
+        self.assertIn("resolved", kinds, "the rays were cast and nobody was told")
+        self.assertIn("resolve", [e for e in said if e["kind"] == "resolved"][0]["text"])
+        self.assertLess(kinds.index("resolved"), kinds.index("result"))
+
+    def test_resolution_that_fails_says_so_and_does_not_cancel_the_build(self):
+        """Bookkeeping about a pin does not get to veto a call the user
+        personally approved. The mark is not lost when this happens — it still
+        carries its pixel, and the panel already labels a sheet the build has
+        moved past — so the cost of going ahead is one pin resolved later, while
+        the cost of refusing is a build the user asked for and did not get.
+
+        Loudly, though: the lines are the launcher's own, on the transcript,
+        because rays that were meant to be cast and were not is exactly the sort
+        of quiet that makes a pin land somewhere wrong two builds later.
+        """
+        space = self.marked(self.space())
+        _, url = self.driven({"call": {"tool": "Bash", "command": "./contour check"}},
+                             space=space, BLENDER="/nowhere/blender")
+        self.ask(url, "/run", {"prompt": "the neck is short — fix it"})
+        gate, _ = self.gate(url)
+        self.ask(url, "/verdict", {"id": gate["id"], "allow": True})
+        said = self.transcript(url, lambda ev: any(e["kind"] == "result" for e in ev))
+        self.assertTrue([e for e in said if e["kind"] == "result"][0]["allowed"],
+                        "a failed resolve took the build down with it")
+        told = " ".join(e["text"] for e in said if e["kind"] == "resolved")
+        self.assertTrue(told.strip(), "resolution failed and said nothing")
+        self.assertTrue(anchor.unresolved(marks_store.load(space / marks_store.NAME)),
+                        "the pin lost its pixel without gaining an anchor")
 
     def test_a_run_holds_the_space_and_a_terminal_check_is_refused(self):
         """Slice 02's lock, taken by a run and not by a build: what actually

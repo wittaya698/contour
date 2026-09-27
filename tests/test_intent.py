@@ -8,6 +8,7 @@ that has silently stopped being enforced.
 These drive `classify` the way the console's gate will: a tool name and the
 input the SDK handed over, unchanged.
 """
+import ast
 import os
 import subprocess
 import sys
@@ -150,6 +151,8 @@ INTENTLESS = {
     "measure": "reads pixels out of a reference image; never writes one",
     "canvas": "serves the sheet and takes marks — the user's own writes",
     "mark": "the agent pinning a finding, which is what it is for",
+    "resolve": "casts rays for marks the user placed; changes no geometry, and "
+               "the console runs it itself before every build it approves",
     "run": "carries whatever the call inside it carries, tested separately",
     "selftest": "builds the toolkit's own fixture, never the user's model",
     "install-hooks": "installs the push guard; refusing it protects nothing",
@@ -179,6 +182,44 @@ class RosterTest(unittest.TestCase):
                     and intent.classify("Bash", {"command": f"./contour {cmd}"}) is None]
         self.assertEqual(stranded, [], "classify these, or say why they are "
                                        "intentless in INTENTLESS")
+
+
+    def builds(self):
+        """The subcommands the launcher routes through `build_path`, read out of
+        its own dispatch.
+
+        Read rather than listed, because the claim is about the launcher and not
+        about a tuple in a test: a build command added later has to arrive as a
+        failure here, which is the only thing that keeps *no build path skips the
+        gate* true tomorrow.
+        """
+        main = [node for node in ast.walk(ast.parse((ROOT / "contour").read_text()))
+                if isinstance(node, ast.FunctionDef) and node.name == "main"][0]
+        found = set()
+        for node in ast.walk(main):
+            if not isinstance(node, ast.If):
+                continue
+            called = {call.func.id for call in ast.walk(node)
+                      if isinstance(call, ast.Call) and isinstance(call.func, ast.Name)}
+            if "build_path" not in called:
+                continue
+            found |= {word.value for word in ast.walk(node.test)
+                      if isinstance(word, ast.Constant) and isinstance(word.value, str)}
+        return sorted(found)
+
+    def test_no_build_path_skips_the_gate(self):
+        """And so no build path skips resolution (ADR 0019, decision 14).
+
+        Resolution hangs off the build's gate, so a build the gate cannot see is
+        a rebuild that invalidates a mark with nobody asked and no rays cast —
+        the mid-typing failure the whole mechanism exists to delete. Every way
+        into `build_path` must therefore classify as one category.
+        """
+        found = self.builds()
+        self.assertTrue(found, "the launcher's build dispatch was not found")
+        for cmd in found:
+            self.assertEqual(intent.classify("Bash", {"command": f"./contour {cmd}"}),
+                             "build", cmd)
 
 
 class EnumerateTest(unittest.TestCase):

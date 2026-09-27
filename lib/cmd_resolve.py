@@ -1,11 +1,14 @@
-"""./contour resolve: one ray per unresolved mark, once per canvas session
-(ADR 0018).
+"""./contour resolve: one ray per unresolved mark, at the last moment before
+geometry can change (ADR 0018, and its trigger amended by ADR 0019).
 
-Not a command the user types. `contour canvas` runs this when the page says
-done, so anchoring costs one Blender startup per session — not one per click
-and not one per build. It rebuilds each sheet camera from what `views.json`
-recorded, casts a ray through the pixel the user clicked, and stores where it
-landed in the hit part's own coordinates.
+Run by whoever knows that moment. `contour canvas` runs it when the page says
+done, because that host owns no build and so cannot know of one coming; the
+console runs it the instant it approves a build, which is strictly better — it
+owns the build, so it knows exactly when the geometry under these rays is about
+to be replaced. Either way it is one Blender startup per batch of pins, not one
+per click. It rebuilds each sheet camera from what `views.json` recorded, casts
+a ray through the pixel the user clicked, and stores where it landed in the hit
+part's own coordinates.
 
 It refuses outright if the build has moved on since the sheet was drawn. The
 ray would still land somewhere; it would just be somewhere the user never saw.
