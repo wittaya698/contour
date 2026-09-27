@@ -5,11 +5,15 @@ every layer it touches — launcher, page, agent loop, tests — not a horizonta
 through one of them. A finished slice is demoable or verifiable on its own.
 
 **HITL** needs the user: a decision, a wording, a review. **AFK** can be
-implemented and landed without one. There are two HITL slices and thirteen AFK.
+implemented and landed without one.
 
-These come from [ADR 0019](../adr/0019-console-a-driven-agent-behind-a-gate.md),
-which holds the reasoning and the rejected alternatives. Each file cites the
-decisions it implements; read the ADR before arguing with a slice.
+Two batches so far. Each file cites what it comes from; read that before arguing
+with a slice.
+
+## Batch 1 — the console
+
+From [ADR 0019](../adr/0019-console-a-driven-agent-behind-a-gate.md), which holds
+the reasoning and the rejected alternatives. Two HITL slices and thirteen AFK.
 
 | # | Slice | Type | Blocked by |
 |---|---|---|---|
@@ -45,3 +49,61 @@ everything — the designed starting point, not a stub.
 **14 is last on purpose.** The eight rules change when the console lands, not
 before; a rule describing a mechanism that does not exist is worse than the
 honour-system wording it replaced.
+
+## Batch 2 — the deepening program
+
+From the architecture review of 2026-09-28, which found the toolkit deep in most
+places and named seven where it is not. Only one of them is a decision rather than
+an implementation: slice 23 rests on
+[ADR 0020](../adr/0020-checks-are-pure-over-a-measurement.md), which is Proposed.
+Two HITL slices and ten AFK.
+
+The through-line is **one owner per concept**. Every slice here takes a thing the
+toolkit knows in several places — what a call means, where a space keeps its files,
+what a mark is, what a measurement is, which commands hold the space — and gives it
+one home. None of them adds a feature.
+
+| # | Slice | Type | Blocked by |
+|---|---|---|---|
+| [15](15-the-guard-asks-what-a-call-means.md) | The guard asks what a call means | AFK | — |
+| [16](16-a-json-store-shared.md) | A JSON store, shared | AFK | — |
+| [17](17-the-space-layout-is-a-function-of-a-space.md) | The space layout is a function of a space | AFK | — |
+| [18](18-the-mark-record-gets-an-owner.md) | The mark record gets an owner | AFK | 16 |
+| [19](19-one-spelling-for-a-part.md) | One spelling for a part, and a migration | HITL | 18 |
+| [20](20-anchor-becomes-views-and-badges.md) | `anchor.py` becomes views and badges | AFK | 18 |
+| [21](21-one-formula-one-git-wrapper.md) | One weighting formula, one git wrapper | AFK | — |
+| [22](22-accept-adr-0020.md) | Accept ADR 0020 | HITL | — |
+| [23](23-the-measurement-becomes-data.md) | The measurement becomes data | AFK | 22 |
+| [24](24-the-launcher-becomes-a-table-and-a-shim.md) | The launcher becomes a table and a shim | AFK | — |
+| [25](25-the-selftests-assertions-become-tests.md) | The selftest's assertions become tests | AFK | 24 |
+| [26](26-the-untested-free-modules-get-tests.md) | The untested free modules get tests | AFK | — |
+
+### Shape of the graph
+
+**15, 16, 17, 21, 22 and 26 are all unblocked,** and each is worth having even if
+nothing else in the batch lands. 15 closes a hole in a shipped rule-1 mechanism. 21
+fixes two divergences that are defects waiting. 26 puts a test on the parser that
+defines what *correct* means. None of them needs the rest.
+
+**16 is first among equals.** It was originally part of slice 21's duplication
+work, gated on the mark record — and slice 18 then routes the record's reader into
+it, which is a cycle. Pulled out ahead of both, it is a few dozen lines with four
+callers waiting.
+
+**19 is HITL because it rewrites tracked user data** in four spaces. Slice 18's
+reader is bilingual, so 19 can wait indefinitely without blocking anything; what
+it needs is the user watching, in a commit of its own, under rule 5.
+
+**22 is HITL and is a tracer bullet, not a review.** ADR 0020 claims every check
+can be arithmetic over summary numbers. One check rewritten answers that. Starting
+23 first risks six rewrites against a shape that turns out wrong — the precedent is
+ADR 0017, whose bullet disagreed with what was expected and was worth more for it.
+
+**24 is the wide one.** It moves 803 lines and touches every subcommand, so it
+wants a green suite in front of it and nothing else in flight. It is placed late for
+that reason alone, not because anything blocks it — and 17 and 19 both remove work
+from it if they land first.
+
+**Nothing here is a feature.** Every acceptance list ends with output that is
+byte-identical and a green `contour selftest`, because a deepening that changes what
+the toolkit says is a deepening that has changed the toolkit.

@@ -14,7 +14,7 @@ works — the alternative you are about to suggest is probably here with a reaso
 | [0006](0006-glb-only-with-round-trip.md) | `.glb` only for now, proven by round-trip |
 | [0007](0007-tracked-artifacts-and-commit-gate.md) | What git tracks, and who commits — superseded in part by [0012](0012-one-directory-per-model.md), [0013](0013-releases-are-versioned-folders.md), [0015](0015-model-spaces.md) |
 | [0008](0008-contour-cli-and-doc-layers.md) | One CLI wrapper, three documentation layers |
-| [0009](0009-verifier-proves-its-own-teeth.md) | The verifier proves it can fail, and refuses what it cannot check |
+| [0009](0009-verifier-proves-its-own-teeth.md) | The verifier proves it can fail, and refuses what it cannot check — extended by [0020](0020-checks-are-pure-over-a-measurement.md) |
 | [0010](0010-miniyaml-no-dependencies.md) | A small in-repo YAML reader instead of PyYAML |
 | [0011](0011-model-content-stays-local.md) | Model content stays local; git carries the toolkit — superseded in part by [0014](0014-toolkit-is-a-tool-a-model-is-a-project.md), [0015](0015-model-spaces.md) |
 | [0012](0012-one-directory-per-model.md) | One directory per model — superseded in part by [0015](0015-model-spaces.md) |
@@ -25,3 +25,4 @@ works — the alternative you are about to suggest is probably here with a reaso
 | [0017](0017-scaffold-measured-from-references.md) | The scaffold: what the references measure, recorded separately |
 | [0018](0018-marks-a-canvas-over-the-sheet.md) | Marks: a canvas over the sheet, and a shared way to point |
 | [0019](0019-console-a-driven-agent-behind-a-gate.md) | The console: a driven agent behind a gate — amends [0010](0010-miniyaml-no-dependencies.md), [0018](0018-marks-a-canvas-over-the-sheet.md) |
+| [0020](0020-checks-are-pure-over-a-measurement.md) | Checks are pure over a measurement — **Proposed**, extends [0009](0009-verifier-proves-its-own-teeth.md) |
