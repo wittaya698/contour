@@ -163,6 +163,31 @@ def above_lib(root, blender, *globs):
     return found
 
 
+def into_console(root, *globs):
+    """Every way a file the launcher runs reaches up into the console.
+
+    The mirror of `above_lib`, and the same boundary read from the other side:
+    the console imports `lib/`'s Blender-free half, and nothing the launcher runs
+    may import the console back. Two things rest on it. `./contour` has to work
+    on a clone with nothing installed, and `console/` is the one directory
+    allowed a dependency — so a single import upwards would make the launcher
+    need an environment to run. And the veto store's only door lives up there on
+    purpose (ADR 0019, decision 27): a veto is written by the user at a gate and
+    by nobody else, which stays true structurally for as long as this line holds.
+
+    Read rather than run, for `above_lib`'s reason: the check has to work where
+    the console's environment does not exist.
+    """
+    found = []
+    for got in sorted(p for g in globs for p in Path(root).glob(g)):
+        if "console" in declared(got):
+            found.append(f"{got.relative_to(root)} imports the console, which "
+                         f"nothing the launcher runs may do — `./contour` works "
+                         f"on a bare clone, and the console's store of vetoes has "
+                         f"one writer because it is only reachable from up there")
+    return found
+
+
 class LibSplitTest(unittest.TestCase):
     def fabricate(self, **modules):
         """A throwaway tree shaped like the toolkit: a `lib/` package holding
@@ -239,11 +264,29 @@ class LibSplitTest(unittest.TestCase):
         self.assertIn("console/server.py", said)
         self.assertIn("lib/turner.py", said)
 
+    def test_a_launcher_module_that_imports_the_console_is_named(self):
+        """The direction that is not allowed, and the one that makes a rule into
+        a mechanism: a store whose only door is in `console/` cannot be written
+        by a subcommand unless somebody first reaches up for it."""
+        tree = self.fabricate(marks="from console import vetoes\n")
+        (tree / "console").mkdir()
+        (tree / "console" / "vetoes.py").write_text("")
+        said = " ".join(into_console(tree, "lib/*.py"))
+        self.assertIn("lib/marks.py", said)
+        self.assertIn("console", said)
+
     def test_the_toolkit_keeps_its_own_split(self):
         """The live check, and the reason this file is in `tests/`: selftest
         runs the unit tests before it starts Blender, so a violation surfaces
         in the command that proves a bare clone works, at no Blender cost."""
         self.assertEqual(offences(ROOT, FREE, BLENDER), [])
+
+    def test_nothing_the_launcher_runs_imports_the_console(self):
+        """The live check on the other direction. `contour` and `verify.py` are
+        in it because they are the two files a bare clone runs, and `lib/*.py`
+        because that is everything they reach."""
+        self.assertEqual(into_console(ROOT, "lib/*.py", "contour", "verify.py"),
+                         [])
 
     def test_the_console_and_its_shim_keep_out_of_the_blender_half(self):
         """The live check on the layer above the launcher (ADR 0019, decision

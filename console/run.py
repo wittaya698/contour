@@ -12,7 +12,7 @@ import secrets
 import threading
 from pathlib import Path
 
-from console import launcher
+from console import launcher, vetoes
 from lib import anchor, intent, lock, marks, policy
 
 
@@ -197,8 +197,12 @@ class Run:
         # The page can only learn it from the event, so a verdict cannot arrive
         # before there is something to receive it, and a stale one from a
         # reloaded tab cannot land on a later gate by arithmetic.
+        # The call is kept on the gate rather than looked up when the verdict
+        # lands: what a veto records is what the user was shown, and a second
+        # reading of the agent's own dict could differ from it by then.
         waiting = {"id": secrets.token_hex(8), "answered": threading.Event(),
-                   "allow": None, "reason": None}
+                   "allow": None, "reason": None, "category": category,
+                   "tool": tool, "call": dict(payload)}
         self.pending = waiting
         # A copy of the call, not the call. The transcript is served to the page
         # and answered from it, and the agent is holding this dict: shared, it
@@ -263,6 +267,12 @@ class Run:
             return None
         waiting["allow"], waiting["reason"] = bool(allow), reason
         self.pending = None
+        if not allow:
+            # The transcript dies with the tab; this does not. A denial is why
+            # two builds differ, so it is kept in the space and reaches git with
+            # the change it prevented (ADR 0019, decisions 15 and 25).
+            vetoes.record(self.space, waiting["category"], waiting["tool"],
+                          waiting["call"], reason)
         self.say("verdict", id=at, allowed=bool(allow), text=reason or "")
         waiting["answered"].set()
         return {"answered": True}

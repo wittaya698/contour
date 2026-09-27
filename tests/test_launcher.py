@@ -117,6 +117,25 @@ class LauncherTest(unittest.TestCase):
         self.assertEqual(r.returncode, 0)
         self.assertNotIn("open", r.stdout)
 
+    def test_check_says_the_same_thing_whether_or_not_vetoes_exist(self):
+        """A veto is never open, so a veto line would never go away — and a
+        status line that is always present is furniture nobody reads (ADR 0019,
+        decision 25). Byte-identical and not merely quiet: the check\'s report is
+        a token budget, and a line about records the user cannot act on here is
+        the one thing a terse report cannot afford.
+        """
+        self.mark()
+        before = self.run_contour("check")
+        (self.space / "vetoes.json").write_text(json.dumps(
+            [{"id": "v1", "category": "spec-write", "tool": "Edit",
+              "call": {"file_path": "spec.yaml"}, "reason": "measure it first",
+              "author": "user", "build": "b0b0b0b0b0b0"}], indent=2) + "\n")
+        after = self.run_contour("check")
+        self.assertEqual(after.returncode, before.returncode)
+        self.assertEqual(after.stdout, before.stdout)
+        self.assertEqual(after.stderr, before.stderr)
+        self.assertIn("1 mark open", after.stdout)   # the marks line still works
+
     def test_the_marks_line_never_changes_the_exit_code(self):
         self.mark()
         red = self.run_contour("check", blender=stub_blender(self.tmp, ok=False))

@@ -62,6 +62,14 @@
   li.closed { opacity: .45; text-decoration: line-through; }
   .part { opacity: .8; font-size: 12px; font-weight: 600; }
   .shut { border: 0; padding: 0 0 0 6px; font-size: 12px; opacity: .6; text-decoration: underline; }
+  /* A veto: the sentence is the point, so it is the part that reads normally.
+     Bordered like nothing — it is a record and not a thing waiting for you. */
+  #vetoes { border-top: 1px solid var(--line); padding-top: 12px; }
+  #denied { padding-left: 0; list-style: none; }
+  #denied li { font-size: 12px; margin-bottom: 8px; }
+  #denied .call { font-family: ui-monospace, SFMono-Regular, monospace;
+                  font-size: 11px; opacity: .7; word-break: break-all; }
+  #exposure { font-size: 12px; color: var(--pin); }
   /* The run, when the host is one that owns a build. Above the ending, because
      the ending is what you reach for last. */
   #run { border-top: 1px solid var(--line); padding-top: 12px; display: flex;
@@ -170,6 +178,18 @@
       </li>
     </template>
   </section>
+  <!-- What was refused, and what it is still exposed to. Here and not in
+       `contour check`: a veto is never open, so a line about one would never go
+       away, and a status line that is always present is furniture nobody reads
+       (ADR 0019, decision 25). The exposure is the console's whole contribution
+       to getting one into git — it does not commit, and it does not offer to:
+       a veto-only commit describes no model state, and this one belongs in the
+       commit where the tolerance did not get widened (decision 27). -->
+  <section id="vetoes" data-needs="drive" hidden>
+    <h1>Vetoes</h1>
+    <p id="exposure"></p>
+    <ol id="denied"></ol>
+  </section>
   <button id="done" data-unless="drive" data-closed="Canvas closed">Done</button>
 </aside>
 <script>
@@ -240,6 +260,14 @@ function drive() {
     state.textContent = 'no run';
   });
 
+  // The vetoes, on the same clock as the panel rather than the transcript: one
+  // arrives at a verdict and the count changes when somebody commits, and
+  // neither is a thing being waited on. Inside `drive` for the launcher's sake —
+  // a page that polled this under a host with no gates would ask forever for a
+  // route that host does not have.
+  refreshVetoes();
+  setInterval(refreshVetoes, 2000);
+
   // Polled from a cursor, so a reloaded tab gets the whole run back rather than
   // whatever happened after it reconnected.
   setInterval(async () => {
@@ -250,6 +278,68 @@ function drive() {
     if (said.events.length) turns.scrollTop = turns.scrollHeight;
     if (said.events.some(e => e.kind === 'ended')) state.textContent = 'no run';
   }, 600);
+}
+
+// What was refused, and what is still only on disk. The whole section goes away
+// when nothing has been refused: a space where nobody has said no has nothing to
+// show, and an empty list under a heading is furniture.
+async function refreshVetoes() {
+  const said = await ask('/vetoes').then(r => r.json()).catch(() => null);
+  if (!said) return;
+  const section = document.getElementById('vetoes');
+  section.hidden = !said.vetoes.length;
+  const exposure = document.getElementById('exposure');
+  // Said only while it is true. Tracked is not committed, and an uncommitted
+  // veto dies exactly as an ignored one would — so this is a live number and not
+  // a label: it goes to zero in the commit that carries the change it prevented.
+  exposure.textContent = said.uncommitted
+    ? said.uncommitted + ' veto' + (said.uncommitted === 1 ? '' : 'es') + ' uncommitted'
+    : '';
+  const list = document.getElementById('denied');
+  list.replaceChildren();
+  for (const veto of said.vetoes) list.append(vetoed(veto));
+}
+
+// One veto, and the one thing that can be done with it. Promotion is what turns
+// a fact about a moment into an open question about the model, and it names a
+// part because that is what gives the mark a position — the user picks it, since
+// guessing which part the sentence was about would attribute a claim to them
+// (ADR 0019, decision 15).
+function vetoed(veto) {
+  const li = document.createElement('li');
+  const call = document.createElement('div');
+  call.className = 'call';
+  call.textContent = veto.category + '  ' + veto.tool;
+  const why = document.createElement('div');
+  why.textContent = veto.reason || '';
+  li.append(call, why);
+  if (veto.promoted) {
+    const said = document.createElement('span');
+    said.className = 'who';
+    said.textContent = 'promoted to ' + veto.promoted;
+    li.append(said);
+    return li;
+  }
+  const pick = document.createElement('select');
+  for (const name of [...new Set(Object.values(parts))].sort()) {
+    const option = document.createElement('option');
+    option.value = option.textContent = name;
+    pick.append(option);
+  }
+  const button = document.createElement('button');
+  button.className = 'shut';
+  button.textContent = 'promote to a mark';
+  button.addEventListener('click', async () => {
+    const res = await ask('/promote', { id: veto.id, part: pick.value });
+    if (!res.ok) return;
+    // The mark is on the sheet from this moment, badged on every view that can
+    // see the part at the next render.
+    marks.push(await res.json());
+    draw();
+    refreshVetoes();
+  });
+  if (pick.options.length) li.append(pick, button);
+  return li;
 }
 
 // One line of the transcript.

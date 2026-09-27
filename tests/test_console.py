@@ -150,6 +150,39 @@ class ConsoleCase(unittest.TestCase):
         threading.Thread(target=loop, daemon=True).start()
 
 
+    def driven(self, *script, **env):
+        """A console whose agent does exactly these things, in this order.
+
+        `$CONTOUR_HOME` points at an empty directory unless a test says
+        otherwise, so the policy in force is the one the design starts from —
+        an ask-list nobody has written, which gates everything — and never the
+        ask-list of whoever is running the suite.
+        """
+        env.setdefault("CONTOUR_HOME", tempfile.mkdtemp())
+        return self.launch(env.pop("space", None),
+                           CONTOUR_CONSOLE_AGENT=f"{STAND_IN}:drive",
+                           CONTOUR_AGENT_SCRIPT=json.dumps(list(script)), **env)
+
+    def gate(self, url):
+        """The one gate now waiting, once it is."""
+        said = self.transcript(url, lambda ev: any(e["kind"] == "gate" for e in ev))
+        return [e for e in said if e["kind"] == "gate"][0], said
+
+    def transcript(self, url, until, timeout=15):
+        """Everything the page would have on screen, once `until` is true of it.
+
+        Polled, as the page polls: the transcript is a cursor over a list, so a
+        reloaded tab and a slow test read it the same way.
+        """
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            _, said = self.ask(url, "/events?since=0")
+            if until(said["events"]):
+                return said["events"]
+            time.sleep(0.1)
+        self.fail(f"transcript never satisfied {until}: {said['events']!r}")
+
+
 class ServesTest(ConsoleCase):
     """The slice's demo: run it in a space and the sheet is in a browser.
 
@@ -318,38 +351,6 @@ class RunTest(ConsoleCase):
     the lock. That the Claude Agent SDK drives the same seam is confirmed by
     hand, since the suite has to pass on a clone with nothing installed.
     """
-
-    def driven(self, *script, **env):
-        """A console whose agent does exactly these things, in this order.
-
-        `$CONTOUR_HOME` points at an empty directory unless a test says
-        otherwise, so the policy in force is the one the design starts from —
-        an ask-list nobody has written, which gates everything — and never the
-        ask-list of whoever is running the suite.
-        """
-        env.setdefault("CONTOUR_HOME", tempfile.mkdtemp())
-        return self.launch(env.pop("space", None),
-                           CONTOUR_CONSOLE_AGENT=f"{STAND_IN}:drive",
-                           CONTOUR_AGENT_SCRIPT=json.dumps(list(script)), **env)
-
-    def gate(self, url):
-        """The one gate now waiting, once it is."""
-        said = self.transcript(url, lambda ev: any(e["kind"] == "gate" for e in ev))
-        return [e for e in said if e["kind"] == "gate"][0], said
-
-    def transcript(self, url, until, timeout=15):
-        """Everything the page would have on screen, once `until` is true of it.
-
-        Polled, as the page polls: the transcript is a cursor over a list, so a
-        reloaded tab and a slow test read it the same way.
-        """
-        deadline = time.monotonic() + timeout
-        while time.monotonic() < deadline:
-            _, said = self.ask(url, "/events?since=0")
-            if until(said["events"]):
-                return said["events"]
-            time.sleep(0.1)
-        self.fail(f"transcript never satisfied {until}: {said['events']!r}")
 
     def test_a_prose_prompt_starts_a_run_and_the_agent_answers_it(self):
         """The slice's demo. Prose, not a skill chosen from a list: the space's
@@ -799,3 +800,363 @@ class InheritsTest(unittest.TestCase):
             for said in self.spoken(f):
                 self.assertNotIn("CLAUDE", said, f)
                 self.assertNotIn("system_prompt", said, f)
+
+
+class VetoTest(ConsoleCase):
+    """A denial outlives the run that produced it (ADR 0019, decisions 15, 25).
+
+    The transcript already carries every verdict, and dies with the tab. A veto
+    is the part of it that has to survive a clean checkout, because it is why two
+    builds differ: *I stopped you widening that tolerance* is reasoning, and an
+    untracked one takes the reasoning with it.
+    """
+
+    def vetoes(self, space):
+        """The veto file as git and the page see it. Absent is not an error: a
+        space where nothing was ever denied has nothing to keep."""
+        path = space / "vetoes.json"
+        return json.loads(path.read_text()) if path.exists() else []
+
+    def built(self, space):
+        """A space with a build on disk, so a veto has something to be against.
+        A veto names the build it happened at, which is what lets a later reader
+        line it up with the geometry the user was looking at."""
+        out = space / "out"
+        out.mkdir(exist_ok=True)
+        blend = out / f"{space.name}.blend"
+        blend.write_bytes(b"a blend")
+        return blend
+
+    def test_denying_at_a_gate_records_the_call_the_reason_and_the_build(self):
+        """The four things a veto is: what was asked, why not, who said so, and
+        which build they said it against. The reason is the user's own sentence
+        and the author is the user, because only the user vetoes — exactly as
+        only the user closes a mark (ADR 0018)."""
+        space = self.space()
+        blend = self.built(space)
+        _, url = self.driven({"call": {"tool": "Bash", "command": "git commit -m wip"}},
+                             space=space)
+        self.ask(url, "/run", {"prompt": "tidy up"})
+        gate, _ = self.gate(url)
+        self.ask(url, "/verdict", {"id": gate["id"], "allow": False,
+                                   "reason": "not until the neck measures 280"})
+        self.transcript(url, lambda ev: any(e["kind"] == "result" for e in ev))
+        got, = self.vetoes(space)
+        self.assertEqual(got["reason"], "not until the neck measures 280")
+        self.assertEqual(got["author"], "user")
+        self.assertEqual(got["category"], "commit")
+        self.assertEqual(got["tool"], "Bash")
+        self.assertEqual(got["call"]["command"], "git commit -m wip")
+        self.assertEqual(got["build"], anchor.fingerprint(blend))
+        self.assertTrue(got["id"], "a veto with no id cannot be promoted later")
+
+    def test_an_allowed_call_leaves_no_veto_behind(self):
+        """A veto is a denial and nothing else. Recording approvals here would
+        make the file a log of the run — which decision 15 refused, because a log
+        is read by nobody and a veto is read by whoever asks why two builds
+        differ. The transcript already has the allow, and is where it belongs."""
+        space = self.space()
+        self.built(space)
+        _, url = self.driven({"call": {"tool": "Bash", "command": "git commit -m wip"}},
+                             space=space)
+        self.ask(url, "/run", {"prompt": "tidy up"})
+        gate, _ = self.gate(url)
+        self.ask(url, "/verdict", {"id": gate["id"], "allow": True})
+        self.transcript(url, lambda ev: any(e["kind"] == "result" for e in ev))
+        self.assertEqual(self.vetoes(space), [])
+
+    def test_ending_the_run_at_a_waiting_gate_writes_no_veto(self):
+        """Ending a run denies whatever was waiting, and that is not a veto.
+
+        A veto is authority exercised against one call, with a sentence its
+        author wrote. Ending the run is a decision about the run: the call is
+        refused as a consequence, by nobody who considered it. Recording it would
+        put sentences in a tracked file that no user ever said — and the file is
+        read by whoever asks why two builds differ.
+        """
+        space = self.space()
+        self.built(space)
+        _, url = self.driven({"call": {"tool": "Bash", "command": "git commit -m wip"}},
+                             space=space)
+        self.ask(url, "/run", {"prompt": "tidy up"})
+        self.gate(url)
+        self.ask(url, "/end", {})
+        # The call really was refused — this is the absence of a record, not the
+        # absence of the denial.
+        said = self.transcript(url, lambda ev: any(e["kind"] == "ended" for e in ev))
+        self.assertTrue([e for e in said if e["kind"] == "ended"])
+        self.assertEqual(self.vetoes(space), [])
+
+    def git(self, space, *args):
+        """Git in this space, told who it is: a throwaway repository has no
+        identity of its own and the suite must not borrow the user's."""
+        done = subprocess.run(("git", "-c", "user.email=t@example.com",
+                               "-c", "user.name=test", *args), cwd=str(space),
+                              capture_output=True, text=True)
+        return done.returncode, done.stdout
+
+    def repo(self, space):
+        """The space as it really is: its own git repository (ADR 0015), with the
+        template's ignore rules in it, because what a space ignores is part of
+        what tracking a file there means."""
+        self.git(space, "init", "-q")
+        space.joinpath(".gitignore").write_text(
+            (ROOT / "templates" / "space" / "gitignore").read_text())
+        self.git(space, "add", "-A")
+        self.git(space, "commit", "-qm", "the space")
+        return space
+
+    def test_the_veto_file_is_tracked_and_a_second_veto_diffs_as_an_addition(self):
+        """Tracked, and legible in a diff — the two halves of *it reaches git
+        with the change it prevented*.
+
+        A space gitignores `.contour/` whole but for its marker, so a veto kept
+        there would vanish on a clean checkout and be the log decision 15
+        refused. And the diff matters because this file is read in one: a store
+        that renumbered or reordered what was already on file would bury the
+        sentence that was added in a rewrite of the ones that were not.
+        """
+        space = self.repo(self.space())
+        self.built(space)
+        _, url = self.driven({"call": {"tool": "Bash", "command": "git commit -m one"}},
+                             {"call": {"tool": "Bash", "command": "git commit -m two"}},
+                             space=space)
+        self.ask(url, "/run", {"prompt": "tidy up"})
+        first, _ = self.gate(url)
+        self.ask(url, "/verdict", {"id": first["id"], "allow": False,
+                                   "reason": "measure the neck first"})
+        self.transcript(url, lambda ev: any(e["kind"] == "result" for e in ev))
+        ignored, _ = self.git(space, "check-ignore", "-q", "vetoes.json")
+        self.assertNotEqual(ignored, 0, "the space ignores its own vetoes")
+        self.git(space, "add", "-A")
+        self.git(space, "commit", "-qm", "the first veto")
+        second = self.transcript(
+            url, lambda ev: len([e for e in ev if e["kind"] == "gate"]) == 2)
+        at = [e for e in second if e["kind"] == "gate"][1]
+        self.ask(url, "/verdict", {"id": at["id"], "allow": False,
+                                   "reason": "and the beak before that"})
+        self.transcript(url, lambda ev: len([e for e in ev if e["kind"] == "result"]) == 2)
+        _, diff = self.git(space, "diff", "--", "vetoes.json")
+        added = [l for l in diff.splitlines() if l.startswith("+") and l[1:2] != "+"]
+        gone = [l for l in diff.splitlines() if l.startswith("-") and l[1:2] != "-"]
+        self.assertTrue(any("and the beak before that" in l for l in added), diff)
+        self.assertEqual([l for l in gone if "measure the neck first" in l], [],
+                         f"the veto already on file was rewritten:\n{diff}")
+
+    def vetoed(self, space, call=None, reason="not until the neck measures 280"):
+        """One veto on file, made the only way one can be: a gated call, denied
+        from the page with a sentence. Returns the console's URL, because most
+        of what is worth asking about a veto is asked while the console stands.
+        """
+        _, url = self.driven({"call": call or {"tool": "Bash",
+                                               "command": "git commit -m wip"}},
+                             space=space)
+        self.ask(url, "/run", {"prompt": "tidy up"})
+        gate, _ = self.gate(url)
+        self.ask(url, "/verdict", {"id": gate["id"], "allow": False,
+                                   "reason": reason})
+        self.transcript(url, lambda ev: any(e["kind"] == "result" for e in ev))
+        return url
+
+    def test_a_veto_naming_a_part_is_promoted_to_a_sheet_mark(self):
+        """Promotion is what turns a fact about a moment into an open question
+        about the model (ADR 0019, decision 15).
+
+        The mark it becomes names a part and no point on it — the shape an
+        agent's `contour mark --part` already makes, which the render badges per
+        view against the identity mask. So a promoted veto gains a position
+        without any new placement machinery, and gains it on every view that can
+        see the part. Authored by the user, because they wrote the sentence: a
+        veto is theirs, and so is the question it turns into.
+        """
+        space = self.space()
+        self.built(space)
+        (space / "out" / "parts.json").write_text(json.dumps({"1": "cap"}))
+        url = self.vetoed(space)
+        _, got = self.ask(url, "/promote", {"id": "v1", "part": "cap"})
+        self.assertEqual(got["anchor"], {"part": "cap"})
+        self.assertEqual(got["text"], "not until the neck measures 280")
+        self.assertEqual(got["author"], "user")
+        self.assertEqual(got["status"], "open")
+        self.assertEqual(got["from"], "v1")
+        self.assertEqual([m["id"] for m in
+                          marks_store.load(space / marks_store.NAME)], [got["id"]])
+        # The veto stays. It was true when it happened and promotion does not
+        # resolve it — what promotion adds is which mark it became.
+        kept, = self.vetoes(space)
+        self.assertEqual(kept["promoted"], got["id"])
+        self.assertEqual(kept["reason"], "not until the neck measures 280")
+
+    def refused(self, url, body):
+        """A promotion the console will not make. 404 and not a 200 carrying a
+        complaint, because the page's own rule is that a route answers with the
+        thing or not at all."""
+        with self.assertRaises(urllib.error.HTTPError) as caught:
+            self.ask(url, "/promote", body)
+        self.assertEqual(caught.exception.code, 404, body)
+        caught.exception.close()
+
+    def test_nothing_is_promoted_that_the_veto_or_the_build_cannot_carry(self):
+        """Three ways a promotion is not one, and the same reason under each: the
+        mark it would make would be a claim nobody can stand behind.
+
+        A veto that is not on file has no sentence to carry. A part this build
+        does not have would produce a mark the render can never badge, which is
+        `contour mark`'s rule already and not a new one. And a second promotion
+        would ask the same question twice on the same picture, from one moment
+        that happened once.
+        """
+        space = self.space()
+        self.built(space)
+        (space / "out" / "parts.json").write_text(json.dumps({"1": "cap"}))
+        url = self.vetoed(space)
+        self.refused(url, {"id": "v9", "part": "cap"})
+        self.refused(url, {"id": "v1", "part": "beak"})
+        self.ask(url, "/promote", {"id": "v1", "part": "cap"})
+        self.refused(url, {"id": "v1", "part": "cap"})
+        self.assertEqual(len(marks_store.load(space / marks_store.NAME)), 1,
+                         "a refused promotion still wrote a mark")
+
+    def test_pruning_the_marks_leaves_the_vetoes_untouched(self):
+        """The reason a veto is not a second collection inside `marks.json`.
+
+        ADR 0018 prunes closed marks the last release tag already holds, because
+        a mark gets resolved and closed and git is the archive. A veto is never
+        resolved, so the same rule applied to one would delete the only record
+        that something was prevented. Two opposite retention rules in one file
+        means the pruner has to tell them apart — and in separate files it cannot
+        get it wrong, which is what this asserts: the pruner really ran, and the
+        veto file was not even opened.
+        """
+        space = self.repo(self.space())
+        self.built(space)
+        self.vetoed(space)
+        path = space / marks_store.NAME
+        marks_store.append(path, {"view": "front", "pixel": [1, 1],
+                                  "text": "the beak is blunt"})
+        marks_store.close(path, "m1")
+        self.git(space, "add", "-A")
+        self.git(space, "commit", "-qm", "a release")
+        self.git(space, "tag", "v1")
+        before = (space / "vetoes.json").read_bytes()
+        self.launch(space)                    # pruning happens as the page opens
+        self.assertEqual(marks_store.load(path), [],
+                         "the pruner did not run, so this proves nothing")
+        self.assertEqual((space / "vetoes.json").read_bytes(), before)
+
+    def test_the_page_is_told_how_many_vetoes_are_uncommitted(self):
+        """Tracked is not committed, and an uncommitted veto dies exactly as an
+        ignored one would (ADR 0019, decision 27).
+
+        So the console's contribution is visibility and nothing else: it does not
+        commit, and it does not propose a records-only commit at run end, because
+        a veto-only commit describes no model state. The count is of vetoes `HEAD`
+        does not hold — not of whether the file is dirty — so the ordinary case,
+        where earlier vetoes already shipped and this one has not, reads true.
+        """
+        space = self.repo(self.space())
+        self.built(space)
+        _, url = self.driven({"call": {"tool": "Bash", "command": "git commit -m one"}},
+                             {"call": {"tool": "Bash", "command": "git commit -m two"}},
+                             space=space)
+        self.ask(url, "/run", {"prompt": "tidy up"})
+        first, _ = self.gate(url)
+        self.ask(url, "/verdict", {"id": first["id"], "allow": False,
+                                   "reason": "measure the neck first"})
+        self.transcript(url, lambda ev: any(e["kind"] == "result" for e in ev))
+        _, said = self.ask(url, "/vetoes")
+        self.assertEqual(said["uncommitted"], 1)
+        self.assertEqual([v["id"] for v in said["vetoes"]], ["v1"])
+        self.git(space, "add", "-A")
+        self.git(space, "commit", "-qm", "the neck, and what it did not become")
+        _, said = self.ask(url, "/vetoes")
+        self.assertEqual(said["uncommitted"], 0)
+        self.assertEqual([v["id"] for v in said["vetoes"]], ["v1"],
+                         "a committed veto left the file")
+        # And the next one is exposure again — one, not two: what is counted is
+        # the vetoes git does not hold, not whether the file has been touched.
+        second = self.transcript(
+            url, lambda ev: len([e for e in ev if e["kind"] == "gate"]) == 2)
+        at = [e for e in second if e["kind"] == "gate"][1]
+        self.ask(url, "/verdict", {"id": at["id"], "allow": False,
+                                   "reason": "and the beak before that"})
+        self.transcript(url, lambda ev: len([e for e in ev if e["kind"] == "result"]) == 2)
+        self.assertEqual(self.ask(url, "/vetoes")[1]["uncommitted"], 1)
+
+    def test_the_veto_surface_is_declared_against_the_host_that_gates(self):
+        """One page, two hosts (ADR 0019, decision 33). Only a console gates, so
+        only a console has vetoes — and the page carries the affordance anyway,
+        removed under the launcher by the same rule that removes the transcript.
+
+        Checked in the markup because that is where the declaration is: an
+        affordance that mentions vetoes outside the section declaring `drive`
+        would be on screen in a bare clone, offering to promote records that host
+        cannot have. `/can` makes `drive` a name the console really answers.
+        """
+        page = (ROOT / "lib" / "canvas.html").read_text()
+        found = re.search(r'<section id="vetoes"([^>]*)>(.*?)</section>', page,
+                          re.S)
+        self.assertIsNotNone(found, "the page has no veto surface")
+        self.assertIn('data-needs="drive"', found.group(1))
+        outside = page[:found.start()] + page[found.end():]
+        # What the user can see and reach: the script wires the section, the
+        # stylesheet paints it and a comment explains it, and none of the three
+        # is an affordance. What must not be out here is markup.
+        markup = re.sub(r"<script.*?</script>|<style.*?</style>|<!--.*?-->", "",
+                        outside, flags=re.S)
+        self.assertNotIn("veto", markup.lower(),
+                         "a veto affordance sits outside the section that "
+                         "declares the capability it needs")
+
+    def named(self, path):
+        """Every call in this file, as the literal words it passes.
+
+        Walked whole rather than read off a command list: the console's git goes
+        through a helper, so the words that matter are arguments to *that* and a
+        check watching `subprocess.run` for a literal list sees nothing at all.
+        Read rather than run, because what is being asked is what this layer is
+        *able* to do — a test that waited to catch a commit happening would only
+        catch the one a test thought to provoke.
+        """
+        found = []
+        for node in ast.walk(ast.parse(path.read_text())):
+            if not isinstance(node, ast.Call):
+                continue
+            found.append((ast.unparse(node.func),
+                          [n.value for n in ast.walk(node)
+                           if isinstance(n, ast.Constant)
+                           and isinstance(n.value, str)]))
+        return found
+
+    def test_the_console_can_read_git_and_cannot_write_it(self):
+        """Rule 5, flat: the console gets no privilege a terminal would not get,
+        including over its own records (ADR 0019, decisions 18 and 27).
+
+        It has a live reason to run git — the exposure count asks `HEAD` what it
+        holds — and that is exactly where a commit would be easiest to slip in.
+        So a word that would change a repository is a finding wherever it is
+        passed: a veto reaches git with the change it prevented, by the user's
+        hand and in the commit where the tolerance did not get widened.
+        """
+        writes = {"commit", "add", "push", "checkout", "restore", "reset",
+                  "merge", "rebase", "stash", "tag", "rm", "apply", "mv"}
+        for f in sorted((ROOT / "console").glob("*.py")):
+            for func, words in self.named(f):
+                self.assertEqual(sorted(set(words) & writes), [],
+                                 f"{f.name} passes a git write to {func}")
+
+    def test_the_run_ends_without_offering_to_commit_the_records(self):
+        """Not even a suggestion at run end. `docs/CONTEXT.md` records that
+        version control bought *a commit fully describes a model*, and a
+        veto-only commit describes no model state — it would have to be skipped
+        past by anyone reading history to understand how the model got here.
+        """
+        space = self.repo(self.space())
+        self.built(space)
+        url = self.vetoed(space)
+        self.ask(url, "/end", {})
+        said = self.transcript(url, lambda ev: any(e["kind"] == "ended" for e in ev))
+        for event in said:
+            self.assertNotIn("commit", (event.get("text") or "").lower(), event)
+        # and the exposure is still just a number, which is the whole offer
+        self.assertEqual(self.ask(url, "/vetoes")[1]["uncommitted"], 1)

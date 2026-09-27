@@ -14,6 +14,7 @@ import webbrowser
 from pathlib import Path
 
 from console import run as run_lib
+from console import vetoes as veto_store
 from lib import canvas as canvas_lib
 from lib import panel as panel_state
 from lib import marks as marks_store
@@ -65,6 +66,8 @@ class Console:
             routes={("POST", "/run"): self.started,
                     ("GET", "/events"): self.transcript,
                     ("POST", "/verdict"): self.verdict,
+                    ("GET", "/vetoes"): self.vetoes,
+                    ("POST", "/promote"): self.promoted,
                     ("POST", "/end"): self.ending})
 
     def started(self, body):
@@ -98,6 +101,21 @@ class Console:
         not among them."""
         return self.run.answer(body.get("id"), body.get("allow"),
                                body.get("reason"))
+
+    def vetoes(self, query):
+        """`GET /vetoes`: every veto in this space, and how many git does not
+        hold. A console route, because a veto has one writer and the page that
+        shows it is the page that made it."""
+        return veto_store.exposure(self.space)
+
+    def promoted(self, body):
+        """`POST /promote`: a veto about a part becomes a sheet mark.
+
+        A console route and not a canvas one, for the same reason the veto store
+        lives above `lib/`: the canvas serves a page under a host with no run and
+        no gates, so it has no vetoes to promote and must not learn about them.
+        """
+        return veto_store.promote(self.space, body.get("id"), body.get("part"))
 
     def start(self):
         url = self.canvas.start()
