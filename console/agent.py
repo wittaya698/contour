@@ -49,6 +49,14 @@ async def session(prompt, options, gate, say):
         async for message in client.receive_response():
             for kind, text in said(message):
                 say(kind, text=text)
+            # What the turn cost, over the same seam and as its own kind: the
+            # console records it and shows it, and neither is this file's
+            # business (ADR 0019, decision 32). Per assistant message, because
+            # that is the turn — `ResultMessage` carries a total, which arrives
+            # once the run is over and informs nothing anybody can still act on.
+            usage = getattr(message, "usage", None)
+            if isinstance(message, AssistantMessage) and usage:
+                say("usage", usage=dict(usage))
 
 
 def said(message):

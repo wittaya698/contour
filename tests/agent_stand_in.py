@@ -31,6 +31,12 @@ def drive(prompt, options, gate, say):
             # limit the user did not choose must not interrupt work they were
             # watching (ADR 0019), which is the same reason a timeout does not.
             say("limit", text=step["limit"])
+        if "usage" in step:
+            # What the SDK reports at the end of a turn, in the SDK's own keys.
+            # Said over the same seam the real driver says it over: usage is a
+            # thing the agent knows and the console records, so a stand-in that
+            # wrote the file itself would prove the file and not the seam.
+            say("usage", usage=step["usage"])
         if "mark" in step:
             # The agent's own return path, run for real: `contour mark` is on
             # `PATH` because `options` put the toolkit there, and it is the way an

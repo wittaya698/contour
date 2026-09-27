@@ -12,7 +12,7 @@ import secrets
 import threading
 from pathlib import Path
 
-from console import launcher, seed, vetoes
+from console import launcher, seed, spend, vetoes
 from lib import anchor, intent, lock, marks, policy
 
 
@@ -100,6 +100,8 @@ class Run:
         self.record = None                    # the hold on the space, while live
         self.stopped = False                  # the user said the run is over
         self.seeded = []                      # the marks this run was started from
+        self.gates = 0                        # gates this run has stopped at
+        self.prompt = ""                      # what this run was asked to do
         self._lock = threading.Lock()
         self._thread = None
 
@@ -113,6 +115,8 @@ class Run:
         # hold had been refused would be a run the user was watching happen
         # somewhere they had been told it would not.
         self.stopped = False
+        self.gates = 0
+        self.prompt = prompt
         self.record = lock.take(self.space, "console run")
         self.say("prompt", text=prompt)
         self._thread = threading.Thread(target=self._go, args=(prompt,),
@@ -231,6 +235,10 @@ class Run:
         self.say("gate", id=waiting["id"], category=category, tool=tool,
                  call=dict(payload))
         waiting["answered"].wait()
+        # Counted here and not at an ask-list allow: what costs a turn is the
+        # stopping and the asking. A call the user allowed in advance cost the
+        # agent nothing to have made.
+        self.gates += 1
         return self.approved(waiting["allow"], waiting["reason"], category)
 
     def approved(self, allow, reason, category):
@@ -302,6 +310,20 @@ class Run:
         into it means the same thing to every reader."""
         if self.stopped and kind != "ended":
             raise Stopped()
+        if kind == "usage":
+            # Not a line of the conversation: what a turn cost is not something
+            # the agent said. It leaves by this seam because usage is the
+            # driver's to report and the file is the console's to keep, and one
+            # seam of two callbacks is what makes the rest of this file provable
+            # without the SDK.
+            here = self.record["run"]
+            spend.record(self.space, here, fields["usage"], self.gates,
+                         self.prompt)
+            # And on the transcript, as a running total: the page is where the
+            # cost is watched, and it reads the transcript from a cursor — so a
+            # reloaded tab gets the figure back with everything else instead of
+            # whatever was spent after it reconnected.
+            return self.say("spend", **spend.total(self.space, here))
         with self._lock:
             event = {"n": len(self.events), "kind": kind, **fields}
             self.events.append(event)

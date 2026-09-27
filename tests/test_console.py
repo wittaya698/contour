@@ -26,6 +26,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+from console import spend
 from lib import anchor, marks as marks_store, panel
 
 from test_launcher import stages, stub_blender
@@ -1462,3 +1463,215 @@ class SeedTest(ConsoleCase):
         # No empty last turn where the prose would have been: the transcript is a
         # conversation, and a blank line in it reads as something not yet said.
         self.assertEqual(first["text"], first["text"].strip())
+
+
+class SpendTest(ConsoleCase):
+    """What a run costs, while it happens (ADR 0019, decision 32).
+
+    Token cost is the second of the three stated priorities, and the tool that
+    serves it reads a transcript a console run does not produce. So the console
+    records what it knows — per turn, cache reads included, which is strictly
+    better than anything a transcript could be parsed for — and the page shows
+    the same figures live, because a gate that fires often costs a turn of
+    re-explanation and *tune the ask-list downward* should be a number rather
+    than an irritation.
+    """
+
+    def lines(self, space):
+        """Every spend line the space holds, oldest first, as JSON."""
+        path = space / ".contour" / spend.NAME
+        if not path.exists():
+            return []
+        return [json.loads(l) for l in path.read_text().splitlines() if l.strip()]
+
+    def test_a_turn_records_what_it_spent_where_the_accounting_reads(self):
+        """The tracer bullet: a run's turn appends one line naming the run and
+        what that turn cost. On disk and in the space, because the transcript
+        dies with the tab and the accounting outlives the session."""
+        space = self.space()
+        _, url = self.driven(
+            {"say": "thinking about it",
+             "usage": {"input_tokens": 120, "output_tokens": 40}},
+            space=space)
+        self.ask(url, "/run", {"prompt": "why is the neck 269"})
+        self.transcript(url, lambda ev: any(e["kind"] == "ended" for e in ev))
+        lines = self.lines(space)
+        self.assertEqual(len(lines), 1, f"one turn, {len(lines)} lines: {lines!r}")
+        self.assertEqual(lines[0]["input"], 120)
+        self.assertEqual(lines[0]["output"], 40)
+        # Which run it was. Two runs from one console are two things that cost
+        # money, and a file that could not tell them apart would report one.
+        self.assertTrue(lines[0]["run"], f"no run named: {lines[0]!r}")
+
+    def test_the_page_is_told_the_running_total_after_every_turn(self):
+        """Live means per turn, not at the end: the display's second job is to
+        make a gate's cost visible while the user is still deciding how many
+        gates they want, and a figure that arrives once the run is over informs
+        nothing they can still act on."""
+        space = self.space()
+        _, url = self.driven({"usage": {"input_tokens": 100, "output_tokens": 10}},
+                             {"say": "still going"},
+                             {"usage": {"input_tokens": 300, "output_tokens": 20}},
+                             space=space)
+        self.ask(url, "/run", {"prompt": "why is the neck 269"})
+        said = self.transcript(url, lambda ev: any(e["kind"] == "ended" for e in ev))
+        totals = [e for e in said if e["kind"] == "spend"]
+        self.assertEqual(len(totals), 2, f"two turns, {len(totals)} figures")
+        # Running, not per turn: what the user wants off the page is what this
+        # run has cost so far, and a page doing the addition would be a second
+        # place the arithmetic lives.
+        self.assertEqual([t["input"] for t in totals], [100, 400])
+        self.assertEqual([t["output"] for t in totals], [10, 30])
+        self.assertEqual([t["turns"] for t in totals], [1, 2])
+
+    def test_a_cached_turn_is_not_reported_as_a_fresh_one(self):
+        """The figure the transcript could never give: a gated run re-sends its
+        whole context every turn and almost all of it is a cache read, at a tenth
+        the price. Folded into fresh input, a long run would read as ten times
+        what it cost — and a number that wrong is worse than none (ADR 0019,
+        decision 32)."""
+        space = self.space()
+        _, url = self.driven(
+            {"usage": {"input_tokens": 200,
+                       "cache_read_input_tokens": 40_000,
+                       "cache_creation_input_tokens": 1_000,
+                       "output_tokens": 300}},
+            space=space)
+        self.ask(url, "/run", {"prompt": "why is the neck 269"})
+        said = self.transcript(url, lambda ev: any(e["kind"] == "ended" for e in ev))
+        figure = [e for e in said if e["kind"] == "spend"][-1]
+        self.assertEqual(figure["cache_read"], 40_000)
+        self.assertEqual(figure["cache_write"], 1_000)
+        self.assertEqual(figure["input"], 200)
+        # One weighted number, in the units `tools/tokens.py` already defines, so
+        # the page and the tool do not each invent an idea of what a turn cost:
+        # 200 + 0.10*40000 + 1.25*1000 + 5*300 = 6950.
+        self.assertEqual(figure["weighted"], 6950)
+        self.assertEqual(self.lines(space)[0]["cache_read"], 40_000)
+
+    def test_a_turn_records_how_many_gates_the_run_had_answered_before_it(self):
+        """What makes the ask-list tunable with a number. A gate costs a turn of
+        re-explanation, and a turn that followed one is only identifiable if the
+        line says so — the file has no other way to know a verdict happened
+        between two turns (ADR 0019, decisions 30 and 32)."""
+        space = self.space()
+        _, url = self.driven(
+            {"usage": {"input_tokens": 100, "output_tokens": 10}},
+            {"call": {"command": "git commit -m done"}},
+            {"usage": {"input_tokens": 900, "output_tokens": 20}},
+            space=space)
+        self.ask(url, "/run", {"prompt": "commit it"})
+        waiting, _ = self.gate(url)
+        self.ask(url, "/verdict", {"id": waiting["id"], "allow": True})
+        self.transcript(url, lambda ev: any(e["kind"] == "ended" for e in ev))
+        lines = self.lines(space)
+        self.assertEqual([t["gates"] for t in lines], [0, 1],
+                         f"gates not counted per turn: {lines!r}")
+
+    def test_a_recorded_turn_names_what_the_run_was_asked_to_do(self):
+        """A run id is not an answer to *what did that cost me*. The accounting's
+        table is read by a person deciding where their tokens went, and a row
+        labelled `a3f1c0` sends them back to a transcript that no longer exists —
+        so the line carries the prompt the run started from."""
+        space = self.space()
+        _, url = self.driven({"usage": {"input_tokens": 100, "output_tokens": 10}},
+                             space=space)
+        self.ask(url, "/run", {"prompt": "why is the neck 269"})
+        self.transcript(url, lambda ev: any(e["kind"] == "ended" for e in ev))
+        self.assertEqual(self.lines(space)[0]["prompt"], "why is the neck 269")
+
+    def test_a_run_that_spends_enormously_is_not_ended_for_it(self):
+        """Rejected on the idle timeout's symmetry: silence is not a verdict, and
+        neither is a threshold set before the user knew what the run involved. The
+        console does not decide for the user in either direction, and with an
+        attended run the stop is the user (ADR 0019, decisions 17 and 32)."""
+        space = self.space()
+        _, url = self.driven(
+            {"usage": {"input_tokens": 9_000_000, "output_tokens": 2_000_000}},
+            {"usage": {"input_tokens": 9_000_000, "output_tokens": 2_000_000}},
+            {"say": "still working, because nobody stopped me"},
+            space=space)
+        self.ask(url, "/run", {"prompt": "spend it all"})
+        said = self.transcript(url, lambda ev: any(e["kind"] == "ended" for e in ev))
+        ended = [e for e in said if e["kind"] == "ended"]
+        self.assertEqual([e["text"] for e in ended], ["the agent stopped"])
+        self.assertIn("still working, because nobody stopped me",
+                      [e.get("text") for e in said])
+
+    def test_the_spend_recorder_has_no_way_to_end_a_run(self):
+        """Structure, not vigilance. The module that knows what a run has cost is
+        the one that would be asked to act on it, so it is the one that must not
+        be able to: nothing there ends, stops or denies anything (ADR 0019,
+        decision 32)."""
+        tree = ast.parse((ROOT / "console" / "spend.py").read_text())
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call):
+                named = ast.unparse(node.func).split(".")[-1]
+                self.assertNotIn(named, ("end", "stop", "finish", "deny", "exit"),
+                                 f"spend.py calls {ast.unparse(node.func)}")
+        # And no figure to compare a run against. A budget is a number before it
+        # is a mechanism, and the number is where it would arrive.
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store):
+                self.assertNotRegex(
+                    node.id, r"(?i)(budget|max_|_max|limit|cap|threshold)",
+                    f"spend.py names a figure a run could be judged against: "
+                    f"{node.id}")
+
+    def test_two_runs_from_one_console_are_two_things_that_cost_money(self):
+        """A console is long-lived and a run is meant to be short — ending one at
+        a gate and starting again is the move that keeps a run from reaching
+        compaction (ADR 0019, decision 32). So the common shape is several runs in
+        one sitting, and an accounting that added them together would report one
+        expensive run where there were three cheap ones."""
+        space = self.space()
+        _, url = self.driven({"usage": {"input_tokens": 100, "output_tokens": 10}},
+                             space=space)
+        for prompt in ("why is the neck 269", "now the beak"):
+            self.ask(url, "/run", {"prompt": prompt})
+            self.transcript(
+                url, lambda ev, p=prompt: any(
+                    e["kind"] == "ended" for e in ev if e["n"] > [
+                        i["n"] for i in ev if i["kind"] == "prompt"
+                        and i["text"] == p][0]))
+        lines = self.lines(space)
+        self.assertEqual([l["prompt"] for l in lines],
+                         ["why is the neck 269", "now the beak"])
+        self.assertEqual(len({l["run"] for l in lines}), 2,
+                         f"two runs, one id: {lines!r}")
+        # And the running total starts again: the figure on the page is what this
+        # run has cost, not what the tab has cost since it was opened.
+        _, said = self.ask(url, "/events?since=0")
+        totals = [e for e in said["events"] if e["kind"] == "spend"]
+        self.assertEqual([t["input"] for t in totals], [100, 100])
+
+    def test_the_spend_surface_is_declared_against_the_host_that_drives(self):
+        """One page, two hosts. Spend belongs to a run, and the launcher has no
+        run — a cost line under `contour canvas` would be a figure about nothing
+        (ADR 0019, decision 5)."""
+        page = (ROOT / "lib" / "canvas.html").read_text()
+        markup = re.sub(r"<script.*?</script>|<style.*?</style>|<!--.*?-->", "",
+                        page, flags=re.S)
+        for found in re.finditer(r"<[^>]*\bspend[^>]*>", markup, re.I):
+            self.assertIn('data-needs="drive"', found.group(0),
+                          "a spend affordance does not declare the host it "
+                          f"needs: {found.group(0)}")
+        self.assertRegex(markup, r'<[^>]*id="spend"[^>]*data-needs="drive"',
+                         "the page offers nowhere to see what a run is costing")
+
+    def test_nothing_offers_a_cost_before_the_first_turn_lands(self):
+        """A pre-run estimate was rejected outright: it cannot be known, and a
+        wrong one is worse than none (ADR 0019, decision 32). So the line is empty
+        until a turn has actually been spent — what is shown is measurement, never
+        prediction."""
+        space = self.space()
+        _, url = self.driven({"say": "thinking"}, space=space)
+        # Before any run at all.
+        _, said = self.ask(url, "/events?since=0")
+        self.assertEqual([e for e in said["events"] if e["kind"] == "spend"], [])
+        self.ask(url, "/run", {"prompt": "why is the neck 269"})
+        # And after a run that spent nothing the console was told about: a figure
+        # invented where no turn reported one would be an estimate by another name.
+        said = self.transcript(url, lambda ev: any(e["kind"] == "ended" for e in ev))
+        self.assertEqual([e for e in said if e["kind"] == "spend"], [])
+        self.assertEqual(self.lines(space), [])

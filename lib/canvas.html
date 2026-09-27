@@ -80,6 +80,10 @@
   #run { border-top: 1px solid var(--line); padding-top: 12px; display: flex;
          flex-direction: column; gap: 8px; }
   #state { opacity: .6; font-size: 12px; }
+  /* Measurement, so it reads as an instrument and not as a warning: there is no
+     threshold here to be near. */
+  #spend { font-size: 11px; opacity: .6; margin: 0 0 4px;
+           font-variant-numeric: tabular-nums; }
   #end { border-color: var(--pin); color: var(--pin); }
   textarea { font: inherit; padding: 7px 9px; border: 1px solid var(--line);
              border-radius: 6px; background: transparent; color: inherit;
@@ -153,6 +157,7 @@
     <h1>Run</h1>
     <ol id="turns"></ol>
     <p id="state">no run yet</p>
+    <p id="spend" data-needs="drive"></p>
     <!-- Prose, not a skill chosen from a list: the space's skills self-trigger
          on their descriptions, so picking one first moves a decision from the
          agent, which reads it from context, to the user, who has not described
@@ -277,6 +282,7 @@ function drive() {
       prose.value = '';
       chosen.clear();
       seedLine();
+      spendLine(null);                    // this run's cost, not the tab's
       draw();
     }
   });
@@ -300,7 +306,13 @@ function drive() {
     const said = await ask('/events?since=' + cursor).then(r => r.json()).catch(() => null);
     if (!said) return;
     cursor = said.next;
-    for (const event of said.events) turns.append(turn(event));
+    for (const event of said.events) {
+      // Spend is a figure, not a line of the conversation. One line per turn in
+      // the transcript would bury what the agent actually said under an
+      // accountant, so the running total replaces itself in one place.
+      if (event.kind === 'spend') { spendLine(event); continue; }
+      turns.append(turn(event));
+    }
     if (said.events.length) turns.scrollTop = turns.scrollHeight;
     if (said.events.some(e => e.kind === 'ended')) state.textContent = 'no run';
   }, 600);
@@ -599,6 +611,34 @@ function draw() {
     }
     list.appendChild(li);
   });
+}
+
+// What this run has cost so far, in the units `tools/tokens.py` reports in — and
+// never before a turn has been spent: a cost that cannot be known must not be
+// guessed at, and a wrong estimate is worse than none (ADR 0019, decision 32).
+// The gate count is here for the reason the figure is: a gate buys a turn of
+// re-explanation, and seeing what that costs is what makes tuning the ask-list
+// downward an informed act rather than an irritated one.
+function spendLine(event) {
+  const line = document.getElementById('spend');
+  if (!line) return;                       // the launcher's page; no run to cost
+  if (!event) { line.textContent = ''; return; }
+  const parts = [round(event.cache_read) + ' cached', round(event.input) + ' fresh',
+                 round(event.output) + ' out', round(event.weighted) + ' weighted'];
+  if (event.gates) {
+    parts.push(event.gates + (event.gates === 1 ? ' gate' : ' gates'));
+  }
+  line.textContent = event.turns + (event.turns === 1 ? ' turn · ' : ' turns · ')
+    + parts.join(' · ');
+}
+
+// A token count as a person reads one. The same thresholds the accounting uses,
+// so a figure watched here and read there is recognisably the same figure.
+function round(n) {
+  n = n || 0;
+  if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+  if (n >= 1000) return (n / 1000).toFixed(1) + 'k';
+  return String(n);
 }
 
 // What the next run will be seeded with, said above the box the prose goes in.
