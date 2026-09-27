@@ -7,7 +7,7 @@ truth; `.blend` files are disposable output, rebuilt from an empty scene.
 
 | Command | Does | Cost |
 |---|---|---|
-| `contour check` | build + verify, terse report | ~60 tok |
+| `contour check` | build + verify, terse report; redraws the sheet for the page | ~60 tok |
 | `contour api <symbol>` | real signature from the installed Blender | ~15 tok |
 | `contour render` | 4-view sheet → `sheet.png` | ~1400 tok |
 | `contour export` | `.glb` + round-trip re-measure | ~80 tok |

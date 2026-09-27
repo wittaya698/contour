@@ -125,6 +125,32 @@ class CanvasTest(unittest.TestCase):
         with open_url(self.canvas, "/", timeout=5) as r:
             self.assertEqual(r.status, 200)
 
+    def test_the_page_labels_the_picture_with_the_build_it_is_of(self):
+        """The sheet changes only when a build finishes, so a page showing one
+        without saying which build it is of is authoritative about whichever
+        picture happens to be on screen (ADR 0019, decision 13). The label sits
+        with the picture and not in the marks column: it is a fact about what is
+        being looked at, and it is read while looking at it."""
+        with open_url(self.canvas, "/", timeout=5) as r:
+            page = r.read().decode()
+        stage = page.split('id="stage"', 1)[1].split("</div>\n<aside", 1)[0]
+        self.assertIn('id="build"', stage, "no label beside the picture")
+        self.assertIn("'/sheet.json'", page, "the page never asks what it is of")
+
+    def test_a_new_build_is_a_new_picture_and_never_a_cached_one(self):
+        """A finished build updates the panel, and the panel is polled — so the
+        picture's address is keyed on the build it is of rather than on the clock.
+        A new build is then an address the browser has never seen and cannot
+        satisfy from cache, and an unchanged one is the address it already holds,
+        so a panel that is current costs no request at all."""
+        with open_url(self.canvas, "/", timeout=5) as r:
+            page = r.read().decode()
+        self.assertIn("'/sheet.png?b=' + ", page)
+        self.assertNotIn("Date.now()", page.split("function show", 1)[1],
+                         "the clock says nothing about which build this is")
+        with open_url(self.canvas, "/sheet.png?b=4f3a9c21b0de", timeout=5) as r:
+            self.assertEqual(r.read(), self.sheet.read_bytes())
+
     def test_the_launcher_says_it_can_mark_and_nothing_more(self):
         """One page, two hosts, and the page asks rather than assumes (ADR 0019).
 
@@ -216,6 +242,30 @@ class CanvasTest(unittest.TestCase):
                                      f"#{got} is inside a capability the host may "
                                      f"remove, and this runs before `/can` answers")
             depth += line.count("{") - line.count("}")
+
+    def test_transcript_and_sheet_share_the_page_when_the_host_drives(self):
+        """An equal split, and only under the console (ADR 0019, decision 13).
+
+        The transcript is where decisions are visible and where a gate fires; the
+        sheet is where a build is verified and where marks live. Neither is a
+        sidebar to the other. Under the launcher there is no transcript, so the
+        marks column stays the column it has always been — which is why the split
+        is declared against the same capability the run panel is.
+        """
+        with open_url(self.canvas, "/", timeout=5) as r:
+            page = r.read().decode()
+        style = page.split("<style>", 1)[1].split("</style>", 1)[0]
+        self.assertRegex(style, r"body\.driving aside \{[^}]*width: 50%")
+        self.assertRegex(style, r"aside \{[^}]*width: 300px",
+                         "the launcher's column is still a column")
+        script = page.split("<script>", 1)[1]
+        depth, added = 0, False
+        for line in script.split("\n"):
+            if "classList.add('driving')" in line:
+                self.assertGreater(depth, 0, "the launcher's page splits too")
+                added = True
+            depth += line.count("{") - line.count("}")
+        self.assertTrue(added, "nothing ever asks for the split")
 
     def test_end_run_is_as_prominent_as_continue(self):
         """Not a link at the bottom. A run that ends at a gate and starts again

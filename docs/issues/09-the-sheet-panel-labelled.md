@@ -41,15 +41,15 @@ frequent one.
 
 ## Acceptance criteria
 
-- [ ] Transcript and sheet share the page as an equal split
-- [ ] The sheet panel shows the build fingerprint it was drawn from
-- [ ] A finished build updates the panel without the agent spending context
-- [ ] A failed build leaves the last good sheet with an explicit not-current label
-- [ ] A failed build shows *marks not resolved: last build failed*
-- [ ] No partially built scene is ever rendered
-- [ ] No failing check is overlaid on the sheet
-- [ ] The agent still pulls a sheet into context only at a checkpoint
-- [ ] A space that has never built shows an empty panel, not a broken one
+- [x] Transcript and sheet share the page as an equal split
+- [x] The sheet panel shows the build fingerprint it was drawn from
+- [x] A finished build updates the panel without the agent spending context
+- [x] A failed build leaves the last good sheet with an explicit not-current label
+- [x] A failed build shows *marks not resolved: last build failed*
+- [x] No partially built scene is ever rendered
+- [x] No failing check is overlaid on the sheet
+- [x] The agent still pulls a sheet into context only at a checkpoint
+- [x] A space that has never built shows an empty panel, not a broken one
 
 ## Blocked by
 

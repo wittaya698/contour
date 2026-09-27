@@ -31,7 +31,8 @@ message, or a conversation, it means what this file says it means.
 | **verify** | Running `verify.py` against a build, judged by its spec. Produces a pass/fail line per check. |
 | **green** | A verify report in which every check passed — `PASS`, and `contour` exits 0. The word the code itself uses (ADR 0005 budgets ~50 tokens on green). |
 | **red** | A report in which any check failed — `FAIL n/total`, one line per failure, exit 1. A build that dies before verify runs is red too. Rule 2: red is a finding, never something to be made to go away by changing what was asked. |
-| **checkpoint** | A moment the agent believes it is done or is stuck, and says so. In a terminal it triggers a render sheet and a request for approval; under a **console** the sheet is already current and a checkpoint is the agent's judgement alone (ADR 0019). Never the same as **green**: green is the spec satisfied, a checkpoint is the agent claiming to be finished — or admitting it is not getting there. |
+| **checkpoint** | A moment the agent believes it is done or is stuck, and says so. In a terminal it triggers a render sheet and a request for approval; under a **console** the **panel** is already current, so a checkpoint is the agent's judgement alone and no longer means *render now* (ADR 0019). Never the same as **green**: green is the spec satisfied, a checkpoint is the agent claiming to be finished — or admitting it is not getting there. |
+| **panel** | The **sheet** on the page, beside the **transcript** in an equal split, labelled with the build it was drawn from (ADR 0019). Every build renders for it and only a checkpoint renders for the agent: the ~1400 tokens a sheet costs are a cost to the agent's context, not to the render, so a picture going to a page can be current. A build that never finished leaves the last good sheet, said to be not current — a partially built scene is never rendered, because that is a picture of a model that has never existed in the place where every other picture is real. No failing check is overlaid: a check knows a number, not a location, so some failures would draw and others would not, and absence would stop meaning anything. |
 | **sheet** | The 4-view orthographic Workbench render (front / right / top / persp) at 1024², with a 1 m grid and scale bar. The agent's only eyes. |
 | **round-trip** | Re-importing an exported file into a clean Blender and re-measuring it there. The only proof an export is correct. |
 | **toolkit** | This repository: `lib/`, `verify.py`, `schema/`, `templates/`, `.claude/`, `fixtures/`, `tools/`. Shared and pushable, and builds no model of its own. Every space uses it through the `contour` launcher. |
@@ -45,7 +46,9 @@ message, or a conversation, it means what this file says it means.
 spec ──┐
        ├──> build ──> out/<name>.blend ──> verify ──> report (~10 lines)
        │                    │
-       │                    ├──> render ──> sheet.png          (checkpoints only)
+       │                    ├──> render ──> sheet.png          (every build; into
+       │                    │                                    context only at a
+       │                    │                                    checkpoint)
        │                    │
        └──────────────────> └──> export ──> exports/<name>.glb ──> round-trip ──> re-measure
 
@@ -64,8 +67,9 @@ Stated priorities, in order: **correctness**, **token usage**, **version control
   cannot move), `bmesh` over `bpy.ops` (so headless context cannot silently
   corrupt a build), orthographic multi-view renders with a scale reference (so
   misalignment and wrong scale are visible), and export round-tripping.
-- **Token usage** bought: the `contour` wrapper's terse reports, renders
-  rate-limited to checkpoints, three-layer docs so `CLAUDE.md` stays ~40 lines,
+- **Token usage** bought: the `contour` wrapper's terse reports, a sheet
+  entering the conversation only at a checkpoint — the render itself runs on
+  every build, for the **panel**, which costs no context (ADR 0019), three-layer docs so `CLAUDE.md` stays ~40 lines,
   and `contour api` so the agent looks up signatures instead of guess-failing.
 - **Version control** bought: deterministic rebuilds (a commit fully describes a
   model), source-plus-thumbnail tracking, a repository per model that is never

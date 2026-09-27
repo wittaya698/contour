@@ -26,6 +26,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+from lib import anchor, panel
+
 CONSOLE = ROOT / "contour-console"
 STAND_IN = Path(__file__).resolve().parent / "agent_stand_in.py"
 
@@ -216,20 +218,24 @@ class ServesTest(ConsoleCase):
         self.assertEqual(self.beat(url), 200)
         self.assertEqual(proc.wait(timeout=30), 0)
 
-    def test_a_space_with_no_sheet_says_what_to_run(self):
-        """The console's page is the sheet; a space that has never been rendered
-        has none. Refused the way `contour canvas` refuses it, because a page
-        whose only panel is a broken image is a worse answer than a sentence."""
+    def test_a_space_that_has_never_built_opens_on_an_empty_panel(self):
+        """The console starts where a space starts: nothing built, nothing drawn.
+
+        `contour canvas` refuses this, and is right to — it exists to mark a
+        sheet. The console exists to *make* one, so refusing here would mean the
+        one surface that can produce a first build cannot be opened until
+        something else has. The panel is empty and says which build it is of,
+        which is none (ADR 0019, decision 13).
+        """
         bare = self.space()
         (bare / "sheet.png").unlink()
-        r = subprocess.run([str(CONSOLE), "--no-browser"], cwd=str(bare),
-                           capture_output=True, text=True, timeout=60,
-                           env=dict(os.environ,
-                                    CONTOUR_CONSOLE_PYTHON=sys.executable))
-        said = r.stdout + r.stderr
-        self.assertNotEqual(r.returncode, 0)
-        self.assertIn("contour render", said)
-        self.assertNotIn("Traceback", said)
+        proc, url = self.launch(bare)
+        self.assertEqual(self.ask(url, "/sheet.json")[1]["build"], None)
+        with self.assertRaises(urllib.error.HTTPError) as caught:
+            self.ask(url, "/sheet.png")
+        self.assertEqual(caught.exception.code, 404)
+        caught.exception.close()
+        self.assertIsNone(proc.poll(), "the console is still standing")
 
     def test_an_idle_console_exits_even_while_the_tab_is_still_beating(self):
         """A beat proves a tab is open, not that anybody is there, so a beat must
@@ -280,6 +286,26 @@ class ServesTest(ConsoleCase):
         self.assertIn("interrupted", said)
         self.assertNotIn("Traceback", said)
         self.assertEqual(code, 130)
+
+
+    def test_the_panel_says_which_build_the_sheet_is_of(self):
+        """The console labels the sheet from the same two files the launcher
+        wrote: `views.json` says which build the cameras drew, and the verdict
+        beside the build log says what the last check came to. A build that
+        raised leaves the previous `.blend` in place, so without the verdict the
+        panel would call a picture of a build that never finished current."""
+        space = self.space()
+        out = space / "out"
+        out.mkdir()
+        blend = out / f"{space.name}.blend"
+        blend.write_bytes(b"a blend")
+        anchor.record(out / "views.json", [1024, 1024],
+                      [{"label": "front", "tile": [0, 0, 512, 512]}], blend)
+        panel.record(space / ".contour" / panel.NAME, {"ok": False, "lines": []})
+        _, said = self.ask(self.launch(space)[1], "/sheet.json")
+        self.assertEqual(said["build"], anchor.fingerprint(blend))
+        self.assertFalse(said["current"])
+        self.assertIn("last build failed", said["why"])
 
 
 class RunTest(ConsoleCase):

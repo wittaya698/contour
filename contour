@@ -9,7 +9,7 @@ Blender's stdout (~2-5k tokens of banner and chatter per run) goes to
 .contour/last-build.log. The Blender side writes a JSON report; this wrapper
 prints only its terse `lines`. Stdlib only: no venv, no yaml.
 
-    contour check                 build + verify
+    contour check                 build + verify, and redraw the sheet
     contour render                4-view sheet -> sheet.png, + mask, + mark badges
     contour export                .glb + round-trip re-measure
     contour api <symbol>...       real signature from the installed Blender
@@ -210,15 +210,46 @@ def run_held(rest):
         free(record)
 
 
+def draw(rep):
+    """Render for the page, once the build is on disk (ADR 0019, decision 23).
+
+    Renders were rate-limited because a sheet entering the *conversation* costs
+    ~1400 tokens (ADR 0005) — a cost to the agent's context and not to the
+    render. A sheet going to a page costs neither, so the panel can be current
+    instead of labelled stale, and this report gains no line: the agent still
+    pulls a sheet into context only at a checkpoint.
+
+    Nothing is drawn unless the build got as far as saving. A `build.py` that
+    raised leaves no report and no geometry, and rendering then would produce a
+    picture of a model that has never existed, in the panel where every other
+    picture is real. A *verify-red* build is not that: it saved, and the wrong
+    model is exactly what the user needs to look at.
+    """
+    if "results" not in rep:
+        return rep
+    drawn = stage(["render"], first=False)
+    if drawn["ok"]:
+        return rep                            # the panel is current; say nothing
+    # A render that failed after a build that saved is a finding, and rule 2 says
+    # report it. Never the exit code, though: what the check judged is the spec.
+    return {**rep, "lines": [*rep["lines"],
+                             *[f"warn {line}" for line in drawn["lines"]]]}
+
+
 def build_path(cmd):
     """check / render / export: the commands that write `out/` and read the
     spec, and so the ones a second run may not join in on."""
     drifted = check_revision()
     if drifted:
         return emit(drifted)
+    if cmd == "check":
+        rep = stage(["build"])
+        sys.path.insert(0, str(ROOT))
+        from lib import panel
+        panel.record(OUT / panel.NAME, rep)
+        return say_marks(emit(draw(rep)))
     if cmd != "export":
-        code = emit(stage(["build" if cmd == "check" else cmd]))
-        return say_marks(code) if cmd == "check" else code
+        return emit(stage([cmd]))
     rep = stage(["export"])
     if not rep["ok"]:
         return emit(rep)
@@ -248,12 +279,15 @@ def main(argv):
         if not PROJECT:
             return need_project(cmd)
         sys.path.insert(0, str(ROOT))
-        from lib import canvas, marks
+        from lib import canvas, marks, panel
         out = PROJECT / "out"
         return emit(canvas.serve(PROJECT / "sheet.png", PROJECT / marks.NAME,
                                  out / "mask.png", out / "parts.json",
                                  resolve=lambda: stage(["resolve"]),
-                                 refs=PROJECT / "refs"))
+                                 refs=PROJECT / "refs",
+                                 views=out / "views.json",
+                                 blend=out / f"{PROJECT.name}.blend",
+                                 verdict=OUT / panel.NAME))
     if cmd == "mark" and rest:
         if not PROJECT:
             return need_project(cmd)

@@ -15,6 +15,7 @@ from pathlib import Path
 
 from console import run as run_lib
 from lib import canvas as canvas_lib
+from lib import panel as panel_state
 from lib import marks as marks_store
 
 
@@ -55,6 +56,12 @@ class Console:
             sheet=self.space / "sheet.png",
             marks=self.space / marks_store.NAME,
             mask=out / "mask.png", parts=out / "parts.json", can=CAN,
+            # What the sheet is a picture of. A space's build is
+            # `out/<its name>.blend` (ADR 0015), and `views.json` beside it says
+            # which build the cameras drew, so the panel can be labelled rather
+            # than quietly authoritative (ADR 0019, decision 13).
+            views=out / "views.json", blend=out / f"{self.space.name}.blend",
+            verdict=self.space / ".contour" / panel_state.NAME,
             routes={("POST", "/run"): self.started,
                     ("GET", "/events"): self.transcript,
                     ("POST", "/verdict"): self.verdict,
@@ -138,11 +145,11 @@ def seconds(name, fallback):
 
 
 def main(argv, space):
-    sheet = Path(space) / "sheet.png"
-    if not sheet.exists():
-        print(f"contour-console: no sheet at {sheet}.\n"
-              f"  Run contour render in this space first.", file=sys.stderr)
-        return 1
+    # No sheet is not a refusal here, unlike `contour canvas`. That command
+    # exists to mark a sheet and has nothing to show without one; this one
+    # exists to make one, and refusing would mean the surface that can produce a
+    # first build cannot be opened until something else has. The panel says which
+    # build it is showing, and none is an answer (ADR 0019, decision 13).
     console = Console(space, grace=seconds("CONTOUR_CONSOLE_GRACE", GRACE_S),
                       idle=seconds("CONTOUR_CONSOLE_IDLE", IDLE_S))
     url = console.start()

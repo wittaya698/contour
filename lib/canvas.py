@@ -19,6 +19,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from lib import anchor
+from lib import panel as panel_state
 from lib import marks as marks_store
 from lib import mask as mask_store
 from lib import refs as refs_store
@@ -106,10 +107,20 @@ class _Handler(BaseHTTPRequestHandler):
             return self._bytes(*got) if got else self.send_error(404)
         if self.path.split("?")[0] == "/refs.json":
             return self._json(refs_store.listing(self.server.canvas.refs))
+        if self.path.split("?")[0] == "/sheet.json":
+            return self._json(panel_state.state(self.server.canvas.views,
+                                                self.server.canvas.blend,
+                                                self.server.canvas.verdict,
+                                                self.server.canvas.marks))
         if self.path.split("?")[0] == "/parts.json":
             return self._json(self.server.canvas.parts_table())
         if self.path.split("?")[0] == "/sheet.png":
-            return self._bytes(self.server.canvas.sheet.read_bytes(), "image/png")
+            # Absent is an answer: a space that has never built has no picture
+            # yet, and a panel with nothing in it is the truth about it. Raising
+            # here instead would put a traceback where a first run belongs.
+            sheet = self.server.canvas.sheet
+            return (self._bytes(sheet.read_bytes(), "image/png")
+                    if sheet.exists() else self.send_error(404))
         return self._extra("GET", {k: v[0] for k, v in urllib.parse.parse_qs(
             urllib.parse.urlparse(self.path).query).items()})
 
@@ -161,13 +172,23 @@ class Canvas:
     """One canvas session. `start` binds and serves; `stop` releases the port."""
 
     def __init__(self, sheet, marks, mask=None, parts=None, resolve=None,
-                 refs=None, can=MARKS_ONLY, routes=None):
+                 refs=None, can=MARKS_ONLY, routes=None, views=None,
+                 blend=None, verdict=None):
         self.sheet = Path(sheet)
         self.marks = Path(marks)
         self.mask = Path(mask) if mask else None
         self.parts = Path(parts) if parts else None
         self.resolve = resolve
         self.refs = Path(refs) if refs else None
+        # What the sheet is a picture of: the cameras that drew it and the build
+        # they drew. Both paths and not a fingerprint, because the build on disk
+        # moves while the page is open and the label has to move with it.
+        self.views = Path(views) if views else None
+        self.blend = Path(blend) if blend else None
+        # What the last build came to. A build that raised leaves the previous
+        # `.blend` in place, so the fingerprints alone cannot tell a current
+        # picture from one of a build that never finished.
+        self.verdict = Path(verdict) if verdict else None
         # What this host can do, for the page to ask about. The caller's to
         # declare and not the Canvas's to infer: the console's extra surface
         # is the console's, and a Canvas that guessed would guess wrong for
@@ -338,7 +359,7 @@ class Canvas:
 
 
 def serve(sheet, marks, mask=None, parts=None, resolve=None, refs=None,
-          open_browser=True):
+          views=None, blend=None, verdict=None, open_browser=True):
     """One canvas session, start to report. Blocks until the page says done.
 
     The first Contour command that waits rather than shoots, so it is also the
@@ -348,7 +369,11 @@ def serve(sheet, marks, mask=None, parts=None, resolve=None, refs=None,
     sheet = Path(sheet)
     if not sheet.exists():
         return {"ok": False, "lines": [f"FAIL no sheet at {sheet} — run contour render first"]}
-    canvas = Canvas(sheet, marks, mask, parts, resolve, refs)
+    # The label is the canvas's, not the console's: this page can show a sheet
+    # the build has moved past just as easily, and resolution already refuses one
+    # (ADR 0018). Said while the user is looking rather than when they press Done.
+    canvas = Canvas(sheet, marks, mask, parts, resolve, refs,
+                    views=views, blend=blend, verdict=verdict)
     url = canvas.start()
     print(f"canvas at {url}  —  click the sheet, then press Done", flush=True)
     if open_browser:

@@ -25,6 +25,11 @@
   button { cursor: pointer; }
   #done { border-color: var(--pin); color: var(--pin); }
   #hint { opacity: .6; font-size: 12px; }
+  /* The label: quiet while the picture is of the build on disk, and the colour
+     every other *stop and look* on this page uses once it is not. */
+  #build { margin: 8px 0 0; font-size: 12px; opacity: .6;
+           font-family: ui-monospace, SFMono-Regular, monospace; }
+  #build.old { opacity: 1; color: var(--pin); }
   .pin { position: absolute; width: 20px; height: 20px; margin: -10px 0 0 -10px;
          border-radius: 50%; background: var(--pin); color: #fff; font-size: 11px;
          font-weight: 700; display: grid; place-items: center; pointer-events: none; }
@@ -72,10 +77,20 @@
      not a thing to be talked out of (ADR 0019). */
   .pair { display: flex; gap: 8px; }
   .pair button { flex: 1; }
+  /* An equal split, under the host that has a transcript (ADR 0019, decision
+     13). The transcript is where decisions are visible and where a gate fires;
+     the sheet is where a build is verified and where marks live, and neither is
+     a sidebar to the other. Declared against the same capability the run panel
+     is, because under the launcher there is no transcript and the marks column
+     is the column it has always been. */
+  body.driving aside { width: 50%; }
   /* The transcript: the run as it happens, which is where a decision becomes
-     visible and where a gate fires. */
+     visible and where a gate fires. Given the height the split bought it, so
+     half a page of width is not half a page of one-line turns. */
   #turns { padding-left: 0; list-style: none; gap: 6px; max-height: 40vh;
            overflow: auto; }
+  body.driving #turns { flex: 1; max-height: none; }
+  body.driving #run { flex: 1; }
   #turns li { font-size: 12px; }
   #turns .prompt { font-weight: 600; }
   #turns .limit, #turns .ended, #turns .verdict { opacity: .6; }
@@ -96,7 +111,12 @@
   body:not(.asked) [data-needs],
   body:not(.asked) [data-unless] { display: none !important; }
 </style>
-<div id="stage"><div id="strip"></div><div id="wrap"><canvas id="sheet"></canvas></div></div>
+<div id="stage"><div id="strip"></div><div id="wrap"><canvas id="sheet"></canvas></div>
+  <!-- Which build this is a picture of. Beside the picture, because it is a fact
+       about what you are looking at and is read while looking at it. A sheet is
+       only ever of a finished build, so an unlabelled one is authoritative about
+       whichever build happens to be on disk (ADR 0019, decision 13). -->
+  <p id="build"></p></div>
 <aside>
   <h1>Marks</h1>
   <ol id="list"></ol>
@@ -199,6 +219,8 @@ ask('/can').then(r => r.json()).then(({ can }) => {
 // load time the launcher's page still holds this markup, and a poll started
 // then would ask a launcher forever for a route it does not have.
 function drive() {
+  // Half the page, now that there is a transcript to put in it.
+  document.body.classList.add('driving');
   const turns = document.getElementById('turns');
   const state = document.getElementById('state');
   let cursor = 0;
@@ -289,6 +311,29 @@ maskImg.onerror = () => {};   // a space rendered before masks existed: no hover
 maskImg.src = asset('/mask.png?' + Date.now());
 ask('/parts.json').then(r => r.json()).then(t => parts = t);
 
+// What the picture is of, asked for and said. Under every host: the launcher's
+// canvas can show a sheet the build has moved past just as easily, and ADR 0018
+// already refuses to resolve marks against one — this says so while the user is
+// still looking, instead of at the moment they press Done.
+const label = document.getElementById('build');
+let drawn = null;                            // the build the canvas is holding
+
+async function labelled() {
+  const said = await ask('/sheet.json').then(r => r.json()).catch(() => null);
+  if (!said) return;
+  label.textContent = [said.build ? 'build ' + said.build : 'nothing built yet',
+                       said.build && !said.current ? 'not current: ' + said.why : '',
+                       said.marks || ''].filter(Boolean).join('  —  ');
+  label.classList.toggle('old', Boolean(said.build) && !said.current);
+  // A new build means a new sheet. Redrawn here rather than on a timer, so the
+  // picture changes when the thing it is a picture of does and at no other time.
+  if (said.build !== drawn) {
+    const first = drawn === null;
+    drawn = said.build;
+    if (!first && !showing) show(null);
+  }
+}
+
 const img = new Image();
 img.onload = () => { cv.width = img.width; cv.height = img.height;
                      ctx.clearRect(0, 0, cv.width, cv.height);
@@ -302,13 +347,24 @@ function show(name) {
   text.placeholder = name ? 'here is what I meant' : 'what is wrong here';
   hint.textContent = name ? 'Click the reference, or drag across a distance.'
                           : 'Click the sheet, then type one line.';
+  // Keyed on the build and not on the clock: a new build is an address this
+  // browser has never seen, and an unchanged one is the address it already
+  // holds — so a panel that is current costs no request at all.
   img.src = asset(name ? '/ref?name=' + encodeURIComponent(name)
-                       : '/sheet.png?' + Date.now());
+                       : '/sheet.png?b=' + (drawn || ''));
 }
 
+// Every build renders for the page (ADR 0019, decision 23), so the label and the
+// picture are both behind this one poll. Slower than the transcript's: a build
+// takes seconds and a verdict is waited on.
+setInterval(labelled, 2000);
+
 // A space with no references gets a strip with the sheet alone, which is the
-// canvas it has always been.
-ask('/refs.json').then(r => r.json()).then(names => {
+// canvas it has always been. Built after the first label, so the first picture
+// is fetched at the address of the build it is of — otherwise a browser holding
+// a cached picture from a previous session would answer the address that says
+// nothing about which build this is.
+labelled().then(() => ask('/refs.json').then(r => r.json()).then(names => {
   for (const name of [null, ...names]) {
     const b = document.createElement('button');
     b.textContent = name || 'sheet';
@@ -317,7 +373,7 @@ ask('/refs.json').then(r => r.json()).then(names => {
     strip.appendChild(b);
   }
   show(null);
-});
+}));
 
 // Marks outlive the session that made them, so the page starts from the file.
 ask('/marks').then(r => r.json()).then(on => { marks = on; draw(); });

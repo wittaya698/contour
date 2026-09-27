@@ -17,12 +17,35 @@ ROOT = Path(__file__).resolve().parent.parent
 CONTOUR = ROOT / "contour"
 
 
-def stub_blender(dirpath, ok=True):
-    rep = json.dumps({"ok": ok, "lines": ["ok   build  stub" if ok
-                                          else "FAIL verify  stub"]})
+def stub_blender(dirpath, ok=True, crash=False):
+    """A Blender that writes the report the launcher reads, names the stage it
+    was asked for, and records it.
+
+    `ok=False` is a verify-red check: the build saved, the spec was not met — so
+    it is the *build* stage that reports red and a render of that build still
+    succeeds. `crash` is a `build.py` that raised, which leaves no report at all
+    and no geometry, and is a different event with a different sheet (ADR 0019,
+    decision 27). The trace is how a test can tell what the launcher did.
+    """
+    verdict = "true" if ok else "false"
     script = dirpath / "blender-stub"
-    script.write_text(f"#!/bin/sh\nprintf '%s' '{rep}' > \"$CONTOUR_REPORT\"\n"
-                      f"exit {0 if ok else 1}\n")
+    lines = [
+        "#!/bin/sh",
+        f'echo "$@" >> "{dirpath / "stages"}"',
+        'for a in "$@"; do last="$a"; done',
+        "ok=true; code=0",
+        f'if [ "$last" = build ]; then ok={verdict}; code={0 if ok else 1}; fi',
+    ]
+    if crash:
+        lines.append("exit 1")                # no report: Blender died mid-stage
+    else:
+        lines += [
+            'printf \'{"ok": %s, "lines": ["stub ran %s"], '
+            '"results": [{"name": "stub", "ok": %s}]}\' '
+            '"$ok" "$last" "$ok" > "$CONTOUR_REPORT"',
+            "exit $code",
+        ]
+    script.write_text("\n".join(lines) + "\n")
     script.chmod(0o755)
     return script
 
@@ -39,6 +62,13 @@ class LauncherTest(unittest.TestCase):
         return subprocess.run([sys.executable, str(CONTOUR), *args],
                               cwd=str(cwd or self.space), env=env,
                               capture_output=True, text=True, timeout=60)
+
+    def stages(self):
+        """Which stages the launcher ran, in order — one Blender process each."""
+        trace = self.tmp / "stages"
+        return [line.rsplit(" -- ", 1)[-1].split()[0]
+                for line in trace.read_text().splitlines()] \
+            if trace.exists() else []
 
     def mark(self, status="open"):
         path = self.space / "marks.json"
@@ -81,6 +111,46 @@ class LauncherTest(unittest.TestCase):
         r = self.run_contour("check")
         self.assertEqual(r.returncode, 0)
         self.assertEqual((self.space / "marks.json").read_bytes(), before)
+
+    def test_a_green_check_renders_for_the_page(self):
+        """Every build renders; only a checkpoint renders for the agent (ADR
+        0019, decision 23). The sheet was rate-limited because it cost the
+        agent's context, not because rendering is expensive — and a sheet going
+        to a page costs no context at all, so the panel can be current."""
+        r = self.run_contour("check")
+        self.assertEqual(r.returncode, 0)
+        self.assertEqual(self.stages(), ["build", "render"])
+
+    def test_a_verify_red_check_still_renders(self):
+        """Red is the common state inside a fix loop, and a red verify has
+        geometry: the build saved before verify judged it. The wrong model is
+        exactly what the user needs to see, so the panel shows it. What must
+        never be drawn is a scene that was never finished — that is the next
+        test, and it is a different event."""
+        r = self.run_contour("check", blender=stub_blender(self.tmp, ok=False))
+        self.assertEqual(r.returncode, 1)
+        self.assertEqual(self.stages(), ["build", "render"])
+
+    def test_the_check_report_says_nothing_about_the_render(self):
+        """The render is for the page, and the page costs no context. If the
+        check's report named it — or named the sheet — the agent would be
+        invited to read a picture outside a checkpoint, which is the one thing
+        decision 23 keeps intact while making the panel current."""
+        r = self.run_contour("check")
+        self.assertEqual(r.returncode, 0)
+        self.assertIn("stub ran build", r.stdout)
+        self.assertNotIn("render", r.stdout)
+        self.assertNotIn("sheet", r.stdout)
+
+    def test_a_build_that_never_finished_renders_nothing(self):
+        """The most dangerous option available, refused: a picture of a model
+        that has never existed, in the panel where every other picture is real.
+        A `build.py` that raised leaves the scene unfinished and the previous
+        `.blend` untouched, so there is nothing new to draw and drawing anyway
+        would draw whatever half a scene happens to hold (ADR 0019, 27)."""
+        r = self.run_contour("check", blender=stub_blender(self.tmp, crash=True))
+        self.assertEqual(r.returncode, 1)
+        self.assertEqual(self.stages(), ["build"])
 
 
 if __name__ == "__main__":
