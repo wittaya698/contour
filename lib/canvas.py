@@ -10,6 +10,8 @@ mark *records* is resolved here, from the mask on disk. Hover is a convenience;
 the record is evidence, and it has one source.
 """
 import json
+import secrets
+import time
 import urllib.parse
 import threading
 import webbrowser
@@ -17,20 +19,82 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from lib import anchor
+from lib import panel as panel_state
 from lib import marks as marks_store
 from lib import mask as mask_store
 from lib import refs as refs_store
 
 PAGE = Path(__file__).resolve().parent / "canvas.html"
+TOKEN_HEADER = "X-Contour-Token"
+TOKEN_PARAM = "t"
+
+MARKS_ONLY = ("marks",)
+"""What a host with no console can do, which is what a bare clone can do.
+
+The whole of the launcher's answer to `/can`. Named here rather than defaulted
+inline so the containment is one readable line: anything a console adds is a
+name this tuple does not hold (ADR 0019).
+"""
 
 
 class _Handler(BaseHTTPRequestHandler):
     def log_message(self, *a):
         pass                                  # the page is chatty; the report is not
 
+    def _authorised(self):
+        """Every request proves it belongs to this session, or gets nothing.
+
+        Two ways in, because the page has two kinds of caller. A fetch sends
+        the token as a header, which is what makes the request non-simple and
+        so unreachable from another site without a preflight. An `<img src>`
+        cannot set a header at all, so those carry it in the query — safe
+        because an image GET changes nothing.
+        """
+        header = self.headers.get(TOKEN_HEADER)
+        asked = urllib.parse.parse_qs(
+            urllib.parse.urlparse(self.path).query).get(TOKEN_PARAM, [None])[0]
+        wanted = self.server.canvas.token
+        return any(got is not None and secrets.compare_digest(got, wanted)
+                   for got in (header, asked))
+
+    def _is_json(self):
+        """A POST says JSON, or it never reaches a handler.
+
+        A form or text POST is a *simple* request: another page can send one
+        at this server with no preflight and no permission. Demanding a
+        content type that only a preflighted request can set turns that whole
+        class of request away at the door, before any body is read.
+        """
+        got = (self.headers.get("Content-Type") or "").split(";")[0].strip()
+        return got.lower() == "application/json"
+
+    def _same_origin(self):
+        """A request that says where it came from says here, or gets nothing.
+
+        The token alone is not the whole story: DNS rebinding hands another
+        site this address, so a request can arrive at the right port while
+        belonging to a page the user never opened. A browser attaches `Origin`
+        to exactly the requests that matter, and cannot be talked out of it.
+        Absent is not a failure — a non-browser caller sends none, and the
+        token is what stands behind it there.
+        """
+        origin = self.headers.get("Origin")
+        if origin is not None and origin != self.server.canvas.origin:
+            return False
+        # The browser's own account of where the request came from, which a
+        # page cannot forge. `none` is the address bar, `same-origin` is this
+        # page's own fetches; everything else is somebody else's page.
+        site = self.headers.get("Sec-Fetch-Site")
+        return site is None or site in ("none", "same-origin")
+
     def do_GET(self):
+        if not self._authorised() or not self._same_origin():
+            return self.send_error(403)
+        self.server.canvas.touched()
         if self.path == "/" or self.path.startswith("/?"):
             return self._bytes(PAGE.read_bytes(), "text/html; charset=utf-8")
+        if self.path.split("?")[0] == "/can":
+            return self._json({"can": list(self.server.canvas.can)})
         if self.path.split("?")[0] == "/marks":
             return self._json(self.server.canvas.listing())
         if self.path.split("?")[0] == "/mask.png":
@@ -43,13 +107,30 @@ class _Handler(BaseHTTPRequestHandler):
             return self._bytes(*got) if got else self.send_error(404)
         if self.path.split("?")[0] == "/refs.json":
             return self._json(refs_store.listing(self.server.canvas.refs))
+        if self.path.split("?")[0] == "/sheet.json":
+            return self._json(panel_state.state(self.server.canvas.views,
+                                                self.server.canvas.blend,
+                                                self.server.canvas.verdict,
+                                                self.server.canvas.marks))
         if self.path.split("?")[0] == "/parts.json":
             return self._json(self.server.canvas.parts_table())
         if self.path.split("?")[0] == "/sheet.png":
-            return self._bytes(self.server.canvas.sheet.read_bytes(), "image/png")
-        self.send_error(404)
+            # Absent is an answer: a space that has never built has no picture
+            # yet, and a panel with nothing in it is the truth about it. Raising
+            # here instead would put a traceback where a first run belongs.
+            sheet = self.server.canvas.sheet
+            return (self._bytes(sheet.read_bytes(), "image/png")
+                    if sheet.exists() else self.send_error(404))
+        return self._extra("GET", {k: v[0] for k, v in urllib.parse.parse_qs(
+            urllib.parse.urlparse(self.path).query).items()})
 
     def do_POST(self):
+        if not self._authorised() or not self._same_origin():
+            return self.send_error(403)
+        if not self._is_json():
+            return self.send_error(415)
+        if self.path != "/beat":
+            self.server.canvas.touched()      # a beat is not somebody being here
         n = int(self.headers.get("Content-Length") or 0)
         body = json.loads(self.rfile.read(n) or b"{}")
         if self.path == "/marks":
@@ -57,10 +138,23 @@ class _Handler(BaseHTTPRequestHandler):
         if self.path == "/close":
             closed = self.server.canvas.close(body.get("id"))
             return self._json(closed) if closed else self.send_error(404)
+        if self.path == "/beat":
+            return self._json(self.server.canvas.beat())
         if self.path == "/done":
             self._json({"done": True})
             return self.server.canvas.finish()
-        self.send_error(404)
+        return self._extra("POST", body)
+
+    def _extra(self, verb, payload):
+        """Whatever this host added, or 404. Last, so a host cannot quietly
+        replace `/marks` — the shared endpoints are the canvas's and mean the
+        same thing under every host, which is the whole of decision 33."""
+        handler = self.server.canvas.routes.get(
+            (verb, urllib.parse.urlparse(self.path).path))
+        if handler is None:
+            return self.send_error(404)
+        answer = handler(payload)
+        return self._json(answer) if answer is not None else self.send_error(404)
 
     def _json(self, payload):
         self._bytes(json.dumps(payload).encode(), "application/json")
@@ -78,13 +172,39 @@ class Canvas:
     """One canvas session. `start` binds and serves; `stop` releases the port."""
 
     def __init__(self, sheet, marks, mask=None, parts=None, resolve=None,
-                 refs=None):
+                 refs=None, can=MARKS_ONLY, routes=None, views=None,
+                 blend=None, verdict=None):
         self.sheet = Path(sheet)
         self.marks = Path(marks)
         self.mask = Path(mask) if mask else None
         self.parts = Path(parts) if parts else None
         self.resolve = resolve
         self.refs = Path(refs) if refs else None
+        # What the sheet is a picture of: the cameras that drew it and the build
+        # they drew. Both paths and not a fingerprint, because the build on disk
+        # moves while the page is open and the label has to move with it.
+        self.views = Path(views) if views else None
+        self.blend = Path(blend) if blend else None
+        # What the last build came to. A build that raised leaves the previous
+        # `.blend` in place, so the fingerprints alone cannot tell a current
+        # picture from one of a build that never finished.
+        self.verdict = Path(verdict) if verdict else None
+        # What this host can do, for the page to ask about. The caller's to
+        # declare and not the Canvas's to infer: the console's extra surface
+        # is the console's, and a Canvas that guessed would guess wrong for
+        # every host added after this one.
+        self.can = tuple(can)
+        # What this host serves beyond the sheet and the marks, as
+        # {(method, path): handler}. The console's run lives here rather than in
+        # this file: the launcher is stdlib-only and knows nothing about agents,
+        # and `canvas.html` outgrowing one file was to be answered by serving
+        # the console's extra views *beside* it, never by bundling them in
+        # (ADR 0019). A capability the host declares comes with the endpoints
+        # that capability implies, and they arrive together.
+        self.routes = dict(routes or {})
+        self.token = secrets.token_urlsafe(32)
+        self.last_beat = None                 # nothing has said it is watching
+        self.last_touch = time.monotonic()    # opening the thing counts as use
         self.captured = []
         self.pruned = None
         self._lock = threading.Lock()         # two posts can land at once
@@ -94,10 +214,18 @@ class Canvas:
         self._addr = None
 
     @property
-    def url(self):
-        """Stays readable after the server stops, so the report can name it."""
+    def origin(self):
+        """Where the server is. Stays readable after it stops, so the report
+        can name it."""
         host, port = self._addr
         return f"http://{host}:{port}"
+
+    @property
+    def url(self):
+        """What the browser is pointed at: the origin, carrying this session's
+        token. The page reads it back out of its own location and sends it as a
+        header from then on, so the secret stops appearing in request URLs."""
+        return f"{self.origin}/?{TOKEN_PARAM}={self.token}"
 
     def start(self):
         self.pruned = marks_store.prune(self.marks)   # before the page reads
@@ -163,6 +291,29 @@ class Canvas:
         with self._lock:
             return marks_store.close(self.marks, mark_id)
 
+    @property
+    def done(self):
+        """Has this session ended? Asked by a caller that owns the lifetime —
+        the console watches for a silence and must stop watching when the
+        session stops."""
+        return self._done.is_set()
+
+    def touched(self):
+        """Somebody did something. Every request but a beat, because a beat is
+        the page breathing and this is the clock an idle timeout reads."""
+        self.last_touch = time.monotonic()
+
+    def beat(self):
+        """The page saying it is still on screen.
+
+        Recorded and nothing more: a server that acted on this would decide the
+        caller's lifetime for it, and the canvas's lifetime is the Done button
+        (ADR 0018). The console reads the same beat and ends when it stops,
+        because a page that went quiet is a tab that closed.
+        """
+        self.last_beat = time.monotonic()
+        return {"beat": True}
+
     def finish(self):
         """The page says it is done. The port closes from `wait`, on the
         caller's thread: shutting a server down from inside one of its own
@@ -181,9 +332,12 @@ class Canvas:
         """Turn this session's pixels into places on parts — one Blender run,
         at the end, and only if there is something to ask it (ADR 0018).
 
-        Here and not per click: a ray per click would pay a Blender startup
-        per mouse press, and a ray per build would be cast against geometry
-        the user never looked at.
+        Here and not per click: a ray per click would pay a Blender startup per
+        mouse press. And here rather than at a build, for this host, because
+        this host has no build to hang it off: `contour canvas` shows a sheet and
+        cannot know when the next build is coming, so Done is the last moment it
+        knows about. A console can do better, and does — it owns the build, so it
+        resolves the instant it approves one (ADR 0019, decisions 8 and 14).
         """
         if not self.resolve or not anchor.unresolved(marks_store.load(self.marks)):
             return []
@@ -208,7 +362,7 @@ class Canvas:
 
 
 def serve(sheet, marks, mask=None, parts=None, resolve=None, refs=None,
-          open_browser=True):
+          views=None, blend=None, verdict=None, open_browser=True):
     """One canvas session, start to report. Blocks until the page says done.
 
     The first Contour command that waits rather than shoots, so it is also the
@@ -218,7 +372,11 @@ def serve(sheet, marks, mask=None, parts=None, resolve=None, refs=None,
     sheet = Path(sheet)
     if not sheet.exists():
         return {"ok": False, "lines": [f"FAIL no sheet at {sheet} — run contour render first"]}
-    canvas = Canvas(sheet, marks, mask, parts, resolve, refs)
+    # The label is the canvas's, not the console's: this page can show a sheet
+    # the build has moved past just as easily, and resolution already refuses one
+    # (ADR 0018). Said while the user is looking rather than when they press Done.
+    canvas = Canvas(sheet, marks, mask, parts, resolve, refs,
+                    views=views, blend=blend, verdict=verdict)
     url = canvas.start()
     print(f"canvas at {url}  —  click the sheet, then press Done", flush=True)
     if open_browser:

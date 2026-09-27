@@ -66,17 +66,17 @@ which a driven agent can commit unwatched.
 
 ## Acceptance criteria
 
-- [ ] A prose prompt starts a run and the transcript streams to the page
-- [ ] Every classified call raises a gate; allow proceeds, deny returns the reason as the tool result
-- [ ] A denied agent visibly receives the sentence and responds to it
-- [ ] The gate dialog offers no way to edit the call
-- [ ] An unanswered gate blocks forever and the idle timeout does not fire
-- [ ] A `refs/` write is denied by the existing guard and never appears as a gate
-- [ ] The agent demonstrably discovered the space's `CLAUDE.md` and skills, with no restated rules in the console's source
-- [ ] **End run** is as prominent as continue
-- [ ] The run holds slice 02's lock; a terminal `contour check` during a run is refused
-- [ ] Model content reaching the API is the named purpose of the command, stated where the user starts a run
-- [ ] A run that reaches a context limit continues
+- [x] A prose prompt starts a run and the transcript streams to the page
+- [x] Every classified call raises a gate; allow proceeds, deny returns the reason as the tool result
+- [x] A denied agent visibly receives the sentence and responds to it
+- [x] The gate dialog offers no way to edit the call
+- [x] An unanswered gate blocks forever and the idle timeout does not fire
+- [x] A `refs/` write is denied by the existing guard and never appears as a gate
+- [x] The agent demonstrably discovered the space's `CLAUDE.md` and skills, with no restated rules in the console's source
+- [x] **End run** is as prominent as continue
+- [x] The run holds slice 02's lock; a terminal `contour check` during a run is refused
+- [x] Model content reaching the API is the named purpose of the command, stated where the user starts a run
+- [x] A run that reaches a context limit continues
 
 ## Blocked by
 

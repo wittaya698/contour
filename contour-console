@@ -1,0 +1,97 @@
+#!/usr/bin/env python3
+"""The console: the page that drives a run (ADR 0019, decisions 4, 11, 33).
+
+Its own executable and not `contour console`, because the two names say what the
+install boundary is at the moment somebody meets it: `contour` needs nothing,
+`contour-console` needs an environment. This file is the half that needs
+nothing — stdlib only, so it can be run and can explain itself on a bare clone.
+It finds the console interpreter and hands over; everything that may import a
+dependency lives under `console/`.
+"""
+import os
+import signal
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent
+VENV = ROOT / ".venv"
+MAKE_IT = ("python3 -m venv .venv && "
+           ".venv/bin/pip install -r console/requirements.txt")
+USAGE = """contour-console            drive a run from the browser, in this space
+  --no-browser             serve, print the URL, and open nothing
+  $CONTOUR_CONSOLE_PYTHON  the interpreter to run under (default .venv/bin/python)
+  $CONTOUR_CONSOLE_IDLE    seconds of nothing happening before the run ends
+"""
+
+
+def interpreter():
+    """The Python the console runs under. `$CONTOUR_CONSOLE_PYTHON` overrides,
+    the way `$BLENDER` does for the launcher: one escape hatch, named after the
+    thing it replaces, so a test never has to build an environment to prove
+    something that is not about environments."""
+    told = os.environ.get("CONTOUR_CONSOLE_PYTHON")
+    return Path(told) if told else VENV / "bin" / "python"
+
+
+def space():
+    """The model space this was typed in, or None. The walk-up rule is the
+    launcher's, imported rather than restated: two definitions of what a space
+    is would be two things to keep in step about a question with one answer."""
+    sys.path.insert(0, str(ROOT))
+    from lib import paths
+    return paths.find()
+
+
+def handover(python, project):
+    """Run the console under its own interpreter, as a child and not an exec,
+    so this process stays the one the terminal is talking to: Ctrl-C reaches
+    both, and the process tree reads `contour-console -> contour -> Blender`
+    the way ADR 0019 describes it.
+    """
+    import subprocess
+    env = dict(os.environ, CONTOUR_ROOT=str(ROOT), CONTOUR_PROJECT=str(project),
+               PYTHONPATH=str(ROOT), PYTHONDONTWRITEBYTECODE="1")
+    child = subprocess.Popen([str(python), "-m", "console.server", *sys.argv[1:]],
+                             cwd=str(ROOT), env=env)
+    while True:
+        try:
+            return child.wait()
+        except KeyboardInterrupt:
+            # Forward and wait, rather than let the interpreter kill the child
+            # where it stands: the console has a port to close and a run whose
+            # hold on the space has to be given back, and SIGKILL releases
+            # neither. A terminal Ctrl-C already reaches both, so this arrives
+            # second and changes nothing.
+            child.send_signal(signal.SIGINT)
+            try:
+                return child.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                child.kill()                  # it had its chance
+                return 130
+            except KeyboardInterrupt:
+                continue                      # somebody is impatient; so wait
+
+
+def main():
+    if {"-h", "--help", "help"} & set(sys.argv[1:]):
+        print(USAGE, end="")                  # before the environment check: a
+        return 0                              # reader asking what this is has none
+    python = interpreter()
+    if not python.exists():
+        print(f"contour-console: no console environment at {python}.\n"
+              f"  The console needs an interpreter the launcher does not.\n"
+              f"  Make one, from {ROOT}:\n"
+              f"    {MAKE_IT}", file=sys.stderr)
+        return 4
+    project = space()
+    if project is None:
+        print(f"contour-console: not in a model space.\n"
+              f"  No .contour/project found here or above {Path.cwd()}.\n"
+              f"  cd into a model space — the directory holding spec.yaml.",
+              file=sys.stderr)
+        return 2
+    return handover(python, project)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -22,12 +22,12 @@ console's extra views are served beside it, not bundled into it.
 
 ## Acceptance criteria
 
-- [ ] Both servers answer the capabilities endpoint
-- [ ] Launcher-served, the page offers marking and shows no console affordance
-- [ ] Console-served, the page offers the console's surface
-- [ ] `contour canvas` behaves exactly as before this slice, from the user's side
-- [ ] The page is still one file with no build step
-- [ ] An unknown capability name is ignored rather than breaking the page
+- [x] Both servers answer the capabilities endpoint
+- [x] Launcher-served, the page offers marking and shows no console affordance
+- [x] Console-served, the page offers the console's surface
+- [x] `contour canvas` behaves exactly as before this slice, from the user's side
+- [x] The page is still one file with no build step
+- [x] An unknown capability name is ignored rather than breaking the page
 
 ## Blocked by
 

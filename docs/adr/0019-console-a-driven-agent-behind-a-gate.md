@@ -1,6 +1,6 @@
 # 0019 — The console: a driven agent behind a gate
 
-**Status:** Proposed · 2026-09-25 · **amends [ADR 0010](0010-miniyaml-no-dependencies.md) (the no-install promise is now bounded to the launcher) and [ADR 0018](0018-marks-a-canvas-over-the-sheet.md) (its daemon rejection is answered, and mark resolution moves to pre-rebuild)**
+**Status:** Accepted · 2026-09-25 · **amends [ADR 0010](0010-miniyaml-no-dependencies.md) (the no-install promise is now bounded to the launcher) and [ADR 0018](0018-marks-a-canvas-over-the-sheet.md) (its daemon rejection is answered, and mark resolution moves to pre-rebuild)**
 
 ## Context
 

@@ -19,13 +19,13 @@ closes. It reports.
 
 ## Acceptance criteria
 
-- [ ] Open marks are selectable on the page, and the selection composes into the prompt
-- [ ] A run can also start from prose with no marks selected
-- [ ] At run end the page names every seeded mark left unaddressed
-- [ ] A mark addressed during the run shows as addressed, not closed
-- [ ] The console closes no mark, by any path
-- [ ] A seeded mark whose part the run deletes is reported as orphaned, not as addressed
-- [ ] Ref marks can seed a run as well as sheet marks
+- [x] Open marks are selectable on the page, and the selection composes into the prompt
+- [x] A run can also start from prose with no marks selected
+- [x] At run end the page names every seeded mark left unaddressed
+- [x] A mark addressed during the run shows as addressed, not closed
+- [x] The console closes no mark, by any path
+- [x] A seeded mark whose part the run deletes is reported as orphaned, not as addressed
+- [x] Ref marks can seed a run as well as sheet marks
 
 ## Blocked by
 

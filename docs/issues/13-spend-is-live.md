@@ -28,13 +28,13 @@ one is worse than none.
 
 ## Acceptance criteria
 
-- [ ] Per-turn usage, cache reads included, is recorded where `tools/tokens.py` reads
-- [ ] `tools/tokens.py` reports a console run and a terminal iteration in the same units
-- [ ] The page shows spend for the run, updating per turn
-- [ ] The cost attributable to gate re-explanation is legible
-- [ ] No budget, threshold or limit ends a run
-- [ ] No pre-run estimate is shown
-- [ ] `tools/tokens.py` still reports correctly for a project with no console runs
+- [x] Per-turn usage, cache reads included, is recorded where `tools/tokens.py` reads
+- [x] `tools/tokens.py` reports a console run and a terminal iteration in the same units
+- [x] The page shows spend for the run, updating per turn
+- [x] The cost attributable to gate re-explanation is legible
+- [x] No budget, threshold or limit ends a run
+- [x] No pre-run estimate is shown
+- [x] `tools/tokens.py` still reports correctly for a project with no console runs
 
 ## Blocked by
 

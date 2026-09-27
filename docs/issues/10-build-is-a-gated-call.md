@@ -30,13 +30,13 @@ build its cameras drew — and needs only to be moved.
 
 ## Acceptance criteria
 
-- [ ] Approving a build resolves every unresolved mark before geometry changes
-- [ ] Resolution casts rays against the build the sheet was drawn from, verified by fingerprint
-- [ ] A mark made and then a build approved: the pin survives in part-local coordinates
-- [ ] A mark on a part that the build deletes is explicitly orphaned, not quietly misplaced
-- [ ] No build path exists that skips the gate, so no path exists that skips resolution
-- [ ] Allowing the build category in a space's ask-list still resolves marks
-- [ ] `contour canvas` still resolves at session close when run without the console
+- [x] Approving a build resolves every unresolved mark before geometry changes
+- [x] Resolution casts rays against the build the sheet was drawn from, verified by fingerprint
+- [x] A mark made and then a build approved: the pin survives in part-local coordinates
+- [x] A mark on a part that the build deletes is explicitly orphaned, not quietly misplaced
+- [x] No build path exists that skips the gate, so no path exists that skips resolution
+- [x] Allowing the build category in a space's ask-list still resolves marks
+- [x] `contour canvas` still resolves at session close when run without the console
 
 ## Blocked by
 

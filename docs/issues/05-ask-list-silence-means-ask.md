@@ -38,13 +38,13 @@ first session is spent writing the file rather than building.
 
 ## Acceptance criteria
 
-- [ ] A category absent from the file is gated
-- [ ] A space with no entry resolves to the empty allow-list, not to the global default
-- [ ] A per-space list replaces the global one; no key merges
-- [ ] The resolved list for a given space path is printable, for auditing against slice 04's enumeration
-- [ ] An unparseable file fails closed, with a message, and never resolves to a wider list
-- [ ] Nothing in the toolkit or a model space is read as policy
-- [ ] A category in the file that the toolkit no longer knows is reported, not ignored
+- [x] A category absent from the file is gated
+- [x] A space with no entry resolves to the empty allow-list, not to the global default
+- [x] A per-space list replaces the global one; no key merges
+- [x] The resolved list for a given space path is printable, for auditing against slice 04's enumeration
+- [x] An unparseable file fails closed, with a message, and never resolves to a wider list
+- [x] Nothing in the toolkit or a model space is read as policy
+- [x] A category in the file that the toolkit no longer knows is reported, not ignored
 
 ## Blocked by
 

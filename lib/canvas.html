@@ -25,6 +25,11 @@
   button { cursor: pointer; }
   #done { border-color: var(--pin); color: var(--pin); }
   #hint { opacity: .6; font-size: 12px; }
+  /* The label: quiet while the picture is of the build on disk, and the colour
+     every other *stop and look* on this page uses once it is not. */
+  #build { margin: 8px 0 0; font-size: 12px; opacity: .6;
+           font-family: ui-monospace, SFMono-Regular, monospace; }
+  #build.old { opacity: 1; color: var(--pin); }
   .pin { position: absolute; width: 20px; height: 20px; margin: -10px 0 0 -10px;
          border-radius: 50%; background: var(--pin); color: #fff; font-size: 11px;
          font-weight: 700; display: grid; place-items: center; pointer-events: none; }
@@ -56,9 +61,84 @@
   .pin.closed { background: transparent; border: 1.5px solid var(--line); color: var(--line); }
   li.closed { opacity: .45; text-decoration: line-through; }
   .part { opacity: .8; font-size: 12px; font-weight: 600; }
+  /* The checkbox that puts a mark in a run's scope. In the list rather than in
+     the run form: the marks are already here, and a second list of them to pick
+     from would be the same findings in two places. */
+  #list .seed { margin-right: 4px; }
+  #seeds { font-size: 11px; opacity: .6; margin: 0 0 4px; }
   .shut { border: 0; padding: 0 0 0 6px; font-size: 12px; opacity: .6; text-decoration: underline; }
+  /* A veto: the sentence is the point, so it is the part that reads normally.
+     Bordered like nothing — it is a record and not a thing waiting for you. */
+  #vetoes { border-top: 1px solid var(--line); padding-top: 12px; }
+  #denied { padding-left: 0; list-style: none; }
+  #denied li { font-size: 12px; margin-bottom: 8px; }
+  #denied .call { font-family: ui-monospace, SFMono-Regular, monospace;
+                  font-size: 11px; opacity: .7; word-break: break-all; }
+  #exposure { font-size: 12px; color: var(--pin); }
+  /* The run, when the host is one that owns a build. Above the ending, because
+     the ending is what you reach for last. */
+  #run { border-top: 1px solid var(--line); padding-top: 12px; display: flex;
+         flex-direction: column; gap: 8px; }
+  #state { opacity: .6; font-size: 12px; }
+  /* Measurement, so it reads as an instrument and not as a warning: there is no
+     threshold here to be near. */
+  #spend { font-size: 11px; opacity: .6; margin: 0 0 4px;
+           font-variant-numeric: tabular-nums; }
+  #end { border-color: var(--pin); color: var(--pin); }
+  textarea { font: inherit; padding: 7px 9px; border: 1px solid var(--line);
+             border-radius: 6px; background: transparent; color: inherit;
+             resize: vertical; }
+  /* Start and End side by side, sharing the width equally. **End run** is as
+     prominent as continue on purpose: a run that ends at a gate and starts
+     again never reaches compaction, so ending one is a thing to do often and
+     not a thing to be talked out of (ADR 0019). */
+  .pair { display: flex; gap: 8px; }
+  .pair button { flex: 1; }
+  /* An equal split, under the host that has a transcript (ADR 0019, decision
+     13). The transcript is where decisions are visible and where a gate fires;
+     the sheet is where a build is verified and where marks live, and neither is
+     a sidebar to the other. Declared against the same capability the run panel
+     is, because under the launcher there is no transcript and the marks column
+     is the column it has always been. */
+  body.driving aside { width: 50%; }
+  /* The transcript: the run as it happens, which is where a decision becomes
+     visible and where a gate fires. Given the height the split bought it, so
+     half a page of width is not half a page of one-line turns. */
+  #turns { padding-left: 0; list-style: none; gap: 6px; max-height: 40vh;
+           overflow: auto; }
+  body.driving #turns { flex: 1; max-height: none; }
+  body.driving #run { flex: 1; }
+  #turns li { font-size: 12px; }
+  #turns .prompt { font-weight: 600; }
+  #turns .limit, #turns .ended, #turns .verdict,
+  #turns .resolved { opacity: .6; }
+  /* One line per seeded mark, so the report reads as a list and not a paragraph:
+     it is answering *what happened to each of these*. */
+  #turns .seeds { white-space: pre-line; border-left: 2px solid currentColor;
+                  padding-left: 6px; opacity: .8; }
+  /* A gate. Bordered in the colour every other *stop and look* on this page
+     uses, because it is the one line of the transcript that is waiting for you. */
+  #turns .gate { border: 1px solid var(--pin); border-radius: 6px; padding: 8px;
+                 display: flex; flex-direction: column; gap: 6px; }
+  #turns .category { font-weight: 700; text-transform: uppercase;
+                     letter-spacing: .06em; font-size: 11px; color: var(--pin); }
+  #turns .call { font-family: ui-monospace, SFMono-Regular, monospace;
+                 font-size: 11px; word-break: break-all; }
+  .why { opacity: .6; font-size: 11px; }
+  /* Until the host has answered, nothing that depends on the answer is on
+     screen. `/can` is a request, and a page painted before it lands offers the
+     launcher the console's panel and the console the canvas's ending — each
+     host briefly showing the other's surface. `!important` because these
+     elements carry ids, and an id's own `display` would otherwise win. */
+  body:not(.asked) [data-needs],
+  body:not(.asked) [data-unless] { display: none !important; }
 </style>
-<div id="stage"><div id="strip"></div><div id="wrap"><canvas id="sheet"></canvas></div></div>
+<div id="stage"><div id="strip"></div><div id="wrap"><canvas id="sheet"></canvas></div>
+  <!-- Which build this is a picture of. Beside the picture, because it is a fact
+       about what you are looking at and is read while looking at it. A sheet is
+       only ever of a finished build, so an unlabelled one is authoritative about
+       whichever build happens to be on disk (ADR 0019, decision 13). -->
+  <p id="build"></p></div>
 <aside>
   <h1>Marks</h1>
   <ol id="list"></ol>
@@ -68,15 +148,283 @@
     <input id="text" placeholder="what is wrong here" autocomplete="off">
     <button type="submit">Add mark</button>
   </form>
-  <button id="done">Done</button>
+  <!-- One page, two hosts (ADR 0019). An element says which capability it
+       needs, or which one it stands in for when the host lacks it, and one rule
+       below applies every such declaration. The alternative was a page per host,
+       which is how the sheet ends up being marked on one surface and watched on
+       another. -->
+  <section id="run" data-needs="drive">
+    <h1>Run</h1>
+    <ol id="turns"></ol>
+    <p id="state">no run yet</p>
+    <p id="spend" data-needs="drive"></p>
+    <!-- Prose, not a skill chosen from a list: the space's skills self-trigger
+         on their descriptions, so picking one first moves a decision from the
+         agent, which reads it from context, to the user, who has not described
+         the task yet — and it answers nothing for a run that is neither skill. -->
+    <form id="begin">
+      <p id="seeds" data-needs="drive"></p>
+      <textarea id="prose" rows="3" placeholder="what should the agent do"></textarea>
+      <div class="pair">
+        <button type="submit">Start run</button>
+        <button type="button" id="end">End run</button>
+      </div>
+    </form>
+    <p class="why">A run sends this space — its spec, its build, its references —
+      to Anthropic&rsquo;s API. That is what starting one is for.</p>
+    <!-- A gate: allow, or deny with a sentence. There is deliberately no field
+         for the call. Editing it would make the user the author of a change
+         attributed to the agent, in the commit and in every later reading of why
+         two builds differ — and this repo tracks authorship everywhere else, so
+         the gate is not the one place it gets laundered. The user says a
+         sentence; the agent writes the code (ADR 0019, decision 13).
+
+         Markup and not built in script, so that what the dialog contains can be
+         read here rather than inferred from the code that assembles it. -->
+    <template id="gate">
+      <li class="gate">
+        <span class="category"></span>
+        <span class="call"></span>
+        <input class="because" placeholder="why not (a sentence)" autocomplete="off">
+        <div class="pair">
+          <button class="allow">Allow</button>
+          <button class="deny">Deny</button>
+        </div>
+      </li>
+    </template>
+  </section>
+  <!-- What was refused, and what it is still exposed to. Here and not in
+       `contour check`: a veto is never open, so a line about one would never go
+       away, and a status line that is always present is furniture nobody reads
+       (ADR 0019, decision 25). The exposure is the console's whole contribution
+       to getting one into git — it does not commit, and it does not offer to:
+       a veto-only commit describes no model state, and this one belongs in the
+       commit where the tolerance did not get widened (decision 27). -->
+  <section id="vetoes" data-needs="drive" hidden>
+    <h1>Vetoes</h1>
+    <p id="exposure"></p>
+    <ol id="denied"></ol>
+  </section>
+  <button id="done" data-unless="drive" data-closed="Canvas closed">Done</button>
 </aside>
 <script>
+// This session's token, from the URL the command opened (ADR 0019). Localhost
+// is not a boundary for a server that takes POSTs, so every request carries it.
+const TOKEN = new URLSearchParams(location.search).get('t') || '';
+
+// One place, so there is one place to get it wrong. A fetch sends the token as
+// a header, which makes the request non-simple and therefore unreachable from
+// another site without a preflight the server refuses; a body makes it a POST
+// and declares JSON, which is the content type the server insists on.
+function ask(path, body) {
+  const init = { headers: { 'X-Contour-Token': TOKEN } };
+  if (body !== undefined) {
+    init.method = 'POST';
+    init.headers['Content-Type'] = 'application/json';
+    init.body = JSON.stringify(body);
+  }
+  return fetch(path, init);
+}
+
+// An <img src> cannot carry a header, so a picture carries the token in the
+// query. Safe: fetching one changes nothing.
+function asset(path) {
+  return path + (path.includes('?') ? '&' : '?') + 't=' + encodeURIComponent(TOKEN);
+}
+// What this host can do. One request, one rule: an element declaring a
+// capability the host lacks is removed, and an element declaring what it stands
+// in for is removed when the host *has* that capability. So the launcher's
+// ending is Done and the console's is End run, from the same markup.
+//
+// A name nobody knows here matches no element and does nothing. That is
+// deliberate: `/can` is written by us, so an unrecognised name in it is our bug
+// and not something to put in front of the user (`lib/policy.py` reports the
+// strangers in the ask-list for the opposite reason — the user wrote that one).
+ask('/can').then(r => r.json()).then(({ can }) => {
+  const has = new Set(can);
+  for (const el of document.querySelectorAll('[data-needs]'))
+    if (!has.has(el.dataset.needs)) el.remove();
+  for (const el of document.querySelectorAll('[data-unless]'))
+    if (has.has(el.dataset.unless)) el.remove();
+  document.body.classList.add('asked');     // what survived may now be seen
+  // Remembered rather than re-asked: `draw()` is the same function under both
+  // hosts, and the checkbox that puts a mark in a run's scope only means
+  // something under the one that has a run to put it in.
+  seeding = has.has('drive');
+  if (seeding) draw();
+  if (has.has('drive')) drive();             // and what survived is now wired
+});
+
+// The run, and everything that only exists when the host owns a build. Reached
+// through the capability rather than run on load: `/can` is a request, so at
+// load time the launcher's page still holds this markup, and a poll started
+// then would ask a launcher forever for a route it does not have.
+function drive() {
+  // Half the page, now that there is a transcript to put in it.
+  document.body.classList.add('driving');
+  const turns = document.getElementById('turns');
+  const state = document.getElementById('state');
+  let cursor = 0;
+
+  document.getElementById('begin').addEventListener('submit', async e => {
+    e.preventDefault();
+    const prose = document.getElementById('prose');
+    // Either will do. A selection is a request the user has already written
+    // down, in the place it applies.
+    if (!prose.value.trim() && !chosen.size) return;
+    const said = await ask('/run', { prompt: prose.value.trim(),
+                                     marks: [...chosen] }).then(r => r.json());
+    state.textContent = said.started ? 'running' : said.why;
+    if (said.started) {
+      // The scope belonged to that run. Kept ticked, it would quietly seed the
+      // next one too, and the report at the end would be about marks the user
+      // had not chosen this time.
+      prose.value = '';
+      chosen.clear();
+      seedLine();
+      spendLine(null);                    // this run's cost, not the tab's
+      draw();
+    }
+  });
+
+  document.getElementById('end').addEventListener('click', async () => {
+    await ask('/end', {});                  // the run, not the console
+    state.textContent = 'no run';
+  });
+
+  // The vetoes, on the same clock as the panel rather than the transcript: one
+  // arrives at a verdict and the count changes when somebody commits, and
+  // neither is a thing being waited on. Inside `drive` for the launcher's sake —
+  // a page that polled this under a host with no gates would ask forever for a
+  // route that host does not have.
+  refreshVetoes();
+  setInterval(refreshVetoes, 2000);
+
+  // Polled from a cursor, so a reloaded tab gets the whole run back rather than
+  // whatever happened after it reconnected.
+  setInterval(async () => {
+    const said = await ask('/events?since=' + cursor).then(r => r.json()).catch(() => null);
+    if (!said) return;
+    cursor = said.next;
+    for (const event of said.events) {
+      // Spend is a figure, not a line of the conversation. One line per turn in
+      // the transcript would bury what the agent actually said under an
+      // accountant, so the running total replaces itself in one place.
+      if (event.kind === 'spend') { spendLine(event); continue; }
+      turns.append(turn(event));
+    }
+    if (said.events.length) turns.scrollTop = turns.scrollHeight;
+    if (said.events.some(e => e.kind === 'ended')) state.textContent = 'no run';
+  }, 600);
+}
+
+// What was refused, and what is still only on disk. The whole section goes away
+// when nothing has been refused: a space where nobody has said no has nothing to
+// show, and an empty list under a heading is furniture.
+async function refreshVetoes() {
+  const said = await ask('/vetoes').then(r => r.json()).catch(() => null);
+  if (!said) return;
+  const section = document.getElementById('vetoes');
+  section.hidden = !said.vetoes.length;
+  const exposure = document.getElementById('exposure');
+  // Said only while it is true. Tracked is not committed, and an uncommitted
+  // veto dies exactly as an ignored one would — so this is a live number and not
+  // a label: it goes to zero in the commit that carries the change it prevented.
+  exposure.textContent = said.uncommitted
+    ? said.uncommitted + ' veto' + (said.uncommitted === 1 ? '' : 'es') + ' uncommitted'
+    : '';
+  const list = document.getElementById('denied');
+  list.replaceChildren();
+  for (const veto of said.vetoes) list.append(vetoed(veto));
+}
+
+// One veto, and the one thing that can be done with it. Promotion is what turns
+// a fact about a moment into an open question about the model, and it names a
+// part because that is what gives the mark a position — the user picks it, since
+// guessing which part the sentence was about would attribute a claim to them
+// (ADR 0019, decision 15).
+function vetoed(veto) {
+  const li = document.createElement('li');
+  const call = document.createElement('div');
+  call.className = 'call';
+  call.textContent = veto.category + '  ' + veto.tool;
+  const why = document.createElement('div');
+  why.textContent = veto.reason || '';
+  li.append(call, why);
+  if (veto.promoted) {
+    const said = document.createElement('span');
+    said.className = 'who';
+    said.textContent = 'promoted to ' + veto.promoted;
+    li.append(said);
+    return li;
+  }
+  const pick = document.createElement('select');
+  for (const name of [...new Set(Object.values(parts))].sort()) {
+    const option = document.createElement('option');
+    option.value = option.textContent = name;
+    pick.append(option);
+  }
+  const button = document.createElement('button');
+  button.className = 'shut';
+  button.textContent = 'promote to a mark';
+  button.addEventListener('click', async () => {
+    const res = await ask('/promote', { id: veto.id, part: pick.value });
+    if (!res.ok) return;
+    // The mark is on the sheet from this moment, badged on every view that can
+    // see the part at the next render.
+    marks.push(await res.json());
+    draw();
+    refreshVetoes();
+  });
+  if (pick.options.length) li.append(pick, button);
+  return li;
+}
+
+// One line of the transcript.
+function turn(event) {
+  if (event.kind === 'gate') return gate(event);
+  const li = document.createElement('li');
+  li.className = event.kind;
+  li.textContent = event.text || '';
+  return li;
+}
+
+// The line that is waiting for you. Two answers and a sentence: the reason goes
+// back to the agent as the call's result, which makes it the cheapest correction
+// channel in the system — a sentence, at the moment it applies, instead of a
+// paragraph after the fact.
+function gate(event) {
+  const li = document.getElementById('gate').content.firstElementChild.cloneNode(true);
+  li.querySelector('.category').textContent = event.category;
+  li.querySelector('.call').textContent = called(event);
+  const because = li.querySelector('.because');
+  const answer = async allow => {
+    for (const b of li.querySelectorAll('button')) b.disabled = true;
+    await ask('/verdict', { id: event.id, allow: allow, reason: because.value.trim() });
+  };
+  li.querySelector('.allow').addEventListener('click', () => answer(true));
+  li.querySelector('.deny').addEventListener('click', () => answer(false));
+  return li;
+}
+
+// The call, as one line to read. Read is all it is: what goes back is the
+// verdict and the sentence, never this.
+function called(event) {
+  const call = event.call || {};
+  return event.tool + '  ' + (call.command || call.file_path || JSON.stringify(call));
+}
+
 const cv = document.getElementById('sheet'), ctx = cv.getContext('2d');
 const wrap = document.getElementById('wrap'), list = document.getElementById('list');
 const entry = document.getElementById('entry'), text = document.getElementById('text');
 const where = document.getElementById('where'), hint = document.getElementById('hint');
 const strip = document.getElementById('strip');
 let marks = [], pending = null, added = 0, parts = {};
+// Whether this host can run an agent, and which open marks the next run is to be
+// seeded with. Ids and not marks: `draw()` rebuilds the list from scratch, and a
+// selection held as objects would survive as a copy of a mark that has moved on.
+let seeding = false;
+const chosen = new Set();
 // Where a drag started, in picture pixels. A drag on a reference is a *span*:
 // two ends that mean one distance, which is the only way a picture can be
 // asked about a separation (ADR 0018).
@@ -94,8 +442,31 @@ const maskImg = new Image();
 maskImg.onload = () => { mk.width = maskImg.width; mk.height = maskImg.height;
                          mctx.drawImage(maskImg, 0, 0); };
 maskImg.onerror = () => {};   // a space rendered before masks existed: no hover
-maskImg.src = '/mask.png?' + Date.now();
-fetch('/parts.json').then(r => r.json()).then(t => parts = t);
+maskImg.src = asset('/mask.png?' + Date.now());
+ask('/parts.json').then(r => r.json()).then(t => parts = t);
+
+// What the picture is of, asked for and said. Under every host: the launcher's
+// canvas can show a sheet the build has moved past just as easily, and ADR 0018
+// already refuses to resolve marks against one — this says so while the user is
+// still looking, instead of at the moment they press Done.
+const label = document.getElementById('build');
+let drawn = null;                            // the build the canvas is holding
+
+async function labelled() {
+  const said = await ask('/sheet.json').then(r => r.json()).catch(() => null);
+  if (!said) return;
+  label.textContent = [said.build ? 'build ' + said.build : 'nothing built yet',
+                       said.build && !said.current ? 'not current: ' + said.why : '',
+                       said.marks || ''].filter(Boolean).join('  —  ');
+  label.classList.toggle('old', Boolean(said.build) && !said.current);
+  // A new build means a new sheet. Redrawn here rather than on a timer, so the
+  // picture changes when the thing it is a picture of does and at no other time.
+  if (said.build !== drawn) {
+    const first = drawn === null;
+    drawn = said.build;
+    if (!first && !showing) show(null);
+  }
+}
 
 const img = new Image();
 img.onload = () => { cv.width = img.width; cv.height = img.height;
@@ -110,12 +481,24 @@ function show(name) {
   text.placeholder = name ? 'here is what I meant' : 'what is wrong here';
   hint.textContent = name ? 'Click the reference, or drag across a distance.'
                           : 'Click the sheet, then type one line.';
-  img.src = name ? '/ref?name=' + encodeURIComponent(name) : '/sheet.png?' + Date.now();
+  // Keyed on the build and not on the clock: a new build is an address this
+  // browser has never seen, and an unchanged one is the address it already
+  // holds — so a panel that is current costs no request at all.
+  img.src = asset(name ? '/ref?name=' + encodeURIComponent(name)
+                       : '/sheet.png?b=' + (drawn || ''));
 }
 
+// Every build renders for the page (ADR 0019, decision 23), so the label and the
+// picture are both behind this one poll. Slower than the transcript's: a build
+// takes seconds and a verdict is waited on.
+setInterval(labelled, 2000);
+
 // A space with no references gets a strip with the sheet alone, which is the
-// canvas it has always been.
-fetch('/refs.json').then(r => r.json()).then(names => {
+// canvas it has always been. Built after the first label, so the first picture
+// is fetched at the address of the build it is of — otherwise a browser holding
+// a cached picture from a previous session would answer the address that says
+// nothing about which build this is.
+labelled().then(() => ask('/refs.json').then(r => r.json()).then(names => {
   for (const name of [null, ...names]) {
     const b = document.createElement('button');
     b.textContent = name || 'sheet';
@@ -124,10 +507,10 @@ fetch('/refs.json').then(r => r.json()).then(names => {
     strip.appendChild(b);
   }
   show(null);
-});
+}));
 
 // Marks outlive the session that made them, so the page starts from the file.
-fetch('/marks').then(r => r.json()).then(on => { marks = on; draw(); });
+ask('/marks').then(r => r.json()).then(on => { marks = on; draw(); });
 
 // Sheet layout, from contour render: front | right over top | persp.
 function viewAt(x, y) {
@@ -206,6 +589,19 @@ function draw() {
       li.append(who);
     }
     li.append(document.createElement('br'), body);
+    if (!closed && seeding) {
+      // Selectable only while open: a closed finding is not what a run is about,
+      // and the server drops one anyway and says that it did.
+      const pick = document.createElement('input');
+      pick.type = 'checkbox';
+      pick.className = 'seed';
+      pick.checked = chosen.has(mark.id);
+      pick.addEventListener('change', () => {
+        pick.checked ? chosen.add(mark.id) : chosen.delete(mark.id);
+        seedLine();
+      });
+      li.prepend(pick);
+    }
     if (!closed) {
       const shut = document.createElement('button');
       shut.className = 'shut';
@@ -217,9 +613,49 @@ function draw() {
   });
 }
 
+// What this run has cost so far, in the units `tools/tokens.py` reports in — and
+// never before a turn has been spent: a cost that cannot be known must not be
+// guessed at, and a wrong estimate is worse than none (ADR 0019, decision 32).
+// The gate count is here for the reason the figure is: a gate buys a turn of
+// re-explanation, and seeing what that costs is what makes tuning the ask-list
+// downward an informed act rather than an irritated one.
+function spendLine(event) {
+  const line = document.getElementById('spend');
+  if (!line) return;                       // the launcher's page; no run to cost
+  if (!event) { line.textContent = ''; return; }
+  const parts = [round(event.cache_read) + ' cached', round(event.input) + ' fresh',
+                 round(event.output) + ' out', round(event.weighted) + ' weighted'];
+  if (event.gates) {
+    parts.push(event.gates + (event.gates === 1 ? ' gate' : ' gates'));
+  }
+  line.textContent = event.turns + (event.turns === 1 ? ' turn · ' : ' turns · ')
+    + parts.join(' · ');
+}
+
+// A token count as a person reads one. The same thresholds the accounting uses,
+// so a figure watched here and read there is recognisably the same figure.
+function round(n) {
+  n = n || 0;
+  if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+  if (n >= 1000) return (n / 1000).toFixed(1) + 'k';
+  return String(n);
+}
+
+// What the next run will be seeded with, said above the box the prose goes in.
+// Said as a count and not as a list: the marks themselves are on screen with
+// their boxes ticked, and repeating them here would be the same findings twice.
+function seedLine() {
+  const line = document.getElementById('seeds');
+  if (!line) return;                       // the launcher's page; no run to seed
+  line.textContent = chosen.size
+    ? chosen.size + (chosen.size === 1 ? ' mark' : ' marks')
+      + ' selected — they go into the prompt'
+    : '';
+}
+
 // One click, no typing: only the user ever closes a mark.
 async function shutMark(mark) {
-  const res = await fetch('/close', { method: 'POST', body: JSON.stringify({ id: mark.id }) });
+  const res = await ask('/close', { id: mark.id });
   if (res.ok) { mark.status = 'closed'; draw(); }
 }
 
@@ -255,7 +691,7 @@ entry.addEventListener('submit', async e => {
   e.preventDefault();
   if (!pending || !text.value.trim()) return;
   const body = { ...pending, text: text.value.trim() };
-  const res = await fetch('/marks', { method: 'POST', body: JSON.stringify(body) });
+  const res = await ask('/marks', body);
   marks.push(await res.json());
   added++;
   pending = null;
@@ -263,9 +699,28 @@ entry.addEventListener('submit', async e => {
   draw();
 });
 
-document.getElementById('done').addEventListener('click', async () => {
-  await fetch('/done', { method: 'POST', body: '{}' });
-  document.body.innerHTML = '<p style="margin:40px">Canvas closed — '
-    + added + ' mark' + (added === 1 ? '' : 's') + ' captured. You can close this tab.</p>';
-});
+// Proof this tab is still on screen. The console ends a run when the beats
+// stop, because a closed tab and a tab nobody is looking at differ only in how
+// long you wait — and `beforeunload` cannot be relied on to arrive at all. The
+// canvas records the beat and acts on nothing, so this costs it a request every
+// few seconds and changes none of its behaviour.
+const BEAT_MS = 3000;
+setInterval(() => { ask('/beat', {}).catch(() => {}); }, BEAT_MS);
+
+// Closing the whole thing, which under the launcher is Done and under the
+// console is the tab itself. Selected rather than fetched by id — an ending the
+// host removed is gone, and reaching through a capability's element is how a
+// page works for one host and throws for the other. **End run** is deliberately
+// not one of these: it ends the run and leaves the console standing, because a
+// run that ends and starts again never reaches compaction at all (ADR 0019).
+for (const ending of document.querySelectorAll('[data-closed]')) {
+  ending.addEventListener('click', async () => {
+    await ask('/done', {});
+    const said = document.createElement('p');
+    said.style.margin = '40px';
+    said.textContent = ending.dataset.closed + ' — ' + added + ' mark'
+                       + (added === 1 ? '' : 's') + ' captured. You can close this tab.';
+    document.body.replaceChildren(said);
+  });
+}
 </script>

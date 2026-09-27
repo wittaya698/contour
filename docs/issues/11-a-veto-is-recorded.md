@@ -44,14 +44,14 @@ vetoes loses them, which is already true of `marks.json`.
 
 ## Acceptance criteria
 
-- [ ] Denying at a gate writes a veto carrying call, reason, author and build fingerprint
-- [ ] The veto file is tracked and diffs readably
-- [ ] Only the console writes it; no agent command can
-- [ ] A veto naming a part can be promoted to a sheet mark and gains a position
-- [ ] `marks.json`'s pruner never sees a veto
-- [ ] The page shows *n vetoes uncommitted* and the count goes to zero on commit
-- [ ] `contour check` output is byte-identical whether or not vetoes exist
-- [ ] Nothing in the console commits, proposes a records-only commit, or bypasses rule 5
+- [x] Denying at a gate writes a veto carrying call, reason, author and build fingerprint
+- [x] The veto file is tracked and diffs readably
+- [x] Only the console writes it; no agent command can
+- [x] A veto naming a part can be promoted to a sheet mark and gains a position
+- [x] `marks.json`'s pruner never sees a veto
+- [x] The page shows *n vetoes uncommitted* and the count goes to zero on commit
+- [x] `contour check` output is byte-identical whether or not vetoes exist
+- [x] Nothing in the console commits, proposes a records-only commit, or bypasses rule 5
 
 ## Blocked by
 

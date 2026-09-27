@@ -28,13 +28,13 @@ about file formats.
 
 ## Acceptance criteria
 
-- [ ] A second `contour check` in a held space is refused with a message, not queued
-- [ ] The refusal names what holds the lock
-- [ ] The lock is released when the holder exits, including on failure and on interrupt
-- [ ] A lock whose holder is gone does not permanently wedge the space
-- [ ] The lock file is git-ignored
-- [ ] Two terminals reproduce the refusal, with no console involved
-- [ ] Open question 11 is marked resolved and says how
+- [x] A second `contour check` in a held space is refused with a message, not queued
+- [x] The refusal names what holds the lock
+- [x] The lock is released when the holder exits, including on failure and on interrupt
+- [x] A lock whose holder is gone does not permanently wedge the space
+- [x] The lock file is git-ignored
+- [x] Two terminals reproduce the refusal, with no console involved
+- [x] Open question 11 is marked resolved and says how
 
 ## Blocked by
 

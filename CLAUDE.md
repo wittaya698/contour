@@ -7,11 +7,12 @@ truth; `.blend` files are disposable output, rebuilt from an empty scene.
 
 | Command | Does | Cost |
 |---|---|---|
-| `contour check` | build + verify, terse report | ~60 tok |
+| `contour check` | build + verify, terse report; redraws the sheet for the page | ~60 tok |
 | `contour api <symbol>` | real signature from the installed Blender | ~15 tok |
 | `contour render` | 4-view sheet → `sheet.png` | ~1400 tok |
 | `contour export` | `.glb` + round-trip re-measure | ~80 tok |
 | `contour canvas` | the sheet in a browser, to mark on; waits for you | ~20 tok |
+| `contour run <cmd>...` | hold this space for one run, then release it | ~0 tok |
 | `contour selftest` | fixture pipeline test | ~60 tok |
 | `contour spaces` | list model spaces; warns if one has a remote | ~20 tok |
 
@@ -21,8 +22,13 @@ Full Blender output goes to `.contour/last-build.log`. Read it **only on failure
 
 1. **Never change anything under `refs/`** — the user's intent in pictures.
    Measure them; never rewrite one. **A `spec.yaml` changes only as: propose →
-   user confirms → write, bumping `revision:` in that same write.** Never
-   propose one while a check is red; fix `build.py` or report the failure.
+   user confirms → write, bumping `revision:` in that same write.** The proposal
+   is the argument — the measurement that shows the contract is wrong, *depth
+   measures 620 against a tolerance of 600 ±20* — and it comes before the write
+   wherever the confirm lands: prose in a terminal, a gate under a console. A
+   gate is a confirm and never a proposal; it can stop a write, it cannot make
+   the case for one. Never propose one while a check is red; fix `build.py` or
+   report the failure.
    `contour check` fails if the spec moved and `revision:` did not (ADR 0016).
    A *new* spec may be drafted when the user asks — scale needs an anchor they
    give you, every number you chose flagged as yours, tolerances loudest, since
@@ -32,9 +38,13 @@ Full Blender output goes to `.contour/last-build.log`. Read it **only on failure
    `build.py`. `out/` is regenerated from zero every build.
 4. **Never use `bpy.ops.*`** unless the call is in `lib/ops_whitelist.py`, and
    then only via `lib.ctx_override`. Build geometry with `bmesh` + the data API.
-5. **Never commit or push without explicit approval.** Show the verify report
-   and the render sheet, wait for the user to say ship, then commit — and push
-   only in that same approved motion, never on your own initiative.
+5. **Never commit or push without explicit approval.** The user has to have
+   seen what is being shipped — the verify report, and the sheet the build was
+   drawn from — and said ship. Then commit, and push only in that same approved
+   motion, never on your own initiative. Rendering to show them is the
+   terminal's way of meeting that; under a console the panel is already current,
+   so what is left is the saying, and an allowed gate on the commit is the user
+   saying it.
 6. **Never run raw `blender`** — its stdout costs 2–5k tokens per run.
 7. **Verify unfamiliar API calls with `./contour api`** instead of recalling
    them. This Blender (5.2.1, built 2026-08-25) postdates the model cutoff, so

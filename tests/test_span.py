@@ -23,7 +23,7 @@ from lib import anchor
 from lib import marks as marks_store
 from lib import span
 from lib.canvas import Canvas
-from test_canvas import post
+from client import post
 
 PNG = b"\x89PNG\r\n\x1a\nreference"
 
@@ -43,7 +43,7 @@ class SpanMarkTest(unittest.TestCase):
     def test_a_span_is_one_mark_carrying_both_of_its_ends(self):
         """Not two marks that happen to be near each other: the distance is
         the comment, so it has one id, one line of text and one status."""
-        status, _ = post(self.canvas.url + "/marks",
+        status, _ = post(self.canvas, "/marks",
                          {"ref": "persp.webp", "pixel": [412, 690],
                           "to": [498, 690], "text": "what separates the legs"})
         self.assertEqual(status, 200)

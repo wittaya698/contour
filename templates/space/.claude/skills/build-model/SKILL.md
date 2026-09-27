@@ -65,6 +65,12 @@ read wrong against the 1 m grid.
 
 Then show the user the verify report and the sheet, and say what changed.
 
+Under a console the sheet is already on the page beside the transcript, redrawn
+by every build and labelled with the build it came from (ADR 0019). Rendering
+again there buys nothing and costs ~1400 tokens of your own context: say what
+changed and what the report says, and let them look. The checkpoint is your
+judgement that you are done or stuck, which is the same claim in either place.
+
 ## Commit
 
 Only after the user explicitly approves. Then:

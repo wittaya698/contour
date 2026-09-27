@@ -23,12 +23,12 @@ about which half it is in.
 
 ## Acceptance criteria
 
-- [ ] `contour selftest` fails when a Blender-free module imports a third-party package
-- [ ] `contour selftest` fails when a Blender-free module imports `bpy`
-- [ ] The test names which module and which import
-- [ ] A new module in `lib/` must be assigned to a half or the test says so
-- [ ] The check costs no Blender run
-- [ ] `contour selftest` stays green on the current tree
+- [x] `contour selftest` fails when a Blender-free module imports a third-party package
+- [x] `contour selftest` fails when a Blender-free module imports `bpy`
+- [x] The test names which module and which import
+- [x] A new module in `lib/` must be assigned to a half or the test says so
+- [x] The check costs no Blender run
+- [x] `contour selftest` stays green on the current tree
 
 ## Blocked by
 

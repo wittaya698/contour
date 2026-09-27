@@ -106,15 +106,24 @@ privileged. `marks.json` is append-mostly and survives concurrent writers by
 luck. `build.py` does not — two agents editing it race, and the loser's work
 disappears silently into a file the other one overwrote.
 
-**Blocks:** nothing today, because the console does not exist. It blocks running
-the console and a terminal agent on the same space at the same time, which is
-the obvious thing to do the day it works.
+**Resolved, and built 2026-09-25.** A run-scoped hold at `.contour/run.lock`,
+taken and enforced by the launcher, refusing a second caller with a message that
+names the process holding it. The launcher holds it, not the console — so it also
+covers terminal-versus-terminal, which raced before any of this existed. Scoped
+to a run rather than a build, because the `build.py` edits between builds are
+what actually race: `contour run <cmd>...` holds the space for a whole session,
+and the builds inside that session are not refused by their own hold.
 
-**Resolved:** a run-scoped lock in `.contour/`, taken and enforced by the
-launcher, refusing a second caller with a message. The launcher holds it, not the
-console — so it also covers terminal-versus-terminal, which raced before any of
-this existed. Scoped to a run rather than a build, because the `build.py` edits
-between builds are what actually race.
+`check`, `render` and `export` are the commands a second run may not join in on.
+`canvas` and `mark` deliberately take nothing: both only append to `marks.json`,
+and a canvas session is a person at a page, which would be a hold nobody is
+watching.
+
+A hold whose process is gone is taken over, with a line saying whose it was, so
+a killed run does not wedge the space behind a file the user has to know about.
+A record written on another machine is never judged dead, because it cannot be.
+
+**Blocks:** nothing.
 
 ## 12. A model space has no identity
 

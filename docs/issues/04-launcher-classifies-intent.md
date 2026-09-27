@@ -31,12 +31,12 @@ surface in this system that is already authoritative and already exhaustive.
 
 ## Acceptance criteria
 
-- [ ] All four spellings of a build classify as one category
-- [ ] A spec write, a commit, a push and a ref write each classify to their own category
-- [ ] A call matching nothing classifies as none, and is distinguishable from an error
-- [ ] The category list is printable and its order is stable
-- [ ] Adding a launcher command that carries an intent fails a test until it is classified
-- [ ] Classification needs no Blender run and no network
+- [x] All four spellings of a build classify as one category
+- [x] A spec write, a commit, a push and a ref write each classify to their own category
+- [x] A call matching nothing classifies as none, and is distinguishable from an error
+- [x] The category list is printable and its order is stable
+- [x] Adding a launcher command that carries an intent fails a test until it is classified
+- [x] Classification needs no Blender run and no network
 
 ## Blocked by
 

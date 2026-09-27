@@ -21,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from lib import anchor
 from lib import marks as marks_store
 from lib.canvas import Canvas
-from test_canvas import get, post
+from client import get, open_url, post
 
 # Two bytes that are honestly a PNG header and honestly nothing else: what is
 # being tested is which file comes back, never how it decodes.
@@ -47,7 +47,7 @@ class RefListingTest(unittest.TestCase):
         (self.refs / "persp.webp").write_bytes(PNG)
         (self.refs / "front.png").write_bytes(PNG)
         canvas = self.open_canvas(self.refs)
-        status, listing = get(canvas.url + "/refs.json")
+        status, listing = get(canvas, "/refs.json")
         self.assertEqual(status, 200)
         self.assertEqual(listing, ["front.png", "persp.webp"])
 
@@ -56,8 +56,8 @@ class RefListingTest(unittest.TestCase):
         first day. The strip is then empty and the canvas is otherwise the
         canvas it always was — an absent reference is not an error."""
         canvas = self.open_canvas(None)
-        self.assertEqual(get(canvas.url + "/refs.json"), (200, []))
-        with urllib.request.urlopen(canvas.url + "/", timeout=5) as r:
+        self.assertEqual(get(canvas, "/refs.json"), (200, []))
+        with open_url(canvas, "/", timeout=5) as r:
             self.assertEqual(r.status, 200)
 
     def test_a_reference_is_served_as_the_image_it_is(self):
@@ -65,7 +65,7 @@ class RefListingTest(unittest.TestCase):
         arrive as an image and not as a download."""
         (self.refs / "persp.webp").write_bytes(PNG + b"-persp")
         canvas = self.open_canvas(self.refs)
-        with urllib.request.urlopen(canvas.url + "/ref?name=persp.webp", timeout=5) as r:
+        with open_url(canvas, "/ref?name=persp.webp", timeout=5) as r:
             self.assertEqual(r.status, 200)
             self.assertEqual(r.headers["Content-Type"], "image/webp")
             self.assertEqual(r.read(), PNG + b"-persp")
@@ -80,8 +80,7 @@ class RefListingTest(unittest.TestCase):
         canvas = self.open_canvas(self.refs)
         for asked in ("../spec.yaml", "/etc/hosts", "notes.md", ""):
             with self.assertRaises(urllib.error.HTTPError) as caught:
-                urllib.request.urlopen(
-                    canvas.url + "/ref?name=" + urllib.parse.quote(asked), timeout=5)
+                open_url(canvas, "/ref?name=" + urllib.parse.quote(asked), timeout=5)
             self.assertEqual(caught.exception.code, 404, asked)
 
 
@@ -102,7 +101,7 @@ class RefMarkTest(unittest.TestCase):
     def test_a_click_on_a_reference_records_the_image_the_pixel_and_the_words(self):
         """And nothing else. Nothing in a photograph knows what a part is, and
         no view of ours drew it, so a ref mark carries neither."""
-        post(self.canvas.url + "/marks",
+        post(self.canvas, "/marks",
              {"ref": "persp.webp", "pixel": [880, 410],
               "text": "the gap between the legs is what I meant"})
         mark, = json.loads(self.marks.read_text())
@@ -120,7 +119,7 @@ class RefMarkTest(unittest.TestCase):
         is not spent (ADR 0018)."""
         asked = []
         self.canvas.resolve = lambda: asked.append(1) or {"lines": []}
-        post(self.canvas.url + "/marks",
+        post(self.canvas, "/marks",
              {"ref": "persp.webp", "pixel": [880, 410], "text": "here"})
         self.assertEqual(self.canvas.anchor(), [])
         self.assertEqual(asked, [])
@@ -130,9 +129,9 @@ class RefMarkTest(unittest.TestCase):
         skipped rather than that resolution is broken."""
         asked = []
         self.canvas.resolve = lambda: asked.append(1) or {"lines": ["resolved"]}
-        post(self.canvas.url + "/marks",
+        post(self.canvas, "/marks",
              {"ref": "persp.webp", "pixel": [880, 410], "text": "here"})
-        post(self.canvas.url + "/marks",
+        post(self.canvas, "/marks",
              {"view": "front", "pixel": [260, 120], "text": "and there"})
         self.assertEqual(self.canvas.anchor(), ["resolved"])
         self.assertEqual(len(asked), 1)
@@ -141,10 +140,10 @@ class RefMarkTest(unittest.TestCase):
         """`contour check` reports findings, not sheet findings. A remark about
         the reference is every bit as unanswered as a remark about the build,
         and the user is owed one number, not two."""
-        post(self.canvas.url + "/marks",
+        post(self.canvas, "/marks",
              {"ref": "persp.webp", "pixel": [880, 410], "text": "here"})
         self.assertEqual(marks_store.status_line(self.marks), "1 mark open")
-        post(self.canvas.url + "/marks",
+        post(self.canvas, "/marks",
              {"view": "front", "pixel": [260, 120], "text": "and there"})
         self.assertEqual(marks_store.status_line(self.marks), "2 marks open")
 
@@ -155,10 +154,10 @@ class RefMarkTest(unittest.TestCase):
         `lib/refs` has no function that writes, and this is what says so."""
         before = {p.name: (p.read_bytes(), p.stat().st_mtime_ns)
                   for p in self.refs.iterdir()}
-        get(self.canvas.url + "/refs.json")
-        urllib.request.urlopen(self.canvas.url + "/ref?name=persp.webp",
+        get(self.canvas, "/refs.json")
+        open_url(self.canvas, "/ref?name=persp.webp",
                                timeout=5).read()
-        post(self.canvas.url + "/marks",
+        post(self.canvas, "/marks",
              {"ref": "persp.webp", "pixel": [880, 410], "text": "here"})
         self.canvas.close(json.loads(self.marks.read_text())[0]["id"])
         after = {p.name: (p.read_bytes(), p.stat().st_mtime_ns)
@@ -169,9 +168,9 @@ class RefMarkTest(unittest.TestCase):
         """Resolution rewrites every sheet mark it can place, and orphans the
         ones whose part has gone. A ref mark is offered to neither: its pixel is
         in a photograph, which no build of ours has any say over."""
-        post(self.canvas.url + "/marks",
+        post(self.canvas, "/marks",
              {"ref": "persp.webp", "pixel": [880, 410], "text": "here"})
-        post(self.canvas.url + "/marks",
+        post(self.canvas, "/marks",
              {"view": "front", "pixel": [260, 120], "text": "and there"})
         was, sheet = json.loads(self.marks.read_text())
 
@@ -194,7 +193,7 @@ class RefMarkTest(unittest.TestCase):
         A guard. The store has exactly one way to close a mark and only the page
         reaches it; this is what will notice if a second way ever appears.
         """
-        post(self.canvas.url + "/marks",
+        post(self.canvas, "/marks",
              {"ref": "persp.webp", "pixel": [880, 410], "text": "here"})
         mid = json.loads(self.marks.read_text())[0]["id"]
         anchor.apply(self.marks, {mid: {"part": "neck", "local": [0, 0, 0]}})
