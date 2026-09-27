@@ -113,6 +113,54 @@ contour export                     # .glb, re-imported and re-measured to prove 
 git add -A && git commit
 ```
 
+## Marking, and driving a run from the browser
+
+Everything above is you and a terminal. There are two more surfaces, and both
+exist because a number is not the only thing that goes wrong with a model.
+
+**Marks are located comments** (ADR 0018). `contour canvas` puts the sheet and
+your reference images in a browser; click a spot, type one line, and it is
+tracked in `marks.json` beside the build. A mark on the sheet says *the build is
+wrong here*; a mark on a reference says *here is what I meant*. The click becomes
+a pin in the hit part's own coordinates, so it moves with the geometry instead of
+pointing at a pixel that stopped meaning anything at the next build. The agent
+marks too — `contour mark --part cap "..."` — and only you ever close one: the
+agent can attach *addressed in this build*, which dims the badge and settles
+nothing.
+
+```sh
+contour canvas                     # the sheet, to mark on; waits for you
+```
+
+**`contour-console` drives the agent behind a gate** (ADR 0019). Same page, one
+more capability: a transcript on one side, the current sheet on the other, and
+every call that means something — a build, a spec write, a commit, a push —
+stopping to ask you first. What you answer is a verdict and a sentence, never an
+edited call: the agent writes the code, you say what you think of it. A denial is
+kept as a **veto** in the space, because it is why two builds differ.
+
+```sh
+cd /path/to/Contour               # once, in the toolkit checkout
+python3 -m venv .venv && .venv/bin/pip install -r console/requirements.txt
+ln -s "$PWD/contour-console" ~/.local/bin/
+
+cd ~/Workspace/chair              # then from inside a model space
+contour-console
+```
+
+What runs unwatched is yours to set, in `~/.contour/ask-list.yaml`. It has no
+presets: a category it does not name is gated, so the first run asks about
+everything and you tune it downward — `contour asks` prints what is in force and
+`contour intents` prints the categories there are to name. Select open marks
+before starting and they compose into the prompt, and at the end the run says of
+each one whether it was addressed, left alone, or orphaned by a part that went
+away. What the run cost appears as it happens, per turn, and `tools/tokens.py`
+reads it afterwards in the same units it reports a terminal session in.
+
+Nothing about the console is load-bearing for the pipeline: `contour selftest`
+proves a clone with none of it installed still builds, verifies, renders and
+exports.
+
 `lib/kit.py` has the helpers a `build.py` uses — millimetre conversion,
 materials from hex, boxes, spheres, cylinders, and `add()` to turn a bmesh
 into a placed object. `fixtures/smoke/build.py` is a complete example in ten
@@ -131,9 +179,18 @@ lines.
 | `contour doctor` | is this space still in step with the toolkit |
 | `contour spaces [name]` | list model spaces, or print one's path |
 | `contour install-hooks` | install the push guard into this clone |
+| `contour canvas` | the sheet and the references in a browser, to mark on |
+| `contour mark --part <p>` | pin a finding on the sheet, for the user to see |
+| `contour resolve` | anchor marks against this build, before it changes |
+| `contour measure <ref>` | real pixel geometry from a reference image |
+| `contour run <cmd>...` | hold this space for one run, then release it |
+| `contour asks` | what this space lets through, and what asks |
+| `contour intents` | the call categories a gate can ask about |
+| `contour-console` | drive a run from the browser, behind a gate |
 
-The first three run inside a model space and take no model name. Outside one
-they refuse and say so, rather than guessing.
+The model commands run inside a model space and take no model name. Outside one
+they refuse and say so, rather than guessing. Every one of them is stdlib except
+`contour-console`, which is a separate executable for exactly that reason.
 
 Blender's stdout is 2–5k tokens of banner per run, so it goes to
 `.contour/last-build.log` and only a terse report is printed. Read the log on
@@ -157,6 +214,8 @@ A model space, anywhere on disk, its own git repository:
     refs/         your intent, in pictures   (the agent reads, never writes)
     build.py      the attempt                (rebuilt from an empty scene)
     sheet.png     the 4-view render you approved
+    marks.json    located comments on the sheet, from both sides (ADR 0018)
+    vetoes.json   calls you refused at a gate, and why            (ADR 0019)
     NOTES.md      what is deferred, and what is undecided
     CLAUDE.md     the agent's rules          (copied from the toolkit; `contour doctor` flags drift)
     .claude/      the spec guard's settings, and the build and release skills
