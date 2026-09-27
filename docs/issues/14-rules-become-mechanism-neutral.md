@@ -32,13 +32,13 @@ the user's, not an agent's.
 
 ## Acceptance criteria
 
-- [ ] Rules 1 and 5 state what must hold and name no mechanism
-- [ ] Neither rule is weakened: the confirm is still required, in both places
-- [ ] The concrete terminal route is in the `build-model` skill, not in the rules
-- [ ] No rule text lives in the console's source
-- [ ] `README.md` scopes the no-dependency promise to `./contour`
-- [ ] `docs/CONTEXT.md` still agrees with both rules
-- [ ] A reader of `CLAUDE.md` alone can tell what is required of them under either mechanism
+- [x] Rules 1 and 5 state what must hold and name no mechanism
+- [x] Neither rule is weakened: the confirm is still required, in both places
+- [x] The concrete terminal route is in the `build-model` skill, not in the rules
+- [x] No rule text lives in the console's source
+- [x] `README.md` scopes the no-dependency promise to `./contour`
+- [x] `docs/CONTEXT.md` still agrees with both rules
+- [x] A reader of `CLAUDE.md` alone can tell what is required of them under either mechanism
 
 ## Blocked by
 

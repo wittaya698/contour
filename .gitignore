@@ -21,6 +21,12 @@ work/
 # version-bound to the `lib/` it imports; nobody else's copy is interchangeable.
 .venv/
 
+# Editor-local settings. Yours, like `work/` — and a checked-in one here would
+# be wrong as well as personal: it names a test runner, and this suite is
+# unittest through `contour selftest`, with `console/requirements.txt` the only
+# dependency the toolkit has.
+.vscode/
+
 # Blender + Python noise
 *.blend1
 *.blend2

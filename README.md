@@ -10,8 +10,11 @@ check. There is no hand-editing step to forget or repeat.
 ## Install
 
 You need **Blender** and **Python 3** on `PATH`. Nothing else — no virtualenv,
-no `pip install`, no dependencies. `./contour` is a stdlib launcher that shells
-out to Blender and runs everything inside Blender's own bundled Python.
+no `pip install`, no dependencies — for everything `./contour` does, which is
+the whole pipeline: it is a stdlib launcher that shells out to Blender and runs
+everything inside Blender's own bundled Python. The one exception is
+`contour-console`, the browser surface a run is driven from; it needs an
+environment, which is why it is a second name rather than a subcommand.
 
 ```sh
 git clone <this repo> Contour
