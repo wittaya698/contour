@@ -5,6 +5,24 @@ expressed as arithmetic over per-part summary numbers, then this file can exist
 at all — no Blender, no fixture, no rebuild. The ADR's mutants stay; they prove
 the gather, the checks and the report are wired together, which nothing here
 can show. These prove the judgement.
+
+Each of ADR 0009's thirteen mutants has a counterpart here — the same defect
+written as a measurement and asserted straight against the check, with no
+rebuild (issue 23):
+
+    height                the model taller than its stated height
+    missing part          a part the spec wants twice and finds once
+    extra object          an object the spec does not name
+    flipped normals       a part with inward faces
+    loose vertex          a stray vertex and a stray edge alike
+    open mesh             a non-manifold edge
+    doubled vertex        two vertices closer than the tolerance
+    scale not applied     an unapplied scale
+    rotation not applied  an unapplied rotation
+    n-gon                 an n-gon reported against the part it is in
+    extra material        a material the spec does not list
+    origin off            a model shifted off base_center
+    tri budget            a model over the triangle budget
 """
 import sys
 import unittest
@@ -24,7 +42,9 @@ def part(name="plinth", **fields):
     """
     return {"name": name, "faces": {}, "verts": 0, "edges": 0,
             "non_manifold_edges": 0, "loose_verts": 0, "loose_edges": 0,
-            "flipped_faces": 0, "nearest_pair_mm": None, **fields}
+            "flipped_faces": 0, "nearest_pair_mm": None, "bounds": None,
+            "scale": (1.0, 1.0, 1.0), "rotation_rad": 0.0, "uv_layers": 0,
+            "materials": (), **fields}
 
 
 def verdicts(results):
@@ -154,3 +174,175 @@ class TopologyTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TrisTest(unittest.TestCase):
+    def test_the_triangle_count_of_a_measurement_is_the_sum_of_its_parts(self):
+        """The round-trip needs this number without a spec to compare it to —
+        it asks whether an export kept the triangles it was given, which is a
+        question about two measurements and not about a budget."""
+        self.assertEqual(checks.tris([part("a", faces={3: 2, 4: 3}),
+                                      part("b", faces={5: 1})]), 11)
+
+
+class DimensionsTest(unittest.TestCase):
+    def test_a_model_taller_than_its_stated_height_fails_by_how_much(self):
+        """The bounding box the check reads is the union of the parts\' own,
+        so the height of a model is the height of everything in it and not of
+        whichever part was measured last."""
+        spec = {"dimensions": {"height": {"value": 200, "tol": 1}}}
+        got = verdicts(checks.dimensions(spec, [
+            part("plinth", bounds=((0.0, 0.0, 0.0), (0.12, 0.1, 0.02))),
+            part("cap", bounds=((0.0, 0.0, 0.23), (0.12, 0.1, 0.25)))]))
+        self.assertFalse(got["height"]["ok"])
+        self.assertIn("250.0mm", got["height"]["msg"])
+
+    def test_a_scene_with_nothing_in_it_fails_its_stated_dimensions(self):
+        """Not skipped, and not passed for want of a reading: a spec that
+        states a height and a scene with no mesh in it is a build that did not
+        happen, which is a failure and not an absence of one."""
+        spec = {"dimensions": {"height": {"value": 200, "tol": 1}}}
+        got = verdicts(checks.dimensions(spec, []))["height"]
+        self.assertFalse(got["ok"])
+        self.assertIn("no mesh to measure", got["msg"])
+
+
+class PartsTest(unittest.TestCase):
+    def test_an_object_the_spec_does_not_name_is_unexpected(self):
+        """Every object in the scene, not every mesh: the thing a stray
+        `Cube` empty is caught by is that it is in the scene at all."""
+        spec = {"parts": [{"name": "plinth"}, {"name": "cap"}]}
+        got = verdicts(checks.parts(spec, ["plinth", "cap", "Cube"]))
+        self.assertFalse(got["parts"]["ok"])
+        self.assertIn("unexpected: Cube", got["parts"]["msg"])
+
+    def test_a_part_the_spec_wants_twice_and_finds_once_is_a_count_problem(self):
+        """`.001` suffixes count as the part: Blender names duplicates that
+        way, and a spec asking for two pillars means two pillars however
+        Blender spelled the second."""
+        spec = {"parts": [{"name": "pillar", "count": 2}]}
+        got = verdicts(checks.parts(spec, ["pillar"]))
+        self.assertIn("pillar x1, want 2", got["parts"]["msg"])
+        self.assertTrue(verdicts(checks.parts(spec, ["pillar", "pillar.001"]))
+                        ["parts"]["ok"])
+
+
+class UVTest(unittest.TestCase):
+    def test_a_part_with_no_uv_layer_fails_a_spec_that_requires_one(self):
+        spec = {"uv": {"required": True}}
+        got = verdicts(checks.uv(spec, [part("cap", uv_layers=1),
+                                        part("plinth", uv_layers=0)]))
+        self.assertFalse(got["uv"]["ok"])
+        self.assertIn("no UV layer: plinth", got["uv"]["msg"])
+
+    def test_a_uv_rule_this_verifier_cannot_enforce_fails_rather_than_skips(self):
+        """Both of them: UDIM and overlap are stated in specs and enforced by
+        nothing here, so a spec asking for either gets told so."""
+        got = verdicts(checks.uv({"uv": {"required": True, "udim": True,
+                                         "overlap_allowed": False}},
+                                 [part("cap", uv_layers=1)]))["uv"]
+        self.assertFalse(got["ok"])
+        self.assertIn("udim not implemented", got["msg"])
+        self.assertIn("uv overlap check not implemented", got["msg"])
+
+
+class MaterialsTest(unittest.TestCase):
+    def test_a_material_the_spec_does_not_list_is_unexpected(self):
+        """Counted across the scene and not per part: two parts sharing one
+        material are one slot, which is what a budget on slots means."""
+        spec = {"materials": {"max_slots": 2, "names": ["stone", "brass"]}}
+        got = verdicts(checks.materials(spec, [
+            part("cap", materials=("brass", "rogue")),
+            part("plinth", materials=("stone",))]))
+        self.assertFalse(got["mat_names"]["ok"])
+        self.assertIn("unexpected ['rogue']", got["mat_names"]["msg"])
+        self.assertFalse(got["mat_slots"]["ok"])
+        self.assertEqual(got["mat_slots"]["info"], "3/2")
+
+
+class TransformTest(unittest.TestCase):
+    def test_a_model_shifted_off_the_origin_fails_base_center(self):
+        """`base_center` is the floor of the box, not its middle: a model
+        standing on Z=0 is at its origin however tall it is."""
+        spec = {"transform": {"origin": "base_center"}}
+        standing = [part("plinth", bounds=((-0.06, -0.05, 0.0), (0.06, 0.05, 0.2)))]
+        self.assertTrue(verdicts(checks.transform(spec, standing))["origin"]["ok"])
+        shifted = [part("plinth", bounds=((-0.01, -0.05, 0.0), (0.11, 0.05, 0.2)))]
+        got = verdicts(checks.transform(spec, shifted))["origin"]
+        self.assertFalse(got["ok"])
+        self.assertIn("(50.0, 0.0, 0.0)mm", got["msg"])
+
+    def test_an_unapplied_scale_names_the_part_carrying_it(self):
+        spec = {"transform": {"scale_applied": True, "rotation_applied": True}}
+        got = verdicts(checks.transform(spec, [
+            part("plinth"), part("pillar", scale=(1.5, 1.0, 1.0)),
+            part("cap", rotation_rad=1.5708)]))
+        self.assertFalse(got["scale"]["ok"])
+        self.assertEqual(got["scale"]["msg"], "scale not applied: pillar")
+        self.assertFalse(got["rotation"]["ok"])
+        self.assertEqual(got["rotation"]["msg"], "rotation not applied: cap")
+
+    def test_an_up_axis_this_build_cannot_produce_fails_rather_than_skips(self):
+        """The same rule as an unimplemented normals rule: what the verifier
+        cannot enforce it must not pass in silence."""
+        got = verdicts(checks.transform({"transform": {"up_axis": "Y"}}, []))
+        self.assertFalse(got["up_axis"]["ok"])
+
+    def test_an_origin_rule_this_verifier_cannot_place_fails_rather_than_skips(self):
+        spec = {"transform": {"origin": "centre_of_mass"}}
+        got = verdicts(checks.transform(spec, [
+            part("plinth", bounds=((0, 0, 0), (0.1, 0.1, 0.1)))]))
+        self.assertFalse(got["origin"]["ok"])
+        self.assertIn("not implemented", got["origin"]["msg"])
+
+
+class SpecTest(unittest.TestCase):
+    def test_a_field_the_verifier_does_not_know_is_named_back(self):
+        """A misspelt constraint is a constraint nobody enforces, which is the
+        quietest way for a spec to stop meaning what it says."""
+        got = verdicts(checks.spec({"model": "smoke", "topology": {"tri_budjet": 100}},
+                                   "smoke"))["spec"]
+        self.assertFalse(got["ok"])
+        self.assertIn("unknown field topology.tri_budjet", got["msg"])
+
+    def test_a_spec_built_for_another_model_is_refused(self):
+        got = verdicts(checks.spec({"model": "beaky"}, "smoke"))["spec"]
+        self.assertFalse(got["ok"])
+        self.assertIn("!= variant 'smoke'", got["msg"])
+
+
+class RunTest(unittest.TestCase):
+    """The whole verdict list, from a measurement written by hand.
+
+    `verify.run` is this plus a gather, which is the shape ADR 0020 was for:
+    the order the report prints in, the ids the mutant suite names, and the
+    `only` filter the round-trip narrows with are all exercised here.
+    """
+    SPEC = {"model": "smoke", "dimensions": {"height": {"value": 200, "tol": 1}},
+            "parts": [{"name": "plinth"}], "topology": {"tri_budget": 100},
+            "transform": {"origin": "base_center"}}
+
+    def measurement(self, **fields):
+        return {"objects": ["plinth"],
+                "parts": [part("plinth", faces={4: 6},
+                               bounds=((-0.06, -0.05, 0.0), (0.06, 0.05, 0.2)),
+                               **fields)]}
+
+    def test_a_measurement_that_meets_its_spec_passes_every_check(self):
+        got = checks.run(self.SPEC, "smoke", self.measurement())
+        self.assertTrue(all(r["ok"] for r in got), [r for r in got if not r["ok"]])
+        self.assertEqual([r["id"] for r in got],
+                         ["spec", "height", "parts", "tris", "origin"])
+
+    def test_the_spec_is_judged_before_any_geometry_is(self):
+        """Order is the report's, and `spec` leads it: a spec nobody can
+        enforce makes every reading after it beside the point."""
+        got = checks.run({**self.SPEC, "model": "beaky"}, "smoke", self.measurement())
+        self.assertEqual(got[0]["id"], "spec")
+        self.assertFalse(got[0]["ok"])
+
+    def test_only_narrows_the_verdicts_to_the_checks_named(self):
+        """What the export round-trip re-measures with: an importer legitimately
+        re-welds and re-triangulates, so topology is not judged there."""
+        got = checks.run(self.SPEC, "smoke", self.measurement(), only={"height"})
+        self.assertEqual([r["id"] for r in got], ["height"])

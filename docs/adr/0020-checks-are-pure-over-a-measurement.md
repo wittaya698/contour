@@ -16,6 +16,16 @@
 > distance instead — the same verdict for any tolerance, and a better failure
 > line. That the correction made the measurement *more* spec-free is why the
 > claim was accepted rather than merely survived.
+>
+> **Implemented in full** (issue 23). All six checks and `check_spec` are pure
+> in `lib/checks.py`; `release()` is gone and `verify.py` is fifty lines that
+> import no Blender, which is what gave `report()` and `stats()` their first
+> tests. One thing decision 1 did not draft: the measurement carries the name
+> of every object in the scene beside the per-part records, because the parts
+> check is about the scene rather than about any part — a stray empty is a part
+> list that does not match, and records of meshes alone cannot see it. An
+> addition to the shape and not a correction to it; each check names which of
+> the two it reads.
 
 ## Context
 

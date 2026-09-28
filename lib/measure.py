@@ -21,6 +21,17 @@ The fields, per part:
     flipped_faces       faces that disagree with a recomputed outward normal
     nearest_pair_mm     how close the closest two vertices came, in mm, or None
                         for a part with fewer than two vertices
+    bounds              the world box this part occupies, `(lo, hi)` in metres,
+                        or None for a part with no vertices
+    scale               the object's own scale, three floats
+    rotation_rad        the largest angle the object is turned by, in radians
+    uv_layers           how many UV layers it carries
+    materials           the material names in its slots, in slot order
+
+The measurement `scene()` returns holds those records under `parts`, and under
+`objects` the name of every object in the scene, mesh or not. A stray empty is
+a part list that does not match, and a check reading only meshes would not see
+it — so the two are gathered together and each check says which it reads.
 
 `verts` and `edges` are gathered and no check reads them, which ADR 0020 says
 to expect and to list: a gather edited for every new check is a gather that
@@ -78,6 +89,35 @@ def _nearest_pair(bm):
     return 1000.0 * min(tree.find_n(v.co, 2)[1][2] for v in verts)
 
 
+def _box(obj, bm):
+    """The world box this part occupies, or None for a part with no vertices.
+
+    World and not local, because what a spec states is how big the model is
+    where it stands. The scene's box is the union of these, taken in
+    `lib/checks.py` — a min over minima is the same number as a min over
+    everything, and doing it there keeps the gather free of the aggregate.
+    """
+    mw = obj.matrix_world
+    corners = [mw @ v.co for v in bm.verts]
+    if not corners:
+        return None
+    return ([min(c[i] for c in corners) for i in range(3)],
+            [max(c[i] for c in corners) for i in range(3)])
+
+
+def _rotation(obj):
+    """The largest angle this object is turned by, in radians.
+
+    Euler and quaternion in one number, because the question a spec asks is
+    `rotation_applied` — whether the object carries any rotation at all — and
+    which of Blender's two spellings holds it is not the spec's business.
+    """
+    worst = max(abs(a) for a in obj.rotation_euler)
+    if obj.rotation_mode == "QUATERNION":
+        worst = max(worst, abs(obj.rotation_quaternion.angle))
+    return worst
+
+
 def part(obj, bm):
     """One part's record, from a mesh already built."""
     return {"name": obj.name,
@@ -88,7 +128,13 @@ def part(obj, bm):
             "loose_verts": sum(1 for v in bm.verts if not v.link_edges),
             "loose_edges": sum(1 for e in bm.edges if not e.link_faces),
             "flipped_faces": _flipped(bm),
-            "nearest_pair_mm": _nearest_pair(bm)}
+            "nearest_pair_mm": _nearest_pair(bm),
+            "bounds": _box(obj, bm),
+            "scale": tuple(obj.scale),
+            "rotation_rad": _rotation(obj),
+            "uv_layers": len(obj.data.uv_layers),
+            "materials": tuple(s.material.name for s in obj.material_slots
+                               if s.material)}
 
 
 def parts(objects=None):
@@ -114,3 +160,42 @@ def parts(objects=None):
         finally:
             bm.free()
     return out
+
+
+def scene(objects=None):
+    """The whole measurement: `{"objects": [name...], "parts": [record...]}`.
+
+    What `verify.run` judges, and the only thing it judges. Nothing that has to
+    be freed comes back, so there is no `release()` and no ordering obligation
+    on the caller (ADR 0020, decision 2).
+    """
+    objs = list(bpy.context.scene.objects if objects is None else objects)
+    return {"objects": [o.name for o in objs], "parts": parts(objs)}
+
+
+def bounds(objects=None):
+    """The world box the scene occupies, as `(lo, hi)` — `(None, None)` when
+    there is no mesh to measure.
+
+    Its own call, and a cheap one: the sheet wants two corners to frame on and
+    used to pay a `bmesh` of every mesh to get them (ADR 0020, decision 5).
+    This walks the evaluated vertices and builds nothing.
+    """
+    bpy.context.view_layer.update()
+    dg = bpy.context.evaluated_depsgraph_get()
+    lo, hi = None, None
+    for obj in (bpy.context.scene.objects if objects is None else objects):
+        if obj.type != "MESH":
+            continue
+        ev = obj.evaluated_get(dg)
+        me = ev.to_mesh()
+        mw = obj.matrix_world
+        for v in me.vertices:
+            w = mw @ v.co
+            if lo is None:
+                lo, hi = list(w), list(w)
+            else:
+                for i in range(3):
+                    lo[i], hi[i] = min(lo[i], w[i]), max(hi[i], w[i])
+        ev.to_mesh_clear()
+    return lo, hi

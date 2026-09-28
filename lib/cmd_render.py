@@ -18,7 +18,7 @@ import numpy as np
 from bpy_extras.object_utils import world_to_camera_view
 from mathutils import Vector
 
-from . import badges, ctx_override, mask, marks, miniyaml, space, scene
+from . import badges, ctx_override, mask, marks, measure, miniyaml, space, scene
 from . import views as sheet_views   # `views` is a local here: the four frames
 
 BG = (0.93, 0.93, 0.94)
@@ -293,8 +293,6 @@ def badge_line(variant, placed):
 
 
 def run(args):
-    import verify
-
     P = space.parse(args)
     variant = P.name
     if not P.blend.exists():
@@ -304,9 +302,8 @@ def run(args):
     res = int((spec.get("render") or {}).get("sheet_resolution", 1024))
     scene.reset()
     scene.load_collections(P.blend)
-    m = verify.measure()
-    lo, hi = list(m["lo"]), list(m["hi"])
-    verify.release(m)
+    # Two corners to frame on, and nothing built to get them (ADR 0020).
+    lo, hi = measure.bounds()
 
     ext = [h - l for l, h in zip(lo, hi)]
     ctr = Vector([(l + h) / 2 for l, h in zip(lo, hi)])

@@ -9,7 +9,7 @@ Two independent readings of the same .glb:
 Topology checks (manifold, doubles, quad %) are NOT re-run: glTF is triangles-only
 and splits vertices at hard edges, so an importer legitimately changes both.
 """
-from . import ctx_override, glb, miniyaml, space, scene
+from . import checks, ctx_override, glb, measure, miniyaml, space, scene
 
 ORIGIN_TOL_MM = 1.0
 GL_AXIS = {"width": 0, "height": 1, "depth": 2}  # glTF: X right, Y up, Z toward viewer
@@ -65,11 +65,11 @@ def run(args):
 
     scene.reset()
     scene.load_collections(P.blend)
-    built_tris = _tris_now(verify)
+    built_tris = checks.tris(measure.parts())
     scene.reset()
     ctx_override.call("import_scene.gltf", filepath=str(P.glb))
     results += [dict(r, id=f"re_{r['id']}") for r in verify.run(spec, variant, only=RE_CHECKS)]
-    got_tris = _tris_now(verify)
+    got_tris = checks.tris(measure.parts())
     results.append(_res("tris_kept", got_tris == built_tris == g["tris"], f"{got_tris:,}",
                         f"triangles: built {built_tris:,}, file {g['tris']:,}, "
                         f"re-imported {got_tris:,}"))
@@ -87,11 +87,3 @@ def run(args):
         from . import mutants
         rep = mutants.attach_roundtrip(rep, spec, P, variant)
     return rep
-
-
-def _tris_now(verify):
-    m = verify.measure()
-    try:
-        return sum(len(f.verts) - 2 for _, bm in m["meshes"] for f in bm.faces)
-    finally:
-        verify.release(m)
