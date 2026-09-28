@@ -73,7 +73,7 @@ def aim(path, mark_id, named=None):
     found = next((m for m in marks.load(path) if m.get("id") == mark_id), None)
     if found is None:
         return {"ok": False, "lines": [f"FAIL measure  no mark {mark_id} on file"]}
-    ref = found.get("ref")
+    ref = marks.reference(found)
     if not ref:
         return {"ok": False, "lines": [
             f"FAIL measure  {mark_id} is not on a reference: it is pinned to "
@@ -97,11 +97,11 @@ def measure(path, mark_id, k):
     found = next((m for m in marks.load(path) if m.get("id") == mark_id), None)
     if found is None:
         return {"ok": False, "lines": [f"FAIL measure  no mark {mark_id} on file"]}
-    if not (found.get("to") and found.get("ref")):
+    if not (marks.span_end(found) and marks.reference(found)):
         return {"ok": False, "lines": [
             f"FAIL measure  {mark_id} is not a span: a span is a mark on a "
             f"reference with two ends, made by dragging on the canvas"]}
-    if found["pixel"] == found["to"]:
+    if marks.pixel(found) == marks.span_end(found):
         return {"ok": False, "lines": [
             f"FAIL measure  {mark_id} has no length: both ends are the same "
             f"pixel, so there is no distance to read"]}
@@ -109,8 +109,10 @@ def measure(path, mark_id, k):
         return {"ok": False, "lines": [
             "FAIL measure  no anchor: this space states no dimensions.height, "
             "so the picture gives proportion and not millimetres"]}
-    got = reading(found["pixel"], found["to"], k)
+    got = reading(marks.pixel(found), marks.span_end(found), k)
     said = agent.write(path, f"span {mark_id}: {line(got)}",
-                       ref=found["ref"], pixel=midpoint(found["pixel"], found["to"]))
-    return {"ok": True, "lines": [f"ok   measure {said['id']} {found['ref']}  "
-                                  f"{found['text']}  {line(got)}"]}
+                       ref=marks.reference(found),
+                       pixel=midpoint(marks.pixel(found), marks.span_end(found)))
+    return {"ok": True, "lines": [f"ok   measure {said['id']} "
+                                  f"{marks.reference(found)}  "
+                                  f"{marks.text(found)}  {line(got)}"]}

@@ -14,18 +14,18 @@ from lib import marks
 
 def where(mark):
     """The place part of a located comment, in the words the page shows: the view
-    it was placed on and the part it landed on. The part comes from the anchor
-    once a ray has landed, because a resolved mark spends its pixel and keeps its
-    answer there (ADR 0018).
+    it was placed on and the part it landed on. Which part that is, is asked of the
+    record rather than read off it: a mark has two ways of saying so until slice
+    19 converges them, and knowing both here was one of the copies slice 18
+    removed (ADR 0018).
 
     A ref mark answers this with the photograph alone. It was drawn by none of
     our views and has no part to land on, so the image *is* where it is — and
     saying `front` about it would send the agent to a render of ours instead.
     """
-    if mark.get("ref"):
-        return mark["ref"]
-    part = mark.get("part") or (mark.get("anchor") or {}).get("part") or ""
-    return " ".join(w for w in (mark.get("view") or "", part) if w)
+    if marks.reference(mark):
+        return marks.reference(mark)
+    return " ".join(w for w in (marks.view(mark) or "", marks.part(mark)) if w)
 
 
 def sentence(mark):
@@ -33,7 +33,7 @@ def sentence(mark):
     at the end of the run names marks by id and the agent has to have been told
     which name is which. Then where it is, because *too thin* about the neck and
     *too thin* about the beak are two different findings."""
-    return f"- {mark['id']} ({where(mark)}): {mark.get('text', '')}"
+    return f"- {mark['id']} ({where(mark)}): {marks.text(mark)}"
 
 
 def compose(space, prose, ids):
@@ -50,7 +50,7 @@ def compose(space, prose, ids):
     finding quietly falling out of scope.
     """
     on_file = {m["id"]: m for m in marks.load(space / marks.NAME)
-               if m.get("status") == "open"}
+               if marks.is_open(m)}
     wanted = list(ids or [])
     seeded = [on_file[i] for i in wanted if i in on_file]
     missing = [i for i in wanted if i not in on_file]
@@ -84,10 +84,10 @@ def state(before, now):
     run and report itself dealt with without the agent touching it — the check
     passing precisely when there is nothing behind it.
     """
-    if now.get("orphaned"):
+    if marks.orphaned(now):
         return "orphaned — its part is not in the build any more"
-    stamp = now.get("addressed")
-    if stamp and stamp != before.get("addressed"):
+    stamp = marks.addressed(now)
+    if stamp and stamp != marks.addressed(before):
         return f"addressed in build {stamp}"
     return "unaddressed"
 

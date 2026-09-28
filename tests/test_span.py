@@ -19,7 +19,6 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from lib import anchor
 from lib import marks as marks_store
 from lib import span
 from lib.canvas import Canvas
@@ -268,7 +267,7 @@ class SpanIsNotGeometryTest(unittest.TestCase):
         made = marks_store.append(self.marks,
                                   {"ref": "persp.webp", "pixel": [412, 690],
                                    "to": [498, 690], "text": "the legs"})
-        self.assertEqual(anchor.unresolved(marks_store.load(self.marks)), [])
+        self.assertEqual(marks_store.unresolved(marks_store.load(self.marks)), [])
         self.assertEqual(marks_store.load(self.marks), [made])
 
     def test_measuring_a_span_writes_nothing_under_the_references(self):

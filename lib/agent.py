@@ -36,8 +36,9 @@ def write(path, text, part=None, ref=None, pixel=None):
     on it the badge goes. About a reference it has no parts to name and a pixel
     is all there is, so it marks one the way the user would.
     """
-    where = {"ref": ref, "pixel": pixel} if ref else {"anchor": {"part": part}}
-    return marks.append(path, {**where, "text": text}, author="agent")
+    if ref:
+        return marks.on_reference(path, ref, pixel, text, author="agent")
+    return marks.on_part(path, part, text)
 
 
 def addressed(path, mark_id, blend):
@@ -50,17 +51,11 @@ def addressed(path, mark_id, blend):
 
     The build is the one on disk, hashed the same way `views.json` hashes it,
     so the agent cannot invent a number and a later reader can tell whether the
-    build has moved on since the claim.
+    build has moved on since the claim. Which build this is, is the only part of
+    the question this module answers: the transition itself belongs to the
+    record, in `lib/marks.py`.
     """
-    kept = marks.load(path)
-    found = None
-    for mark in kept:
-        if mark.get("id") == mark_id:
-            mark["addressed"] = anchor.fingerprint(blend)
-            found = mark
-    if found is not None:
-        marks.save(path, kept)
-    return found
+    return marks.address(path, mark_id, anchor.fingerprint(blend))
 
 
 def known(parts):
@@ -99,7 +94,7 @@ def command(path, args, blend=None, parts=None):
             return {"ok": False,
                     "lines": [f"FAIL mark  no mark {opt.addressed} on file"]}
         return {"ok": True, "lines": [f"ok   mark    {done['id']} addressed in "
-                                      f"build {done['addressed'] or 'no build'}"]}
+                                      f"build {marks.addressed(done) or 'no build'}"]}
     if not opt.text or not (opt.part or opt.ref):
         return {"ok": False, "lines": [f"FAIL mark  {USAGE}"]}
     here = known(parts)

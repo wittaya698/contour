@@ -72,7 +72,7 @@ def run(args):
     drift = anchor.stale(sheet, P.blend)
     if drift:
         return {"ok": False, "lines": [f"FAIL resolve {drift}"]}
-    todo = anchor.unresolved(marks.load(P.marks))
+    todo = marks.unresolved(marks.load(P.marks))
     if not todo:
         return {"ok": True, "lines": [f"{variant} resolve nothing to anchor"]}
 
@@ -83,9 +83,9 @@ def run(args):
     dg = bpy.context.evaluated_depsgraph_get()
     found, missed = {}, 0
     for mark in todo:
-        aimed = anchor.aim(sheet, mark["pixel"])
-        cam = cams.get(mark.get("view")) if aimed else None
-        if cam is None or aimed[0]["label"] != mark.get("view"):
+        aimed = anchor.aim(sheet, marks.pixel(mark))
+        cam = cams.get(marks.view(mark)) if aimed else None
+        if cam is None or aimed[0]["label"] != marks.view(mark):
             missed += 1                       # a pixel on no tile, or on another view
             continue
         origin, direction = ray(sc, cam, aimed[0], aimed[1], aimed[2])
@@ -96,7 +96,7 @@ def run(args):
         local = matrix.inverted() @ location
         found[mark["id"]] = {"part": obj.name,
                              "local": [round(c, 6) for c in local]}
-    anchor.apply(P.marks, found)
+    marks.anchor(P.marks, found)
     line = f"{variant} resolve {marks.phrase(len(found))} anchored"
     if missed:
         line += f", {missed} on background"

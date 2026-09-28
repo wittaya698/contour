@@ -98,9 +98,8 @@ def promote(space, veto_id, part):
     named = agent.known(here.parts)
     if named is not None and part not in named:
         return None
-    mark = marks.append(here.marks,
-                        {"anchor": {"part": part}, "text": found["reason"],
-                         "from": found["id"]})
+    mark = marks.on_part(here.marks, part, found["reason"], author="user",
+                         came_from=found["id"])
     # Which mark it became, on the veto. Not a resolution — a veto is never
     # resolved — but the page has to be able to say a question was already asked,
     # and a reader following one backwards has to land on the moment it came from.

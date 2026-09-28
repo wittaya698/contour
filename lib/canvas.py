@@ -18,7 +18,6 @@ import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from lib import anchor
 from lib import panel as panel_state
 from lib import marks as marks_store
 from lib import mask as mask_store
@@ -247,17 +246,13 @@ class Canvas:
         (ADR 0018).
         """
         pixel, text = body.get("pixel"), body.get("text", "")
-        if body.get("ref"):
-            mark = {"ref": body["ref"], "pixel": pixel, "text": text}
-            if body.get("to"):
-                mark = {**mark, "to": body["to"]}
-        else:
-            mark = {"view": body.get("view"), "pixel": pixel, "text": text}
-            part = self.part_at(pixel)
-            if part:
-                mark["part"] = part
         with self._lock:
-            stored = marks_store.append(self.marks, mark)
+            if body.get("ref"):
+                stored = marks_store.on_reference(self.marks, body["ref"], pixel,
+                                                  text, to=body.get("to"))
+            else:
+                stored = marks_store.on_sheet(self.marks, body.get("view"), pixel,
+                                              text, part=self.part_at(pixel))
             self.captured.append(stored)
         return stored
 
@@ -339,7 +334,7 @@ class Canvas:
         knows about. A console can do better, and does — it owns the build, so it
         resolves the instant it approves one (ADR 0019, decisions 10 and 14).
         """
-        if not self.resolve or not anchor.unresolved(marks_store.load(self.marks)):
+        if not self.resolve or not marks_store.unresolved(marks_store.load(self.marks)):
             return []
         return self.resolve().get("lines", [])
 

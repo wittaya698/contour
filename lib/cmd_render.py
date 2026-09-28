@@ -178,16 +178,16 @@ def pins(path, sc):
     the identity mask instead, in `aimless` below.
     """
     here = {o.name: o for o in sc.objects if o.type == "MESH"}
-    anchor.orphan(path, set(here))
+    marks.orphan(path, set(here))
     out = []
     for mark in marks.load(path):
-        a, live = mark.get("anchor"), None
-        if not a or mark.get("status") != "open":
+        local = marks.pin(mark)
+        if not local or not marks.is_open(mark):
             continue
-        live = here.get(a["part"]) if a.get("local") else None
+        live = here.get(marks.part(mark))
         if live:
             m = [c for row in live.matrix_world for c in row]
-            out.append((mark["id"], Vector(anchor.place(m, a["local"]))))
+            out.append((mark["id"], Vector(anchor.place(m, local))))
     return out
 
 
@@ -198,10 +198,14 @@ def aimless(path):
     no point in the part's own space, because it never cast a ray — it knows
     *which part* it has a question about and nothing finer. Where on that part
     the badge goes is decided per view, against the identity mask, in `on_part`.
+
+    A user's mark that is still carrying a pixel is not among them, whatever the
+    mask read under it: it is waiting on a ray, and badging it here would put a
+    leader line on a pin nobody has cast yet.
     """
-    return [(m["id"], m["anchor"]["part"]) for m in marks.load(path)
-            if m.get("status") == "open" and m.get("anchor")
-            and not m["anchor"].get("local") and m["anchor"].get("part")]
+    return [(m["id"], marks.part(m)) for m in marks.load(path)
+            if marks.is_open(m) and marks.part(m)
+            and not marks.pin(m) and not marks.pixel(m)]
 
 
 def on_part(idtile, number):

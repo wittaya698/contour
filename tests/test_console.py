@@ -541,7 +541,7 @@ class RunTest(ConsoleCase):
         self.transcript(url, lambda ev: any(e["kind"] == "result" for e in ev))
         self.assertEqual(stages(space), [])
         # And the pin is untouched: it still carries the pixel it was born with.
-        self.assertTrue(anchor.unresolved(marks_store.load(space / marks_store.NAME)))
+        self.assertTrue(marks_store.unresolved(marks_store.load(space / marks_store.NAME)))
 
     def test_approving_something_that_is_not_a_build_casts_no_rays(self):
         """Resolution is tied to the *build* category and not to approval itself.
@@ -602,7 +602,7 @@ class RunTest(ConsoleCase):
                         "a failed resolve took the build down with it")
         told = " ".join(e["text"] for e in said if e["kind"] == "resolved")
         self.assertTrue(told.strip(), "resolution failed and said nothing")
-        self.assertTrue(anchor.unresolved(marks_store.load(space / marks_store.NAME)),
+        self.assertTrue(marks_store.unresolved(marks_store.load(space / marks_store.NAME)),
                         "the pin lost its pixel without gaining an anchor")
 
     def test_a_run_holds_the_space_and_a_terminal_check_is_refused(self):

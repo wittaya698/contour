@@ -13,7 +13,7 @@ import threading
 from pathlib import Path
 
 from console import launcher, seed, spend, vetoes
-from lib import anchor, intent, lock, marks, policy
+from lib import intent, lock, marks, policy
 
 
 class Stopped(Exception):
@@ -269,7 +269,7 @@ class Run:
         # waiting, and a Blender startup on every one of them would add a second
         # to the most-pressured gate in the system for nothing. Read by importing
         # `lib/`, which is the half of ADR 0019's decision 31 this process may do itself.
-        if not anchor.unresolved(marks.load(self.space / marks.NAME)):
+        if not marks.unresolved(marks.load(self.space / marks.NAME)):
             return
         _ok, lines = launcher.run(self.space, "resolve",
                                   held_by=self.record["run"])

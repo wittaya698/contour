@@ -46,6 +46,209 @@ def append(path, mark, author="user"):
     return stored
 
 
+def on_sheet(path, view, pixel, text, part=None):
+    """A click on one of our four views. Returns the stored mark.
+
+    The view is part of where it is: *too thin* about the front and *too thin*
+    about the side are two findings, and a badge has to be drawn on the tile the
+    user was looking at. The part is what the identity mask says was under the
+    pixel, and is absent when the click landed on background — a remark about a
+    gap is about no part at all (ADR 0018).
+    """
+    mark = {"view": view, "pixel": pixel, "text": text}
+    if part:
+        mark["part"] = part
+    return append(path, mark)
+
+
+def on_reference(path, ref, pixel, text, to=None, author="user"):
+    """A click — or a drag — on one of the user's photographs. Returns it.
+
+    It says *here is what I meant*, and it can never be closed by a build: there
+    are no parts in a photograph to anchor into and no render of ours to move
+    under it, so the pixel it is born with is the whole answer. With a second end
+    it is a **span**, which is what aims `contour measure` at a separation
+    (ADR 0018).
+
+    The reference itself is never touched by any of this. Rule 1 is unchanged:
+    what is stored here is a comment in the space, beside the picture.
+    """
+    mark = {"ref": ref, "pixel": pixel, "text": text}
+    if to:
+        mark["to"] = to
+    return append(path, mark, author=author)
+
+
+def on_part(path, part, text, author="agent", came_from=None):
+    """A mark that names a part and no point on it. Returns it.
+
+    The agent's shape, and the shape a promoted veto takes. Neither author
+    clicked anything: the agent knows which part it has a question about and
+    nothing finer, and a veto was authored against a call, not a pixel. Where on
+    the part the badge goes is decided per view against the identity mask, so
+    naming the part is enough to be drawn (ADR 0018).
+
+    `came_from` is the veto this became a question about, if it was one. Not a
+    resolution — a veto is never resolved — but a reader following the question
+    backwards has to land on the moment it came from.
+    """
+    mark = {"anchor": {"part": part}, "text": text}
+    if came_from:
+        mark["from"] = came_from
+    return append(path, mark, author=author)
+
+
+def pin(mark):
+    """Where this mark actually is, in its part's own coordinates, or None.
+
+    A pin and not a pixel: the sheet is regenerated every build, so a pixel
+    starts lying the moment geometry moves. A mark that names a part and no
+    point on it has no pin, and is badged from the identity mask instead.
+    """
+    return (mark.get("anchor") or {}).get("local")
+
+
+def reference(mark):
+    """Which of the user's photographs this is on, or None for a sheet mark."""
+    return mark.get("ref")
+
+
+def span_end(mark):
+    """The far end of a span, or None when the mark has only one end."""
+    return mark.get("to")
+
+
+def view(mark):
+    """Which of our views this was placed on, or None. A ref mark answers None:
+    it was drawn by no view of ours."""
+    return mark.get("view")
+
+
+def pixel(mark):
+    """Where on that picture it was placed, or None once a ray has spent it."""
+    return mark.get("pixel")
+
+
+def part(mark):
+    """Which part this mark is about, or `""`.
+
+    One question with one answer, asked of a record that has two ways of saying
+    it: the canvas writes the mask's reading at the top level as the mark is
+    born, and a resolved pin carries the part the ray actually hit. Slice 19
+    converges the spelling; until it does, every reader asks here rather than
+    knowing both (ADR 0018).
+    """
+    return mark.get("part") or (mark.get("anchor") or {}).get("part") or ""
+
+
+def text(mark):
+    """The one line the author wrote."""
+    return mark.get("text", "")
+
+
+def is_open(mark):
+    """Whether this finding still stands. Only the user closes one, so this is
+    the question every reader asks and none of them answers."""
+    return mark.get("status") == "open"
+
+
+def anchor(path, found):
+    """Write back what the rays found: `{mark id: {"part", "local"}}`.
+
+    Returns the ids that were anchored. The pixel is dropped as the pin lands,
+    so `unresolved` needs no flag to read and no mark ever carries two answers
+    to the same question. A mark on a photograph is skipped whatever the caller
+    offers for it: there are no parts in a photograph to be anchored in.
+
+    The ray itself is cast in `lib/cmd_resolve.py`, which is the only part of
+    this that needs a scene. What lands here is the record\'s own transition.
+    """
+    kept = load(path)
+    done = []
+    for mark in kept:
+        if reference(mark):
+            continue
+        hit = found.get(mark.get("id"))
+        if hit:
+            mark.pop("pixel", None)
+            mark["anchor"] = hit
+            done.append(mark["id"])
+    if done:
+        save(path, kept)
+    return done
+
+
+def orphan(path, part_names):
+    """Say, for every mark that points at a part, whether that part is still in
+    the build. Returns the ids now orphaned.
+
+    The flag is what the last build found, not a scar: a part that comes back
+    takes its pins back with it. Deleting a part does not answer the question
+    that was asked about it, so the pin is said to be homeless rather than
+    re-projected against whatever happens to be nearest — which is the same
+    mistake nearest-centroid makes, one build later (ADR 0018).
+
+    A mark still carrying a pixel is not asked. It is waiting on a ray, and what
+    part it will turn out to be about is not yet anybody\'s answer.
+    """
+    kept = load(path)
+    gone, before = [], json.dumps(kept)
+    for mark in kept:
+        if not part(mark) or pixel(mark):
+            continue
+        if part(mark) in part_names:
+            mark.pop("orphaned", None)   # a rename undone, a part back in build.py
+        else:
+            mark["orphaned"] = True
+            gone.append(mark["id"])
+    if json.dumps(kept) != before:
+        save(path, kept)
+    return gone
+
+
+def orphaned(mark):
+    """Whether the part this mark points at is missing from the last build."""
+    return bool(mark.get("orphaned"))
+
+
+def address(path, mark_id, build):
+    """Attach *addressed in this build* to one finding. Returns it, or None.
+
+    Not a close, and deliberately hard to mistake for one: the status is not
+    touched here. The badge dims, which says the agent believes it has done
+    something about the question — and the question stands until the user says
+    otherwise (ADR 0018).
+
+    `build` is a fingerprint the caller already has, passed in rather than
+    computed: which build this is belongs to `lib/anchor.py`, and a record does
+    not reach for a `.blend` to find out what it is being told.
+    """
+    kept = load(path)
+    found = None
+    for mark in kept:
+        if mark.get("id") == mark_id:
+            mark["addressed"] = build
+            found = mark
+    if found is not None:
+        save(path, kept)
+    return found
+
+
+def addressed(mark):
+    """The build the agent claims deals with this, or None. Never a close."""
+    return mark.get("addressed")
+
+
+def unresolved(all_marks):
+    """The marks still waiting on a ray: a pixel, and no pin yet.
+
+    A ref mark is never among them. It points into a photograph, which has no
+    parts and never gets rebuilt, so its pixel is the whole answer (ADR 0018).
+    """
+    return [m for m in all_marks
+            if pixel(m) and not pin(m) and not reference(m)]
+
+
 def close(path, mark_id):
     """Mark one finding as dealt with, by the only party allowed to say so.
 

@@ -176,9 +176,9 @@ class RefMarkTest(unittest.TestCase):
 
         # What a build does to the marks file, without a build: the sheet mark
         # lands on a part, and then that part is deleted from build.py.
-        anchor.apply(self.marks, {sheet["id"]: {"part": "neck",
+        marks_store.anchor(self.marks, {sheet["id"]: {"part": "neck",
                                                 "local": [0.0, 0.1, 0.0]}})
-        anchor.orphan(self.marks, {"torso", "head"})
+        marks_store.orphan(self.marks, {"torso", "head"})
 
         now = next(m for m in json.loads(self.marks.read_text())
                    if m["id"] == was["id"])
@@ -196,8 +196,8 @@ class RefMarkTest(unittest.TestCase):
         post(self.canvas, "/marks",
              {"ref": "persp.webp", "pixel": [880, 410], "text": "here"})
         mid = json.loads(self.marks.read_text())[0]["id"]
-        anchor.apply(self.marks, {mid: {"part": "neck", "local": [0, 0, 0]}})
-        anchor.orphan(self.marks, set())
+        marks_store.anchor(self.marks, {mid: {"part": "neck", "local": [0, 0, 0]}})
+        marks_store.orphan(self.marks, set())
         marks_store.prune(self.marks)
         marks_store.status_line(self.marks)
         mark, = json.loads(self.marks.read_text())

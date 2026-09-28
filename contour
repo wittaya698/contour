@@ -639,24 +639,25 @@ def anchor_check():
     marks_path = F.marks
     marks_path.unlink(missing_ok=True)
     from lib import marks as marks_store
-    hit = marks_store.append(marks_path, {"view": "front", "pixel": on_cap,
-                                          "text": "is the cap too round"})["id"]
-    miss = marks_store.append(marks_path, {"view": "front", "pixel": [4, 4],
-                                           "text": "nothing out here"})["id"]
+    hit = marks_store.on_sheet(marks_path, "front", on_cap,
+                               "is the cap too round")["id"]
+    miss = marks_store.on_sheet(marks_path, "front", [4, 4],
+                                "nothing out here")["id"]
     rep = stage(["resolve", "smoke", "--fixture"], first=False)
     if not rep["ok"]:
         return {"ok": False, "lines": rep["lines"]}
     by_id = {m["id"]: m for m in marks_store.load(marks_path)}
-    got = by_id[hit].get("anchor")
-    if not got or got["part"] != "cap":
-        return {"ok": False, "lines": [f"a pixel the mask calls cap anchored to {got}"]}
-    if "pixel" in by_id[hit]:
+    local = marks_store.pin(by_id[hit])
+    if not local or marks_store.part(by_id[hit]) != "cap":
+        return {"ok": False, "lines": ["a pixel the mask calls cap anchored to "
+                                       f"{marks_store.part(by_id[hit]) or None}"]}
+    if marks_store.pixel(by_id[hit]):
         return {"ok": False, "lines": ["a resolved mark is still carrying its pixel"]}
-    r = sum(c * c for c in got["local"]) ** 0.5
+    r = sum(c * c for c in local) ** 0.5
     if not 0.0280 <= r <= 0.0302:         # 30 mm sphere, faceted 32 x 24
         return {"ok": False, "lines": [f"the anchor sits {r * 1000:.1f} mm from the "
                                        "cap's origin, not on its 30 mm surface"]}
-    if by_id[miss].get("anchor"):
+    if marks_store.pin(by_id[miss]):
         return {"ok": False, "lines": ["a click on background anchored to something"]}
 
     # Render again. The anchor is only worth anything if it comes back to the

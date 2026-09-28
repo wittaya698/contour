@@ -9,13 +9,15 @@ part's own coordinates, and the pixel goes away. Move the part and the pin
 moves with it.
 
 Everything here is stdlib and knows nothing about Blender: the ray is cast in
-`lib/cmd_resolve.py`, which is the only part that needs a scene.
+`lib/cmd_resolve.py`, which is the only part that needs a scene. It knows
+nothing about the mark record either — writing back what the rays found, and
+orphaning a pin whose part went, are transitions the record owns, in
+`lib/marks.py` (slice 18).
 """
 import hashlib
-import json
 from pathlib import Path
 
-from . import marks, store
+from . import store
 
 
 def aim(sheet, pixel):
@@ -31,38 +33,6 @@ def aim(sheet, pixel):
         if tx <= x < tx + w and ty <= y < ty + h:
             return view, (x - tx + 0.5) / w, 1.0 - (y - ty + 0.5) / h
     return None
-
-
-def apply(path, found):
-    """Write back what the rays found: `{mark id: {"part", "local"}}`.
-
-    The pixel is dropped as the anchor lands, so `unresolved` needs no flag to
-    read and no mark ever carries two answers to the same question. Returns
-    the ids that were anchored.
-    """
-    kept = marks.load(path)
-    done = []
-    for mark in kept:
-        if mark.get("ref"):
-            continue          # a photograph has no parts to be anchored in
-        hit = found.get(mark.get("id"))
-        if hit:
-            mark.pop("pixel", None)
-            mark["anchor"] = hit
-            done.append(mark["id"])
-    if done:
-        marks.save(path, kept)
-    return done
-
-
-def unresolved(all_marks):
-    """The marks still waiting on a ray: a pixel, and no anchor yet.
-
-    A ref mark is never among them. It points into a photograph, which has no
-    parts and never gets rebuilt, so its pixel is the whole answer (ADR 0018).
-    """
-    return [m for m in all_marks
-            if m.get("pixel") and not m.get("anchor") and not m.get("ref")]
 
 
 def fingerprint(blend):
@@ -96,36 +66,6 @@ def stale(sheet, blend):
     return (f"the build moved on since this sheet was drawn "
             f"({sheet['build'] or 'no build'} -> {now or 'no build'}): "
             f"run contour render, then mark again")
-
-
-def orphan(path, part_names):
-    """Say, for every anchored mark, whether its part is still in the build.
-    Returns the ids now orphaned.
-
-    The flag is what the last build found, not a scar: a part that comes back
-    takes its pins back with it.
-
-    Deleting a part does not answer the question that was asked about it, so
-    the pin is said to be homeless rather than re-projected against whatever
-    happens to be nearest — which is the same mistake nearest-centroid makes,
-    one build later.
-    """
-    kept = marks.load(path)
-    gone, before = [], json.dumps(kept)
-    for mark in kept:
-        if mark.get("ref"):
-            continue          # no build of ours can orphan a mark on a reference
-        part = (mark.get("anchor") or {}).get("part")
-        if not part:
-            continue
-        if part in part_names:
-            mark.pop("orphaned", None)   # a rename undone, a part back in build.py
-        else:
-            mark["orphaned"] = True
-            gone.append(mark["id"])
-    if json.dumps(kept) != before:
-        marks.save(path, kept)
-    return gone
 
 
 def _edge(at, towards, away, size):

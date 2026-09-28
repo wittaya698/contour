@@ -63,7 +63,7 @@ class ResolveTest(unittest.TestCase):
         authoritative and is wrong the moment the model is rebuilt."""
         one = self.add(view="front", pixel=[128, 384], text="cap too round")
         two = self.add(view="top", pixel=[10, 520], text="unresolved still")
-        anchor.apply(self.marks, {one: {"part": "cap", "local": [0.0, 0.0, 0.03]}})
+        marks_store.anchor(self.marks, {one: {"part": "cap", "local": [0.0, 0.0, 0.03]}})
         first, second = json.loads(self.marks.read_text())
         self.assertEqual(first["anchor"], {"part": "cap", "local": [0.0, 0.0, 0.03]})
         self.assertNotIn("pixel", first)
@@ -77,8 +77,8 @@ class ResolveTest(unittest.TestCase):
         rebuilt sheet move a pin that was already right."""
         one = self.add(view="front", pixel=[128, 384], text="cap too round")
         two = self.add(view="right", pixel=[600, 100], text="pillar thin")
-        anchor.apply(self.marks, {one: {"part": "cap", "local": [0, 0, 0.03]}})
-        self.assertEqual([m["id"] for m in anchor.unresolved(marks_store.load(self.marks))],
+        marks_store.anchor(self.marks, {one: {"part": "cap", "local": [0, 0, 0.03]}})
+        self.assertEqual([m["id"] for m in marks_store.unresolved(marks_store.load(self.marks))],
                          [two])
 
     def test_a_ref_mark_is_never_put_to_the_ray(self):
@@ -87,7 +87,7 @@ class ResolveTest(unittest.TestCase):
         slice that could break them, so the exemption is pinned here."""
         self.add(view="front", pixel=[128, 384], text="cap too round")
         ref = self.add(ref="beaky-front.png", pixel=[300, 120], text="that gap")
-        got = [m["id"] for m in anchor.unresolved(marks_store.load(self.marks))]
+        got = [m["id"] for m in marks_store.unresolved(marks_store.load(self.marks))]
         self.assertNotIn(ref, got)
 
 
@@ -138,7 +138,7 @@ class OrphanTest(unittest.TestCase):
         self.marks = Path(tempfile.mkdtemp()) / "marks.json"
         mark = marks_store.append(self.marks, {"view": "front", "pixel": [128, 384],
                                                "text": "cap too round"})
-        anchor.apply(self.marks, {mark["id"]: {"part": "cap", "local": [0, 0, 0.03]}})
+        marks_store.anchor(self.marks, {mark["id"]: {"part": "cap", "local": [0, 0, 0.03]}})
 
     def on_disk(self):
         return json.loads(self.marks.read_text())[0]
@@ -147,7 +147,7 @@ class OrphanTest(unittest.TestCase):
         """Deleting a part does not answer the question asked about it. The
         pin has nowhere to be, so it says so in the file instead of being
         re-projected against whatever is nearest."""
-        anchor.orphan(self.marks, {"plinth", "pillar"})
+        marks_store.orphan(self.marks, {"plinth", "pillar"})
         self.assertTrue(self.on_disk()["orphaned"])
         self.assertEqual(self.on_disk()["anchor"]["part"], "cap")
 
@@ -155,8 +155,8 @@ class OrphanTest(unittest.TestCase):
         """Usually a rename, or a part briefly commented out of build.py. The
         flag says what the last build found, not what once went wrong, or a
         mark would stay marked homeless forever."""
-        anchor.orphan(self.marks, {"plinth"})
-        anchor.orphan(self.marks, {"plinth", "cap"})
+        marks_store.orphan(self.marks, {"plinth"})
+        marks_store.orphan(self.marks, {"plinth", "cap"})
         self.assertFalse(self.on_disk().get("orphaned"))
 
 
@@ -196,7 +196,7 @@ class CanvasResolveTest(unittest.TestCase):
         cost what it always cost: a page and a port."""
         mark = marks_store.append(self.marks, {"view": "front", "pixel": [1, 2],
                                                "text": "already placed"})
-        anchor.apply(self.marks, {mark["id"]: {"part": "cap", "local": [0, 0, 0.03]}})
+        marks_store.anchor(self.marks, {mark["id"]: {"part": "cap", "local": [0, 0, 0.03]}})
         canvas = self.open_canvas()
         post(canvas, "/close", {"id": mark["id"]})
         post(canvas, "/done", {})

@@ -60,6 +60,6 @@ def pending(path):
     one line when open and nothing at zero, and a sentence that is always on
     screen is furniture nobody reads.
     """
-    if not path or not anchor.unresolved(marks_store.load(path)):
+    if not path or not marks_store.unresolved(marks_store.load(path)):
         return None
     return "marks not resolved: last build failed"
