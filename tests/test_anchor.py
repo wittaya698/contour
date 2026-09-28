@@ -65,7 +65,8 @@ class ResolveTest(unittest.TestCase):
         two = self.add(view="top", pixel=[10, 520], text="unresolved still")
         marks_store.anchor(self.marks, {one: {"part": "cap", "local": [0.0, 0.0, 0.03]}})
         first, second = json.loads(self.marks.read_text())
-        self.assertEqual(first["anchor"], {"part": "cap", "local": [0.0, 0.0, 0.03]})
+        self.assertEqual(first["part"], "cap")
+        self.assertEqual(first["anchor"], {"local": [0.0, 0.0, 0.03]})
         self.assertNotIn("pixel", first)
         self.assertEqual(first["text"], "cap too round")
         self.assertEqual(second["pixel"], [10, 520])
@@ -149,7 +150,7 @@ class OrphanTest(unittest.TestCase):
         re-projected against whatever is nearest."""
         marks_store.orphan(self.marks, {"plinth", "pillar"})
         self.assertTrue(self.on_disk()["orphaned"])
-        self.assertEqual(self.on_disk()["anchor"]["part"], "cap")
+        self.assertEqual(self.on_disk()["part"], "cap")
 
     def test_an_orphan_comes_home_when_its_part_does(self):
         """Usually a rename, or a part briefly commented out of build.py. The

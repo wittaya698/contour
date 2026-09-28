@@ -213,6 +213,9 @@ INTENTLESS = {
     "install-hooks": "installs the push guard; refusing it protects nothing",
     "init": "creates a space, and there is no space yet to have policy about",
     "doctor": "compares a space against the toolkit and writes nothing",
+    "migrate-marks": "rewrites the user\'s own marks into one spelling, and only "
+                     "when they ask for it by name; the diff it makes is theirs "
+                     "to read and reaches a remote only past the commit gate",
     "spaces": "lists spaces on this machine",
     "intents": "prints this very vocabulary",
     "asks": "prints the ask-list; gating the audit would gate reading the gate",

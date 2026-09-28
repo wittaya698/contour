@@ -91,8 +91,13 @@ def on_part(path, part, text, author="agent", came_from=None):
     `came_from` is the veto this became a question about, if it was one. Not a
     resolution — a veto is never resolved — but a reader following the question
     backwards has to land on the moment it came from.
+
+    The part is named at the top level and the record carries no anchor at all,
+    which is the whole of what it means to have no pin: an anchor holds a
+    position in a part's own coordinates, and a part's name is not one
+    (slice 19).
     """
-    mark = {"anchor": {"part": part}, "text": text}
+    mark = {"part": part, "text": text}
     if came_from:
         mark["from"] = came_from
     return append(path, mark, author=author)
@@ -160,6 +165,11 @@ def anchor(path, found):
     to the same question. A mark on a photograph is skipped whatever the caller
     offers for it: there are no parts in a photograph to be anchored in.
 
+    What a ray found is two answers and is stored as two. The part it hit is
+    written where every part name lives, at the top level, and what stays under
+    the anchor is the pin alone — the mask's reading under the click, if there
+    was one, is overwritten by the surface the ray actually reached (slice 19).
+
     The ray itself is cast in `lib/cmd_resolve.py`, which is the only part of
     this that needs a scene. What lands here is the record\'s own transition.
     """
@@ -171,7 +181,8 @@ def anchor(path, found):
         hit = found.get(mark.get("id"))
         if hit:
             mark.pop("pixel", None)
-            mark["anchor"] = hit
+            mark["part"] = hit["part"]
+            mark["anchor"] = {"local": hit["local"]}
             done.append(mark["id"])
     if done:
         save(path, kept)
@@ -247,6 +258,67 @@ def unresolved(all_marks):
     """
     return [m for m in all_marks
             if pixel(m) and not pin(m) and not reference(m)]
+
+
+def old_spelling(all_marks):
+    """The marks still keeping a part's name under the anchor (slice 19).
+
+    What `contour doctor` counts and what `migrate` rewrites, asked of a list
+    so that counting one costs no more than reading the file already did.
+
+    A space is never migrated on load and may never be migrated at all: the
+    reader above is bilingual, so an untouched space keeps working, and the
+    only thing this slice ends is new marks being written either way. Which is
+    also why this is a question a space can be asked rather than a state it is
+    put into.
+    """
+    return [m for m in all_marks if (m.get("anchor") or {}).get("part")]
+
+
+def migrate(path):
+    """Move every part name out of the anchor and up to the top level. Returns
+    the ids rewritten, and writes nothing when there are none.
+
+    Idempotent by what it asks: a record already in one spelling has no name
+    under its anchor, so running this twice is running it once and then reading
+    the file. An anchor left holding nothing at all is dropped rather than kept
+    empty — that is an agent's mark, which never had a pin, and `{}` there
+    would be a third spelling of *no pin* for the next reader to handle.
+
+    Which part a mark is about does not change here. A record written before
+    this slice can carry both spellings at once and they can disagree — the
+    canvas wrote the mask's reading as the mark was born, and a ray later wrote
+    the surface it hit under the anchor without touching it — and every reader
+    since has answered with the top-level one. So that is the one kept.
+    Preferring the ray may well be right; it is not a decision a rewrite makes
+    on the way past. No record written from here on can disagree with itself:
+    `anchor` above writes the one field.
+
+    The record is rebuilt rather than edited so the name takes the anchor's
+    place in it. This is the one commit that rewrites `marks.json` wholesale,
+    and a name appended at the end would put the line that went and the line
+    that arrived in different hunks of the diff the user has to review.
+    """
+    kept = load(path)
+    moved = []
+    for at, mark in enumerate(kept):
+        name = (mark.get("anchor") or {}).get("part")
+        if not name:
+            continue
+        pin_only = {k: v for k, v in mark["anchor"].items() if k != "part"}
+        fresh = {}
+        for key, value in mark.items():
+            if key != "anchor":
+                fresh[key] = value
+                continue
+            fresh.setdefault("part", name)
+            if pin_only:
+                fresh["anchor"] = pin_only
+        kept[at] = fresh
+        moved.append(mark["id"])
+    if moved:
+        save(path, kept)
+    return moved
 
 
 def close(path, mark_id):

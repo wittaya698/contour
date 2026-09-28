@@ -23,6 +23,7 @@ prints only its terse `lines`. Stdlib only: no venv, no yaml.
     contour install-hooks         install the pre-push guard (ADR 0011)
     contour init <name>           create a model space here
     contour doctor                is this space in step with the toolkit
+    contour migrate-marks         rewrite this space's marks into one spelling
     contour spaces [name]         list model spaces, or print one's path
     contour intents               the call categories a gate can ask about
     contour asks                  what this space lets through, and what asks
@@ -351,6 +352,10 @@ def main(argv):
         if not PROJECT:
             return need_project(cmd)
         return emit(doctor())
+    if cmd == "migrate-marks" and not rest:
+        if not PROJECT:
+            return need_project(cmd)
+        return emit(migrate_marks())
     if cmd == "spaces" and len(rest) <= 1:
         return emit(spaces(rest[0] if rest else None))
     print(USAGE, file=sys.stderr)
@@ -451,6 +456,12 @@ def doctor():
     if not (PROJECT / hooks / "pre-push").exists():
         lines.append("WARN no pre-push stub — nothing stops a push from here")
         ok = False
+    from lib import marks
+    old = marks.old_spelling(marks.load(HERE.marks))
+    if old:
+        lines.append(f"NOTE {marks.phrase(len(old))} in the old spelling "
+                     f"(the part named under the anchor) — run contour "
+                     f"migrate-marks")
     if not shutil.which("contour"):
         lines.append("WARN `contour` is not on PATH: the spec guard in "
                      ".claude/settings.json cannot run,")
@@ -459,6 +470,31 @@ def doctor():
         ok = False
     lines.append(f"     toolkit at {ROOT}")
     return {"ok": ok, "lines": lines}
+
+
+def migrate_marks():
+    """Rewrite this space's marks into one spelling: the part at the top level,
+    the anchor holding the pin alone (slice 19).
+
+    Asked for by name, and the only thing in the toolkit that rewrites the
+    user's findings without them having just written one. `marks.json` is
+    tracked across four spaces, so what it moved is printed rather than
+    counted: a diff nobody can attribute is a diff nobody can review (rule 5).
+
+    Never run on load, and not run by `doctor`, which only says how many there
+    are. A space that is never migrated keeps working — the reader in
+    `lib/marks.py` answers either spelling — so there is no moment at which
+    this has to happen and no reason to make it happen quietly.
+    """
+    from lib import marks
+    moved = marks.migrate(HERE.marks)
+    if not moved:
+        return {"ok": True, "lines": ["ok   nothing to migrate: every mark "
+                                      "names its part at the top level"]}
+    return {"ok": True, "lines": [f"ok   {marks.phrase(len(moved))} migrated: "
+                                  f"{', '.join(moved)}",
+                                  f"     review the diff in {HERE.marks.name} "
+                                  f"before you commit it"]}
 
 
 def run_hook(name, rest):

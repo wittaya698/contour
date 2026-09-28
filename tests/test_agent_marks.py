@@ -56,8 +56,8 @@ class AgentMarkTest(unittest.TestCase):
         rather than guessed here."""
         self.mark("--part", "neck", "12 mm gap to torso")
         mark, = self.stored()
-        self.assertEqual(mark["anchor"], {"part": "neck"})
-        self.assertNotIn("local", mark["anchor"])
+        self.assertEqual(mark["part"], "neck")
+        self.assertNotIn("anchor", mark)          # a name is not a position
         self.assertNotIn("pixel", mark)
         self.assertNotIn("view", mark)
 

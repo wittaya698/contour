@@ -84,6 +84,15 @@ class BirthTest(unittest.TestCase):
         self.assertIsNone(marks.pin(born))
         self.assertEqual(born["author"], "agent")
 
+    def test_an_agent_mark_names_its_part_at_the_top_level(self):
+        """One place a part name lives, and `anchor` is not it. A **pin** is a
+        position in the hit part's own coordinates, and a part's name is not a
+        position — so they stop sharing a key (slice 19). This mark has no pin
+        at all, and now says so by carrying no anchor."""
+        born = marks.on_part(self.path, "neck", "12 mm gap to torso")
+        self.assertEqual(born["part"], "neck")
+        self.assertNotIn("anchor", born)
+
     def test_a_promoted_veto_says_which_moment_it_came_from(self):
         """A veto becomes a question about a part, and the author is the user:
         they wrote the sentence. A reader following it backwards has to land on
@@ -115,6 +124,18 @@ class TransitionTest(unittest.TestCase):
         self.assertEqual(marks.pin(now), [0.0, 0.0, 0.03])
         self.assertEqual(marks.part(now), "cap")
         self.assertIsNone(marks.pixel(now))
+
+    def test_a_landed_ray_names_its_part_beside_the_pin_and_not_inside_it(self):
+        """What the ray found is two answers, and they are stored as two: which
+        part it hit, at the top level where every part name lives, and where on
+        that part it landed, which is the anchor and the whole of it (slice 19).
+        """
+        born = marks.on_sheet(self.path, "front", [412, 208], "cap too round")
+        marks.anchor(self.path, {born["id"]: {"part": "cap",
+                                              "local": [0.0, 0.0, 0.03]}})
+        now = self.on_disk(born["id"])
+        self.assertEqual(now["part"], "cap")
+        self.assertEqual(now["anchor"], {"local": [0.0, 0.0, 0.03]})
 
     def test_a_mark_on_a_photograph_is_never_anchored(self):
         """A photograph has no parts to be anchored in, and no build of ours
@@ -204,6 +225,134 @@ class TransitionTest(unittest.TestCase):
         marks.on_part(self.path, "neck", "12 mm gap")
         todo = marks.unresolved(marks.load(self.path))
         self.assertEqual([m["id"] for m in todo], [waiting["id"]])
+
+
+class SpellingTest(unittest.TestCase):
+    """One spelling for a part, and the migration that gets a space there
+    (slice 19).
+
+    A mark that is about a part used to store that name in one of two places
+    depending on how it was born — top level, or under the anchor beside the
+    pin. Slice 18 hid that behind one accessor; this ends it, in the storage.
+    Nothing here runs on load: `marks.json` is tracked, and it holds the user's
+    own findings, so the rewrite is a state they choose and see (rule 5).
+    """
+
+    def setUp(self):
+        self.path = Path(tempfile.mkdtemp()) / "marks.json"
+
+    def mixed(self):
+        """A file as a space that has been marked on since before this slice
+        actually holds it: both spellings, and records that are neither."""
+        marks.save(self.path, [
+            {"id": "m1", "status": "open", "text": "12 mm gap",
+             "anchor": {"part": "neck"}},
+            {"id": "m2", "status": "open", "text": "cap too round",
+             "anchor": {"part": "cap", "local": [0.0, 0.0, 0.03]}},
+            {"id": "m3", "status": "open", "text": "and this", "part": "torso",
+             "anchor": {"local": [0.0, 0.1, 0.0]}},
+            {"id": "m4", "status": "open", "text": "here", "ref": "persp.webp",
+             "pixel": [880, 410]},
+        ])
+
+    def test_a_part_named_under_the_anchor_is_the_old_spelling(self):
+        """Both of the old shapes and neither of the new ones: an agent mark
+        whose anchor held a name and no pin, and a landed ray whose anchor held
+        both."""
+        self.mixed()
+        found = marks.old_spelling(marks.load(self.path))
+        self.assertEqual([m["id"] for m in found], ["m1", "m2"])
+
+
+    def test_a_space_nobody_migrated_still_reads(self):
+        """Which is the point of leaving the reader bilingual: a space may never
+        be migrated at all, and until someone asks, every question about it has
+        to answer the same in either spelling. Orphaning is asked here because
+        it is the reader that *writes* on what it finds — a build that could not
+        see an old pin's part would call it homeless and dim a finding that is
+        perfectly well anchored."""
+        self.mixed()
+        by = {m["id"]: m for m in marks.load(self.path)}
+        self.assertEqual(marks.part(by["m1"]), "neck")
+        self.assertEqual(marks.part(by["m2"]), "cap")
+        self.assertEqual(marks.pin(by["m2"]), [0.0, 0.0, 0.03])
+        self.assertEqual(marks.orphan(self.path, {"neck", "cap", "torso"}), [])
+        self.assertEqual(sorted(marks.orphan(self.path, {"torso"})), ["m1", "m2"])
+
+    def test_migrating_moves_the_part_up_and_leaves_the_pin_where_it_is(self):
+        """The name goes to the top level; what the ray found stays exactly
+        where it was. An anchor that held nothing but the name goes altogether,
+        rather than staying behind as an empty dict — that record never had a
+        pin, and `{}` would be a third way of saying so."""
+        self.mixed()
+        self.assertEqual(marks.migrate(self.path), ["m1", "m2"])
+        by = {m["id"]: m for m in marks.load(self.path)}
+        self.assertEqual(by["m1"]["part"], "neck")
+        self.assertNotIn("anchor", by["m1"])
+        self.assertEqual(by["m2"]["part"], "cap")
+        self.assertEqual(by["m2"]["anchor"], {"local": [0.0, 0.0, 0.03]})
+        self.assertEqual(marks.old_spelling(marks.load(self.path)), [])
+
+    def test_migrating_leaves_alone_what_it_was_not_asked_about(self):
+        """A mark already in the new spelling, and one on a photograph that
+        names no part at all. A migration that touched either would be a diff
+        the user did not cause in a file git tracks."""
+        self.mixed()
+        before = {m["id"]: dict(m) for m in marks.load(self.path)}
+        marks.migrate(self.path)
+        by = {m["id"]: m for m in marks.load(self.path)}
+        self.assertEqual(by["m3"], before["m3"])
+        self.assertEqual(by["m4"], before["m4"])
+
+    def test_a_migrated_name_lands_where_it_came_from(self):
+        """`marks.json` is tracked and this is the one commit that rewrites it
+        wholesale, so the diff has to be readable by the person reviewing it.
+        The name takes the anchor's place in the record rather than being
+        appended at the end, which puts the line that went and the line that
+        arrived in the same hunk, next to each other."""
+        self.mixed()
+        was = {m["id"]: list(m) for m in marks.load(self.path)}
+        marks.migrate(self.path)
+        by = {m["id"]: list(m) for m in marks.load(self.path)}
+        self.assertEqual(by["m2"].index("part") + 1, by["m2"].index("anchor"))
+        self.assertEqual(by["m1"].index("part"), was["m1"].index("anchor"))
+
+    def test_migrating_never_changes_which_part_a_mark_is_about(self):
+        """A record can carry both spellings at once — the canvas wrote the
+        mask's reading at the top level as the mark was born, and a ray later
+        wrote the surface it actually hit under the anchor — and the two can
+        disagree. Every reader since has answered with the top-level one, so
+        that is the one the migration keeps.
+
+        Deciding that the ray is the better answer may well be right, and it is
+        not a decision a rewrite gets to make on the way past: it would change
+        which part a finding is about, in a tracked file, in a commit whose
+        subject says the spelling was converged.
+        """
+        marks.save(self.path, [{"id": "m1", "status": "open", "text": "x",
+                                "part": "neck",
+                                "anchor": {"part": "torso",
+                                           "local": [0.0, 0.1, 0.0]}}])
+        before = marks.part(marks.load(self.path)[0])
+        self.assertEqual(marks.migrate(self.path), ["m1"])
+        now = marks.load(self.path)[0]
+        self.assertEqual(marks.part(now), before)
+        self.assertEqual(now["part"], "neck")
+        self.assertEqual(now["anchor"], {"local": [0.0, 0.1, 0.0]})
+
+    def test_migrating_twice_is_migrating_once(self):
+        """Nothing to move, nothing said, and not one byte written: the second
+        run is a read of the file. Which is what makes this safe to put in
+        front of a user who cannot remember whether they ran it."""
+        self.mixed()
+        marks.migrate(self.path)
+        settled = self.path.read_bytes()
+        self.path.chmod(0o444)          # nothing to move: nothing is opened to write
+        try:
+            self.assertEqual(marks.migrate(self.path), [])
+        finally:
+            self.path.chmod(0o644)
+        self.assertEqual(self.path.read_bytes(), settled)
 
 
 class OwnershipTest(unittest.TestCase):

@@ -89,6 +89,70 @@ class LauncherTest(unittest.TestCase):
                        "status": status})
         path.write_text(json.dumps(stored))
 
+    def old_spelling_mark(self):
+        """A mark as a space marked on before slice 19 holds it: the part named
+        under the anchor, beside the pin."""
+        path = self.space / "marks.json"
+        stored = json.loads(path.read_text()) if path.exists() else []
+        stored.append({"id": f"m{len(stored) + 1}", "text": "x",
+                       "anchor": {"part": "neck", "local": [0, 0, 0]},
+                       "author": "user", "status": "open"})
+        path.write_text(json.dumps(stored))
+
+    def test_doctor_counts_the_marks_in_the_old_spelling(self):
+        """Reported and not repaired. `marks.json` is tracked and holds the
+        user's own findings, so the rewrite is a state they choose and see —
+        doctor says how many and what to type (rule 5, slice 19)."""
+        self.old_spelling_mark()
+        self.old_spelling_mark()
+        r = self.run_contour("doctor")
+        self.assertIn("2 marks in the old spelling", r.stdout)
+        self.assertIn("contour migrate-marks", r.stdout)
+
+    def test_doctor_says_nothing_about_spelling_when_there_is_none(self):
+        """A space that has nothing to migrate must not carry a line about
+        migrating. A report that always mentions it is furniture, and an ok
+        beside it reads as a thing the user has to keep checking."""
+        self.mark()
+        r = self.run_contour("doctor")
+        self.assertNotIn("spelling", r.stdout)
+
+    def test_migrate_marks_rewrites_them_and_names_what_it_moved(self):
+        """The one command that rewrites a tracked file the user did not just
+        edit, so it says which records moved: a diff nobody can attribute is a
+        diff nobody can review."""
+        self.old_spelling_mark()
+        r = self.run_contour("migrate-marks")
+        self.assertEqual(r.returncode, 0)
+        self.assertIn("1 mark migrated", r.stdout)
+        self.assertIn("m1", r.stdout)
+        stored = json.loads((self.space / "marks.json").read_text())
+        self.assertEqual(stored[0]["part"], "neck")
+        self.assertEqual(stored[0]["anchor"], {"local": [0, 0, 0]})
+
+    def test_migrate_marks_a_second_time_says_so_and_writes_nothing(self):
+        """Idempotent where the user can see it. Someone who cannot remember
+        whether they ran it must be able to run it again and get an answer
+        rather than a diff."""
+        self.old_spelling_mark()
+        self.run_contour("migrate-marks")
+        settled = (self.space / "marks.json").read_bytes()
+        r = self.run_contour("migrate-marks")
+        self.assertEqual(r.returncode, 0)
+        self.assertIn("nothing to migrate", r.stdout)
+        self.assertEqual((self.space / "marks.json").read_bytes(), settled)
+
+    def test_nothing_else_migrates_a_space(self):
+        """Nothing rewrites tracked user data on load. A check builds, renders
+        and reads the marks, and a space in the old spelling comes out of it
+        byte-identical — the migration is a thing the user asks for by name
+        (rule 5, slice 19)."""
+        self.old_spelling_mark()
+        before = (self.space / "marks.json").read_bytes()
+        self.assertEqual(self.run_contour("check").returncode, 0)
+        self.assertIn("in the old spelling", self.run_contour("doctor").stdout)
+        self.assertEqual((self.space / "marks.json").read_bytes(), before)
+
     def test_canvas_outside_a_model_space_says_so_and_fails(self):
         r = self.run_contour("canvas", cwd=self.tmp)
         self.assertEqual(r.returncode, 2)
