@@ -30,7 +30,12 @@ class MarksAreWritableTest(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
 
     def guard(self, path):
-        ev = json.dumps({"cwd": str(self.space), "tool_input": {"file_path": str(path)}})
+        # `tool_name` as well as the input, because the guard asks `lib.intent`
+        # what the call means and the answer depends on which tool made it. A
+        # PreToolUse event always carries both; a fixture that carried one was
+        # passing by accident of the guard reading only the path.
+        ev = json.dumps({"cwd": str(self.space), "tool_name": "Write",
+                         "tool_input": {"file_path": str(path)}})
         return subprocess.run([sys.executable, str(GUARD)], input=ev,
                               capture_output=True, text=True,
                               env=dict(os.environ, CLAUDE_PROJECT_DIR=str(self.space)))

@@ -28,6 +28,13 @@ WRITING = ("tee", "cp", "mv", "dd", "truncate", "install", "patch",
            "python", "python3", "perl", "ruby", "awk")
 
 
+# A path under the user's references, wherever in a call it sits. Read out of the
+# raw text and not the words: a path inside a heredoc or a quoted script is part
+# of a word rather than a word, and a heredoc is how an agent in auto mode edits
+# a file. The prefix is whole components only, so `sourcerefs/x` is not one.
+REFS = re.compile(r"(?<![.\w])(/?(?:[\w.~@+=,:-]+/)*refs/[\w.~@+=,:/-]*)")
+
+
 # A substitution is a whole command line packed inside one word, so splitting
 # the outer line into words never reaches it.
 INSIDE = re.compile(r"\$\(([^()]*)\)|`([^`]*)`")
@@ -77,9 +84,33 @@ def mentioned(call):
     """
     if "spec.yaml" in call:
         return "spec-write"
-    if re.search(r"(?<![.\w])refs/", call.replace(".git/refs/", "")):
+    if refs_in(call):
         return "ref-write"
     return None
+
+
+def refs_in(text):
+    """The paths under `refs/` this text names, in the order it names them.
+
+    One definition, because `mentioned` asking *does this call touch a reference*
+    and `references` asking *which ones* must never be able to disagree: the
+    first decides whether a gate fires and the second what the guard denies.
+    """
+    # A space holds two directories called `refs`: the user's reference images,
+    # and git's branch heads under `.git`. Only the first is the one rule 1 is
+    # about, and the second is named on every commit.
+    return tuple(REFS.findall(text.replace(".git/refs/", "")))
+
+
+def references(tool, payload):
+    """The paths under `refs/` this call names, in the order it names them.
+
+    Beside `classify` rather than inside it, because a category answers *is this
+    gated* and the guard has a second question: whether git tracks this
+    particular reference, since saving a new one is how a space starts
+    (ADR 0012). One call can name several, and the guard judges each.
+    """
+    return refs_in(payload.get("command") or payload.get("file_path") or "")
 
 
 def path_intent(path):

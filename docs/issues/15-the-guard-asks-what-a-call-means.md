@@ -51,15 +51,30 @@ already cover every term this touches.
 
 ## Acceptance criteria
 
-- [ ] `tools/guards/spec.py` asks `lib.intent` for a call's category and holds no path rule of its own
-- [ ] A `Write` to a nested `refs/` path that git tracks is denied
-- [ ] A Bash call writing a tracked `refs/` path is denied, naming the path
-- [ ] A Bash or `Write` call to an untracked `refs/` path is still allowed
-- [ ] A Bash call that only *reads* under `refs/` is allowed
-- [ ] `intent` exposes the `refs/` paths a call names, and `tests/test_intent.py` covers it
-- [ ] `tracked()` still denies when git cannot be asked, with that reason stated in place
-- [ ] The guard's docstring describes only what the guard does, citing ADR 0016
-- [ ] `contour selftest` green; the Blender-free roster unchanged
+- [x] `tools/guards/spec.py` asks `lib.intent` for a call's category and holds no path rule of its own
+- [x] A `Write` to a nested `refs/` path that git tracks is denied
+- [x] A Bash call writing a tracked `refs/` path is denied, naming the path
+- [x] A Bash or `Write` call to an untracked `refs/` path is still allowed
+- [x] A Bash call that only *reads* under `refs/` is allowed
+- [x] `intent` exposes the `refs/` paths a call names, and `tests/test_intent.py` covers it
+- [x] `tracked()` still denies when git cannot be asked, with that reason stated in place
+- [x] The guard's docstring describes only what the guard does, citing ADR 0016
+- [x] `contour selftest` green; the Blender-free roster unchanged
+
+One thing this slice found and had to fix to mean anything: the space template's
+`PreToolUse` matcher read `Write|Edit`, so the hook was never handed a Bash call
+at all. A guard that judges a Bash call correctly and a hook that never passes it
+one is the same hole in a quieter place — the guard's own tests all pass. The
+matcher is now `Write|Edit|Bash`, and `tests/test_spec_guard.py` derives the
+required list from `intent` so the two cannot drift apart again. Spaces created
+before this report `DRIFT .claude/settings.json` under `contour doctor`, which is
+the intended way to find out.
+
+The guard also had to grow an answer for a call `classify` refuses to read. A
+gate is right to raise there — `None` would mean *not gated* — but a guard has to
+answer, so `references` reads the call's text rather than its words and the guard
+denies an unsplittable call only when it names a tracked reference. `echo it's
+fine` is a quoting accident, not a rule-1 event.
 
 ## Blocked by
 

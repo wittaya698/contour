@@ -143,6 +143,61 @@ class ClassifyTest(unittest.TestCase):
         self.assertEqual(said, "spec-write")
 
 
+class ReferencesTest(unittest.TestCase):
+    """Which references a call names, beside what the call means.
+
+    A category answers *is this gated*; the guard also has to ask git whether
+    this particular reference is tracked, because saving a new one is how a
+    space starts (ADR 0012). So the two questions are two functions.
+    """
+
+    def test_a_write_names_the_reference_it_would_overwrite(self):
+        said = intent.references("Write", {"file_path": "/m/widget/refs/front.png"})
+        self.assertEqual(list(said), ["/m/widget/refs/front.png"])
+
+    def test_a_shell_call_names_every_reference_it_touches(self):
+        """The guard asks git about each one, so one answer per path and not one
+        per call: `cp a refs/x.png refs/y.png` is two contracts."""
+        said = intent.references("Bash", {"command":
+            "cp ~/Downloads/a.jpg refs/front.png widget/refs/side/low.jpg"})
+        self.assertEqual(list(said),
+                         ["refs/front.png", "widget/refs/side/low.jpg"])
+
+    def test_gits_own_refs_are_not_among_them(self):
+        """Every space has a second directory called `refs` holding branch
+        heads. Naming one here would have the guard ask git whether git tracks
+        its own index — and then deny a commit for failing rule 1."""
+        for call in ("cat .git/refs/heads/main",
+                     "cp .git/refs/heads/main /tmp/x"):
+            self.assertEqual(intent.references("Bash", {"command": call}), (), call)
+        self.assertEqual(
+            intent.references("Write", {"file_path": "/m/w/.git/refs/heads/main"}), ())
+
+    def test_a_directory_merely_ending_in_refs_is_not_the_references(self):
+        """`refs` is a component of a path, not a substring of one. A gate that
+        fired on `sourcerefs/` would be a gate about a directory the user never
+        agreed was theirs, and the guard behind it would deny a write there."""
+        for call in ("cp a sourcerefs/front.png", "cat > myrefs/x.png"):
+            self.assertEqual(intent.references("Bash", {"command": call}), (), call)
+
+    def test_a_call_naming_no_reference_names_none(self):
+        """The guard asks git nothing for these, and a gate says nothing about
+        them. An empty answer is the common one."""
+        for call in ("./contour check", "git commit -m x", "ls out/"):
+            self.assertEqual(intent.references("Bash", {"command": call}), (), call)
+
+    def test_an_unreadable_call_still_says_which_references_it_names(self):
+        """`classify` raises on a call it cannot parse, which is right for a
+        gate: None there would mean *not gated*. A guard has no such option — it
+        must answer — so this reads the text and never raises, and the guard can
+        deny an unparseable call that names a reference while letting `echo
+        it's fine` through."""
+        said = intent.references("Bash", {"command": 'cp a refs/front.png "'})
+        self.assertEqual(list(said), ["refs/front.png"])
+        with self.assertRaises(ValueError):
+            intent.classify("Bash", {"command": 'cp a refs/front.png "'})
+        self.assertEqual(intent.references("Bash", {"command": "echo it's fine"}), ())
+
 # Launcher commands that carry no intent, each for a stated reason. This is a
 # roster and not an inference: a command is exempt because somebody decided it
 # is, so a command nobody decided about is a finding rather than a default.
