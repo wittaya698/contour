@@ -3,7 +3,7 @@
 The sheet changes only when a build finishes, so a page that showed it without
 saying which build it is of would be authoritative about whichever one happened
 to be on screen. `views.json` already carries a fingerprint of the build its
-cameras drew, and `lib/anchor.py` already hashes the build on disk the same way,
+cameras drew, and `lib/views.py` already hashes the build on disk the same way,
 so the label is a comparison of two numbers that exist — no new source of truth
 and nothing for a second reader to disagree with.
 
@@ -12,9 +12,11 @@ the console may never import a `bpy`-bound module (ADR 0019, decision 32).
 """
 from pathlib import Path
 
-from . import anchor
 from . import marks as marks_store
 from . import store
+from . import views as sheet_views
+"""Aliased because `state` takes a `views` argument — the path to the file —
+and the module that reads it would be shadowed by its own subject."""
 
 NAME = "last-build.json"
 """The last build's verdict, beside the log of it in the space's `.contour/`.
@@ -48,7 +50,7 @@ def state(views=None, blend=None, verdict=None, marks=None):
     said = store.load(verdict, None) if verdict else None
     failed = bool(said) and not said["built"]
     why = ("last build failed" if failed
-           else anchor.stale(sheet, blend) and "the build moved on")
+           else sheet_views.stale(sheet, blend) and "the build moved on")
     return {"build": sheet["build"] or None, "current": not why, "why": why,
             "marks": pending(marks) if failed else None}
 

@@ -5,7 +5,7 @@ distance, right here* — which is the only way a picture can be asked about a
 separation at all, because a scanline finds runs and cannot know which two of
 them the question was about.
 
-The arithmetic lives here, out of Blender, for the reason `anchor.place` does:
+The arithmetic lives here, out of Blender, for the reason `views.place` does:
 the image reading is what needs bpy, and the number that comes out of it is
 what needs to be checkable without a scene.
 """

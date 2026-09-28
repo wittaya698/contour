@@ -18,7 +18,8 @@ import numpy as np
 from bpy_extras.object_utils import world_to_camera_view
 from mathutils import Vector
 
-from . import anchor, ctx_override, mask, marks, miniyaml, space, scene
+from . import badges, ctx_override, mask, marks, miniyaml, space, scene
+from . import views as sheet_views   # `views` is a local here: the four frames
 
 BG = (0.93, 0.93, 0.94)
 GRID = (0.72, 0.74, 0.78)
@@ -187,7 +188,7 @@ def pins(path, sc):
         live = here.get(marks.part(mark))
         if live:
             m = [c for row in live.matrix_world for c in row]
-            out.append((mark["id"], Vector(anchor.place(m, local))))
+            out.append((mark["id"], Vector(sheet_views.place(m, local))))
     return out
 
 
@@ -223,7 +224,7 @@ def on_part(idtile, number):
     ys, xs = np.nonzero(idtile == number)
     if not len(xs):
         return None
-    return anchor.nearest(list(zip(xs.tolist(), ys.tolist())))
+    return badges.nearest(list(zip(xs.tolist(), ys.tolist())))
 
 
 
@@ -237,7 +238,7 @@ def badge(tile, bgmask, label, at, t, taken):
     """
     x, y = at
     w, h = GLYPH_W * len(label), GLYPH_H
-    spot = anchor.badge_spot(
+    spot = badges.badge_spot(
         lambda bx, by, bw, bh: bool(bgmask[by:by + bh, bx:bx + bw].all()),
         x, y, w, h, (t, t), taken=taken)
     if spot is None:
@@ -384,9 +385,9 @@ def run(args):
     mask.write(P.mask, np.flipud(idx))   # Blender reads bottom-up, PNG top-down
     P.parts.write_text(json.dumps(parts, indent=2) + "\n", encoding="utf-8")
 
-    anchor.record(P.views, res,
-                  [view_record(label, (*corners[label], t, t), cam)
-                   for label, cam in cams], P.blend)
+    sheet_views.record(P.views, res,
+                       [view_record(label, (*corners[label], t, t), cam)
+                        for label, cam in cams], P.blend)
 
     sheet = np.ones((res, res, 4), dtype=np.float32)
     for (row, col), tile in zip([(1, 0), (1, 1), (0, 0), (0, 1)], tiles):

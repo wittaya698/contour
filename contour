@@ -647,7 +647,7 @@ def anchor_check():
     stored where it is *on the part*, not where it happened to be on a sheet.
     """
     sys.path.insert(0, str(ROOT))
-    from lib import anchor, mask as mask_store, store
+    from lib import mask as mask_store, store, views
     F = space.fixture("smoke", ROOT)
     sheet = store.load(F.views, None)
     if not sheet:
@@ -655,7 +655,7 @@ def anchor_check():
     labels = [v["label"] for v in sheet["views"]]
     if labels != ["front", "right", "top", "persp"]:
         return {"ok": False, "lines": [f"views.json holds {labels}"]}
-    if sheet["build"] != anchor.fingerprint(F.blend):
+    if sheet["build"] != views.fingerprint(F.blend):
         return {"ok": False, "lines": ["views.json names a different build "
                                        "than the one it was rendered from"]}
 
@@ -733,7 +733,7 @@ def agent_check(marks_path, F, w, h, data, table):
     The fixture cannot witness the harder half: every part here is convex and
     centred on its own origin, so it cannot tell this answer from the two that
     were tried before it. That claim is made in `tests/test_agent_marks.py`
-    against `anchor.nearest`, on an L (ADR 0018).
+    against `badges.nearest`, on an L (ADR 0018).
 
     Returns the line to report, or the sentence to fail with.
     """

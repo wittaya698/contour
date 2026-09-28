@@ -14,7 +14,7 @@ import argparse
 import json
 from pathlib import Path
 
-from . import anchor, marks
+from . import marks, views
 
 USAGE = ('contour mark --part <name> "one line", '
          'or --ref <image> --pixel <x,y> "one line", '
@@ -55,7 +55,7 @@ def addressed(path, mark_id, blend):
     the question this module answers: the transition itself belongs to the
     record, in `lib/marks.py`.
     """
-    return marks.address(path, mark_id, anchor.fingerprint(blend))
+    return marks.address(path, mark_id, views.fingerprint(blend))
 
 
 def known(parts):

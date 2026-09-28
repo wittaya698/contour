@@ -87,14 +87,14 @@ class AgentMarkTest(unittest.TestCase):
         Contour already computes for `views.json`, so the agent cannot invent a
         number, and a later reader can tell whether the build has moved on since
         the claim was made."""
-        from lib import anchor
+        from lib import views
         self.build()
         self.mark("--part", "neck", "12 mm gap to torso")
         done = self.mark("--addressed", "m1")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         mark, = self.stored()
         self.assertEqual(mark["addressed"],
-                         anchor.fingerprint(self.space / "out" / "widget.blend"))
+                         views.fingerprint(self.space / "out" / "widget.blend"))
 
     def test_saying_it_is_addressed_is_not_saying_it_is_closed(self):
         """A finding is not disposed of by the party it is aimed at. The badge
@@ -221,19 +221,19 @@ class AgentBadgeTest(unittest.TestCase):
         middle of its pixels is in the hole beside the torso, on background.
         This is the case that made the fixture an insufficient witness: a box
         and a sphere are both convex and cannot fail it."""
-        from lib import anchor
+        from lib import badges
         arm = ell()
         self.assertNotIn((mean(arm, 0), mean(arm, 1)), arm)   # the trap
-        self.assertIn(anchor.nearest(arm), arm)
+        self.assertIn(badges.nearest(arm), arm)
 
     def test_and_it_is_the_nearest_such_pixel_to_the_middle(self):
         """Not just any pixel of the part. A badge at the far tip of an arm is
         on the arm and still the wrong place to leash a remark about it."""
-        from lib import anchor
+        from lib import badges
         arm = ell()
         mx, my = mean(arm, 0), mean(arm, 1)
         best = min((p[0] - mx) ** 2 + (p[1] - my) ** 2 for p in arm)
-        got = anchor.nearest(arm)
+        got = badges.nearest(arm)
         self.assertAlmostEqual((got[0] - mx) ** 2 + (got[1] - my) ** 2, best)
 
 

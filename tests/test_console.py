@@ -27,7 +27,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from console import spend
-from lib import anchor, marks as marks_store, panel
+from lib import marks as marks_store, panel, views
 
 from test_launcher import stages, stub_blender
 
@@ -335,11 +335,11 @@ class ServesTest(ConsoleCase):
         out.mkdir()
         blend = out / f"{space.name}.blend"
         blend.write_bytes(b"a blend")
-        anchor.record(out / "views.json", [1024, 1024],
+        views.record(out / "views.json", [1024, 1024],
                       [{"label": "front", "tile": [0, 0, 512, 512]}], blend)
         panel.record(space / ".contour" / panel.NAME, {"ok": False, "lines": []})
         _, said = self.ask(self.launch(space)[1], "/sheet.json")
-        self.assertEqual(said["build"], anchor.fingerprint(blend))
+        self.assertEqual(said["build"], views.fingerprint(blend))
         self.assertFalse(said["current"])
         self.assertIn("last build failed", said["why"])
 
@@ -462,7 +462,7 @@ class RunTest(ConsoleCase):
         out.mkdir(exist_ok=True)
         blend = out / f"{space.name}.blend"
         blend.write_bytes(b"a blend")
-        anchor.record(out / "views.json", [1024, 1024],
+        views.record(out / "views.json", [1024, 1024],
                       [{"label": "front", "tile": [0, 0, 512, 512]}], blend)
         marks_store.append(space / marks_store.NAME,
                            {"view": "front", "pixel": [10, 10],
@@ -848,7 +848,7 @@ class VetoTest(ConsoleCase):
         self.assertEqual(got["category"], "commit")
         self.assertEqual(got["tool"], "Bash")
         self.assertEqual(got["call"]["command"], "git commit -m wip")
-        self.assertEqual(got["build"], anchor.fingerprint(blend))
+        self.assertEqual(got["build"], views.fingerprint(blend))
         self.assertTrue(got["id"], "a veto with no id cannot be promoted later")
 
     def test_an_allowed_call_leaves_no_veto_behind(self):
@@ -1310,7 +1310,7 @@ class SeedTest(ConsoleCase):
         out.mkdir(exist_ok=True)
         blend = out / f"{space.name}.blend"
         blend.write_bytes(b"a blend")
-        return anchor.fingerprint(blend)
+        return views.fingerprint(blend)
 
     def test_a_mark_the_run_addressed_reads_addressed_and_stays_open(self):
         """`addressed` is a claim, not a disposal. The agent attaches it and the

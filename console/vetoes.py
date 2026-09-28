@@ -18,7 +18,7 @@ import json
 import subprocess
 from pathlib import Path
 
-from lib import agent, anchor, marks, space as space_lib, store
+from lib import agent, marks, space as space_lib, store, views
 
 NAME = "vetoes.json"
 """Beside `marks.json` at the space's root, and tracked for the same reason.
@@ -67,7 +67,7 @@ def record(space, category, tool, call, reason):
     vetoes = load(space)
     kept = {"id": next_id(vetoes), "category": category, "tool": tool,
             "call": dict(call), "reason": reason, "author": "user",
-            "build": anchor.fingerprint(here.blend)}
+            "build": views.fingerprint(here.blend)}
     save(space, vetoes + [kept])
     return kept
 

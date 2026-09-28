@@ -19,7 +19,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from lib import anchor
+from lib import views
 from lib.canvas import Canvas
 
 from client import get
@@ -46,7 +46,7 @@ class PanelTest(unittest.TestCase):
         got as far as saving leaves behind."""
         self.blend.write_bytes(geometry)
         self.sheet.write_bytes(b"\x89PNG\r\n\x1a\npixels")
-        anchor.record(self.views, [1024, 1024], VIEWS, self.blend)
+        views.record(self.views, [1024, 1024], VIEWS, self.blend)
 
     def check(self, **kw):
         """`contour check` in this space, with Blender stubbed. What the page
@@ -69,7 +69,7 @@ class PanelTest(unittest.TestCase):
     def test_the_panel_names_the_build_the_sheet_was_drawn_from(self):
         self.built()
         panel = self.panel()
-        self.assertEqual(panel["build"], anchor.fingerprint(self.blend))
+        self.assertEqual(panel["build"], views.fingerprint(self.blend))
         self.assertTrue(panel["current"], "a fresh sheet is of the build on disk")
 
     def test_a_sheet_the_build_has_moved_past_says_it_is_not_current(self):
@@ -111,7 +111,7 @@ class PanelTest(unittest.TestCase):
         self.assertEqual(self.check(crash=True).returncode, 1)
         panel = self.panel()
         self.assertFalse(panel["current"])
-        self.assertEqual(panel["build"], anchor.fingerprint(self.blend),
+        self.assertEqual(panel["build"], views.fingerprint(self.blend),
                          "still the build it is a picture of")
         self.assertIn("last build failed", panel["why"])
 
@@ -180,7 +180,7 @@ class PanelTest(unittest.TestCase):
                                      headers={"X-Contour-Token": token})
         with urllib.request.urlopen(req, timeout=10) as r:
             said = json.loads(r.read())
-        self.assertEqual(said["build"], anchor.fingerprint(self.blend))
+        self.assertEqual(said["build"], views.fingerprint(self.blend))
         self.assertTrue(said["current"])
 
 

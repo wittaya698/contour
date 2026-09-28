@@ -231,7 +231,7 @@ def address(path, mark_id, build):
     otherwise (ADR 0018).
 
     `build` is a fingerprint the caller already has, passed in rather than
-    computed: which build this is belongs to `lib/anchor.py`, and a record does
+    computed: which build this is belongs to `lib/views.py`, and a record does
     not reach for a `.blend` to find out what it is being told.
     """
     kept = load(path)

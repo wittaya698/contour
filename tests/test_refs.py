@@ -18,7 +18,6 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from lib import anchor
 from lib import marks as marks_store
 from lib.canvas import Canvas
 from client import get, open_url, post

@@ -16,7 +16,7 @@ ray would still land somewhere; it would just be somewhere the user never saw.
 import bpy
 from mathutils import Matrix, Vector
 
-from . import anchor, marks, space, scene, store
+from . import marks, space, scene, store, views
 
 PULLBACK = 100.0   # metres to back an orthographic ray off before it starts
 
@@ -69,7 +69,7 @@ def run(args):
     if sheet is None:
         return {"ok": True, "lines": [f"{variant} resolve no views.json: "
                                       "this sheet predates anchoring"]}
-    drift = anchor.stale(sheet, P.blend)
+    drift = views.stale(sheet, P.blend)
     if drift:
         return {"ok": False, "lines": [f"FAIL resolve {drift}"]}
     todo = marks.unresolved(marks.load(P.marks))
@@ -83,7 +83,7 @@ def run(args):
     dg = bpy.context.evaluated_depsgraph_get()
     found, missed = {}, 0
     for mark in todo:
-        aimed = anchor.aim(sheet, marks.pixel(mark))
+        aimed = views.aim(sheet, marks.pixel(mark))
         cam = cams.get(marks.view(mark)) if aimed else None
         if cam is None or aimed[0]["label"] != marks.view(mark):
             missed += 1                       # a pixel on no tile, or on another view
