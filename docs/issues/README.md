@@ -7,8 +7,8 @@ through one of them. A finished slice is demoable or verifiable on its own.
 **HITL** needs the user: a decision, a wording, a review. **AFK** can be
 implemented and landed without one.
 
-Two batches so far. Each file cites what it comes from; read that before arguing
-with a slice.
+Two batches so far, and a third section for what the work itself turned up. Each
+file cites what it comes from; read that before arguing with a slice.
 
 ## Batch 1 — the console
 
@@ -107,3 +107,19 @@ from it if they land first.
 **Nothing here is a feature.** Every acceptance list ends with output that is
 byte-identical and a green `contour selftest`, because a deepening that changes what
 the toolkit says is a deepening that has changed the toolkit.
+
+## Found in flight
+
+Not from either review — a defect the work turned up, filed where the rest of the
+sliced work is.
+
+| # | Slice | Type | Blocked by |
+|---|---|---|---|
+| [27](27-a-terminated-console-lets-go.md) | A terminated console lets go of the space | AFK | — |
+
+**27 came out of slice 17's own suite runs.** `contour-console` forwards `SIGINT`
+and not `SIGTERM`, so every console a test terminates leaves its server running —
+holding a port, and holding the space if a run was under way. About 57 per suite
+run, and at a thousand the machine stops forking and the suite goes red for
+reasons that have nothing to do with the change being tested. It is placed before
+24 for that reason: a wide slice wants a suite whose red means something.
