@@ -15,10 +15,9 @@ record that something was prevented. Two opposite rules in one file means the
 pruner has to tell them apart, and the first bug is that it does not.
 """
 import json
-import subprocess
 from pathlib import Path
 
-from lib import agent, marks, space as space_lib, store, views
+from lib import agent, git, marks, space as space_lib, store, views
 
 NAME = "vetoes.json"
 """Beside `marks.json` at the space's root, and tracked for the same reason.
@@ -108,18 +107,6 @@ def promote(space, veto_id, part):
     return mark
 
 
-def _git(space, *args):
-    """Git in this space, or nothing. A space that is not a repository yet, or a
-    machine with no git, is not an error to raise at the page — it is a space
-    where no veto is committed, which is what the count then says."""
-    try:
-        done = subprocess.run(("git",) + args, cwd=str(space),
-                              capture_output=True, text=True)
-    except OSError:
-        return ""
-    return done.stdout if done.returncode == 0 else ""
-
-
 def committed(space):
     """The veto ids `HEAD` already holds.
 
@@ -127,9 +114,13 @@ def committed(space):
     be a claim about a commit that had not happened, and the thing that makes it
     true or false afterwards is `git checkout`, which does not come past here.
     """
-    blob = _git(space, "show", f"HEAD:./{NAME}")
+    # A space that is not a repository yet, or a machine with no git, is not an
+    # error to raise at the page — it is a space where no veto is committed,
+    # which is what the count then says. `lib/git.py` says so once, for every
+    # caller that used to decide it alone (slice 21).
+    blob = git.show(space, "HEAD", NAME)
     try:
-        return {v.get("id") for v in json.loads(blob)} if blob.strip() else set()
+        return {v.get("id") for v in json.loads(blob)} if blob and blob.strip() else set()
     except json.JSONDecodeError:
         return set()
 

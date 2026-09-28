@@ -44,7 +44,7 @@ TIMEOUT_S = 300
 USAGE = __doc__.split("\n\n", 2)[2].rstrip()
 
 sys.path.insert(0, str(ROOT))
-from lib import space                      # stdlib-only by test (ADR 0019, 29)
+from lib import git, space                 # stdlib-only by test (ADR 0019, 29)
 
 MARKER = space.MARKER
 PROJECT = space.find()
@@ -129,14 +129,13 @@ def check_revision():
     spec = HERE.spec
     if not spec.exists():
         return None
-    head = subprocess.run(["git", "-C", str(PROJECT), "show", "HEAD:spec.yaml"],
-                          capture_output=True, text=True)
-    if head.returncode != 0:      # untracked, or no commit yet: creation is not mutation
+    was_text = git.show(PROJECT, "HEAD", "spec.yaml")
+    if was_text is None:          # untracked, or no commit yet: creation is not mutation
         return None
     now = spec.read_text(encoding="utf-8")
-    if now == head.stdout:
+    if now == was_text:
         return None
-    was, is_ = spec_revision(head.stdout), spec_revision(now)
+    was, is_ = spec_revision(was_text), spec_revision(now)
     if is_ > was:
         return None
     return {"ok": False, "lines": [
@@ -369,9 +368,9 @@ SCAFFOLD = ("CLAUDE.md", ".claude/settings.json",
 
 
 def toolkit_commit():
-    r = subprocess.run(["git", "-C", str(ROOT), "rev-parse", "--short", "HEAD"],
-                       capture_output=True, text=True, timeout=10)
-    return r.stdout.strip() if r.returncode == 0 else "unknown"
+    """Which toolkit this is, as a space's marker records it. `unknown` is the
+    spelling a person reads for *git could not say* (`lib/git.py`, slice 21)."""
+    return git.head(ROOT) or "unknown"
 
 
 def init(name):
@@ -405,12 +404,12 @@ def init(name):
         f"toolkit_path: {ROOT}\n"
         f"created: {time.strftime('%Y-%m-%d')}\n")
     lines = [f"ok   {space}"]
-    r = subprocess.run(["git", "init", "-q", str(space)], capture_output=True, text=True)
-    if r.returncode != 0:
-        return {"ok": False, "lines": [f"FAIL git init: {r.stderr.strip()}"]}
-    hooks = subprocess.run(["git", "-C", str(space), "rev-parse", "--git-path", "hooks"],
-                           capture_output=True, text=True).stdout.strip()
-    dst = (space / hooks).resolve()
+    failed = git.start(space)
+    if failed:
+        return {"ok": False, "lines": [f"FAIL git init: {failed}"]}
+    dst = git.hooks_dir(space)
+    if dst is None:
+        return {"ok": False, "lines": ["FAIL git made no repository to hook"]}
     dst.mkdir(parents=True, exist_ok=True)
     (dst / "pre-push").write_bytes((tpl / "pre-push").read_bytes())
     (dst / "pre-push").chmod(0o755)
@@ -446,14 +445,12 @@ def doctor():
     now = toolkit_commit()
     lines.append(f"{'ok  ' if was == now else 'NOTE'} toolkit {was}"
                  + ("" if was == now else f" -> {now} since this space was created"))
-    remotes = subprocess.run(["git", "-C", str(PROJECT), "remote"],
-                             capture_output=True, text=True).stdout.split()
+    remotes = git.remotes(PROJECT)
     if remotes:
         lines.append(f"WARN this space has a remote ({', '.join(remotes)}); it is never pushed")
         ok = False
-    hooks = subprocess.run(["git", "-C", str(PROJECT), "rev-parse", "--git-path", "hooks"],
-                           capture_output=True, text=True).stdout.strip()
-    if not (PROJECT / hooks / "pre-push").exists():
+    hooks = git.hooks_dir(PROJECT)
+    if hooks is None or not (hooks / "pre-push").exists():
         lines.append("WARN no pre-push stub — nothing stops a push from here")
         ok = False
     from lib import marks
@@ -529,12 +526,9 @@ def install_hooks():
     hooks = [h for h in sorted(src.glob("*")) if h.is_file()]
     if not hooks:
         return {"ok": False, "lines": [f"FAIL no hooks in {src.relative_to(ROOT)}"]}
-    try:
-        r = subprocess.run(["git", "-C", str(ROOT), "rev-parse", "--git-path", "hooks"],
-                           capture_output=True, text=True, timeout=10, check=True)
-    except Exception as e:
-        return {"ok": False, "lines": [f"FAIL not a git checkout ({e})"]}
-    dst = (ROOT / r.stdout.strip()).resolve()
+    dst = git.hooks_dir(ROOT)
+    if dst is None:
+        return {"ok": False, "lines": ["FAIL not a git checkout"]}
     dst.mkdir(parents=True, exist_ok=True)
     lines = []
     for h in hooks:
@@ -542,17 +536,11 @@ def install_hooks():
         t.write_bytes(h.read_bytes())
         t.chmod(0o755)
         lines.append(f"ok   {h.name}")
-    override = subprocess.run(["git", "-C", str(ROOT), "config", "--get", "core.hooksPath"],
-                              capture_output=True, text=True, timeout=10).stdout.strip()
+    override = git.hooks_override(ROOT)
     if override:
         lines.append(f"WARN core.hooksPath={override} overrides these; unset it")
     lines.append(f"installed {len(hooks)} hook(s) in {dst}")
     return {"ok": not override, "lines": lines}
-
-
-def git_out(repo, *args):
-    r = subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True)
-    return r.stdout.strip() if r.returncode == 0 else ""
 
 
 def spaces(name=None):
@@ -573,11 +561,11 @@ def spaces(name=None):
         marker = (s / MARKER).read_text()
         was = next((l.split(":", 1)[1].strip() for l in marker.splitlines()
                     if l.startswith("toolkit:")), "?")
-        n = git_out(s, "rev-list", "--count", "HEAD") or "0"
+        n = git.commits(s)
         home = str(s).replace(str(Path.home()), "~")
         state = "(unknown)" if was == "?" else "(current)" if was == now else "(behind)"
         lines.append(f"  {s.name:<12} {home:<34} toolkit {was} {state:<10} {n:>4} commits")
-        for r in git_out(s, "remote").split():
+        for r in git.remotes(s):
             lines.append(f"  WARN {s.name} has a remote ({r}) — a model space is never pushed")
             ok = False
     return {"ok": ok, "lines": lines}

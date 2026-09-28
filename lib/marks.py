@@ -9,10 +9,9 @@ model, and `beaky`'s one known defect lived in the one file nothing verifies
 here needs no confirmation gate.
 """
 import json
-import subprocess
 from pathlib import Path
 
-from . import store
+from . import git, store
 
 NAME = "marks.json"
 PREFIX = "m"
@@ -346,26 +345,15 @@ def _released(path):
     contains rather than a stamp of our own being trusted about it.
     """
     path = Path(path)
-    # Two keys: the last one given is git's primary, so this is newest
-    # first, with the version number breaking a same-second tie.
-    tags = _git(path.parent, "tag", "--sort=-v:refname", "--sort=-creatordate")
-    if not tags:
+    released = git.tags(path.parent)
+    if not released:
         return None, []
-    tag = tags.splitlines()[0]
-    blob = _git(path.parent, "show", f"{tag}:./{path.name}")
+    tag = released[0]
+    blob = git.show(path.parent, tag, path.name)
     try:
         return tag, (json.loads(blob) if blob else [])
     except json.JSONDecodeError:
         return tag, []
-
-
-def _git(cwd, *args):
-    try:
-        done = subprocess.run(("git",) + args, cwd=cwd, capture_output=True,
-                              text=True)
-    except OSError:
-        return ""
-    return done.stdout.strip() if done.returncode == 0 else ""
 
 
 def prune(path):

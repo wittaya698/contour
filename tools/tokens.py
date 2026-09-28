@@ -24,13 +24,12 @@ NOISE = re.compile(
     r"command-name|command-message|command-args|pasted_content)\b.*?"
     r"(</\1>|$)", re.S)
 
-# Anthropic cache pricing multipliers, relative to a normal input token, and
-# output's premium over one — from `console/spend.py`, which is where the console
-# weighs a turn for the page. One definition, because a run read here and watched
-# there must not come out as two prices (ADR 0019, decision 37).
-CACHE_READ_MULT = spend.CACHE_READ_MULT
-CACHE_WRITE_MULT = spend.CACHE_WRITE_MULT
-OUTPUT_MULT = spend.OUTPUT_MULT
+# What a turn cost, and what the SDK's usage keys are called, both come from
+# `console/spend.py` — the module the console weighs a turn with for the page.
+# Nothing here re-expresses either. One definition, because a run read here and
+# watched there must not come out as two prices, and a key the SDK renames must
+# not break one reader while silently miscounting the other (ADR 0019,
+# decision 37).
 
 
 def transcript_dir(project: Path) -> Path:
@@ -87,31 +86,27 @@ def iterations(events):
                 cur = {
                     "prompt": p[0], "images": p[1], "time": e.get("timestamp", ""),
                     "branch": e.get("gitBranch", ""), "turns": 0,
-                    "input": 0, "cache_read": 0, "cache_write": 0,
-                    "output": 0, "thinking": 0, "tools": 0,
+                    **{k: 0 for k in spend.FIGURES}, "thinking": 0, "tools": 0,
                 }
                 out.append(cur)
         elif t == "assistant" and cur is not None:
             m = e.get("message", {})
-            u = m.get("usage", {})
+            u = m.get("usage", {}) or {}
             cur["turns"] += 1
-            cur["input"] += u.get("input_tokens", 0)
-            cur["cache_read"] += u.get("cache_read_input_tokens", 0)
-            cur["cache_write"] += u.get("cache_creation_input_tokens", 0)
-            cur["output"] += u.get("output_tokens", 0)
-            cur["thinking"] += u.get("output_tokens_details", {}).get("thinking_tokens", 0)
+            # Translated by the console's own reader, so the four figures mean
+            # here exactly what they mean on the page — including a figure the
+            # SDK sends as `null` rather than leaving out, which is nothing
+            # spent and not a crash.
+            for k, n in spend.counts(u).items():
+                cur[k] += n
+            cur["thinking"] += spend.thinking(u)
             cur["tools"] += sum(
                 1 for b in m.get("content", []) if isinstance(b, dict)
                 and b.get("type") == "tool_use"
             )
     out = [i for i in out if i["turns"]]
     for it in out:
-        it["weighted"] = round(
-            it["input"]
-            + it["cache_read"] * CACHE_READ_MULT
-            + it["cache_write"] * CACHE_WRITE_MULT
-            + it["output"] * OUTPUT_MULT
-        )
+        it["weighted"] = spend.weigh(it)
     return out
 
 
@@ -129,8 +124,7 @@ def console_runs(project: Path):
             "prompt": (turn.get("prompt") or turn.get("run", "?"))[:58],
             "images": 0,
             "time": turn.get("at", ""), "branch": "console", "turns": 0,
-            "input": 0, "cache_read": 0, "cache_write": 0,
-            "output": 0, "thinking": 0, "tools": 0,
+            **{k: 0 for k in spend.FIGURES}, "thinking": 0, "tools": 0,
             # How many gates the run stopped at, and what the turns after one
             # cost. A gate buys a turn of re-explanation, and this is the figure
             # that makes tuning the ask-list a decision rather than a mood.
@@ -183,8 +177,9 @@ def report(its, name):
         after = sum(i.get("after_gates", 0) for i in its)
         print(f"  gates: {gates}, and {after} weighted spent in the turns after "
               f"one — the ask-list is what shortens this")
-    print("  weighted = fresh + 0.10*cached + 1.25*written + 5*out "
-          "(relative units, not dollars — use /cost for billing)")
+    print(f"  weighted = fresh + {spend.CACHE_READ_MULT:g}*cached "
+          f"+ {spend.CACHE_WRITE_MULT:g}*written + {spend.OUTPUT_MULT:g}*out "
+          f"(relative units, not dollars — use /cost for billing)")
 
 
 def main():

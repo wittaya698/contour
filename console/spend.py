@@ -42,6 +42,20 @@ def counts(usage):
             "output": usage.get("output_tokens", 0) or 0}
 
 
+def thinking(usage):
+    """How much of one turn's output was thought rather than said.
+
+    Not one of `FIGURES` — the console does not record it, because the page
+    weighs what a turn cost and thinking is already inside `output`. It is named
+    here for the other reason `counts` exists: this is where the SDK's own
+    spelling is kept, and the accounting must not hold a second copy of it. The
+    details block is absent on a turn that did none, so *no thinking* and *no
+    such key* are the same answer, which is zero and never a crash.
+    """
+    details = (usage or {}).get("output_tokens_details") or {}
+    return details.get("thinking_tokens", 0) or 0
+
+
 def path(space):
     """The layout says where a space's `.contour` is; the name is this
     module's own (slice 17)."""

@@ -162,6 +162,52 @@ class TerminalOnlyTest(TokensCase):
         self.assertNotIn("gates", printed,
                          "a gate line where no gate ever happened")
 
+    def test_a_turn_whose_usage_carries_a_null_is_still_counted(self):
+        """The SDK sends a figure it did not spend as `null`, not as absent, and
+        the two readers disagreed about that: the console translates its usage
+        through `spend.counts`, which reads a null as nothing spent, while the
+        accounting read the SDK's own keys raw and got `None` into the
+        arithmetic. One translation, or a transcript with a null in it is a
+        crash on the one side and a figure on the other (ADR 0019, decision 37).
+        """
+        space = self.space()
+        self.typed(space, "why is the neck 269",
+                   {"input_tokens": 200, "cache_creation_input_tokens": None,
+                    "cache_read_input_tokens": None, "output_tokens": 300})
+        code, said = self.report(space, "--json")
+        self.assertEqual(code, 0, said)
+        every = [it for group in json.loads(said).values() for it in group]
+        self.assertEqual(every[0]["cache_write"], 0)
+        self.assertEqual(every[0]["weighted"], 200 + 5 * 300)
+
+    def test_what_a_turn_thought_is_reported_beside_what_it_said(self):
+        """The line under the table — thinking against output — is why anyone
+        reads this tool twice. It is the fifth SDK key and the only figure the
+        console does not record, so it is spelled in `console/spend.py` with
+        the other four and read from there."""
+        space = self.space()
+        self.typed(space, "why is the neck 269",
+                   {"input_tokens": 200, "output_tokens": 300,
+                    "output_tokens_details": {"thinking_tokens": 180}})
+        code, said = self.report(space, "--json")
+        self.assertEqual(code, 0, said)
+        every = [it for group in json.loads(said).values() for it in group]
+        self.assertEqual(every[0]["thinking"], 180)
+
+    def test_a_turn_that_reports_no_thinking_at_all_is_still_counted(self):
+        """The fifth SDK key, and the last one this tool spelled for itself.
+        Thinking is reported under a details block the SDK omits or sends as
+        `null` on a turn that did none, and the tool read straight through it —
+        so the accounting fell over on the cheapest turn there is."""
+        space = self.space()
+        self.typed(space, "why is the neck 269",
+                   {"input_tokens": 200, "output_tokens": 300,
+                    "output_tokens_details": None})
+        code, said = self.report(space, "--json")
+        self.assertEqual(code, 0, said)
+        every = [it for group in json.loads(said).values() for it in group]
+        self.assertEqual(every[0]["thinking"], 0)
+
     def test_a_project_with_neither_still_says_where_it_looked(self):
         """The error that tells a first-time reader what this tool reads. It has
         to survive the slice: a console run is a second source, not a reason for
