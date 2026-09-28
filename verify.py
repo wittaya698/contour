@@ -11,6 +11,9 @@ import re
 import bmesh
 import bpy
 
+from lib import checks
+from lib import measure as gather
+
 
 TOP = {"model", "revision", "description", "targets", "dimensions", "parts",
        "topology", "uv", "materials", "transform", "render", "notes"}
@@ -28,8 +31,8 @@ ORIGIN_TOL_MM = 1.0
 UNIT_TOL = 1e-4
 
 
-def _res(cid, ok, info="", msg=""):
-    return {"id": cid, "ok": ok, "info": info, "msg": msg}
+# One verdict shape, defined with the checks that produce it (ADR 0020).
+_res = checks.result
 
 
 def _names(objs, cap=4):
@@ -43,7 +46,10 @@ def measure():
     """Everything the checks need, gathered once from the evaluated scene."""
     bpy.context.view_layer.update()
     dg = bpy.context.evaluated_depsgraph_get()
-    m = {"objects": list(bpy.context.scene.objects), "meshes": [], "lo": None, "hi": None}
+    m = {"objects": list(bpy.context.scene.objects), "meshes": [], "lo": None, "hi": None,
+         # The reading rather than the instrument: summary numbers per part,
+         # which `lib/checks.py` judges without touching geometry (ADR 0020).
+         "parts": gather.parts()}
     lo, hi = [1e30] * 3, [-1e30] * 3
     for obj in m["objects"]:
         if obj.type != "MESH":
@@ -140,74 +146,11 @@ def check_parts(spec, m):
     return [_res("parts", not problems, f"{len(objs)}/{total}", "parts " + "; ".join(problems))]
 
 
-def _per_mesh(m, pred):
-    """Names of meshes for which pred(bm) is truthy, and the summed detail."""
-    return [(o, r) for o, bm in m["meshes"] if (r := pred(bm))]
-
-
 def check_topology(spec, m):
-    t = spec.get("topology")
-    if not t:
-        return []
-    out = []
-    faces = sum(len(bm.faces) for _, bm in m["meshes"])
-    tris = sum(len(f.verts) - 2 for _, bm in m["meshes"] for f in bm.faces)
-    if "tri_budget" in t:
-        out.append(_res("tris", tris <= t["tri_budget"], f"{tris:,}/{t['tri_budget']:,}",
-                        f"tris {tris:,} > budget {t['tri_budget']:,}"))
-    if "quads_min_pct" in t:
-        quads = sum(1 for _, bm in m["meshes"] for f in bm.faces if len(f.verts) == 4)
-        pct = 100.0 * quads / faces if faces else 0.0
-        out.append(_res("quads", pct >= t["quads_min_pct"], f"{pct:.0f}%",
-                        f"quads {pct:.1f}%, want >={t['quads_min_pct']}%"))
-    if t.get("ngons_allowed") is False:
-        bad = _per_mesh(m, lambda bm: sum(1 for f in bm.faces if len(f.verts) > 4))
-        out.append(_res("ngons", not bad, "0",
-                        "ngons in " + ", ".join(f"{o.name}({n})" for o, n in bad[:4])))
-    if t.get("manifold") == "required":
-        bad = _per_mesh(m, lambda bm: sum(1 for e in bm.edges if not e.is_manifold))
-        out.append(_res("manifold", not bad, "ok",
-                        "non-manifold edges in "
-                        + ", ".join(f"{o.name}({n})" for o, n in bad[:4])))
-    if t.get("loose_geometry") == "forbidden":
-        def loose(bm):
-            return (sum(1 for v in bm.verts if not v.link_edges)
-                    + sum(1 for e in bm.edges if not e.link_faces))
-        bad = _per_mesh(m, loose)
-        out.append(_res("loose", not bad, "0",
-                        "loose verts/edges in "
-                        + ", ".join(f"{o.name}({n})" for o, n in bad[:4])))
-    if t.get("normals") == "outward":
-        out.append(_check_normals(m))
-    elif "normals" in t:
-        out.append(_res("normals", False, msg=f"normals: {t['normals']!r} not implemented"))
-    if "doubles_tolerance_mm" in t:
-        d = t["doubles_tolerance_mm"] / 1000.0
-
-        def doubles(bm):
-            return len(bmesh.ops.find_doubles(bm, verts=bm.verts, dist=d)["targetmap"])
-        bad = _per_mesh(m, doubles)
-        out.append(_res("doubles", not bad, "0",
-                        f"verts within {t['doubles_tolerance_mm']}mm in "
-                        + ", ".join(f"{o.name}({n})" for o, n in bad[:4])))
-    return out
-
-
-def _check_normals(m):
-    """Recompute outward normals on a copy and count faces that disagree."""
-    bad = []
-    for obj, bm in m["meshes"]:
-        ref = bm.copy()
-        bmesh.ops.recalc_face_normals(ref, faces=ref.faces)
-        ref.normal_update()
-        bm.faces.ensure_lookup_table()
-        ref.faces.ensure_lookup_table()
-        n = sum(1 for a, b in zip(bm.faces, ref.faces) if a.normal.dot(b.normal) < 0)
-        ref.free()
-        if n:
-            bad.append((obj, n))
-    return _res("normals", not bad, "outward",
-                "inward faces in " + ", ".join(f"{o.name}({n})" for o, n in bad[:4]))
+    """Pure, over the measurement (ADR 0020). The arithmetic moved to
+    `lib/checks.py`, where it can be exercised from a record written by hand;
+    what is left here is the name `run` and the mutant suite call it by."""
+    return checks.topology(spec, m["parts"])
 
 
 def check_uv(spec, m):

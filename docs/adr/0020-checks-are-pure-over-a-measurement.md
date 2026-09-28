@@ -1,13 +1,21 @@
 # 0020 — Checks are pure over a measurement
 
-**Status:** Proposed · 2026-09-28 · **extends [ADR 0009](0009-verifier-proves-its-own-teeth.md)**
+**Status:** Accepted · 2026-09-28 · **extends [ADR 0009](0009-verifier-proves-its-own-teeth.md)**
 
-> **Proposed, not accepted.** The untested claim is that every check in
-> `verify.py` can be expressed as arithmetic over per-part summary numbers, with
-> no live geometry. Accept it once one check — `check_topology`, the richest —
-> has been rewritten that way and its mutant still fails. If a check turns out to
-> need real geometry, this ADR is wrong and the honest alternative is the one
-> rejected below: a handle behind the seam, with the cost stated.
+> **Accepted on its tracer bullet, with decision 1 amended** (issue 22).
+> `check_topology` — the richest of the six, and the one that would have broken
+> this if anything did — was rewritten as a pure function over per-part summary
+> numbers. All six of its sub-checks came out as arithmetic; none needed the
+> handle behind the seam that the rejected alternative would have given them.
+> Twelve pure tests exercise it from records written by hand, with no Blender,
+> and all six of ADR 0009's topology mutants still fail their named check.
+>
+> One field could not be gathered as drafted, and decision 1 says so below: a
+> *duplicate-vertex count* is a count at a tolerance, and the tolerance is in
+> the spec, which a gather does not read. The gather answers the nearest-pair
+> distance instead — the same verdict for any tolerance, and a better failure
+> line. That the correction made the measurement *more* spec-free is why the
+> claim was accepted rather than merely survived.
 
 ## Context
 
@@ -44,10 +52,21 @@ it does gather, but it hands over the instrument instead of the reading.
 ## Decision
 
 1. **A measurement is data.** One record per part: face-degree histogram, vertex
-   and edge counts, non-manifold and loose counts, duplicate-vertex count,
+   and edge counts, non-manifold and loose counts, **nearest-pair distance**,
    flipped-normal count, bounds, world transform, material names. No `bpy`
    object and no `bmesh` handle survives the gather. The record is small enough
    to write by hand in a test, which is the property the whole ADR is for.
+
+   *Nearest-pair distance and not a duplicate-vertex count* (amended, issue 22).
+   How many vertices are duplicates is a question about a tolerance, and the
+   tolerance is `topology.doubles_tolerance_mm` — in the spec, which the gather
+   does not read and must not, or the gather is coupled to the thing it is
+   being kept clean of. How close the closest two vertices came is the same
+   question with the tolerance taken out of it: a pair within `d` exists if and
+   only if the nearest pair is within `d`, so the check is unchanged as a
+   verdict and improved as a report, since it can say how close rather than how
+   many. The rule this is an instance of: **where a field would need the spec
+   to gather, gather the reading the spec is compared against.**
 2. **The gather owns its own lifetimes.** `lib/measure.py` frees every `bmesh`
    before it returns. `release()` ceases to exist, and the leak in `cmd_render`
    goes with it — not fixed, removed.
