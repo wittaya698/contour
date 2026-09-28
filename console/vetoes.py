@@ -15,11 +15,10 @@ record that something was prevented. Two opposite rules in one file means the
 pruner has to tell them apart, and the first bug is that it does not.
 """
 import json
-import re
 import subprocess
 from pathlib import Path
 
-from lib import agent, anchor, marks
+from lib import agent, anchor, marks, store
 
 NAME = "vetoes.json"
 """Beside `marks.json` at the space's root, and tracked for the same reason.
@@ -29,32 +28,29 @@ that vanished on a clean checkout would be exactly the log ADR 0019's decision 1
 to make it.
 """
 
-_ID = re.compile(r"^v(\d+)$")
+PREFIX = "v"
+"""The letter a veto's id carries. `lib/store.py` knows how to read and write a
+JSON file and nothing about which ones exist, so the file's name and its ids
+stay here, where they mean something."""
 
 
 def load(space):
-    path = Path(space) / NAME
-    return json.loads(path.read_text(encoding="utf-8")) if path.exists() else []
+    """Every veto in this space. Taking the space and not the file, because the
+    path is this module's knowledge — there is one place a veto may be written
+    and this is it."""
+    return store.load(Path(space) / NAME, [])
 
 
 def save(space, vetoes):
-    """Indented, one field per line, in the order they happened.
-
-    Shaped to be read in a diff rather than by a parser: a veto arrives at the
-    bottom and nothing above it moves, so `git diff` shows the sentence that was
-    added and not a reformatted file.
-    """
-    Path(space).joinpath(NAME).write_text(
-        json.dumps(vetoes, indent=2) + "\n", encoding="utf-8")
+    return store.save(Path(space) / NAME, vetoes)
 
 
 def next_id(vetoes):
     """One past the highest ever used, the way a mark's id is. Nothing here is
-    ever deleted, so this is also one past the count — but it is written as the
-    highest, because an id that could be reused would point at two moments."""
-    used = [int(m.group(1)) for m in
-            (_ID.match(str(v.get("id", ""))) for v in vetoes) if m]
-    return f"v{max(used, default=0) + 1}"
+    ever deleted, so this is also one past the count — but it is asked for as
+    the highest, because an id that could be reused would point at two
+    moments."""
+    return store.next_id(vetoes, PREFIX)
 
 
 def record(space, category, tool, call, reason):

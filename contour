@@ -645,9 +645,9 @@ def anchor_check():
     stored where it is *on the part*, not where it happened to be on a sheet.
     """
     sys.path.insert(0, str(ROOT))
-    from lib import anchor, mask as mask_store
+    from lib import anchor, mask as mask_store, store
     out = ROOT / "fixtures" / "smoke" / "out"
-    sheet = anchor.load(out / "views.json")
+    sheet = store.load(out / "views.json", None)
     if not sheet:
         return {"ok": False, "lines": ["no views.json beside the sheet"]}
     labels = [v["label"] for v in sheet["views"]]

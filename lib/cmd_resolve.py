@@ -16,7 +16,7 @@ ray would still land somewhere; it would just be somewhere the user never saw.
 import bpy
 from mathutils import Matrix, Vector
 
-from . import anchor, marks, paths, scene
+from . import anchor, marks, paths, scene, store
 
 PULLBACK = 100.0   # metres to back an orthographic ray off before it starts
 
@@ -65,7 +65,7 @@ def ray(sc, cam, view, u, v):
 def run(args):
     variant, fixture = paths.parse(args)
     P = paths.resolve(variant, fixture)
-    sheet = anchor.load(P["views"])
+    sheet = store.load(P["views"], None)
     if sheet is None:
         return {"ok": True, "lines": [f"{variant} resolve no views.json: "
                                       "this sheet predates anchoring"]}

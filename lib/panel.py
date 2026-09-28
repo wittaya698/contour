@@ -10,11 +10,11 @@ and nothing for a second reader to disagree with.
 Stdlib, and Blender-free: the launcher serves this and so does the console, and
 the console may never import a `bpy`-bound module (ADR 0019, decision 32).
 """
-import json
 from pathlib import Path
 
 from . import anchor
 from . import marks as marks_store
+from . import store
 
 NAME = "last-build.json"
 """The last build's verdict, beside the log of it in the space's `.contour/`.
@@ -35,18 +35,17 @@ def record(path, rep):
     """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({"built": "results" in rep}) + "\n",
-                    encoding="utf-8")
+    store.save(path, {"built": "results" in rep})
 
 
 def state(views=None, blend=None, verdict=None, marks=None):
     """What the panel shows, as one dict the page renders and does not reason
     about. `build` is None when nothing has ever been drawn, which is a space
     at the start and not a broken page."""
-    sheet = anchor.load(views) if views else None
+    sheet = store.load(views, None) if views else None
     if sheet is None:
         return {"build": None, "current": False}
-    said = anchor.load(verdict) if verdict else None
+    said = store.load(verdict, None) if verdict else None
     failed = bool(said) and not said["built"]
     why = ("last build failed" if failed
            else anchor.stale(sheet, blend) and "the build moved on")

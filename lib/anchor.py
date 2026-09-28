@@ -15,7 +15,7 @@ import hashlib
 import json
 from pathlib import Path
 
-from . import marks
+from . import marks, store
 
 
 def aim(sheet, pixel):
@@ -78,14 +78,8 @@ def fingerprint(blend):
 def record(path, resolution, views, blend):
     """Leave beside the sheet what it would take to re-cast its rays: the
     tiles, their cameras, and the build they were drawn from."""
-    Path(path).write_text(json.dumps(
-        {"resolution": resolution, "build": fingerprint(blend), "views": views},
-        indent=2) + "\n", encoding="utf-8")
-
-
-def load(path):
-    path = Path(path)
-    return json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
+    store.save(path, {"resolution": resolution, "build": fingerprint(blend),
+                      "views": views})
 
 
 def stale(sheet, blend):

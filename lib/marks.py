@@ -9,29 +9,28 @@ model, and `beaky`'s one known defect lived in the one file nothing verifies
 here needs no confirmation gate.
 """
 import json
-import re
 import subprocess
 from pathlib import Path
 
+from . import store
+
 NAME = "marks.json"
-_ID = re.compile(r"^m(\d+)$")
+PREFIX = "m"
+"""The file and the letter its ids carry. `lib/store.py` holds the mechanics of
+a JSON file and none of this: `m1` means a mark, which is a fact about marks."""
 
 
 def load(path):
-    path = Path(path)
-    return json.loads(path.read_text(encoding="utf-8")) if path.exists() else []
+    """Every mark on file, or none at all. A space with no marks has no file."""
+    return store.load(path, [])
 
 
 def save(path, marks):
-    Path(path).write_text(json.dumps(marks, indent=2) + "\n", encoding="utf-8")
+    return store.save(path, marks)
 
 
 def next_id(marks):
-    """One past the highest ever used, not one past the count: closed marks are
-    pruned (0018-2), and a reused id would point at two different things."""
-    used = [int(m.group(1)) for m in
-            (_ID.match(str(k.get("id", ""))) for k in marks) if m]
-    return f"m{max(used, default=0) + 1}"
+    return store.next_id(marks, PREFIX)
 
 
 def append(path, mark, author="user"):

@@ -15,6 +15,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from lib import anchor
+from lib import store
 from lib import marks as marks_store
 from lib.canvas import Canvas
 
@@ -104,7 +105,10 @@ class BuildWindowTest(unittest.TestCase):
     def record(self):
         anchor.record(self.views, 1024,
                       [{"label": "front", "tile": [0, 0, 512, 512]}], self.blend)
-        return anchor.load(self.views)
+        # Read back through the store, which is where reading a JSON file
+        # lives now: `anchor.record` writes a sheet, and `anchor.load` was a
+        # generic reader that only happened to sit here (slice 16).
+        return store.load(self.views, None)
 
     def test_a_sheet_records_the_build_it_was_drawn_from(self):
         sheet = self.record()

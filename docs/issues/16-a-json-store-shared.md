@@ -38,14 +38,40 @@ furniture.
 
 ## Acceptance criteria
 
-- [ ] `lib/store.py` exposes `load`, `save`, `next_id` and nothing else
-- [ ] `lib/marks.py`, `console/vetoes.py`, `lib/panel.py` and the views reader all use it
-- [ ] `lib/anchor.py:load` is gone, and `lib/panel.py` no longer imports `anchor`
-- [ ] `marks.json` and `vetoes.json` are byte-identical before and after for the same data
-- [ ] Id allocation still refuses to reuse an id, for both prefixes
-- [ ] `tests/test_lib_split.py`'s `FREE` roster names `store`
-- [ ] `tests/test_store.py` covers a missing file, an unreadable one, and id allocation over a gap
-- [ ] `contour selftest` green; `tests/test_marks.py`, `test_prune.py` and `test_console.py` unchanged in behaviour
+- [x] `lib/store.py` exposes `load`, `save`, `next_id` and nothing else
+- [x] `lib/marks.py`, `console/vetoes.py`, `lib/panel.py` and the views reader all use it
+- [x] `lib/anchor.py:load` is gone
+- [ ] `lib/panel.py` no longer imports `anchor` — not this slice's to finish; see below
+- [x] `marks.json` and `vetoes.json` are byte-identical before and after for the same data
+- [x] Id allocation still refuses to reuse an id, for both prefixes
+- [x] `tests/test_lib_split.py`'s `FREE` roster names `store`
+- [x] `tests/test_store.py` covers a missing file, an unreadable one, and id allocation over a gap
+- [x] `contour selftest` green; `tests/test_marks.py`, `test_prune.py` and `test_console.py` unchanged in behaviour
+
+Criterion 4 was written as one thing and is two. `anchor.load` is gone, but
+`lib/panel.py` also calls `anchor.stale` and `anchor.unresolved`, so the import
+survives it — the reader was never the whole of that dependency. Moving the other
+two here would be slice 20 done early and under a different name, so the reader
+moved and the import stayed. **Slice 20 inherits the second half.**
+
+`anchor.load` had a fifth caller nobody had counted: `contour:650`, in
+`anchor_check`, which `contour selftest` runs and the unit suite does not. It
+surfaced as a crash after 296 unit tests were green, which is the one place in
+this repo where that can still happen. Routed to the store with the rest.
+
+`lib/agent.py:known` is a sixth reader of the same shape — read `parts.json` or
+None — and it is left alone. It reads `.values()` off the result rather than the
+result, so routing it is a change to what `known` returns on an absent file, not
+a change of mechanics, and this slice was scoped to the four the review named.
+
+`load` raises on a file that is not JSON, which is what all four callers did
+already, and `tests/test_store.py` now says so on purpose. The fail-soft reading
+is the one that loses data: the default would be believed by the next `append`,
+which writes the whole file back, so every mark in a truncated file would be
+deleted by the tool that was keeping them.
+
+`panel.record` now writes `.contour/last-build.json` through the store, so that
+file gains indentation. It is untracked and only ever read by `json.loads`.
 
 ## Blocked by
 
