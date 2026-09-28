@@ -34,7 +34,7 @@ import numpy as np
 
 import bpy
 
-from . import marks, paths, span
+from . import marks, space, span
 
 BG_TOL = 0.10     # distance from the sampled background colour
 DARK = 0.22       # below this mean brightness a pixel is toon outline, not colour
@@ -146,8 +146,11 @@ def flag(args, name, cast=str, default=None):
 def run(args):
     named = None if not args or args[0].startswith("--") else args[0]
     rest = args if named is None else args[1:]
-    base = paths.PROJECT or paths.ROOT
-    store = base / marks.NAME
+    # The space this was typed in, and nothing to fall back to: `PROJECT or
+    # ROOT` used to answer here, which let the toolkit's own directory pass for
+    # a model space.
+    P = space.parse([])
+    store = P.marks
 
     # A span is already pinned to a reference, so it names its own: asking for
     # the picture again means saying it twice, in two spellings -- the path
@@ -167,7 +170,7 @@ def run(args):
                                        "  e.g. contour measure refs/front.jpg --anchor 1700 --silhouette"]}
     else:
         name = named
-    path = next((p for p in (base / name, paths.ROOT / name) if p.exists()), None)
+    path = next((p for p in (P.root / name, P.toolkit / name) if p.exists()), None)
     if path is None:
         return {"ok": False, "lines": [f"FAIL measure: no such reference {name}"]}
 
@@ -179,7 +182,7 @@ def run(args):
     # behaviour of measuring in pixels until an anchor is given.
     anchor = flag(rest, "--anchor", float)
     if asked and anchor is None:
-        anchor = span.anchor_mm(base / "spec.yaml")
+        anchor = span.anchor_mm(P.spec)
     px = load(path)
     h, w = px.shape[:2]
     bg, fg = masks(px, bg_tol)

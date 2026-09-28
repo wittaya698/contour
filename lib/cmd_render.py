@@ -18,7 +18,7 @@ import numpy as np
 from bpy_extras.object_utils import world_to_camera_view
 from mathutils import Vector
 
-from . import anchor, ctx_override, mask, marks, miniyaml, paths, scene
+from . import anchor, ctx_override, mask, marks, miniyaml, space, scene
 
 BG = (0.93, 0.93, 0.94)
 GRID = (0.72, 0.74, 0.78)
@@ -290,15 +290,15 @@ def badge_line(variant, placed):
 def run(args):
     import verify
 
-    variant, fixture = paths.parse(args)
-    P = paths.resolve(variant, fixture)
-    if not P["blend"].exists():
-        return {"ok": False, "lines": [f"FAIL no build at {paths.display(P['blend'])}"
+    P = space.parse(args)
+    variant = P.name
+    if not P.blend.exists():
+        return {"ok": False, "lines": [f"FAIL no build at {P.display(P.blend)}"
                                        f": run ./contour check {variant} first"]}
-    spec = miniyaml.load(P["spec"])
+    spec = miniyaml.load(P.spec)
     res = int((spec.get("render") or {}).get("sheet_resolution", 1024))
     scene.reset()
-    scene.load_collections(P["blend"])
+    scene.load_collections(P.blend)
     m = verify.measure()
     lo, hi = list(m["lo"]), list(m["hi"])
     verify.release(m)
@@ -317,17 +317,17 @@ def run(args):
     sc = setup(res)
     segs = world_segments(lo, hi)
     t = res // 2
-    P["out"].mkdir(parents=True, exist_ok=True)
+    P.out.mkdir(parents=True, exist_ok=True)
     # Top-down tile rects, the way a click counts: front|right / top|persp.
     corners = {"front": (0, 0), "right": (t, 0), "top": (0, t), "persp": (t, t)}
-    pinned, placed = pins(P["marks"], sc), {}
-    noted = aimless(P["marks"])
+    pinned, placed = pins(P.marks, sc), {}
+    noted = aimless(P.marks)
     tiles, cams, spare = [], [], []
     for label, loc, orth, down in views:
         cam = add_camera(label, loc, ctr, orth, down)
         cams.append((label, cam))
         sc.camera = cam
-        tmp = P["out"] / f"_view_{label}.png"
+        tmp = P.out / f"_view_{label}.png"
         sc.render.filepath = str(tmp)
         ctx_override.call("render.render", write_still=True)
         tile = read(tmp)
@@ -357,7 +357,7 @@ def run(args):
     mtiles = []
     for label, cam in cams:
         sc.camera = cam
-        tmp = P["out"] / f"_mask_{label}.png"
+        tmp = P.out / f"_mask_{label}.png"
         sc.render.filepath = str(tmp)
         ctx_override.call("render.render", write_still=True)
         mtiles.append(np.round(read(tmp, raw=True)[..., 0] * 255).astype(np.uint8))
@@ -377,12 +377,12 @@ def run(args):
     idx = np.zeros((res, res), dtype=np.uint8)
     for (row, col), tile in zip([(1, 0), (1, 1), (0, 0), (0, 1)], mtiles):
         idx[row * t:(row + 1) * t, col * t:(col + 1) * t] = tile
-    mask.write(P["mask"], np.flipud(idx))   # Blender reads bottom-up, PNG top-down
-    P["parts"].write_text(json.dumps(parts, indent=2) + "\n", encoding="utf-8")
+    mask.write(P.mask, np.flipud(idx))   # Blender reads bottom-up, PNG top-down
+    P.parts.write_text(json.dumps(parts, indent=2) + "\n", encoding="utf-8")
 
-    anchor.record(P["views"], res,
+    anchor.record(P.views, res,
                   [view_record(label, (*corners[label], t, t), cam)
-                   for label, cam in cams], P["blend"])
+                   for label, cam in cams], P.blend)
 
     sheet = np.ones((res, res, 4), dtype=np.float32)
     for (row, col), tile in zip([(1, 0), (1, 1), (0, 0), (0, 1)], tiles):
@@ -391,14 +391,14 @@ def run(args):
     sheet[:, t - 1:t + 1, :3] = 0.35
     out = bpy.data.images.new("sheet", res, res, alpha=False)
     out.pixels.foreach_set(sheet.ravel())
-    P["sheet"].parent.mkdir(parents=True, exist_ok=True)
-    out.filepath_raw = str(P["sheet"])
+    P.sheet.parent.mkdir(parents=True, exist_ok=True)
+    out.filepath_raw = str(P.sheet)
     out.file_format = "PNG"
     out.save()
-    kb = P["sheet"].stat().st_size / 1024
+    kb = P.sheet.stat().st_size / 1024
     return {"ok": True, "lines": [f"{variant} sheet {res}x{res} {kb:.0f}KB -> "
-                                  f"{paths.display(P['sheet'])}"
+                                  f"{P.display(P.sheet)}"
                                   "  (front|right / top|persp)",
                                   f"{variant} mask {len(parts)} parts -> "
-                                  f"{paths.display(P['mask'])}",
+                                  f"{P.display(P.mask)}",
                                   *badge_line(variant, placed)]}

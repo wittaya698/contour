@@ -9,7 +9,7 @@ Two independent readings of the same .glb:
 Topology checks (manifold, doubles, quad %) are NOT re-run: glTF is triangles-only
 and splits vertices at hard edges, so an importer legitimately changes both.
 """
-from . import ctx_override, glb, miniyaml, paths, scene
+from . import ctx_override, glb, miniyaml, space, scene
 
 ORIGIN_TOL_MM = 1.0
 GL_AXIS = {"width": 0, "height": 1, "depth": 2}  # glTF: X right, Y up, Z toward viewer
@@ -54,20 +54,20 @@ def file_checks(spec, g):
 def run(args):
     import verify
 
-    variant, fixture = paths.parse(args)
-    P = paths.resolve(variant, fixture)
-    if not P["glb"].exists():
-        return {"ok": False, "lines": [f"FAIL no {paths.display(P['glb'])}: "
+    P = space.parse(args)
+    variant = P.name
+    if not P.glb.exists():
+        return {"ok": False, "lines": [f"FAIL no {P.display(P.glb)}: "
                                        f"run ./contour export {variant} first"]}
-    spec = miniyaml.load(P["spec"])
-    g = glb.measure(P["glb"])
+    spec = miniyaml.load(P.spec)
+    g = glb.measure(P.glb)
     results = file_checks(spec, g)
 
     scene.reset()
-    scene.load_collections(P["blend"])
+    scene.load_collections(P.blend)
     built_tris = _tris_now(verify)
     scene.reset()
-    ctx_override.call("import_scene.gltf", filepath=str(P["glb"]))
+    ctx_override.call("import_scene.gltf", filepath=str(P.glb))
     results += [dict(r, id=f"re_{r['id']}") for r in verify.run(spec, variant, only=RE_CHECKS)]
     got_tris = _tris_now(verify)
     results.append(_res("tris_kept", got_tris == built_tris == g["tris"], f"{got_tris:,}",
@@ -83,7 +83,7 @@ def run(args):
         lines = [f"{variant} roundtrip FAIL {ok}/{n}"] + [
             f"  FAIL {r['id']:<10} {r['msg']}" for r in results if not r["ok"]]
     rep = {"ok": ok == n, "lines": lines, "results": results}
-    if fixture:
+    if P.fixture:
         from . import mutants
         rep = mutants.attach_roundtrip(rep, spec, P, variant)
     return rep

@@ -38,8 +38,8 @@ def space():
     launcher's, imported rather than restated: two definitions of what a space
     is would be two things to keep in step about a question with one answer."""
     sys.path.insert(0, str(ROOT))
-    from lib import paths
-    return paths.find()
+    from lib import space as space_lib
+    return space_lib.find()
 
 
 def handover(python, project):

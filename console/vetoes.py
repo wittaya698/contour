@@ -18,7 +18,7 @@ import json
 import subprocess
 from pathlib import Path
 
-from lib import agent, anchor, marks, store
+from lib import agent, anchor, marks, space as space_lib, store
 
 NAME = "vetoes.json"
 """Beside `marks.json` at the space's root, and tracked for the same reason.
@@ -37,7 +37,9 @@ stay here, where they mean something."""
 def load(space):
     """Every veto in this space. Taking the space and not the file, because the
     path is this module's knowledge — there is one place a veto may be written
-    and this is it."""
+    and this is it, and the space's own root is not a layout question: what
+    `lib/space.py` is asked for here is where the *build* and the *parts* are
+    (slice 17)."""
     return store.load(Path(space) / NAME, [])
 
 
@@ -61,13 +63,11 @@ def record(space, category, tool, call, reason):
     The fingerprint is the one `views.json` and the panel already use, so there
     is no second answer to *which build was this*.
     """
-    space = Path(space)
-    # The space's own build, by the convention ADR 0015 set: `out/<name>.blend`.
-    blend = space / "out" / f"{space.name}.blend"
+    here = space_lib.layout(space)
     vetoes = load(space)
     kept = {"id": next_id(vetoes), "category": category, "tool": tool,
             "call": dict(call), "reason": reason, "author": "user",
-            "build": anchor.fingerprint(blend)}
+            "build": anchor.fingerprint(here.blend)}
     save(space, vetoes + [kept])
     return kept
 
@@ -86,7 +86,6 @@ def promote(space, veto_id, part):
     claim to the user they did not make, in the one file that records what they
     personally refused.
     """
-    space = Path(space)
     kept = load(space)
     found = next((v for v in kept if v.get("id") == veto_id), None)
     if found is None or found.get("promoted"):
@@ -95,10 +94,11 @@ def promote(space, veto_id, part):
         return None
     # The build's own list of parts, which is what `contour mark` is held to as
     # well — a mark naming a part no view can see is a badge that never draws.
-    here = agent.known(space / "out" / "parts.json")
-    if here is not None and part not in here:
+    here = space_lib.layout(space)
+    named = agent.known(here.parts)
+    if named is not None and part not in named:
         return None
-    mark = marks.append(space / marks.NAME,
+    mark = marks.append(here.marks,
                         {"anchor": {"part": part}, "text": found["reason"],
                          "from": found["id"]})
     # Which mark it became, on the veto. Not a resolution — a veto is never
@@ -145,7 +145,6 @@ def exposure(space):
     the model got here. *I stopped you widening that tolerance* belongs in the
     commit where the tolerance did not get widened.
     """
-    space = Path(space)
     kept = load(space)
     held = committed(space)
     return {"vetoes": kept,

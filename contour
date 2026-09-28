@@ -43,11 +43,17 @@ TIMEOUT_S = 300
 USAGE = __doc__.split("\n\n", 2)[2].rstrip()
 
 sys.path.insert(0, str(ROOT))
-from lib import paths                      # stdlib-only by test (ADR 0019, 29)
+from lib import space                      # stdlib-only by test (ADR 0019, 29)
 
-MARKER = paths.MARKER
-PROJECT = paths.find()
-OUT = (PROJECT or ROOT) / ".contour"     # logs sit with whatever the command is about
+MARKER = space.MARKER
+PROJECT = space.find()
+HERE = space.layout(PROJECT, ROOT) if PROJECT else None
+"""The layout of the space this was typed in, or None outside one.
+
+Asked of the space rather than derived here: `out/<name>.blend` was spelled in
+five places and `marks.json` in nine, all of them restating ADR 0015 (slice 17).
+"""
+OUT = (HERE.dot if HERE else ROOT / ".contour")   # logs sit with whatever the command is about
 LOG = OUT / "last-build.log"
 REPORT = OUT / "report.json"
 
@@ -119,7 +125,7 @@ def check_revision():
     change that was. Returns None when there is nothing to say — this runs on
     every model command, so it is silent on success and costs nothing.
     """
-    spec = PROJECT / "spec.yaml"
+    spec = HERE.spec
     if not spec.exists():
         return None
     head = subprocess.run(["git", "-C", str(PROJECT), "show", "HEAD:spec.yaml"],
@@ -149,7 +155,7 @@ def say_marks(code):
     """
     sys.path.insert(0, str(ROOT))
     from lib import marks
-    line = marks.status_line(PROJECT / marks.NAME)
+    line = marks.status_line(HERE.marks)
     if line:
         print(line)
     return code
@@ -280,15 +286,12 @@ def main(argv):
         if not PROJECT:
             return need_project(cmd)
         sys.path.insert(0, str(ROOT))
-        from lib import canvas, marks, panel
-        out = PROJECT / "out"
-        return emit(canvas.serve(PROJECT / "sheet.png", PROJECT / marks.NAME,
-                                 out / "mask.png", out / "parts.json",
+        from lib import canvas, panel
+        return emit(canvas.serve(HERE.sheet, HERE.marks, HERE.mask, HERE.parts,
                                  resolve=lambda: stage(["resolve"]),
-                                 refs=PROJECT / "refs",
-                                 views=out / "views.json",
-                                 blend=out / f"{PROJECT.name}.blend",
-                                 verdict=OUT / panel.NAME))
+                                 refs=HERE.refs, views=HERE.views,
+                                 blend=HERE.blend,
+                                 verdict=HERE.dot / panel.NAME))
     if cmd == "resolve" and not rest:
         if not PROJECT:
             return need_project(cmd)
@@ -314,9 +317,7 @@ def main(argv):
             return need_project(cmd)
         sys.path.insert(0, str(ROOT))
         from lib import agent, marks
-        return emit(agent.command(PROJECT / marks.NAME, rest,
-                                  PROJECT / "out" / f"{PROJECT.name}.blend",
-                                  PROJECT / "out" / "parts.json"))
+        return emit(agent.command(HERE.marks, rest, HERE.blend, HERE.parts))
     if cmd == "measure" and rest:
         if not PROJECT:
             return need_project(cmd)
@@ -434,7 +435,7 @@ def doctor():
             ok = False
         else:
             lines.append(f"ok   {rel}")
-    marker = (PROJECT / ".contour" / "project").read_text()
+    marker = (PROJECT / MARKER).read_text()
     was = next((l.split(":", 1)[1].strip() for l in marker.splitlines()
                 if l.startswith("toolkit:")), "unknown")
     now = toolkit_commit()
@@ -513,42 +514,6 @@ def install_hooks():
     return {"ok": not override, "lines": lines}
 
 
-SKIP = {"node_modules", "venv", ".venv", "target", "Library", "Pictures", "Music"}
-
-
-def space_roots():
-    """Where to look for spaces. $CONTOUR_SPACES overrides; otherwise the
-    directory holding the toolkit, which is where spaces live by convention.
-
-    This names where to look, not what exists — so unlike a registry it cannot
-    go stale, and a space moved within a root is still found (ADR 0015).
-    """
-    env = os.environ.get("CONTOUR_SPACES")
-    return [Path(p).expanduser() for p in env.split(":") if p] if env else [ROOT.parent]
-
-
-def find_spaces(depth=4):
-    """Every model space under the roots, by its marker. Bounded on purpose: a
-    scan of $HOME does not finish in a usable time, a scan of one workspace is
-    instant."""
-    found = []
-    for root in space_roots():
-        if not root.is_dir():
-            continue
-        base = len(root.parts)
-        for here, dirs, _ in os.walk(root):
-            d = Path(here)
-            if (d / MARKER).is_file():
-                found.append(d)
-                dirs[:] = []                      # spaces do not nest
-                continue
-            if len(d.parts) - base >= depth:
-                dirs[:] = []
-                continue
-            dirs[:] = [x for x in dirs if not x.startswith(".") and x not in SKIP]
-    return sorted(found)
-
-
 def git_out(repo, *args):
     r = subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True)
     return r.stdout.strip() if r.returncode == 0 else ""
@@ -556,7 +521,7 @@ def git_out(repo, *args):
 
 def spaces(name=None):
     """List the model spaces, or print one's path for `cd $(contour spaces x)`."""
-    found = find_spaces()
+    found = space.spaces(space.roots(ROOT))
     if name:
         hits = [s for s in found if s.name == name]
         if len(hits) != 1:
@@ -564,7 +529,8 @@ def spaces(name=None):
                                            + (": " + ", ".join(str(h) for h in hits) if hits else "")]}
         return {"ok": True, "lines": [str(hits[0])]}
     if not found:
-        return {"ok": True, "lines": [f"no model spaces under {', '.join(str(r) for r in space_roots())}",
+        return {"ok": True, "lines": [f"no model spaces under "
+                                      f"{', '.join(str(r) for r in space.roots(ROOT))}",
                                       "(set $CONTOUR_SPACES to look elsewhere)"]}
     now, lines, ok = toolkit_commit(), [], True
     for s in found:
@@ -610,8 +576,8 @@ def mask_check():
     """
     sys.path.insert(0, str(ROOT))
     from lib import mask as mask_store
-    out = ROOT / "fixtures" / "smoke" / "out"
-    mpath, ppath = out / "mask.png", out / "parts.json"
+    F = space.fixture("smoke", ROOT)
+    mpath, ppath = F.mask, F.parts
     if not (mpath.exists() and ppath.exists()):
         return {"ok": False, "lines": ["no mask.png / parts.json beside the sheet"]}
     parts = json.loads(ppath.read_text())
@@ -646,22 +612,22 @@ def anchor_check():
     """
     sys.path.insert(0, str(ROOT))
     from lib import anchor, mask as mask_store, store
-    out = ROOT / "fixtures" / "smoke" / "out"
-    sheet = store.load(out / "views.json", None)
+    F = space.fixture("smoke", ROOT)
+    sheet = store.load(F.views, None)
     if not sheet:
         return {"ok": False, "lines": ["no views.json beside the sheet"]}
     labels = [v["label"] for v in sheet["views"]]
     if labels != ["front", "right", "top", "persp"]:
         return {"ok": False, "lines": [f"views.json holds {labels}"]}
-    if sheet["build"] != anchor.fingerprint(out / "smoke.blend"):
+    if sheet["build"] != anchor.fingerprint(F.blend):
         return {"ok": False, "lines": ["views.json names a different build "
                                        "than the one it was rendered from"]}
 
     # Two marks the fixture's own mask picks out: one on the cap, one on the
     # background beside it. Written here rather than clicked, because what is
     # being checked is the ray, not the page.
-    w, h, data = mask_store.read(out / "mask.png")
-    table = json.loads((out / "parts.json").read_text())
+    w, h, data = mask_store.read(F.mask)
+    table = json.loads(F.parts.read_text())
     cap = [i for i, name in table.items() if name == "cap"]
     if not cap:
         return {"ok": False, "lines": ["no cap in the parts table"]}
@@ -670,7 +636,7 @@ def anchor_check():
     if not rows:
         return {"ok": False, "lines": ["the cap is not on the front view's centre column"]}
     on_cap = [col, rows[len(rows) // 2]]
-    marks_path = out / "marks.json"
+    marks_path = F.marks
     marks_path.unlink(missing_ok=True)
     from lib import marks as marks_store
     hit = marks_store.append(marks_path, {"view": "front", "pixel": on_cap,
@@ -707,7 +673,7 @@ def anchor_check():
     if off > 3:
         return {"ok": False, "lines": [f"{hit} was clicked at {on_cap} and "
                                        f"re-projects to {back}"]}
-    said = agent_check(marks_path, out, w, h, data, table)
+    said = agent_check(marks_path, F, w, h, data, table)
     marks_path.unlink()          # the fixture keeps no marks; the sheet keeps the badge
     if not said.startswith("agent"):
         return {"ok": False, "lines": [said]}
@@ -718,7 +684,7 @@ def anchor_check():
                                   f"badge back at {back}, {off} px out", said]}
 
 
-def agent_check(marks_path, out, w, h, data, table):
+def agent_check(marks_path, F, w, h, data, table):
     """An agent mark lands on its part, without anyone having clicked anything.
 
     The agent names a part and no point on it, so the badge's position is
@@ -736,7 +702,7 @@ def agent_check(marks_path, out, w, h, data, table):
     """
     from lib import agent
     rep = agent.command(marks_path, ["--part", "cap", "is the cap too round"],
-                        parts=out / "parts.json")
+                        parts=F.parts)
     if not rep["ok"]:
         return f"contour mark refused the fixture's own part: {rep['lines'][0]}"
     mid = marks_store_id(marks_path)

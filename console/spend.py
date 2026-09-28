@@ -18,6 +18,8 @@ No `contour` subcommand has a turn to account for.
 import json
 from datetime import datetime, timezone
 
+from lib import space as space_lib
+
 NAME = "spend.jsonl"
 """One line per turn, appended, in the space's own `.contour/`.
 
@@ -41,7 +43,9 @@ def counts(usage):
 
 
 def path(space):
-    return space / ".contour" / NAME
+    """The layout says where a space's `.contour` is; the name is this
+    module's own (slice 17)."""
+    return space_lib.layout(space).dot / NAME
 
 
 def load(space, run=None):

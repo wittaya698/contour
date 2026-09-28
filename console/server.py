@@ -17,7 +17,7 @@ from console import run as run_lib
 from console import vetoes as veto_store
 from lib import canvas as canvas_lib
 from lib import panel as panel_state
-from lib import marks as marks_store
+from lib import space as space_lib
 
 
 def phrase(secs):
@@ -51,18 +51,20 @@ class Console:
         self.grace = grace
         self.idle = idle
         self.ended = None                     # why it ended, for the last line
-        out = self.space / "out"
+        # Where this space keeps its files, asked of the space. The console
+        # used to restate ADR 0015 here — which build the sheet is of, where a
+        # mark goes — and a restatement is a copy that can go out of step
+        # (slice 17).
+        here = space_lib.layout(self.space)
         self.run = run_lib.Run(self.space)
         self.canvas = canvas_lib.Canvas(
-            sheet=self.space / "sheet.png",
-            marks=self.space / marks_store.NAME,
-            mask=out / "mask.png", parts=out / "parts.json", can=CAN,
-            # What the sheet is a picture of. A space's build is
-            # `out/<its name>.blend` (ADR 0015), and `views.json` beside it says
-            # which build the cameras drew, so the panel can be labelled rather
-            # than quietly authoritative (ADR 0019, decision 13).
-            views=out / "views.json", blend=out / f"{self.space.name}.blend",
-            verdict=self.space / ".contour" / panel_state.NAME,
+            sheet=here.sheet, marks=here.marks,
+            mask=here.mask, parts=here.parts, can=CAN,
+            # `views.json` beside the build says which build the cameras drew,
+            # so the panel can be labelled rather than quietly authoritative
+            # (ADR 0019, decision 13).
+            views=here.views, blend=here.blend,
+            verdict=here.dot / panel_state.NAME,
             routes={("POST", "/run"): self.started,
                     ("GET", "/events"): self.transcript,
                     ("POST", "/verdict"): self.verdict,

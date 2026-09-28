@@ -10,7 +10,8 @@ import json
 import os
 import secrets
 import socket
-from pathlib import Path
+
+from . import space as space_lib
 
 NAME = "run.lock"
 
@@ -24,7 +25,9 @@ class Held(Exception):
 
 
 def path(space):
-    return Path(space) / ".contour" / NAME
+    """The layout says where a space's `.contour` is; the name is this
+    module's own (slice 17)."""
+    return space_lib.layout(space).dot / NAME
 
 
 def holder(space):

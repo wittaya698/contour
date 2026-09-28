@@ -3,31 +3,32 @@ import runpy
 
 import bpy
 
-from . import miniyaml, paths, scene
+from . import miniyaml, space, scene
 
 
 def build(P, variant):
     """Empty scene -> build.py -> one collection. Returns the collection."""
     scene.reset()
-    runpy.run_path(str(P["build"]), run_name="__main__")
+    runpy.run_path(str(P.build), run_name="__main__")
     return scene.organize(variant)
 
 
 def run(args):
     import verify
 
-    variant, fixture = paths.parse(args)
-    P = paths.resolve(variant, fixture)
-    for key in ("spec", "build"):
-        if not P[key].exists():
-            return {"ok": False, "lines": [f"FAIL {variant}: missing {paths.display(P[key])}"]}
-    spec = miniyaml.load(P["spec"])
+    P = space.parse(args)
+    variant = P.name
+    for needed in (P.spec, P.build):
+        if not needed.exists():
+            return {"ok": False,
+                    "lines": [f"FAIL {variant}: missing {P.display(needed)}"]}
+    spec = miniyaml.load(P.spec)
     coll = build(P, variant)
-    scene.save_collection(coll, P["blend"])
+    scene.save_collection(coll, P.blend)
     results = verify.run(spec, variant)
     rep = {"ok": all(r["ok"] for r in results), "lines": verify.report(variant, results),
            "results": results}
-    if fixture:
+    if P.fixture:
         from . import mutants
         rep = mutants.attach(rep, spec, P, variant)
     return rep

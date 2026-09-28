@@ -16,7 +16,7 @@ ray would still land somewhere; it would just be somewhere the user never saw.
 import bpy
 from mathutils import Matrix, Vector
 
-from . import anchor, marks, paths, scene, store
+from . import anchor, marks, space, scene, store
 
 PULLBACK = 100.0   # metres to back an orthographic ray off before it starts
 
@@ -63,21 +63,21 @@ def ray(sc, cam, view, u, v):
 
 
 def run(args):
-    variant, fixture = paths.parse(args)
-    P = paths.resolve(variant, fixture)
-    sheet = store.load(P["views"], None)
+    P = space.parse(args)
+    variant = P.name
+    sheet = store.load(P.views, None)
     if sheet is None:
         return {"ok": True, "lines": [f"{variant} resolve no views.json: "
                                       "this sheet predates anchoring"]}
-    drift = anchor.stale(sheet, P["blend"])
+    drift = anchor.stale(sheet, P.blend)
     if drift:
         return {"ok": False, "lines": [f"FAIL resolve {drift}"]}
-    todo = anchor.unresolved(marks.load(P["marks"]))
+    todo = anchor.unresolved(marks.load(P.marks))
     if not todo:
         return {"ok": True, "lines": [f"{variant} resolve nothing to anchor"]}
 
     scene.reset()
-    scene.load_collections(P["blend"])
+    scene.load_collections(P.blend)
     sc = bpy.context.scene
     cams = {v["label"]: camera_from(v) for v in sheet["views"]}
     dg = bpy.context.evaluated_depsgraph_get()
@@ -96,7 +96,7 @@ def run(args):
         local = matrix.inverted() @ location
         found[mark["id"]] = {"part": obj.name,
                              "local": [round(c, 6) for c in local]}
-    anchor.apply(P["marks"], found)
+    anchor.apply(P.marks, found)
     line = f"{variant} resolve {marks.phrase(len(found))} anchored"
     if missed:
         line += f", {missed} on background"

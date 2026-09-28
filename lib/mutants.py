@@ -136,23 +136,23 @@ def attach_roundtrip(rep, spec, P, variant):
     """Corrupt real .glb files and require file_checks (and the re-import) to object."""
     from . import cmd_roundtrip, ctx_override, glb
 
-    doc, blob = glb.load(P["glb"])
+    doc, blob = glb.load(P.glb)
     missed = []
     for name, trs, expect in GLB_MUTANTS:
-        path = P["out"] / "_mutant.glb"
+        path = P.out / "_mutant.glb"
         glb.write(path, glb.wrapped(doc, **trs), blob)
         failed = {r["id"] for r in cmd_roundtrip.file_checks(spec, glb.measure(path)) if not r["ok"]}
         if not expect <= failed:
             missed.append(f"{name} (wanted {sorted(expect)}, got {sorted(failed)})")
     # renamed part: same file, spec expects a name the file does not have
     s2 = {**spec, "parts": [{"name": "plinth_x", "count": 1}, *spec["parts"][1:]]}
-    failed = {r["id"] for r in cmd_roundtrip.file_checks(s2, glb.measure(P["glb"])) if not r["ok"]}
+    failed = {r["id"] for r in cmd_roundtrip.file_checks(s2, glb.measure(P.glb)) if not r["ok"]}
     if "gl_parts" not in failed:
         missed.append(f"renamed part (wanted gl_parts, got {sorted(failed)})")
     n = len(GLB_MUTANTS) + 1
     # the Blender re-import stage must object to a Z-up file as well
     import verify
-    path = P["out"] / "_mutant.glb"
+    path = P.out / "_mutant.glb"
     glb.write(path, glb.wrapped(doc, rotation=[0.70710678, 0.0, 0.0, 0.70710678]), blob)
     scene.reset()
     ctx_override.call("import_scene.gltf", filepath=str(path))

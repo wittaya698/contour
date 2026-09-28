@@ -7,7 +7,7 @@ message, or a conversation, it means what this file says it means.
 
 | Term | Means |
 |---|---|
-| **model space** | One model's own directory and its own git repository, found by walking up from the working directory for `.contour/project`. Never pushed (ADR 0011, ADR 0015). Spaces coexist; a variation of a model is a new space. |
+| **model space** | One model's own directory and its own git repository, found by walking up from the working directory for `.contour/project`. Never pushed (ADR 0011, ADR 0015). Spaces coexist; a variation of a model is a new space. One module answers where a space is, what it contains, and where spaces are found — `lib/space.py` — asked about a space rather than about the process asking, so the launcher, the console and the Blender side read one table instead of three. |
 | **variant** | The old word for a model space, from when each model lived on a long-lived branch of this repo (ADR 0003, retired by ADR 0015). It survives in older ADRs and in some code identifiers. |
 | **spec** | `spec.yaml` at the root of a model space. The user's intent, expressed in numbers. Agent-read-only. The definition of correct. |
 | **reference** | An image the user supplies, stored in `refs/` at original fidelity: their intent in pictures, in the spec's trust class (ADR 0012). Say *reference*, not "model picture" — and never *sheet*, which is Contour's own render. |
