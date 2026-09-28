@@ -1,6 +1,6 @@
 # 03 — The lib/ split becomes a test
 
-**Type:** AFK · **Source:** ADR 0019 decision 29
+**Type:** AFK · **Source:** ADR 0019 decision 32
 
 ## What to build
 

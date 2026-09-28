@@ -1,5 +1,5 @@
 """`lib/` has two halves, and the Blender-free one stays importable on a bare
-clone (ADR 0019, decision 29).
+clone (ADR 0019, decision 32).
 
 The split is a decision, not an inference: `cmd_api.py` imports nothing but
 `importlib` and `inspect` yet exists to resolve `bpy.*` symbols inside Blender,
@@ -290,7 +290,7 @@ class LibSplitTest(unittest.TestCase):
 
     def test_the_console_and_its_shim_keep_out_of_the_blender_half(self):
         """The live check on the layer above the launcher (ADR 0019, decision
-        29). `contour-console` is in it because it is the file a bare clone runs
+        32). `contour-console` is in it because it is the file a bare clone runs
         to be told it needs an environment, and a Blender import there would
         break the one message that has to survive having nothing installed."""
         self.assertEqual(above_lib(ROOT, BLENDER, "console/*.py",

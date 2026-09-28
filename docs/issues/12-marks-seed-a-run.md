@@ -1,6 +1,6 @@
 # 12 — Marks seed a run
 
-**Type:** AFK · **Source:** ADR 0019 decision 19
+**Type:** AFK · **Source:** ADR 0019 decision 21
 
 ## What to build
 

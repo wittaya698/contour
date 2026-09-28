@@ -1,6 +1,6 @@
 # 10 — A build is a gated call, and that gate resolves marks
 
-**Type:** AFK · **Source:** ADR 0019 decisions 8, 14
+**Type:** AFK · **Source:** ADR 0019 decisions 10, 14
 
 ## What to build
 

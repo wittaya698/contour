@@ -212,7 +212,7 @@ def run_held(rest):
 
 
 def draw(rep):
-    """Render for the page, once the build is on disk (ADR 0019, decision 23).
+    """Render for the page, once the build is on disk (ADR 0019, decision 24).
 
     Renders were rate-limited because a sheet entering the *conversation* costs
     ~1400 tokens (ADR 0005) — a cost to the agent's context and not to the
@@ -296,7 +296,7 @@ def main(argv):
         # from. ADR 0018 ran this at canvas close because that was the last
         # moment before geometry could change; the console knows a better one —
         # the instant a build is approved — and reaches it by typing this
-        # (ADR 0019, decisions 8 and 14).
+        # (ADR 0019, decisions 10 and 14).
         #
         # Held like a build, because it reads the build: rays cast while another
         # terminal is rebuilding would land in geometry that is being replaced

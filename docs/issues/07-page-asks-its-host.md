@@ -1,6 +1,6 @@
 # 07 — The page asks its host what it can do
 
-**Type:** AFK · **Source:** ADR 0019 decision 21
+**Type:** AFK · **Source:** ADR 0019 decision 23
 
 ## What to build
 

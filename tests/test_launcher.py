@@ -37,7 +37,7 @@ def stub_blender(dirpath, ok=True, crash=False):
     it is the *build* stage that reports red and a render of that build still
     succeeds. `crash` is a `build.py` that raised, which leaves no report at all
     and no geometry, and is a different event with a different sheet (ADR 0019,
-    decision 27). The trace is how a test can tell what the launcher did.
+    decision 29). The trace is how a test can tell what the launcher did.
     """
     verdict = "true" if ok else "false"
     script = dirpath / "blender-stub"
@@ -120,7 +120,7 @@ class LauncherTest(unittest.TestCase):
     def test_check_says_the_same_thing_whether_or_not_vetoes_exist(self):
         """A veto is never open, so a veto line would never go away — and a
         status line that is always present is furniture nobody reads (ADR 0019,
-        decision 25). Byte-identical and not merely quiet: the check\'s report is
+        decision 28). Byte-identical and not merely quiet: the check\'s report is
         a token budget, and a line about records the user cannot act on here is
         the one thing a terse report cannot afford.
         """
@@ -154,7 +154,7 @@ class LauncherTest(unittest.TestCase):
 
     def test_a_green_check_renders_for_the_page(self):
         """Every build renders; only a checkpoint renders for the agent (ADR
-        0019, decision 23). The sheet was rate-limited because it cost the
+        0019, decision 24). The sheet was rate-limited because it cost the
         agent's context, not because rendering is expensive — and a sheet going
         to a page costs no context at all, so the panel can be current."""
         r = self.run_contour("check")
@@ -175,7 +175,7 @@ class LauncherTest(unittest.TestCase):
         """The render is for the page, and the page costs no context. If the
         check's report named it — or named the sheet — the agent would be
         invited to read a picture outside a checkpoint, which is the one thing
-        decision 23 keeps intact while making the panel current."""
+        ADR 0019's decision 24 keeps intact while making the panel current."""
         r = self.run_contour("check")
         self.assertEqual(r.returncode, 0)
         self.assertIn("stub ran build", r.stdout)
@@ -205,7 +205,7 @@ class LauncherTest(unittest.TestCase):
 
         The console resolves at the instant it approves a build, because it owns
         the build and so knows when geometry is about to change (ADR 0019,
-        decision 8). `contour canvas` owns no build and cannot know that, so for
+        decision 10). `contour canvas` owns no build and cannot know that, so for
         it the last moment before anything can change is still the moment the
         user says Done.
         """

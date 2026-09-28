@@ -1,6 +1,6 @@
 # 24 — The launcher becomes a table and a shim
 
-**Type:** AFK · **Source:** architecture review 2026-09-28 · ADR 0008, ADR 0019 decision 20, open question 11
+**Type:** AFK · **Source:** architecture review 2026-09-28 · ADR 0008, ADR 0019 decision 22, open question 11
 
 ## What to build
 

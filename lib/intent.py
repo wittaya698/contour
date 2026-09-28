@@ -1,4 +1,4 @@
-"""What a call means, in Contour's vocabulary (ADR 0019, decision 20).
+"""What a call means, in Contour's vocabulary (ADR 0019, decision 22).
 
 The console's gate consults a list of intents — a build, a spec write — and
 asks this module which one a call belongs to. It does not pattern-match the

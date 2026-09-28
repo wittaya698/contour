@@ -1,6 +1,6 @@
 """`contour-console`: the executable above the launcher, and its lifetime.
 
-ADR 0019, decisions 1, 4, 11, 13, 17, 33. The console is the one layer allowed
+ADR 0019, decisions 1, 2, 34, 13, 17, 23. The console is the one layer allowed
 dependencies, and the first thing it has to do well is not need them where it
 does not: every test here runs it as a subprocess the way a person would type it,
 `$CONTOUR_CONSOLE_PYTHON` stands in for the environment, and the run is driven by
@@ -370,7 +370,7 @@ class RunTest(ConsoleCase):
         """A gate says *a build*, not *a Bash command matching this glob*. One
         intent has four spellings and a permission list needing one rule per
         spelling will still have a hole, so the launcher is asked what a call
-        means (ADR 0019, decision 20)."""
+        means (ADR 0019, decision 22)."""
         _, url = self.driven({"call": {"tool": "Bash", "command": "./contour check"}})
         self.ask(url, "/run", {"prompt": "check the build"})
         gate, said = self.gate(url)
@@ -474,7 +474,7 @@ class RunTest(ConsoleCase):
         always on screen, so it can always be clicked, and a rebuild would
         otherwise invalidate a mark mid-typing. The console owns the build, so it
         knows the instant before geometry changes — a strictly better place to
-        cast rays than session close ever was (decision 8).
+        cast rays than session close ever was (ADR 0019, decision 10).
 
         Ordering is the claim: the agent is holding a verdict it cannot act on
         until the gate returns, so a resolve that has happened by the time the
@@ -490,7 +490,7 @@ class RunTest(ConsoleCase):
         self.assertEqual(stages(space), ["resolve"])
 
     def test_a_build_the_ask_list_allows_still_resolves_first(self):
-        """The cost of decision 14 is a click per build, and the sanctioned
+        """The cost of ADR 0019's decision 14 is a click per build, and the sanctioned
         relief is this — a deliberate per-space ask-list entry. What it buys is
         not being asked; it is not permission for a rebuild to invalidate a mark
         mid-typing. So resolution hangs off the *allow*, not off the dialog, and a
@@ -513,7 +513,7 @@ class RunTest(ConsoleCase):
         no new pin waiting: a Blender startup on every approval would be a second
         a click long, paid for nothing. The same question `contour canvas` asks
         before it resolves at close, asked by importing `lib/` — which is the half
-        of decision 28 this file may do in its own process.
+        of ADR 0019's decision 31 this file may do in its own process.
         """
         space = self.space()
         _, url = self.driven({"call": {"tool": "Bash", "command": "./contour check"}},
@@ -612,7 +612,7 @@ class RunTest(ConsoleCase):
         launcher's — the console takes the same one through the same module,
         because a lock the console owned would put privilege in the one layer
         allowed to carry dependencies and would leave terminal-versus-terminal,
-        which races today, unprotected (ADR 0019, decision 17).
+        which races today, unprotected (ADR 0019, decision 18).
         """
         from lib import lock
         space = self.space()
@@ -804,7 +804,7 @@ class InheritsTest(unittest.TestCase):
 
 
 class VetoTest(ConsoleCase):
-    """A denial outlives the run that produced it (ADR 0019, decisions 15, 25).
+    """A denial outlives the run that produced it (ADR 0019, decisions 15, 27).
 
     The transcript already carries every verdict, and dies with the tab. A veto
     is the part of it that has to survive a clean checkout, because it is why two
@@ -853,7 +853,7 @@ class VetoTest(ConsoleCase):
 
     def test_an_allowed_call_leaves_no_veto_behind(self):
         """A veto is a denial and nothing else. Recording approvals here would
-        make the file a log of the run — which decision 15 refused, because a log
+        make the file a log of the run — which ADR 0019's decision 15 refused, because a log
         is read by nobody and a veto is read by whoever asks why two builds
         differ. The transcript already has the allow, and is where it belongs."""
         space = self.space()
@@ -912,7 +912,7 @@ class VetoTest(ConsoleCase):
         with the change it prevented*.
 
         A space gitignores `.contour/` whole but for its marker, so a veto kept
-        there would vanish on a clean checkout and be the log decision 15
+        there would vanish on a clean checkout and be the log ADR 0019's decision 15
         refused. And the diff matters because this file is read in one: a store
         that renumbered or reordered what was already on file would bury the
         sentence that was added in a rewrite of the ones that were not.
@@ -1047,7 +1047,7 @@ class VetoTest(ConsoleCase):
 
     def test_the_page_is_told_how_many_vetoes_are_uncommitted(self):
         """Tracked is not committed, and an uncommitted veto dies exactly as an
-        ignored one would (ADR 0019, decision 27).
+        ignored one would (ADR 0019, decision 33).
 
         So the console's contribution is visibility and nothing else: it does not
         commit, and it does not propose a records-only commit at run end, because
@@ -1085,7 +1085,7 @@ class VetoTest(ConsoleCase):
         self.assertEqual(self.ask(url, "/vetoes")[1]["uncommitted"], 1)
 
     def test_the_veto_surface_is_declared_against_the_host_that_gates(self):
-        """One page, two hosts (ADR 0019, decision 33). Only a console gates, so
+        """One page, two hosts (ADR 0019, decision 23). Only a console gates, so
         only a console has vetoes — and the page carries the affordance anyway,
         removed under the launcher by the same rule that removes the transcript.
 
@@ -1131,7 +1131,7 @@ class VetoTest(ConsoleCase):
 
     def test_the_console_can_read_git_and_cannot_write_it(self):
         """Rule 5, flat: the console gets no privilege a terminal would not get,
-        including over its own records (ADR 0019, decisions 18 and 27).
+        including over its own records (ADR 0019, decisions 18 and 33).
 
         It has a live reason to run git — the exposure count asks `HEAD` what it
         holds — and that is exactly where a commit would be easiest to slip in.
@@ -1164,7 +1164,7 @@ class VetoTest(ConsoleCase):
 
 
 class SeedTest(ConsoleCase):
-    """Marks seed a run (ADR 0019, decision 19).
+    """Marks seed a run (ADR 0019, decision 21).
 
     A mark is the one place the user's intent is already located, authored and
     tracked, so a run started from marks starts from something better than a
@@ -1205,7 +1205,7 @@ class SeedTest(ConsoleCase):
         """The base case, and it stays the base case. The page sends the
         selection every time, so an empty one is the common shape — and prose is
         what a run is *for*: a measurement is not a mark and not a build loop
-        (ADR 0019, decision 19)."""
+        (ADR 0019, decision 21)."""
         space = self.space()
         self.pinned(space, {"view": "front", "text": "the neck is short"})
         _, url = self.driven({"say": "measuring"}, space=space)
@@ -1287,7 +1287,7 @@ class SeedTest(ConsoleCase):
         """The whole reason seeding is worth building: the console knows what was
         in scope, so a finding the run walked past is visible instead of silently
         dropped. It is a report and nothing more — nothing here closes, dims or
-        edits a mark (ADR 0019, decision 19)."""
+        edits a mark (ADR 0019, decision 21)."""
         space = self.space()
         self.pinned(space,
                     {"view": "front", "part": "neck", "text": "the neck is short"},
@@ -1368,7 +1368,7 @@ class SeedTest(ConsoleCase):
         """The ending a seeded run is most likely to get: the user has seen enough
         at a gate and stops it. That is exactly when the scope report matters — the
         run is over with work outstanding — so it cannot be the ending that skips
-        it (ADR 0019, decision 19)."""
+        it (ADR 0019, decision 21)."""
         space = self.space()
         self.pinned(space, {"view": "front", "part": "neck",
                             "text": "the neck is short"})
@@ -1386,7 +1386,7 @@ class SeedTest(ConsoleCase):
         """Only the user closes a mark, and seeding does not make the console a
         party to that. The run knows the scope, addresses one, walks past the
         other and ends — and the store comes out of it with two open findings and
-        one claim (ADR 0018, ADR 0019, decision 19)."""
+        one claim (ADR 0018, ADR 0019, decision 21)."""
         space = self.space()
         build = self.built(space)
         self.pinned(space,
@@ -1427,7 +1427,7 @@ class SeedTest(ConsoleCase):
                     self.fail(f"{f.name} spells out a closed status")
 
     def test_the_seeding_surface_is_declared_against_the_host_that_runs(self):
-        """One page, two hosts (ADR 0019, decision 33). Only a console runs an
+        """One page, two hosts (ADR 0019, decision 23). Only a console runs an
         agent, so only a console can seed one — and the page carries the
         affordance anyway, removed under the launcher by the same rule that
         removes the transcript.
@@ -1450,7 +1450,7 @@ class SeedTest(ConsoleCase):
         """A mark is already a sentence about the model, written where it applies.
         Making the user restate it in prose to be allowed to start would ask them
         to type the thing they pointed at — and *these two* is a complete request
-        (ADR 0019, decision 19)."""
+        (ADR 0019, decision 21)."""
         space = self.space()
         self.pinned(space, {"view": "front", "part": "neck",
                             "text": "the neck is short"})
@@ -1466,7 +1466,7 @@ class SeedTest(ConsoleCase):
 
 
 class SpendTest(ConsoleCase):
-    """What a run costs, while it happens (ADR 0019, decision 32).
+    """What a run costs, while it happens (ADR 0019, decision 37).
 
     Token cost is the second of the three stated priorities, and the tool that
     serves it reads a transcript a console run does not produce. So the console
@@ -1529,7 +1529,7 @@ class SpendTest(ConsoleCase):
         whole context every turn and almost all of it is a cache read, at a tenth
         the price. Folded into fresh input, a long run would read as ten times
         what it cost — and a number that wrong is worse than none (ADR 0019,
-        decision 32)."""
+        decision 37)."""
         space = self.space()
         _, url = self.driven(
             {"usage": {"input_tokens": 200,
@@ -1553,7 +1553,7 @@ class SpendTest(ConsoleCase):
         """What makes the ask-list tunable with a number. A gate costs a turn of
         re-explanation, and a turn that followed one is only identifiable if the
         line says so — the file has no other way to know a verdict happened
-        between two turns (ADR 0019, decisions 30 and 32)."""
+        between two turns (ADR 0019, decisions 36 and 37)."""
         space = self.space()
         _, url = self.driven(
             {"usage": {"input_tokens": 100, "output_tokens": 10}},
@@ -1584,7 +1584,7 @@ class SpendTest(ConsoleCase):
         """Rejected on the idle timeout's symmetry: silence is not a verdict, and
         neither is a threshold set before the user knew what the run involved. The
         console does not decide for the user in either direction, and with an
-        attended run the stop is the user (ADR 0019, decisions 17 and 32)."""
+        attended run the stop is the user (ADR 0019, decisions 17 and 37)."""
         space = self.space()
         _, url = self.driven(
             {"usage": {"input_tokens": 9_000_000, "output_tokens": 2_000_000}},
@@ -1602,7 +1602,7 @@ class SpendTest(ConsoleCase):
         """Structure, not vigilance. The module that knows what a run has cost is
         the one that would be asked to act on it, so it is the one that must not
         be able to: nothing there ends, stops or denies anything (ADR 0019,
-        decision 32)."""
+        decision 37)."""
         tree = ast.parse((ROOT / "console" / "spend.py").read_text())
         for node in ast.walk(tree):
             if isinstance(node, ast.Call):
@@ -1621,7 +1621,7 @@ class SpendTest(ConsoleCase):
     def test_two_runs_from_one_console_are_two_things_that_cost_money(self):
         """A console is long-lived and a run is meant to be short — ending one at
         a gate and starting again is the move that keeps a run from reaching
-        compaction (ADR 0019, decision 32). So the common shape is several runs in
+        compaction (ADR 0019, decision 37). So the common shape is several runs in
         one sitting, and an accounting that added them together would report one
         expensive run where there were three cheap ones."""
         space = self.space()
@@ -1648,7 +1648,7 @@ class SpendTest(ConsoleCase):
     def test_the_spend_surface_is_declared_against_the_host_that_drives(self):
         """One page, two hosts. Spend belongs to a run, and the launcher has no
         run — a cost line under `contour canvas` would be a figure about nothing
-        (ADR 0019, decision 5)."""
+        (ADR 0019, decision 23)."""
         page = (ROOT / "lib" / "canvas.html").read_text()
         markup = re.sub(r"<script.*?</script>|<style.*?</style>|<!--.*?-->", "",
                         page, flags=re.S)
@@ -1661,7 +1661,7 @@ class SpendTest(ConsoleCase):
 
     def test_nothing_offers_a_cost_before_the_first_turn_lands(self):
         """A pre-run estimate was rejected outright: it cannot be known, and a
-        wrong one is worse than none (ADR 0019, decision 32). So the line is empty
+        wrong one is worse than none (ADR 0019, decision 37). So the line is empty
         until a turn has actually been spent — what is shown is measurement, never
         prediction."""
         space = self.space()

@@ -32,11 +32,11 @@ does not do is drive anything.
 
 ## Decision
 
-**A *console* sits above the launcher and drives the agent.** It owns the agent
+**1. A *console* sits above the launcher and drives the agent.** It owns the agent
 loop through the Claude Agent SDK, gates the agent's tool calls against a
 user-owned policy, and renders the sheet, the report and the marks on one page.
 
-**The console is above `contour`, not inside it.** It shells out to `./contour`
+**2. The console is above `contour`, not inside it.** It shells out to `./contour`
 exactly as `contour` shells out to Blender, and the launcher stays stdlib-only.
 This is the whole containment: `README.md`'s promise — *no virtualenv, no `pip
 install`, no dependencies* — becomes false for the console and stays true for
@@ -45,25 +45,25 @@ ADR 0010 actually bought and what makes the toolkit shareable at all. The stack
 is console → agent → `contour` → Blender, each layer a subprocess of the one
 above, and the only dependency at the top.
 
-**The console drives rather than observes.** A passive window would have made
+**3. The console drives rather than observes.** A passive window would have made
 marks the only intervention channel, and marks are deliberately asynchronous —
 ADR 0018 chose that so findings survive across turns. Driving is the opposite
 bet: that being present at the moment a decision is made is what was missing.
 Both bets are now available, which is the point.
 
-**It is a control surface, not a progress bar.** Tailing the log and refreshing
+**4. It is a control surface, not a progress bar.** Tailing the log and refreshing
 the sheet would have been nearly free and would have answered *what is it
 doing*. It does not answer *stop*. The reason to be present is to catch a bad
 decision before it lands, so the gate is the feature and the progress view is
 the by-product.
 
-**What is gated is a tunable ask-list, per tool and per path.** Gating every
+**5. What is gated is a tunable ask-list, per tool and per path.** Gating every
 tool call is unusable — an agent makes dozens of reads per turn and the user
 would be clicking, not watching. Gating only the eight rules was the tempting
 answer, since that list has been argued out across eighteen ADRs, but it is a
 policy the user cannot tighten for a released model or loosen for a scratch one.
 
-**The ask-list lives in `~/.contour`, and the agent may only propose.** It is
+**6. The ask-list lives in `~/.contour`, and the agent may only propose.** It is
 outside both the toolkit and every model space, so an agent working in a space
 has no in-scope reason to touch it. This does not make tampering impossible —
 an agent with Bash can write any path — it makes tampering stop being a
@@ -73,11 +73,11 @@ agent may *propose* a wider list; **the console performs the write.** A
 mechanism that let the agent perform it would be authorised by the very list it
 widens, and every self-amending permission system has that bug.
 
-**This is rule 2 applied to permissions.** An ask-list is a check. Never weaken
+**7. This is rule 2 applied to permissions.** An ask-list is a check. Never weaken
 a check to make it pass — and never let the party being checked hold the pen.
 It is ADR 0002's reasoning about the spec, in a second costume.
 
-**Scope is layered, two levels, replace not merge.** A global default plus a
+**8. Scope is layered, two levels, replace not merge.** A global default plus a
 per-space override, both in `~/.contour`. Merging two permission lists can
 silently *narrow* the result — an override that reads as adding a rule can
 shadow one, invisibly in both files — so a space's list replaces the default
@@ -88,13 +88,13 @@ the filesystem path. Fail-closed turns a moved or renamed space from *permission
 silently widened* into *the console asks about more than expected*, which is
 annoying in the right direction.
 
-**One page, and `canvas.html` is reused.** Two surfaces that both render the
+**9. One page, and `canvas.html` is reused.** Two surfaces that both render the
 sheet is how the user ends up marking on one and watching the other, and ADR
 0018's whole argument is that the sheet is the one surface both parties point
 at. The toolkit keeps serving it for `contour canvas`; the console serves the
 same file.
 
-**Mark resolution moves from session close to pre-rebuild.** ADR 0018 resolved
+**10. Mark resolution moves from session close to pre-rebuild.** ADR 0018 resolved
 at close because the ray must hit the geometry the sheet was drawn from, and
 called it a window to be kept shut. A console that rebuilds would open that
 window on every build. But the console *owns* the build, so it knows the instant
@@ -103,14 +103,14 @@ session close ever was. The window is deleted rather than managed.
 `views.json` already carries a fingerprint of the build its cameras drew
 (`lib/anchor.py`), so the staleness test exists and needs only to be moved.
 
-**The console ends when the page says done.** Last tab closes, process exits —
+**11. The console ends when the page says done.** Last tab closes, process exits —
 which is how `contour canvas` already works. ADR 0018 rejected a daemon as *"a
 thing to remember to kill and a thing to serve a stale sheet"*; the second half
 is now impossible, because the console owns the build, and the first half is
 answered by keeping the canvas's own lifetime rule and letting it say done
 later. An idle timeout catches the tab left open on Friday.
 
-**A gate offers allow and deny-with-a-reason.** The reason goes back to the
+**12. A gate offers allow and deny-with-a-reason.** The reason goes back to the
 agent as the tool result, which makes a gate the cheapest correction channel in
 the system — a sentence, at the moment it applies, instead of a paragraph after
 the fact. **A gate deliberately cannot edit the call.** Editing it would make the
@@ -120,23 +120,23 @@ else (a mark carries an author, `addressed` is not a close) and the gate does no
 become the one place it is laundered. The user says a sentence; the agent writes
 the code.
 
-**The page is an equal split: transcript and sheet.** The transcript is where
+**13. The page is an equal split: transcript and sheet.** The transcript is where
 decisions are visible and where a gate fires; the sheet is where a build is
 verified and where marks live. The sheet changes only when a build finishes, so
 the panel **states which build it is drawn from** — `views.json` already carries
 a fingerprint of the build its cameras drew, so a stale sheet is labelled rather
 than quietly authoritative.
 
-**A build is a gated call, and that gate is the resolution point.** Because the
+**14. A build is a gated call, and that gate is the resolution point.** Because the
 sheet is always on screen it can always be clicked, and an agent rebuild would
 otherwise invalidate marks mid-typing. Putting the build on the ask-list means
 the only thing that can invalidate a mark is a call the user personally
-approved — so decision 8's *resolve before rebuild* and the ask-list compose
+approved — so decision 10's *resolve before rebuild* and the ask-list compose
 into one mechanism, and there is no second concurrency story to own. The cost is
 a click per build, which is the most-pressured gate in the system; the sanctioned
 relief is a deliberate per-space ask-list entry, never a button on the dialog.
 
-**A denial is recorded as a *veto*, tracked in the space.** A veto carries the
+**15. A denial is recorded as a *veto*, tracked in the space.** A veto carries the
 call, the reason, the author and the build it happened against. It is not a mark:
 a mark has a position, and ADR 0018 rejected position-less marks because they
 collapse *the left of the beak* back to *the beak* and return the conversation to
@@ -145,10 +145,10 @@ meant*, but *not this* — and it is the user's authority against one call, whic
 is why only the user has it, exactly as only the user closes a mark. It is
 tracked for ADR 0018's reason and not as a log: a veto is why two builds differ,
 and an untracked one vanishes on a clean checkout taking the reasoning with it.
-**A veto about a part may be promoted to a sheet mark**, which is what gives it a
+**16. A veto about a part may be promoted to a sheet mark**, which is what gives it a
 position and turns a fact about a moment into an open question about the model.
 
-**A run is attended by definition, and a gate waits indefinitely.** The console
+**17. A run is attended by definition, and a gate waits indefinitely.** The console
 never answers a gate on the user's behalf, in either direction. ADR 0018 rejected
 auto-closing a mark on a green check and rejected the agent closing its own,
 because *a finding is not disposed of by the party it is aimed at*; a timed-out
@@ -160,10 +160,10 @@ lifetime rule would end the run at an unanswered gate and quietly become the
 timeout policy this rejects. What this buys: no run state on disk, no resume, no
 notification path. The console is an instrument someone is holding.
 
-**A space is held by a lock, and the lock lives in the launcher.** While a run is
+**18. A space is held by a lock, and the lock lives in the launcher.** While a run is
 live the space is held; a second caller — console or terminal — is refused with a
 message rather than silently overwriting `build.py`. The lock is **not** the
-console's, because decision 4 makes the console a client of the toolkit with no
+console's, because decision 2 makes the console a client of the toolkit with no
 privileged access: a lock the console owned would put privilege in the one layer
 allowed to carry dependencies, and would leave terminal-versus-terminal, which
 races today, unprotected. It is scoped to a **run**, not a build, because the
@@ -171,7 +171,7 @@ thing that actually races is the `build.py` editing *between* builds; a
 build-scoped lock would look like a fix and not be one. The lock file lives in
 `.contour/`, git-ignored beside `report.json` and `last-build.log`.
 
-**The console's agent inherits the space's configuration, and the ask-list is
+**19. The console's agent inherits the space's configuration, and the ask-list is
 additional.** The SDK is pointed at the space directory and discovers what Claude
 Code discovers — CLAUDE.md, `.claude/settings.json` (which wires `contour hook
 spec` on `Write|Edit`), and the space's `build-model` and `release-model` skills.
@@ -179,13 +179,13 @@ The console does not restate the discipline; it discovers it, because a hand-rol
 system prompt yields an agent that follows whichever of the eight rules its author
 remembered, in a second place that drifts.
 
-**The guard keeps denying and the ask-list only asks.** These are not two
+**20. The guard keeps denying and the ask-list only asks.** These are not two
 implementations of one idea. A `refs/` write must never be approvable — ADR 0012
 and the guard itself say no measurement argument justifies rewriting a reference —
 and routing it through a dialog makes it something a tired user can click through.
 Decisions made in advance stay denials; decisions needing presence become asks.
 
-**A run starts from prose, and marks may seed it.** The space's skills already
+**21. A run starts from prose, and marks may seed it.** The space's skills already
 self-trigger on their descriptions — `build-model` says it is for *any* model work
 or a failing check — so making the user pick a skill first moves a decision from
 the agent, which reads it from context, to the user, who has not described the
@@ -196,7 +196,7 @@ located, authored and tracked. **A run seeded from marks makes `addressed`
 checkable:** the console knows which marks were in scope, so one left unaddressed
 at the end of a run is visible rather than silently dropped.
 
-**The ask-list is written in Contour's vocabulary, not in tool globs.** A category
+**22. The ask-list is written in Contour's vocabulary, not in tool globs.** A category
 is an intent — a spec write, a commit, a push, a build, a ref write — and the
 launcher is asked what a call means, rather than the console pattern-matching the
 call's text. A glob is brittle exactly where the stakes are: the gated build is
@@ -204,13 +204,13 @@ call's text. A glob is brittle exactly where the stakes are: the gated build is
 render`, which also builds — one intent, four spellings, and a permission list that
 needs four rules will still have a hole. A gap in this list is a rule that has
 silently stopped being enforced. Semantic categories are also what make decision
-10's fail-closed default definable at all: *strictest* means every category gated,
+8's fail-closed default definable at all: *strictest* means every category gated,
 which is finite and checkable, where a glob list can never be known to be complete.
 The cost is that the console classifies calls and therefore knows the launcher's
 command table — coupling to the one surface in this system that is already
 authoritative and already exhaustive.
 
-**`contour canvas` survives, and the page degrades to its host.** Served by the
+**23. `contour canvas` survives, and the page degrades to its host.** Served by the
 launcher it is marks-only; served by the console it is the full surface. Keeping
 the launcher stdlib-pure means nothing unless the pipeline is fully usable without
 the console, and marking is not a nicety — ADR 0018 made the sheet the surface both
@@ -224,15 +224,15 @@ components was rejected as a bundler with a delay** — ADR 0018's own signal th
 the scope went wrong. If `canvas.html` outgrows one file, the console's extra views
 are served beside it, not bundled into it.
 
-**Every build renders for the page; only a checkpoint renders for the agent.** ADR
+**24. Every build renders for the page; only a checkpoint renders for the agent.** ADR
 0005 rate-limited renders because a sheet entering the conversation costs ~1400
 tokens — a cost to the agent's context, not to the render. A sheet going to a page
-costs neither, so the panel decision 12 made permanent can be current instead of
+costs neither, so the panel decision 13 made permanent can be current instead of
 labelled stale; labelling was the fix for unavoidable staleness, and this staleness
 is avoidable. The agent's budget is untouched: it still may not pull a sheet into
 context except at a checkpoint.
 
-**And *checkpoint* keeps its meaning while losing its trigger.** It no longer means
+**25. And *checkpoint* keeps its meaning while losing its trigger.** It no longer means
 *render now*; it means only *the agent believes it is done, or is stuck* — which is
 the part with no mechanical replacement, since green is not the same as finished and
 *stuck* has no signal at all. Retiring the word was rejected because it is the
@@ -243,7 +243,7 @@ The cost accepted: four extra Workbench passes and the identity mask on every
 build, felt on every gated click, and the lever if it hurts is a lower-resolution
 panel render, never a less frequent one.
 
-**Rules 1 and 5 become mechanism-neutral, and the confirm happens once.** A
+**26. Rules 1 and 5 become mechanism-neutral, and the confirm happens once.** A
 proposal and a gate are not duplicates: the proposal carries the argument — *depth
 measures 620 against a tolerance of 600 ±20* — which no gate can show. The
 *confirm* is what duplicates, and a ritual performed twice is one that stops being
@@ -256,7 +256,7 @@ reading `CLAUDE.md`, and diverges the first time a rule changes. **This means
 `CLAUDE.md` changes when the console lands** — the concrete route stays in the
 `build-model` skill, and the rule says what must hold rather than how.
 
-**A veto lives in its own tracked file, not inside `marks.json`.** Their retention
+**27. A veto lives in its own tracked file, not inside `marks.json`.** Their retention
 policies are opposite: ADR 0018 prunes resolved marks older than the last release
 tag and leaves the archive to git, which is coherent because a mark gets resolved
 and closed. **A veto is never resolved** — it is a fact about a moment, already
@@ -266,15 +266,15 @@ one file means the pruner must tell them apart, and the first bug is that it doe
 not. Their writers differ too: `marks.json` is written by the agent through `contour
 mark` and by the user through the canvas, while a veto is only ever written by the
 console at a gate — fewer writers per file matters more now that a run holds a lock.
-**`contour check` gains no veto line.** ADR 0018 was careful that marks report one
+**28. `contour check` gains no veto line.** ADR 0018 was careful that marks report one
 line when open and nothing at zero; a veto is never open, so a veto line would never
 go away, and a status line that is always present is furniture nobody reads.
 
-**A failed build leaves the last good sheet in the panel, labelled.** A red build
+**29. A failed build leaves the last good sheet in the panel, labelled.** A red build
 produces no geometry, and red is the common state inside a fix loop — so the panel
 shows the last successful sheet with its build fingerprint and an explicit
-not-current label. This is the job decision 12's labelling was actually for.
-**Rendering a partially built scene was rejected as the most dangerous option
+not-current label. This is the job decision 13's labelling was actually for.
+**30. Rendering a partially built scene was rejected as the most dangerous option
 available:** it produces a picture of a model that has never existed, in the panel
 where every other picture is real, and ADR 0018 rejected pixel pins in exactly these
 terms — authoritative while lying. Overlaying the failing check was rejected because
@@ -284,7 +284,7 @@ resolution happened, the page says so** — *marks not resolved: last build fail
 rather than leaving marks silently pending, which would return ADR 0018's window
 through a side door as a mark that looks pinned and is not.
 
-**The console reads state by importing `lib/`, and acts by spawning `./contour`.**
+**31. The console reads state by importing `lib/`, and acts by spawning `./contour`.**
 `lib/` already has two halves: ten Blender-free modules — `marks`, `anchor`, `mask`,
 `span`, `refs`, `paths`, `miniyaml`, `glb`, `agent`, `canvas` — and the `bpy`-bound
 `cmd_*`, `kit`, `scene`, `mutants`, `ctx_override` that run inside Blender.
@@ -296,13 +296,13 @@ in two places that drift silently, both still parsing the old shape. Growing rea
 subcommands on the launcher was rejected as new surface with one consumer, a process
 spawn per read, for what an import already gives.
 
-**Two properties become load-bearing, and are named here because nothing names them
+**32. Two properties become load-bearing, and are named here because nothing names them
 today.** The Blender-free half of `lib/` must stay stdlib-only — it is today, and a
 single pip-installed import there would break `contour` on a bare clone, which is the
-whole of decision 4. And the console must never import a `bpy`-bound module. That
+whole of decision 2. And the console must never import a `bpy`-bound module. That
 split is currently legible only by reading imports; it now deserves a test.
 
-**A veto reaches git with the change it prevented, and the console shows the
+**33. A veto reaches git with the change it prevented, and the console shows the
 exposure.** Tracked is not committed: decision 15 tracked vetoes so they survive a
 clean checkout, and an uncommitted one dies exactly as an ignored one would. The
 console does not commit them itself — that is rule 5 flat, and decision 18 already
@@ -318,40 +318,40 @@ visibility, on the page and not in `contour check`: *n vetoes uncommitted*. The
 residual risk is stated rather than solved — a `git checkout .` with uncommitted
 vetoes loses them, which is already true of `marks.json` and which ADR 0018 accepted.
 
-**The console is its own executable, `contour-console`, beside `contour`.** A
+**34. The console is its own executable, `contour-console`, beside `contour`.** A
 `contour console` subcommand is structurally defensible — the launcher already spawns
 a heavy external process it does not link against, via `$BLENDER` — and was rejected
 because it hides the install boundary at the exact point someone meets it. Two names
 are self-documenting: `contour` needs nothing, `contour-console` needs an
 environment, and `README.md`'s promise stays true of the thing that was typed instead
 of needing a footnote. It also keeps the process tree honest: `contour-console →
-contour → Blender` is the stack decision 4 describes, where `contour → console →
+contour → Blender` is the stack decision 2 describes, where `contour → console →
 contour → Blender` has the launcher pretending to be a peer of what it launched.
-**A pip-installed console was rejected on version drift** — it imports `lib/` and
+**35. A pip-installed console was rejected on version drift** — it imports `lib/` and
 classifies the launcher's command table, so it is bound to this checkout by design,
 and shipping it separately invites a mismatch neither side can detect. And because
 the console needs an interpreter `contour` does not, a missing environment must fail
 as *no console environment* with the command to create one, not as a traceback about
 an import.
 
-**The ask-list is an allow-list with no presets: silence means ask.** The file names
+**36. The ask-list is an allow-list with no presets: silence means ask.** The file names
 only the categories the user has chosen to let through, and a category the toolkit
 knows but the file does not mention is gated. Presets were rejected because a preset's
 meaning changes underneath the user: when a later toolkit version adds a gated
 category, a file saying `normal` silently denotes a different set and no decision was
 ever made about the new thing. Under an allow-list a new category arrives as a gate
-that is noticed and then decided — decision 10's fail-closed principle applied to time
+that is noticed and then decided — decision 8's fail-closed principle applied to time
 instead of to space. Writing down what to *gate* was rejected for the same reason
 globs were: a category forgotten is a category running unwatched. **And *the strictest
 list* stops needing a definition — it is the empty list**, which is what an
-unrecognised space naturally has, so decision 10 needs no preset to name and no
+unrecognised space naturally has, so decision 8 needs no preset to name and no
 fallback table that could disagree with one. The cost is that a first run gates
 everything and is tuned downward, which is the right direction and does mean the first
 session is spent writing the file rather than building. Because the file is meaningful
 only against the current set of categories, **the console must be able to enumerate
 them** — a list that cannot be printed cannot be audited.
 
-**The console shows spend live and records it where the existing accounting can read
+**37. The console shows spend live and records it where the existing accounting can read
 it.** `tools/tokens.py` measures per-iteration cost by parsing the Claude Code
 transcript for this project; a console run produces no such transcript, so the one
 tool serving the second stated priority would go blind in the same change that makes
@@ -359,14 +359,14 @@ runs longer and adds a turn per gate. The console has strictly better data than 
 transcript ever did — the SDK returns usage per turn, cache reads included — so it
 appends that per turn and `tools/tokens.py` learns to read it. The live display has a
 second job: a gate that fires often costs a turn of re-explanation every time, and
-seeing that cost is what makes decision 30's *tune it downward* an informed act rather
+seeing that cost is what makes decision 36's *tune it downward* an informed act rather
 than an irritated one. **A per-run budget that ends the run was rejected on decision
 17's symmetry:** silence is not a verdict and neither is a threshold set before the
 user knew what the run involved — the console does not decide for the user in either
 direction, and with an attended run the stop is the user. A pre-run cost estimate was
 rejected outright: it cannot be known, and a wrong one is worse than none.
 
-**The spec is never a memory, and a run is meant to be short.** A gated run is long —
+**38. The spec is never a memory, and a run is meant to be short.** A gated run is long —
 a turn per gate, a report per build — so the harness will compact it, and a compacted
 spec is the goalpost moved by the harness rather than by the agent: the same failure ADR
 0002 exists to prevent, with nobody to blame. The distinction that makes this
@@ -383,7 +383,7 @@ was rejected as the quiet risk** — the agent would keep working against a summ
 contract while `verify.py` kept reading the real spec from disk, so the build would stay
 honest and the agent's understanding would drift: correct output, wrong model of why.
 
-**The console's endpoints are authenticated, and not by locality.** A per-session
+**39. The console's endpoints are authenticated, and not by locality.** A per-session
 secret in the URL the console opens, checked on every request; an explicit bind to
 `127.0.0.1`; an `Origin` / `Sec-Fetch-Site` check; and a required JSON content type so
 a simple cross-site POST cannot reach a handler at all. *Localhost is private* is false
@@ -399,7 +399,7 @@ browsers cannot connect to one and the point is a page. **Because the token belo
 the server rather than in the console, `contour canvas` gains it too** — a change to
 shipped behaviour, and ADR 0018's surface stops resting on trust-by-locality.
 
-**Model content goes to an API, by design, and this ADR is where that is
+**40. Model content goes to an API, by design, and this ADR is where that is
 stated.** Rule 8 is a git boundary: a model space is never pushed, and sharing a
 model means `contour export`. Driving an agent over a model space sends its
 references and spec to a model provider, which that boundary permits and which
@@ -522,7 +522,7 @@ not a silent consequence of a UI, and it does not become one.
 - **An ask-list of tool-and-glob patterns.** Familiar from `settings.json`, and
   brittle in the place that matters: one intent has several spellings, and the
   list can never be shown to be complete.- **Retiring `contour canvas`**, or making it an alias that needs the venv. Both
-  walk back decision 4 by moving an existing zero-dependency capability behind an
+  walk back decision 2 by moving an existing zero-dependency capability behind an
   install.
 - **Two pages sharing components.** Needs a bundler about a week later, which ADR
   0018 named as the signal that the scope has gone wrong.- **Rendering only at checkpoints and labelling the panel stale.** Correct when

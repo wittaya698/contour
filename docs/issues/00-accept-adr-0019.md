@@ -15,11 +15,21 @@ and the file agree afterwards.
 
 ## Acceptance criteria
 
-- [ ] ADR 0019's status line reads Accepted, or the ADR is revised and this slice
+- [x] ADR 0019's status line reads Accepted, or the ADR is revised and this slice
       is reopened against the revision
-- [ ] `docs/adr/README.md` and each ADR file state the same status for 0018 and 0019
-- [ ] The decision numbers cited by slices 01–14 still exist and still mean what
+- [x] `docs/adr/README.md` and each ADR file state the same status for 0018 and 0019
+- [x] The decision numbers cited by slices 01–14 still exist and still mean what
       those slices say they mean
+
+The third one did not hold, and closing it was most of this slice. ADR 0019's
+decisions were never numbered, so none of the hundred and seventy-four citations
+across the repo resolved to anything. Recovered by subject, the old citations of
+ADR 0019 decisions 20 and 22 turned out to mean each other, and the old citation of
+ADR 0019 decision 31 meant its thirty-ninth. The decisions now carry numbers, in the numbered-list idiom ADR 0009 and ADR 0020
+already use; every citation was remapped by what it claims; eleven that named no
+ADR at all now name one; and `tests/test_adr_citations.py` holds it together, so
+an ADR cited by number has to number its decisions and a citation has to land
+inside the range.
 
 ## Blocked by
 

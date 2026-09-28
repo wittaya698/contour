@@ -1,6 +1,6 @@
 # 08 — A gated run, end to end
 
-**Type:** AFK · **Source:** ADR 0019 decisions 1, 3, 13, 17, 22
+**Type:** AFK · **Source:** ADR 0019 decisions 1, 3, 13, 17, 20
 
 ## What to build
 

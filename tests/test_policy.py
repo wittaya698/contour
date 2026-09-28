@@ -1,6 +1,6 @@
 """The ask-list: which calls run unwatched, and everything else asks.
 
-ADR 0019, decisions 6, 7, 10 and 30. These drive the reader the way the
+ADR 0019, decisions 6, 7, 8 and 36. These drive the reader the way the
 console's gate will — a category from `lib.intent` and the space the agent is
 working in — and they always pass the file explicitly, because the point of the
 thing living in `~/.contour` is that no test and no agent has to go looking for

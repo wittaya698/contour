@@ -1,4 +1,4 @@
-"""Talking to a canvas the way its page does (ADR 0019 decision 31).
+"""Talking to a canvas the way its page does (ADR 0019 decision 39).
 
 The server authenticates every request, so a test that reaches it has to hold
 the session's token — which is the point: a helper that could not would be

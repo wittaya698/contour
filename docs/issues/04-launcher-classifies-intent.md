@@ -1,6 +1,6 @@
 # 04 — The launcher classifies a call's intent
 
-**Type:** AFK · **Source:** ADR 0019 decision 20
+**Type:** AFK · **Source:** ADR 0019 decision 22
 
 ## What to build
 

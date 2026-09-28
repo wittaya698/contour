@@ -1,4 +1,4 @@
-"""What a call *means*, in Contour's vocabulary (ADR 0019, decision 20).
+"""What a call *means*, in Contour's vocabulary (ADR 0019, decision 22).
 
 The gate asks the launcher rather than pattern-matching the call's text,
 because one intent has several spellings and a permission list needing one

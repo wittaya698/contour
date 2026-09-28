@@ -105,7 +105,7 @@ class PanelTest(unittest.TestCase):
         """Red is the common state inside a fix loop, and a build that raised
         leaves the *previous* `.blend` on disk — so the two fingerprints agree
         and say `current` about a picture of a build that never finished. The
-        verdict is what the page reads instead (ADR 0019, decision 27)."""
+        verdict is what the page reads instead (ADR 0019, decision 29)."""
         self.built()
         self.assertTrue(self.panel()["current"])
         self.assertEqual(self.check(crash=True).returncode, 1)
@@ -119,7 +119,7 @@ class PanelTest(unittest.TestCase):
         """A mark is born with a pixel and becomes a pin when a ray lands. No
         build means no rays, and leaving those marks silently pending returns
         ADR 0018's window through a side door — a mark that looks pinned and is
-        not. The page says which it is (ADR 0019, decision 27)."""
+        not. The page says which it is (ADR 0019, decision 29)."""
         self.built()
         self.marks.write_text(json.dumps(
             [{"id": "m1", "view": "front", "pixel": [3, 4], "text": "too tall",

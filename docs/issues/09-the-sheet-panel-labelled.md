@@ -1,6 +1,6 @@
 # 09 — The sheet panel, labelled
 
-**Type:** AFK · **Source:** ADR 0019 decisions 12, 23, 26
+**Type:** AFK · **Source:** ADR 0019 decisions 13, 24, 29
 
 ## What to build
 

@@ -1,5 +1,5 @@
 """One run: prose in, a driven agent, every call gated (ADR 0019, decisions 1,
-3, 13, 17, 22).
+3, 13, 17, 20).
 
 The console's half of the run and not the SDK's. Everything here is standard
 library, which is what makes the gate, the wait and the lock provable on a clone
@@ -55,7 +55,7 @@ def options(space, record):
     discovers what Claude Code discovers there — the space's own rules, its
     settings, its skills. Writing them out here would yield an agent following
     whichever of the eight rules this file's author remembered, in a second place
-    that drifts (ADR 0019, decision 21).
+    that drifts (ADR 0019, decision 19).
 
     Two things about the environment, both of which the agent needs in order for
     the toolkit's own mechanisms to work on it rather than around it:
@@ -109,7 +109,7 @@ class Run:
         """Begin. The prompt is the transcript's first line, because it is the
         first turn and the page is showing a conversation — so what is said there
         is the composed prompt and not the prose, because the composed one is
-        what the agent was actually given (ADR 0019, decision 19)."""
+        what the agent was actually given (ADR 0019, decision 21)."""
         prompt, self.seeded = seed.compose(self.space, prompt, marks_selected)
         # Hold the space first: a run whose transcript had started and whose
         # hold had been refused would be a run the user was watching happen
@@ -261,14 +261,14 @@ class Run:
         hit the geometry the sheet was drawn from. The console owns the build, so
         this is the instant before geometry changes — a strictly better place to
         cast rays than session close, which is where ADR 0018 had to put them
-        (ADR 0019, decisions 8 and 14).
+        (ADR 0019, decisions 10 and 14).
         """
         if category != "build":
             return
         # Asked here rather than paid for blindly: most approvals have no new pin
         # waiting, and a Blender startup on every one of them would add a second
         # to the most-pressured gate in the system for nothing. Read by importing
-        # `lib/`, which is the half of decision 28 this process may do itself.
+        # `lib/`, which is the half of ADR 0019's decision 31 this process may do itself.
         if not anchor.unresolved(marks.load(self.space / marks.NAME)):
             return
         _ok, lines = launcher.run(self.space, "resolve",
@@ -298,7 +298,7 @@ class Run:
         if not allow:
             # The transcript dies with the tab; this does not. A denial is why
             # two builds differ, so it is kept in the space and reaches git with
-            # the change it prevented (ADR 0019, decisions 15 and 25).
+            # the change it prevented (ADR 0019, decisions 15 and 33).
             vetoes.record(self.space, waiting["category"], waiting["tool"],
                           waiting["call"], reason)
         self.say("verdict", id=at, allowed=bool(allow), text=reason or "")

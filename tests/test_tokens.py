@@ -3,7 +3,7 @@
 Token cost is the second of the three stated priorities, and this tool is the
 whole of Contour's accounting for it. It grew up reading the Claude Code
 transcript for a project; a console run produces no transcript and records its
-own turns instead (ADR 0019, decision 32). Both have to arrive in one table in
+own turns instead (ADR 0019, decision 37). Both have to arrive in one table in
 one set of units, or the priority is served by two numbers that cannot be
 compared.
 """
@@ -124,8 +124,8 @@ class ConsoleRunTest(TokensCase):
     def test_the_report_says_what_the_gates_cost(self):
         """The display's second job, in the tool as well as on the page. A gate
         costs a turn of re-explanation, and *tune the ask-list downward* should be
-        an informed act rather than an irritated one (ADR 0019, decisions 30
-        and 32)."""
+        an informed act rather than an irritated one (ADR 0019, decisions 36
+        and 37)."""
         space = self.space()
         self.spent(space, "r1",
                    {"input_tokens": 100, "output_tokens": 10},

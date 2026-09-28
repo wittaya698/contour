@@ -1,6 +1,6 @@
 # 15 — The guard asks what a call means
 
-**Type:** AFK · **Source:** architecture review 2026-09-28 · ADR 0019 decision 22, ADR 0012, rule 1
+**Type:** AFK · **Source:** architecture review 2026-09-28 · ADR 0019 decision 20, ADR 0012, rule 1
 
 ## What to build
 
@@ -14,7 +14,7 @@ entirely.
 
 **This matters because the guard is the layer rule 1 actually rests on.** A
 space's `PreToolUse` hook fires before the SDK consults the console's
-`can_use_tool`, which is why ADR 0019 decision 22 has the guard keep denying while
+`can_use_tool`, which is why ADR 0019 decision 20 has the guard keep denying while
 the ask-list only asks, and why the console deliberately carries no `ref-write`
 special case. The strict layer being the narrower one inverts that.
 

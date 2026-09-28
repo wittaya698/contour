@@ -27,7 +27,7 @@ NOISE = re.compile(
 # Anthropic cache pricing multipliers, relative to a normal input token, and
 # output's premium over one — from `console/spend.py`, which is where the console
 # weighs a turn for the page. One definition, because a run read here and watched
-# there must not come out as two prices (ADR 0019, decision 32).
+# there must not come out as two prices (ADR 0019, decision 37).
 CACHE_READ_MULT = spend.CACHE_READ_MULT
 CACHE_WRITE_MULT = spend.CACHE_WRITE_MULT
 OUTPUT_MULT = spend.OUTPUT_MULT
@@ -121,7 +121,7 @@ def console_runs(project: Path):
     A run is one prompt and every turn it caused, which is what an iteration has
     always meant here — so a console run and a terminal one land in one table in
     one set of units, and the second stated priority is served by one number
-    (ADR 0019, decision 32).
+    (ADR 0019, decision 37).
     """
     out = {}
     for turn in spend.load(project):

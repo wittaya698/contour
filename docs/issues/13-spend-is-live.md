@@ -1,6 +1,6 @@
 # 13 — Spend is live, and `tools/tokens.py` can read it
 
-**Type:** AFK · **Source:** ADR 0019 decision 32
+**Type:** AFK · **Source:** ADR 0019 decision 37
 
 ## What to build
 

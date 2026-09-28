@@ -1,6 +1,6 @@
 # 06 — `contour-console` exists and serves the page
 
-**Type:** AFK · **Source:** ADR 0019 decisions 4, 11, 33
+**Type:** AFK · **Source:** ADR 0019 decisions 2, 34, 23
 
 ## What to build
 

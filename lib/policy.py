@@ -1,4 +1,4 @@
-"""The ask-list: which categories of call run unwatched (ADR 0019, decision 30).
+"""The ask-list: which categories of call run unwatched (ADR 0019, decision 36).
 
 An allow-list with no presets. The file names only what the user has chosen to
 let through, and a category it does not mention is gated — so a category the

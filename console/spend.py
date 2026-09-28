@@ -1,4 +1,4 @@
-"""What a run cost, per turn (ADR 0019, decision 32).
+"""What a run cost, per turn (ADR 0019, decision 37).
 
 Token cost is the second of Contour's three stated priorities, and the tool that
 serves it — `tools/tokens.py` — measures it by parsing the Claude Code transcript
@@ -104,7 +104,7 @@ def record(space, run, usage, gates=0, prompt=""):
     the only way the file can know a verdict happened between two turns: a turn
     that followed one carries a re-explanation of everything the agent had
     already said, and that cost is what makes tuning the ask-list an informed act
-    rather than an irritated one (ADR 0019, decision 32).
+    rather than an irritated one (ADR 0019, decision 37).
     """
     line = {"run": run, "at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             # On every line and not only the first: the accounting is read by

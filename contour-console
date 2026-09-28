@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The console: the page that drives a run (ADR 0019, decisions 4, 11, 33).
+"""The console: the page that drives a run (ADR 0019, decisions 2, 34, 23).
 
 Its own executable and not `contour console`, because the two names say what the
 install boundary is at the moment somebody meets it: `contour` needs nothing,

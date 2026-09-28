@@ -1,6 +1,6 @@
 # 01 — The canvas server authenticates
 
-**Type:** AFK · **Source:** ADR 0019 decision 31
+**Type:** AFK · **Source:** ADR 0019 decision 39
 
 ## What to build
 
@@ -30,14 +30,14 @@ to one, and the point is a page.
 
 ## Acceptance criteria
 
-- [ ] A request without the session secret is refused, GET and POST alike
-- [ ] A POST with a non-JSON content type is refused before any handler runs
-- [ ] A POST carrying a foreign `Origin` is refused
-- [ ] The server binds `127.0.0.1` explicitly, not all interfaces
-- [ ] The secret differs between two runs of the command
-- [ ] `contour canvas` still works end to end: the page opens, a mark round-trips
+- [x] A request without the session secret is refused, GET and POST alike
+- [x] A POST with a non-JSON content type is refused before any handler runs
+- [x] A POST carrying a foreign `Origin` is refused
+- [x] The server binds `127.0.0.1` explicitly, not all interfaces
+- [x] The secret differs between two runs of the command
+- [x] `contour canvas` still works end to end: the page opens, a mark round-trips
       to disk, the command prints its report and exits
-- [ ] The secret never reaches a log or the terse report
+- [x] The secret never reaches a log or the terse report
 
 ## Blocked by
 

@@ -148,7 +148,7 @@ class _Handler(BaseHTTPRequestHandler):
     def _extra(self, verb, payload):
         """Whatever this host added, or 404. Last, so a host cannot quietly
         replace `/marks` — the shared endpoints are the canvas's and mean the
-        same thing under every host, which is the whole of decision 33."""
+        same thing under every host, which is the whole of ADR 0019's decision 23."""
         handler = self.server.canvas.routes.get(
             (verb, urllib.parse.urlparse(self.path).path))
         if handler is None:
@@ -337,7 +337,7 @@ class Canvas:
         this host has no build to hang it off: `contour canvas` shows a sheet and
         cannot know when the next build is coming, so Done is the last moment it
         knows about. A console can do better, and does — it owns the build, so it
-        resolves the instant it approves one (ADR 0019, decisions 8 and 14).
+        resolves the instant it approves one (ADR 0019, decisions 10 and 14).
         """
         if not self.resolve or not anchor.unresolved(marks_store.load(self.marks)):
             return []

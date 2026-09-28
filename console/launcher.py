@@ -1,4 +1,4 @@
-"""The console's one door onto `./contour` (ADR 0019, decision 28).
+"""The console's one door onto `./contour` (ADR 0019, decision 31).
 
 The console reads state by importing `lib/` and *acts* by spawning the launcher.
 Both halves matter here. A Blender stage run in this process would put `bpy`

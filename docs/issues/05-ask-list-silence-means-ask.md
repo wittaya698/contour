@@ -1,6 +1,6 @@
 # 05 — The ask-list is read, and silence means ask
 
-**Type:** AFK · **Source:** ADR 0019 decisions 6, 7, 10, 30
+**Type:** AFK · **Source:** ADR 0019 decisions 6, 7, 8, 36
 
 ## What to build
 

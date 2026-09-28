@@ -1,6 +1,6 @@
 # 11 — A veto is recorded
 
-**Type:** AFK · **Source:** ADR 0019 decisions 15, 25, 27
+**Type:** AFK · **Source:** ADR 0019 decisions 15, 27, 33
 
 ## What to build
 

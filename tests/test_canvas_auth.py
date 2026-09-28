@@ -1,9 +1,11 @@
-"""The canvas is not open because it is local (ADR 0019 decision 31).
+"""The canvas is not open because it is local (ADR 0019 decision 39).
 
 A server taking state-changing POSTs is reachable from any page the browser
 happens to be showing, so *localhost is private* is false for this one. These
 talk to the running server the way a page does, and the way an attacker would.
 """
+import contextlib
+import io
 import json
 import sys
 import tempfile
@@ -135,6 +137,23 @@ class CanvasAuthTest(unittest.TestCase):
         other = Canvas(sheet=self.sheet, marks=self.marks)
         self.assertNotEqual(self.canvas.token, other.token)
         self.assertGreater(len(other.token), 20)
+
+    def test_serving_the_page_never_writes_the_token_to_stderr(self):
+        """The first request is a navigation, so the token is in its URL — and
+        a request logger prints the request line. That is a secret in a
+        terminal, a CI record and `.contour/`, put there by the one request
+        every session makes. The report is checked below; this is the other
+        way out."""
+        caught = io.StringIO()
+        req = urllib.request.Request(self.canvas.url,
+                                     headers={"Sec-Fetch-Site": "none"})
+        with contextlib.redirect_stderr(caught):
+            with urllib.request.urlopen(req, timeout=5) as r:
+                self.assertEqual(r.status, 200)
+            # The handler logs from the serving thread, so give it the moment
+            # it needs to write before reading what was written.
+            self.canvas._thread.join(0.2)
+        self.assertNotIn(self.canvas.token, caught.getvalue())
 
     def test_the_report_never_carries_the_token(self):
         """The report is the one output that reaches a transcript and a log.

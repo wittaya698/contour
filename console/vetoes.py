@@ -1,4 +1,4 @@
-"""The veto store: a denial, kept (ADR 0019, decisions 15, 25).
+"""The veto store: a denial, kept (ADR 0019, decisions 15, 27).
 
 Above `lib/` on purpose, and the only store that is. Every other one — marks,
 refs, the panel's verdict — is written by the pipeline and lives where the
@@ -25,7 +25,7 @@ NAME = "vetoes.json"
 """Beside `marks.json` at the space's root, and tracked for the same reason.
 
 Not in `.contour/`, which a space gitignores whole but for its marker: a veto
-that vanished on a clean checkout would be exactly the log decision 15 refused
+that vanished on a clean checkout would be exactly the log ADR 0019's decision 15 refused
 to make it.
 """
 
@@ -142,7 +142,7 @@ def committed(space):
 def exposure(space):
     """What the page says about vetoes: all of them, and how many are at risk.
 
-    The count is the console's whole contribution to decision 27. It does not
+    The count is the console's whole contribution to ADR 0019's decision 33. It does not
     commit them — that is rule 5 flat — and it does not propose a records-only
     commit at run end either, because a veto-only commit describes no model state
     and would have to be skipped past by anyone reading history to understand how

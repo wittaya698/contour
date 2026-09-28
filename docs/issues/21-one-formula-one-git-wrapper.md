@@ -1,6 +1,6 @@
 # 21 — One weighting formula, one git wrapper
 
-**Type:** AFK · **Source:** architecture review 2026-09-28 · ADR 0019 decision 32
+**Type:** AFK · **Source:** architecture review 2026-09-28 · ADR 0019 decision 37
 
 ## What to build
 
@@ -9,7 +9,7 @@ Two small duplications, each of which is a defect waiting rather than an untidin
 **One weighting formula.** `console/spend.py:weigh()` and an inline copy in
 `tools/tokens.py` are the same arithmetic written twice — in a module whose own
 comment says *"One definition, because a run read here and watched there must not
-come out as two prices (ADR 0019, decision 32)."* It already imports the three
+come out as two prices (ADR 0019, decision 37)."* It already imports the three
 multipliers from `spend` for exactly that reason and then re-expresses the formula
 around them. There are also two spellings of the SDK's usage keys: `spend.counts`
 translates them, `tools/tokens.py` reads `cache_creation_input_tokens` and

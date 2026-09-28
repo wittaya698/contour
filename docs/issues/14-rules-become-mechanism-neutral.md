@@ -1,6 +1,6 @@
 # 14 — Rules 1 and 5 become mechanism-neutral
 
-**Type:** HITL · **Source:** ADR 0019 decision 24 and its first consequence
+**Type:** HITL · **Source:** ADR 0019 decision 26 and its first consequence
 
 ## What to build
 

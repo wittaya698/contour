@@ -8,7 +8,7 @@ so the label is a comparison of two numbers that exist — no new source of trut
 and nothing for a second reader to disagree with.
 
 Stdlib, and Blender-free: the launcher serves this and so does the console, and
-the console may never import a `bpy`-bound module (ADR 0019, decision 29).
+the console may never import a `bpy`-bound module (ADR 0019, decision 32).
 """
 import json
 from pathlib import Path

@@ -196,10 +196,10 @@
   <!-- What was refused, and what it is still exposed to. Here and not in
        `contour check`: a veto is never open, so a line about one would never go
        away, and a status line that is always present is furniture nobody reads
-       (ADR 0019, decision 25). The exposure is the console's whole contribution
+       (ADR 0019, decision 28). The exposure is the console's whole contribution
        to getting one into git — it does not commit, and it does not offer to:
        a veto-only commit describes no model state, and this one belongs in the
-       commit where the tolerance did not get widened (decision 27). -->
+       commit where the tolerance did not get widened (ADR 0019, decision 33). -->
   <section id="vetoes" data-needs="drive" hidden>
     <h1>Vetoes</h1>
     <p id="exposure"></p>
@@ -488,7 +488,7 @@ function show(name) {
                        : '/sheet.png?b=' + (drawn || ''));
 }
 
-// Every build renders for the page (ADR 0019, decision 23), so the label and the
+// Every build renders for the page (ADR 0019, decision 24), so the label and the
 // picture are both behind this one poll. Slower than the transcript's: a build
 // takes seconds and a verdict is waited on.
 setInterval(labelled, 2000);
@@ -615,7 +615,7 @@ function draw() {
 
 // What this run has cost so far, in the units `tools/tokens.py` reports in — and
 // never before a turn has been spent: a cost that cannot be known must not be
-// guessed at, and a wrong estimate is worse than none (ADR 0019, decision 32).
+// guessed at, and a wrong estimate is worse than none (ADR 0019, decision 37).
 // The gate count is here for the reason the figure is: a gate buys a turn of
 // re-explanation, and seeing what that costs is what makes tuning the ask-list
 // downward an informed act rather than an irritated one.

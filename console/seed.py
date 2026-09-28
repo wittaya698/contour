@@ -1,4 +1,4 @@
-"""What a run was started from: the marks in scope (ADR 0019, decision 19).
+"""What a run was started from: the marks in scope (ADR 0019, decision 21).
 
 A run starts from prose. Marks may seed it, and seeding is composition rather
 than a second kind of run: the selected marks become lines above the prose, and
@@ -98,7 +98,7 @@ def report(space, seeded):
     A report and only a report. Nothing here closes a mark, dims one, or writes
     to the store at all: `addressed` is the agent's claim and closing is the
     user's act, and the console being the one that knows the scope does not make
-    it the one that gets to decide (ADR 0018, ADR 0019, decision 19).
+    it the one that gets to decide (ADR 0018, ADR 0019, decision 21).
     """
     if not seeded:
         return None
