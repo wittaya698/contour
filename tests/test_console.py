@@ -119,6 +119,17 @@ class ConsoleCase(unittest.TestCase):
         if not proc.stdout.closed:
             proc.stdout.close()
 
+    def servers(self):
+        """Every `console.server` alive on this machine, by pid.
+
+        Asked of the machine and not of the shim, because the failure this looks
+        for is a server that outlived the process that launched it: a child the
+        parent still knows about is not the thing that wedges a space.
+        """
+        found = subprocess.run(["pgrep", "-f", "console.server"],
+                               capture_output=True, text=True)
+        return {int(pid) for pid in found.stdout.split()}
+
     def ask(self, url, path, body=None):
         """One request, exactly as the page makes it: the token in a header,
         which is what makes it a request another site cannot forge, and JSON on
@@ -342,6 +353,132 @@ class ServesTest(ConsoleCase):
         self.assertEqual(said["build"], views.fingerprint(blend))
         self.assertFalse(said["current"])
         self.assertIn("last build failed", said["why"])
+
+
+class SignalTest(ConsoleCase):
+    """What happens to the server when the shim is told to go.
+
+    `contour-console` is a shim in front of `python -m console.server`, and the
+    signal a console meets is not always the one a person typed: a terminated
+    console, a closed terminal, a test harness tidying up. Every one of them has
+    the same two things to give back — the port, and the space's hold — and
+    exactly one way to give them back, which is to be asked (issue 27).
+    """
+
+    def test_a_terminated_console_leaves_no_server_behind(self):
+        """SIGTERM is what anything that is not a person sends, and it is what
+        this suite's own cleanup sends. A shim that dies where it stands leaves
+        the server reparented to init with its port still bound and no page, no
+        parent and no terminal — which is not an ending, it is a stray."""
+        space = self.space()
+        before = self.servers()
+        proc, url = self.launch(space)
+        started = self.servers() - before
+        self.assertEqual(len(started), 1, f"one server, not {started}")
+        self.addCleanup(self.reap, started)
+        proc.terminate()
+        proc.wait(timeout=30)
+        self.assertEqual(self.servers() & started, set(),
+                         "the server outlived the console that launched it")
+        with self.assertRaises((urllib.error.URLError, OSError)):
+            urllib.request.urlopen(url, timeout=5).read()
+
+    def test_a_terminated_console_gives_the_space_back(self):
+        """The hold is the half that outlives a killed console worst. A port
+        still answering makes the next console look like a port conflict; a hold
+        still held wedges the space behind a `run.lock` naming a pid with no
+        terminal, no page and no parent, and `lock.alive` asks the kernel, which
+        says yes. So the user's next `contour check` in their own space is
+        refused by a console nobody can go and look at."""
+        from lib import lock
+        space = self.space()
+        before = self.servers()
+        proc, url = self.driven({"call": {"tool": "Bash", "command": "./contour check"}},
+                                space=space)
+        self.addCleanup(self.reap, self.servers() - before)
+        self.ask(url, "/run", {"prompt": "check the build"})
+        self.gate(url)
+        self.assertIsNotNone(lock.holder(space), "the run did not hold the space")
+        proc.terminate()
+        proc.wait(timeout=30)
+        self.assertIsNone(lock.holder(space), "the run kept the space it was holding")
+        # The refusal a person would meet, from the launcher they would type.
+        # `$BLENDER` points nowhere so a check that was *not* refused fails for
+        # its own reason instead of spending a minute in Blender first.
+        r = subprocess.run([str(ROOT / "contour"), "check"], cwd=str(space),
+                           capture_output=True, text=True, timeout=60,
+                           env=dict(os.environ, BLENDER="/nowhere/blender"))
+        self.assertNotIn("is held by", r.stderr)
+
+    def test_a_closed_terminal_ends_the_console_and_says_which_signal_did(self):
+        """SIGHUP is what a closed terminal sends, and the console has no way to
+        ask about it afterwards — so it says which signal stopped it on the way
+        out, and exits as that signal. Which one arrived is the only thing that
+        differs between the three paths, and it is the thing a person reading a
+        log wants: a console that was hung up on is a different story from one
+        somebody typed Ctrl-C at."""
+        space = self.space()
+        before = self.servers()
+        proc, url = self.launch(space)
+        self.addCleanup(self.reap, self.servers() - before)
+        proc.send_signal(signal.SIGHUP)
+        code = proc.wait(timeout=30)
+        said = proc.stdout.read()
+        self.assertEqual(code, 128 + int(signal.SIGHUP))
+        self.assertIn("SIGHUP", said)
+        self.assertNotIn("Traceback", said)
+        self.assertEqual(self.servers() - before, set(),
+                         "the server outlived the terminal it was hung up on")
+
+    def test_a_console_killed_outright_still_lets_go_of_the_space(self):
+        """SIGKILL is the one thing forwarding cannot reach: nothing runs after
+        it, so the shim cannot pass it on and the server is never asked. It is
+        also what a person reaches for when a console will not go — and what
+        Activity Monitor sends. So the server watches the one fact that says it
+        happened: the parent it was launched by is gone, and a console with no
+        shim has no terminal to print to and no page to serve."""
+        from lib import lock
+        space = self.space()
+        before = self.servers()
+        proc, url = self.driven({"call": {"tool": "Bash", "command": "./contour check"}},
+                                space=space)
+        started = self.servers() - before
+        self.addCleanup(self.reap, started)
+        self.ask(url, "/run", {"prompt": "check the build"})
+        self.gate(url)
+        self.assertIsNotNone(lock.holder(space), "the run did not hold the space")
+        proc.kill()
+        proc.wait(timeout=30)
+        deadline = time.monotonic() + 30
+        while time.monotonic() < deadline and self.servers() & started:
+            time.sleep(0.25)
+        self.assertEqual(self.servers() & started, set(),
+                         "the server outlived the console nobody could stop")
+        self.assertIsNone(lock.holder(space), "the run kept the space it was holding")
+
+    def test_the_cleanup_this_suite_runs_puts_back_what_it_launched(self):
+        """The bill this issue came from. Every console test ends through
+        `finish`, which terminates — the right thing for a harness to do — and
+        one `unittest discover` left about fifty-seven servers behind, each with
+        a port. A session that ran the suite a dozen times could not fork at all,
+        and the suite failed with errors that accused the change in flight. So
+        the harness is held to the same standard as the console: what it starts,
+        it puts back."""
+        before = self.servers()
+        proc, _ = self.launch()
+        self.assertEqual(len(self.servers() - before), 1, "no server started")
+        self.finish(proc)
+        self.assertEqual(self.servers() - before, set(),
+                         "the suite's own cleanup leaves servers behind")
+
+    def reap(self, pids):
+        """Kill what the test proved should not be there, so one red does not
+        cost the next run its ability to fork."""
+        for pid in pids & self.servers():
+            try:
+                os.kill(pid, signal.SIGKILL)
+            except OSError:
+                pass
 
 
 class RunTest(ConsoleCase):

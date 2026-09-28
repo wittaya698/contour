@@ -17,6 +17,7 @@ from console import run as run_lib
 from console import vetoes as veto_store
 from lib import canvas as canvas_lib
 from lib import panel as panel_state
+from lib import signals
 from lib import space as space_lib
 
 
@@ -51,6 +52,12 @@ class Console:
         self.grace = grace
         self.idle = idle
         self.ended = None                     # why it ended, for the last line
+        # Who launched this. The shim cannot forward a SIGKILL — nothing runs
+        # after one — so the server watches the single fact that says it
+        # happened, which is that its parent is gone. Read once at the start,
+        # because after the parent dies the question has no answer left: the
+        # process is reparented to init and `getppid` says 1 forever (issue 27).
+        self.launched_by = os.getppid()
         # Where this space keeps its files, asked of the space. The console
         # used to restate ADR 0015 here — which build the sheet is of, where a
         # mark goes — and a restatement is a copy that can go out of step
@@ -131,6 +138,14 @@ class Console:
         and ending then would make a slow browser look like a closed tab.
         """
         while not self.canvas.done:
+            if self.launched_by > 1 and os.getppid() != self.launched_by:
+                # Before the gate suppression below, and deliberately: a console
+                # parked at a gate is exactly the one holding the space, so a
+                # check that a gate could postpone would miss the case that
+                # costs something. Not a new way for a console to decide to
+                # die — it is the page closing, seen from the other end.
+                self.ended = "the console that launched it is gone"
+                return self.canvas.finish()
             beat = self.canvas.last_beat
             if beat is not None and time.monotonic() - beat > self.grace:
                 self.ended = "the page closed"
@@ -176,12 +191,19 @@ def main(argv, space):
     print(f"console at {url}", flush=True)
     if "--no-browser" not in argv:
         webbrowser.open(url)
+    # All three, and not only the SIGINT the interpreter raises for: a console
+    # is stopped by a closed terminal and by anything tidying up as often as by
+    # a person, and the port and the hold below are given back only on a path
+    # out of `wait` (issue 27).
+    signals.raising(*signals.STOPPING)
     try:
         try:
             console.wait()
-        except KeyboardInterrupt:
-            print("console closed — interrupted", flush=True)
-            return 130
+        except (KeyboardInterrupt, signals.Arrived) as which:
+            number = signals.number(which)
+            print(f"console closed — interrupted by {signals.name(number)}",
+                  flush=True)
+            return 128 + number
         print(f"console closed — {console.ended or 'the page said done'}",
               flush=True)
         return 0

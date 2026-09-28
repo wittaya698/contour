@@ -65,6 +65,13 @@ class RunLockTest(unittest.TestCase):
                 p.wait(timeout=10)
             except subprocess.TimeoutExpired:
                 p.kill()
+                p.wait(timeout=10)
+        # The pipes are files and they are ours. Left open they warn from
+        # inside `doCleanups`, which is noise on top of the suite's own output
+        # and the place a real leak would have shown (issue 27).
+        for pipe in (p.stdout, p.stderr):
+            if pipe is not None and not pipe.closed:
+                pipe.close()
 
     def test_a_check_in_a_held_space_is_refused_rather_than_queued(self):
         self.holder()

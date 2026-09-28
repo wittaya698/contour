@@ -49,26 +49,37 @@ def handover(python, project):
     the way ADR 0019 describes it.
     """
     import subprocess
+    from lib import signals               # stdlib-only by test (ADR 0019, 32)
     env = dict(os.environ, CONTOUR_ROOT=str(ROOT), CONTOUR_PROJECT=str(project),
                PYTHONPATH=str(ROOT), PYTHONDONTWRITEBYTECODE="1")
     child = subprocess.Popen([str(python), "-m", "console.server", *sys.argv[1:]],
                              cwd=str(ROOT), env=env)
+
+    # SIGTERM is what anything that is not a person sends — a harness tidying
+    # up, a supervisor, `kill` — and SIGHUP is what a closed terminal sends.
+    # Neither was handled, so the default killed this process where it stood
+    # and left the server reparented to init, port still bound and the space
+    # still held (issue 27).
+    signals.raising(signal.SIGTERM, signal.SIGHUP)
     while True:
         try:
             return child.wait()
-        except KeyboardInterrupt:
-            # Forward and wait, rather than let the interpreter kill the child
-            # where it stands: the console has a port to close and a run whose
-            # hold on the space has to be given back, and SIGKILL releases
-            # neither. A terminal Ctrl-C already reaches both, so this arrives
-            # second and changes nothing.
-            child.send_signal(signal.SIGINT)
+        except (KeyboardInterrupt, signals.Arrived) as which:
+            # Forward and wait, rather than let this process die and leave the
+            # child where it stands: the console has a port to close and a run
+            # whose hold on the space has to be given back, and dying releases
+            # neither. The child is sent the signal that arrived, because what
+            # it means to the person who sent it is the same either side. A
+            # terminal Ctrl-C already reached both, so that one arrives second
+            # and changes nothing; the other two reached only this process.
+            number = signals.number(which)
+            child.send_signal(number)
             try:
                 return child.wait(timeout=10)
             except subprocess.TimeoutExpired:
                 child.kill()                  # it had its chance
-                return 130
-            except KeyboardInterrupt:
+                return 128 + number
+            except (KeyboardInterrupt, signals.Arrived):
                 continue                      # somebody is impatient; so wait
 
 

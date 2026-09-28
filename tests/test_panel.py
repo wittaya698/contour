@@ -156,6 +156,25 @@ class PanelTest(unittest.TestCase):
         for leak in ("stub", "FAIL", "verify"):
             self.assertNotIn(leak, said, f"the panel was handed {leak!r}")
 
+    def stop(self, proc):
+        """End a canvas this test launched, and wait for it.
+
+        `kill` on its own returns before the process is gone and never reaps it,
+        so the suite reported `ResourceWarning: subprocess is still running` and
+        left one more process behind on every run — the small sibling of the
+        leak issue 27 is about, and the same discipline: what a test starts, it
+        puts back.
+        """
+        if proc.poll() is None:
+            proc.terminate()
+            try:
+                proc.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.wait(timeout=10)
+        if not proc.stdout.closed:
+            proc.stdout.close()
+
     def test_the_launchers_own_canvas_labels_the_sheet(self):
         """`contour canvas` shows the same picture and can be just as wrong about
         which build it is of — ADR 0018 already refuses to resolve marks against a
@@ -173,7 +192,7 @@ class PanelTest(unittest.TestCase):
             [sys.executable, str(CONTOUR), "canvas"], cwd=str(self.tmp),
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
             env=dict(os.environ, BROWSER=str(quiet)))
-        self.addCleanup(proc.kill)
+        self.addCleanup(self.stop, proc)
         url = re.search(r"http://\S+", proc.stdout.readline()).group(0)
         origin, token = url.split("/?")[0], url.split("t=")[1]
         req = urllib.request.Request(origin + "/sheet.json",
