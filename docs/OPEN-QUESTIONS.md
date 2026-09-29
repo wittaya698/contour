@@ -143,6 +143,18 @@ contained; the cause is not fixed.
 **Blocks:** nothing. It bites when a space is renamed or moved, which has not
 happened yet across `beaky`, `beaky-lite`, `beaky-fable` and `beaky-solo`.
 
+**The path is a key in a second place, found 2026-09-29.** Claude Code files a
+session's transcripts under `~/.claude/projects/<the path, slashed to dashes>/`,
+and `tools/tokens.py` finds a space's transcripts by deriving that directory
+from the space's path. A renamed space therefore starts its **spend** history
+from nothing, and the old history sits under a path that no longer exists.
+
+**The lobby makes it likelier.** Renaming a space from the **lobby** is a
+decided feature: it shows everything a rename changes and everything it leaves
+behind — the ask-list key and the transcripts — before the user confirms. That
+makes the loss visible; it does not prevent it. An id in `~/.contour` would fix
+both keys at once.
+
 **If nobody decides:** paths stay the key and fail-closed stays the guard. The
 durable fix is an id in `~/.contour` pointing *at* the path — not a field in
 `.contour/project`, which is tracked, inside the space and agent-writable, and
