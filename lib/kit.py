@@ -2,22 +2,15 @@
 
 Units: author in millimetres, Blender stores metres. Helpers take mm.
 Every builder returns a fresh bmesh centred on the origin; `add` turns it into an
-object placed at `at_mm`.
+object placed at `at_mm`. The arithmetic and the validation are `lib/units.py`,
+where a test can reach them without Blender; `mm` and `MM` are re-exported here
+because every space's build spells them `kit.mm` (issue 26).
 """
 import bmesh
 import bpy
 from mathutils import Matrix
 
-MM = 0.001
-
-
-def mm(*v):
-    """mm(50) -> 0.05 ; mm(1, 2, 3) -> (0.001, 0.002, 0.003)"""
-    return v[0] * MM if len(v) == 1 else tuple(x * MM for x in v)
-
-
-def _srgb_to_linear(c):
-    return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+from .units import MM, linear, mm, size  # noqa: F401  (MM, mm: kit's own names)
 
 
 def material(name, hex_colour, roughness=0.9):
@@ -26,8 +19,7 @@ def material(name, hex_colour, roughness=0.9):
     m = bpy.data.materials.get(name)
     if m:
         return m
-    h = hex_colour.lstrip("#")
-    lin = [_srgb_to_linear(int(h[i:i + 2], 16) / 255) for i in (0, 2, 4)]
+    lin = linear(hex_colour)
     m = bpy.data.materials.new(name)
     m.diffuse_color = (*lin, 1.0)
     m.use_nodes = True
@@ -40,7 +32,7 @@ def material(name, hex_colour, roughness=0.9):
 def box_bm(size_mm):
     bm = bmesh.new()
     bmesh.ops.create_cube(bm, size=1.0)
-    bmesh.ops.scale(bm, vec=mm(*size_mm), verts=bm.verts)
+    bmesh.ops.scale(bm, vec=size(size_mm), verts=bm.verts)
     return bm
 
 

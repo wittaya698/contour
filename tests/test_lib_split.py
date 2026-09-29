@@ -36,7 +36,8 @@ print(" ".join(sorted({n.split(".")[0] for n in set(sys.modules) - before}
 # only, because `./contour` has to work on a clone with nothing installed.
 FREE = ("agent", "badges", "canvas", "checks", "cli", "commands", "git",
         "glb", "intent", "lock", "marks", "mask", "miniyaml", "ops_whitelist",
-        "panel", "policy", "refs", "signals", "space", "span", "store", "views")
+        "panel", "policy", "refs", "signals", "space", "span", "store", "units",
+        "views")
 
 # Runs inside Blender, and may import anything in FREE — the ban is one way.
 # Two of these are here by role rather than by their imports: `entry` is
@@ -189,6 +190,23 @@ def into_console(root, *globs):
     return found
 
 
+def untested(root, free):
+    """Every module in the free half that no test file imports (issue 26).
+
+    The free half is the half a pure test *can* reach, so a module in it with
+    no test on its interface is an oversight nothing else will name. This file
+    does not count: it imports each module only to see what arrives, which
+    proves it loads and nothing about what it does. Not a coverage threshold,
+    since a coverage tool is a dependency and having none is what the roster
+    above protects.
+    """
+    tested = {name for got in Path(root).glob("tests/test_*.py")
+              if got.name != Path(__file__).name for name in leans_on(got)}
+    return [f"lib/{name}.py is in the free half and no test imports it — "
+            f"give it a tests/test_*.py that exercises its interface"
+            for name in free if name not in tested]
+
+
 class LibSplitTest(unittest.TestCase):
     def fabricate(self, **modules):
         """A throwaway tree shaped like the toolkit: a `lib/` package holding
@@ -300,6 +318,28 @@ class LibSplitTest(unittest.TestCase):
         break the one message that has to survive having nothing installed."""
         self.assertEqual(above_lib(ROOT, BLENDER, "console/*.py",
                                    "contour-console"), [])
+
+    def test_a_free_module_no_test_imports_is_named(self):
+        """The gap issue 26 closed, kept closed: a new Blender-free module
+        arrives without a test and is a finding rather than an oversight."""
+        tree = self.fabricate(shape="import json\n", reader="import json\n")
+        (tree / "tests").mkdir()
+        (tree / "tests" / "test_shape.py").write_text("from lib import shape\n")
+        said = untested(tree, ["shape", "reader"])
+        self.assertEqual(len(said), 1)
+        self.assertIn("lib/reader.py", said[0])
+
+    def test_a_helper_beside_the_tests_is_not_a_test(self):
+        """`tests/client.py` imports the canvas to drive it; that is a helper
+        the tests share, and a module only it reaches is still untested."""
+        tree = self.fabricate(shape="import json\n")
+        (tree / "tests").mkdir()
+        (tree / "tests" / "client.py").write_text("from lib import shape\n")
+        self.assertIn("lib/shape.py", " ".join(untested(tree, ["shape"])))
+
+    def test_every_free_module_has_a_test(self):
+        """The live check: everything in the free half is imported by a test."""
+        self.assertEqual(untested(ROOT, FREE), [])
 
     def test_a_pip_import_hidden_in_a_function_body_is_found(self):
         """Importing the module cannot see this one: the statement never runs

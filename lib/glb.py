@@ -14,24 +14,50 @@ _COMP = {5120: "b", 5121: "B", 5122: "h", 5123: "H", 5125: "I", 5126: "f"}
 _NCOMP = {"SCALAR": 1, "VEC2": 2, "VEC3": 3, "VEC4": 4, "MAT4": 16}
 
 
+_JSON, _BIN = 0x4E4F534A, 0x004E4942
+
+
 def load(path):
+    """-> (document, buffer). Refuses a file that is not exactly one glTF 2.0
+    container: cut short, longer than it says, chunks out of order or
+    misaligned. A half-read file would be measured, confidently, as whatever
+    half arrived."""
     with open(path, "rb") as f:
         data = f.read()
+    if len(data) < 12:
+        raise ValueError(f"truncated: {len(data)} bytes is not even a header")
     magic, version, length = struct.unpack_from("<4sII", data, 0)
     if magic != b"glTF" or version != 2:
         raise ValueError(f"not a glTF 2.0 binary: {magic!r} v{version}")
-    doc, blob, off = None, b"", 12
+    if length > len(data):
+        raise ValueError(f"truncated: the header says {length} bytes and there are {len(data)}")
+    if length < len(data):
+        raise ValueError(f"the header's length is {length} and the file is {len(data)} bytes")
+    doc, blob, off = None, None, 12
     while off < length:
+        if off + 8 > length:
+            raise ValueError(f"truncated: a chunk header at byte {off} is cut short")
         clen, ctype = struct.unpack_from("<II", data, off)
+        if off + 8 + clen > length:
+            raise ValueError(f"truncated: a chunk at byte {off} runs {off + 8 + clen - length} "
+                             f"bytes past the end")
+        if clen % 4:
+            raise ValueError(f"a chunk at byte {off} is {clen} bytes, not padded to 4")
         chunk = data[off + 8: off + 8 + clen]
-        off += 8 + clen
-        if ctype == 0x4E4F534A:
+        if off == 12 and ctype != _JSON:
+            raise ValueError(f"the first chunk must be JSON, not {ctype:#010x}")
+        if ctype == _JSON:
+            if doc is not None:
+                raise ValueError("a second JSON chunk")
             doc = json.loads(chunk)
-        elif ctype == 0x004E4942:
+        elif ctype == _BIN:
+            if blob is not None:
+                raise ValueError("a second BIN chunk")
             blob = chunk
+        off += 8 + clen                     # a chunk of any other kind is skipped
     if doc is None:
         raise ValueError("no JSON chunk")
-    return doc, blob
+    return doc, blob or b""
 
 
 def accessor(doc, blob, idx):

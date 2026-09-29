@@ -83,6 +83,29 @@ class RefListingTest(unittest.TestCase):
             self.assertEqual(caught.exception.code, 404, asked)
 
 
+class RefsModuleTest(unittest.TestCase):
+    """What `lib/refs.py` promises that no page can show: it has no way to
+    change a reference at all (rule 1), so there is nothing to call wrongly."""
+
+    def test_it_offers_a_listing_and_the_bytes_and_nothing_else(self):
+        from lib import refs
+        offered = {n for n, v in vars(refs).items()
+                   if callable(v) and not n.startswith("_") and v.__module__ == refs.__name__}
+        self.assertEqual(offered, {"listing", "blob"})
+
+    def test_a_listing_is_images_that_are_files_whatever_their_case(self):
+        from lib import refs
+        tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, tmp, True)
+        (tmp / "FRONT.PNG").write_bytes(PNG)
+        (tmp / "side.jpeg").write_bytes(PNG)
+        (tmp / "notes.md").write_text("no")
+        (tmp / "folder.png").mkdir()
+        self.assertEqual(refs.listing(tmp), ["FRONT.PNG", "side.jpeg"])
+        self.assertEqual(refs.blob(tmp, "FRONT.PNG"), (PNG, "image/png"))
+        self.assertIsNone(refs.blob(tmp, "folder.png"))
+
+
 class RefMarkTest(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())

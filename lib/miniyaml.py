@@ -14,6 +14,10 @@ _INT = re.compile(r"[-+]?\d+")
 _FLOAT = re.compile(r"[-+]?(\d+\.\d*|\.\d+|\d+)([eE][-+]?\d+)?")
 
 
+_MARKERS = {"&": "anchors", "*": "aliases", "!": "tags"}
+_DOCUMENT = re.compile(r"(---|\.\.\.)(\s|$)")
+
+
 class YamlError(ValueError):
     pass
 
@@ -44,8 +48,10 @@ def _scalar(s):
     s = s.strip()
     if s == "" or s in ("~", "null", "Null", "NULL"):
         return None
-    if s[0] in "&*!" or s.startswith("---"):
-        raise YamlError(f"unsupported YAML construct: {s[:20]!r}")
+    if s[0] in _MARKERS:
+        raise YamlError(f"{_MARKERS[s[0]]} are not supported")
+    if s == "?" or s.startswith("? "):
+        raise YamlError("complex keys (`?`) are not supported")
     if s[0] == '"' and s[-1] == '"' and len(s) >= 2:
         return re.sub(r"\\(.)", lambda m: {"n": "\n", "t": "\t"}.get(m.group(1), m.group(1)),
                       s[1:-1])
@@ -153,10 +159,8 @@ def _inline(s):
 
 class _Parser:
     def __init__(self, text):
-        if "\t" in "".join(l[: len(l) - len(l.lstrip("\t "))] for l in text.splitlines()):
-            raise YamlError("tab indentation is not supported")
         self.raw = text.splitlines()
-        self.i = 0
+        self.i = self.at = 0
 
     def peek(self):
         """(indent, content) of the next meaningful line, or None. Does not consume."""
@@ -166,18 +170,33 @@ class _Parser:
             if body.strip() == "":
                 self.i += 1
                 continue
+            self.at = self.i
             return len(body) - len(body.lstrip(" ")), body.strip()
         return None
 
     def document(self):
+        """The whole stream as one value. A refusal says which line it was on
+        and what that line holds, so the field it came from is named."""
+        try:
+            return self._document()
+        except YamlError as e:
+            raise YamlError(f"line {self.at + 1}: {e} — "
+                            f"{self.raw[self.at].strip()!r}") from None
+
+    def _document(self):
+        for self.at, line in enumerate(self.raw):
+            # Indentation, and the gap after a `- `, which is indentation too.
+            if "\t" in re.match(r"[ \t]*(-[ \t]+)*", line).group():
+                raise YamlError("tab indentation is not supported")
+            if _DOCUMENT.match(line):
+                raise YamlError("multi-document streams are not supported")
+        self.at = 0
         p = self.peek()
         if p is None:
             return None
-        if p[1].startswith("---"):
-            raise YamlError("multi-document streams are not supported")
         v = self.block(p[0])
         if self.peek() is not None:
-            raise YamlError(f"unparsed content at line {self.i + 1}: {self.raw[self.i]!r}")
+            raise YamlError("unparsed content")
         return v
 
     def block(self, indent):
