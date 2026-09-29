@@ -583,181 +583,44 @@ def spaces(name=None):
 
 
 def unit_tests():
-    """The toolkit's own tests: stdlib unittest, no Blender, under ten seconds.
+    """The toolkit's own tests: stdlib unittest, no Blender.
 
     They cover what runs outside Blender — the mark store, the canvas server,
     part identity as the canvas reads it, the launcher's own behaviour around a
-    stubbed Blender. What the mask *contains* is geometry, so it is checked
-    against the fixture instead, in `mask_check` below. Geometry is not
-    testable this way and is not tested this way; that is what the fixture and
-    the mutants below are for (ADR 0009).
+    stubbed Blender. `$BLENDER` is withheld, so what needs the fixture's render
+    skips here and runs in `fixture_tests` instead. Geometry is not testable
+    this way and is not tested this way; that is what the fixture and the
+    mutants are for (ADR 0009).
     """
+    env = {k: v for k, v in os.environ.items() if k != "BLENDER"}
     r = subprocess.run([sys.executable, "-m", "unittest", "discover", "-s", "tests"],
-                       cwd=str(ROOT), capture_output=True, text=True, timeout=TIMEOUT_S)
+                       cwd=str(ROOT), env=env, capture_output=True, text=True,
+                       timeout=TIMEOUT_S)
     tail = (r.stderr or r.stdout).strip().splitlines()
     ran = next((l for l in tail if l.startswith("Ran ")), "ran ?")
     return {"ok": r.returncode == 0,
             "lines": [ran] if r.returncode == 0 else tail[-12:]}
 
 
-def mask_check():
-    """The identity mask, read back from the fixture's own render.
-
-    This is the one part of ADR 0018 that geometry decides, so it is checked
-    where geometry is checked: against the fixture, after the render step that
-    just ran, paying no second Blender startup. plinth / pillar / cap stack,
-    and the cap overhangs the pillar, so the centre column is a real occlusion
-    test — each pixel must name its nearest owner and nothing else.
+def fixture_tests():
+    """`tests/test_fixture.py`'s claims against the fixture's render — the
+    mask, the views, anchoring and an agent's badge — run here so that one
+    command still proves them (ADR 0009, issue 25). A skip is a failure: the
+    point of running them here is that they cannot be left out.
     """
-    from lib import mask as mask_store
-    F = space.fixture("smoke", ROOT)
-    mpath, ppath = F.mask, F.parts
-    if not (mpath.exists() and ppath.exists()):
-        return {"ok": False, "lines": ["no mask.png / parts.json beside the sheet"]}
-    parts = json.loads(ppath.read_text())
-    w, h, data = mask_store.read(mpath)
-    if sorted(parts.values()) != ["cap", "pillar", "plinth"]:
-        return {"ok": False, "lines": [f"parts table is {sorted(parts.values())}"]}
-    if len(set(parts)) != len(parts.values()):
-        return {"ok": False, "lines": ["two parts share one index"]}
-    if data[0] != 0:
-        return {"ok": False, "lines": [f"corner pixel is {data[0]}, not background"]}
-    # Front view is the top-left quadrant; walk its centre column top to bottom.
-    x, seen = w // 4, []
-    for y in range(h // 2):
-        name = parts.get(str(data[y * w + x]))
-        if name and (not seen or seen[-1] != name):
-            seen.append(name)
-    if seen != ["cap", "pillar", "plinth"]:
-        return {"ok": False, "lines": [f"centre column reads {seen}, "
-                                       "not cap over pillar over plinth"]}
-    return {"ok": True, "lines": [f"{len(parts)} parts, {w}x{h}, "
-                                  f"centre column {' / '.join(seen)}"]}
-
-
-def anchor_check():
-    """Anchoring, against the one build whose geometry is known.
-
-    The fixture's cap is a sphere of radius 30 mm centred on its own origin,
-    sitting on the pillar. So a ray through a pixel the mask says is `cap` must
-    come back naming `cap`, and the point it comes back with must be 30 mm from
-    that object's origin — which is the whole claim of this slice: the mark is
-    stored where it is *on the part*, not where it happened to be on a sheet.
-    """
-    from lib import mask as mask_store, store, views
-    F = space.fixture("smoke", ROOT)
-    sheet = store.load(F.views, None)
-    if not sheet:
-        return {"ok": False, "lines": ["no views.json beside the sheet"]}
-    labels = [v["label"] for v in sheet["views"]]
-    if labels != ["front", "right", "top", "persp"]:
-        return {"ok": False, "lines": [f"views.json holds {labels}"]}
-    if sheet["build"] != views.fingerprint(F.blend):
-        return {"ok": False, "lines": ["views.json names a different build "
-                                       "than the one it was rendered from"]}
-
-    # Two marks the fixture's own mask picks out: one on the cap, one on the
-    # background beside it. Written here rather than clicked, because what is
-    # being checked is the ray, not the page.
-    w, h, data = mask_store.read(F.mask)
-    table = json.loads(F.parts.read_text())
-    cap = [i for i, name in table.items() if name == "cap"]
-    if not cap:
-        return {"ok": False, "lines": ["no cap in the parts table"]}
-    col = w // 4                                  # front view is the top-left tile
-    rows = [y for y in range(h // 2) if data[y * w + col] == int(cap[0])]
-    if not rows:
-        return {"ok": False, "lines": ["the cap is not on the front view's centre column"]}
-    on_cap = [col, rows[len(rows) // 2]]
-    marks_path = F.marks
-    marks_path.unlink(missing_ok=True)
-    from lib import marks as marks_store
-    hit = marks_store.on_sheet(marks_path, "front", on_cap,
-                               "is the cap too round")["id"]
-    miss = marks_store.on_sheet(marks_path, "front", [4, 4],
-                                "nothing out here")["id"]
-    rep = stage(["resolve", "smoke", "--fixture"], first=False)
-    if not rep["ok"]:
-        return {"ok": False, "lines": rep["lines"]}
-    by_id = {m["id"]: m for m in marks_store.load(marks_path)}
-    local = marks_store.pin(by_id[hit])
-    if not local or marks_store.part(by_id[hit]) != "cap":
-        return {"ok": False, "lines": ["a pixel the mask calls cap anchored to "
-                                       f"{marks_store.part(by_id[hit]) or None}"]}
-    if marks_store.pixel(by_id[hit]):
-        return {"ok": False, "lines": ["a resolved mark is still carrying its pixel"]}
-    r = sum(c * c for c in local) ** 0.5
-    if not 0.0280 <= r <= 0.0302:         # 30 mm sphere, faceted 32 x 24
-        return {"ok": False, "lines": [f"the anchor sits {r * 1000:.1f} mm from the "
-                                       "cap's origin, not on its 30 mm surface"]}
-    if marks_store.pin(by_id[miss]):
-        return {"ok": False, "lines": ["a click on background anchored to something"]}
-
-    # Render again. The anchor is only worth anything if it comes back to the
-    # pixel it came from, and a badge is how the user ever sees that it did.
-    rep = stage(["render", "smoke", "--fixture"], first=False)
-    if not rep["ok"]:
-        return {"ok": False, "lines": rep["lines"]}
-    drawn = next((l for l in rep["lines"] if "badge" in l), "")
-    seen = re.search(rf"{hit} front (\d+),(\d+)", drawn)
-    if not seen:
-        return {"ok": False, "lines": [f"the re-render drew no badge for {hit}: {drawn!r}"]}
-    back = [int(seen.group(1)), int(seen.group(2))]
-    off = max(abs(a - b) for a, b in zip(back, on_cap))
-    if off > 3:
-        return {"ok": False, "lines": [f"{hit} was clicked at {on_cap} and "
-                                       f"re-projects to {back}"]}
-    said = agent_check(marks_path, F, w, h, data, table)
-    marks_path.unlink()          # the fixture keeps no marks; the sheet keeps the badge
-    if not said.startswith("agent"):
-        return {"ok": False, "lines": [said]}
-    return {"ok": True, "lines": [f"{len(labels)} views, build {sheet['build']}",
-                                  f"cap pixel {on_cap} -> cap, "
-                                  f"{r * 1000:.1f} mm from its origin",
-                                  "background unresolved",
-                                  f"badge back at {back}, {off} px out", said]}
-
-
-def agent_check(marks_path, F, w, h, data, table):
-    """An agent mark lands on its part, without anyone having clicked anything.
-
-    The agent names a part and no point on it, so the badge's position is
-    decided per view, against the identity mask: the pixel of the part nearest
-    the middle of its pixels. The fixture's cap is a sphere on top of the
-    pillar, so the badge must land on a pixel the mask calls `cap` — which is
-    the whole claim, and one the part's *origin* would not always make.
-
-    The fixture cannot witness the harder half: every part here is convex and
-    centred on its own origin, so it cannot tell this answer from the two that
-    were tried before it. That claim is made in `tests/test_agent_marks.py`
-    against `badges.nearest`, on an L (ADR 0018).
-
-    Returns the line to report, or the sentence to fail with.
-    """
-    from lib import agent
-    rep = agent.command(marks_path, ["--part", "cap", "is the cap too round"],
-                        parts=F.parts)
-    if not rep["ok"]:
-        return f"contour mark refused the fixture's own part: {rep['lines'][0]}"
-    mid = marks_store_id(marks_path)
-    rep = stage(["render", "smoke", "--fixture"], first=False)
-    if not rep["ok"]:
-        return "render failed with an agent mark on file"
-    drawn = " | ".join(rep["lines"])
-    seen = re.search(rf"{mid} front (\d+),(\d+)", drawn)
-    if not seen:
-        return f"no badge drawn for the agent's mark: {drawn}"
-    x, y = int(seen.group(1)), int(seen.group(2))
-    named = table.get(str(data[y * w + x]))
-    if named != "cap":
-        return (f"the agent's cap mark pinned at {[x, y]}, which the mask "
-                f"calls {named!r}, not cap")
-    return f"agent mark on cap, no click, badge at {[x, y]}"
-
-
-def marks_store_id(path):
-    """The id of the last mark on file."""
-    return json.loads(path.read_text())[-1]["id"]
+    import unittest
+    os.environ["BLENDER"] = BLENDER          # before loading: the skip is decided there
+    found = unittest.defaultTestLoader.discover(str(ROOT / "tests"), pattern="test_fixture.py")
+    cases = unittest.TestSuite(t for s in found for c in s for t in c
+                               if type(t).__name__ == "FixtureTest")
+    result = unittest.TestResult()
+    cases.run(result)
+    wrong = [f"{getattr(t, '_testMethodName', t)}: {err.strip().splitlines()[-1]}"
+             for t, err in result.failures + result.errors]
+    wrong += [f"{getattr(t, '_testMethodName', t)}: skipped, {why}" for t, why in result.skipped]
+    if wrong or not result.testsRun:
+        return {"ok": False, "lines": wrong or ["no fixture tests ran"]}
+    return {"ok": True, "lines": [f"{result.testsRun}/{result.testsRun} held against its render"]}
 
 
 def stage_selftest():
@@ -782,19 +645,11 @@ def stage_selftest():
         lines.append(f"{'ok  ' if rep['ok'] else 'FAIL'} {args[0]:<10}{shown}")
         if not rep["ok"]:
             break
-        if args[0] == "render":
-            mk = mask_check()
-            ok &= mk["ok"]
-            lines.append(f"{'ok  ' if mk['ok'] else 'FAIL'} {'mask':<10}"
-                         + " | ".join(mk["lines"]))
-            if not mk["ok"]:
-                break
-            an = anchor_check()
-            ok &= an["ok"]
-            lines.append(f"{'ok  ' if an['ok'] else 'FAIL'} {'anchor':<10}"
-                         + " | ".join(an["lines"]))
-            if not an["ok"]:
-                break
+    else:
+        fx = fixture_tests()
+        ok &= fx["ok"]
+        lines.append(f"{'ok  ' if fx['ok'] else 'FAIL'} {'fixture':<10}"
+                     + " | ".join(fx["lines"]))
     lines.insert(0, f"selftest {'PASS' if ok else 'FAIL'} ({time.time() - t0:.1f}s)")
     return {"ok": ok, "lines": lines}
 
