@@ -108,6 +108,45 @@ from it if they land first.
 byte-identical and a green `contour selftest`, because a deepening that changes what
 the toolkit says is a deepening that has changed the toolkit.
 
+## Batch 3 — the lobby
+
+From [ADR 0021](../adr/0021-the-lobby.md), which is Proposed. One page above the
+model spaces, from which a space is listed, created, renamed, deleted, restored
+and entered. One HITL slice and ten AFK.
+
+| # | Slice | Type | Blocked by |
+|---|---|---|---|
+| [28](28-spaces-speaks-json.md) | `contour spaces --json`: the list and its health | AFK | — |
+| [29](29-contour-lobby-serves-the-list.md) | `contour lobby` serves the list | AFK | 28 |
+| [30](30-an-open-page-leaves-a-presence.md) | An open page leaves a presence | AFK | — |
+| [31](31-contour-rename.md) | `contour rename`: it proposes, then does the rename | AFK | 30 |
+| [32](32-rename-from-the-lobby.md) | Rename from the lobby | AFK | 29, 31 |
+| [33](33-accept-adr-0021.md) | Accept ADR 0021 | HITL | 32 |
+| [34](34-delete-leaves-a-bundle.md) | Delete leaves a bundle | AFK | 33 |
+| [35](35-restore-a-deleted-space.md) | Restore a deleted space | AFK | 34 |
+| [36](36-enter-a-space.md) | Enter a space | AFK | 33 |
+| [37](37-create-a-space-from-the-lobby.md) | Create a space from the lobby | AFK | 36 |
+| [38](38-create-a-variation.md) | Create a variation of a space | AFK | 37 |
+
+### Shape of the graph
+
+**28–32 are ADR 0021's tracer bullet, built as slices,** because it crosses the
+launcher, a split server, a new page and a new record. 33 is the verdict on it,
+as 22 was for ADR 0020, and nothing after 33 starts against a proposal.
+
+**28 and 30 are unblocked,** and each is worth having if the lobby never ships.
+28 gives every client, not just a page, the list the launcher already derives. 30
+answers *is anything open on this space?*, which has no answer today.
+
+**31 is the CLI and 32 is the page,** split because ADR 0021 decision 3 makes the command
+the contract: 31 is verifiable from a terminal alone. 34 is not split, being
+smaller. The page holds none of the rules in either case.
+
+**31 and 34 add launcher commands, and slice 24 has not landed.** Whichever lands
+second fits around the other. Neither blocks 24, and 24 does not block them.
+
+**36 before 37,** because creating a space ends by entering it.
+
 ## Found in flight
 
 Not from either review — a defect the work turned up, filed where the rest of the
