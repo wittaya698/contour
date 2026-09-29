@@ -49,17 +49,59 @@ imports no console module now points at `lib/cli*.py`, and the roster gains
 
 ## Acceptance criteria
 
-- [ ] `contour` is a shim of under a dozen lines
-- [ ] `lib/commands.py` is data only and imports nothing from `lib/cli.py`
-- [ ] Every command's space requirement and hold policy is a column, applied in one place
-- [ ] `lib/intent.py` reads the table; no tuple of build commands exists anywhere else
-- [ ] `tests/test_intent.py` asserts against the table and AST-walks nothing
-- [ ] `sys.path.insert` appears once
-- [ ] `contour --help` is generated from the table and matches it by test
-- [ ] `tests/test_commands.py` asserts the hold policy per command with no subprocess
-- [ ] `tests/test_lib_split.py` names `commands` and `cli` free, and checks `lib/cli*.py` imports no console module
-- [ ] Every `contour` subcommand behaves identically, exit codes included
-- [ ] `contour selftest` green; `tests/test_launcher.py` and `test_run_lock.py` green
+- [x] `contour` is a shim of under a dozen lines
+- [x] `lib/commands.py` is data only and imports nothing from `lib/cli.py`
+- [x] Every command's space requirement and hold policy is a column, applied in one place
+- [x] `lib/intent.py` reads the table; no tuple of build commands exists anywhere else
+- [x] `tests/test_intent.py` asserts against the table and AST-walks nothing
+- [x] `sys.path.insert` appears once
+- [x] `contour --help` is generated from the table and matches it by test
+- [x] `tests/test_commands.py` asserts the hold policy per command with no subprocess
+- [x] `tests/test_lib_split.py` names `commands` and `cli` free, and checks `lib/cli*.py` imports no console module
+- [x] Every `contour` subcommand behaves identically, exit codes included
+- [x] `contour selftest` green; `tests/test_launcher.py` and `test_run_lock.py` green
+
+## What it came to
+
+**The launcher is ten lines.** It puts the toolkit on `sys.path` and calls
+`cli.main(argv)`. Everything else it held is `lib/cli.py`, moved rather than
+rewritten: `stage`, `init`, `doctor`, `install_hooks`, `spaces`, the hold and
+the selftest's own checks are importable for the first time. `lib/entry.py`
+keeps a `sys.path.insert` of its own, and should: it is the file Blender runs,
+in a process the launcher only spawns.
+
+**`main` applies the columns in one order: arity, space, hold.** Arity first,
+so a mistyped call gets the usage wherever it is typed — which is what the
+if-chain did, since every arm tested `not rest` before it looked for a space.
+The hold last, released in one `finally` for every command that takes it. `run`
+is no longer a special case of holding: `main` takes its hold like any other,
+and what `on_run` adds is handing the run id to the process inside.
+
+**`resolve` and `run` hold, and the table says so.** Open question 11 named
+`check`, `render` and `export`. The code also held for `resolve` — casting
+rays into a build another terminal may be replacing — and for `run`, the unit
+the hold is scoped to. Both were already true, and neither was in the
+decision's own words. A column is where that stops being something to notice.
+The question's entry now says so.
+
+**The help moved one column.** Rendered, the widths come from the longest
+entry, so every line but `mark`'s sits one space further right than the
+hand-spaced version did; `mark`'s is byte-identical. That is the only output
+that changed.
+
+**Forty-five calls, before and after.** Every subcommand inside a space and
+outside one, with too few words and too many, against a stubbed Blender: stdout,
+stderr, exit code and which stages were spawned. Identical, apart from the help
+text's spacing.
+
+**Fifteen mutants against the table, the gate and the dispatcher; fourteen
+caught.** The first run caught eleven. Two of the survivors were real: nothing
+anywhere tested which commands need a space, and nothing anywhere tested that a
+call with the wrong number of words is refused — a gap the if-chain had too,
+where it was harder to see. `tests/test_commands.py` now pins both, the arity
+through `cli.main` with no subprocess. The survivor left is deleting a usage
+line from the table, which removes it from the help as designed: that is the
+table's content changing, not the rendering failing.
 
 ## Blocked by
 

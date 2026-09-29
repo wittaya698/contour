@@ -8,7 +8,6 @@ that has silently stopped being enforced.
 These drive `classify` the way the console's gate will: a tool name and the
 input the SDK handed over, unchanged.
 """
-import ast
 import os
 import subprocess
 import sys
@@ -19,7 +18,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from lib import intent
+from lib import commands, intent
 
 
 class ClassifyTest(unittest.TestCase):
@@ -242,42 +241,50 @@ class RosterTest(unittest.TestCase):
                                        "intentless in INTENTLESS")
 
 
-    def builds(self):
-        """The subcommands the launcher routes through `build_path`, read out of
-        its own dispatch.
-
-        Read rather than listed, because the claim is about the launcher and not
-        about a tuple in a test: a build command added later has to arrive as a
-        failure here, which is the only thing that keeps *no build path skips the
-        gate* true tomorrow.
-        """
-        main = [node for node in ast.walk(ast.parse((ROOT / "contour").read_text()))
-                if isinstance(node, ast.FunctionDef) and node.name == "main"][0]
-        found = set()
-        for node in ast.walk(main):
-            if not isinstance(node, ast.If):
-                continue
-            called = {call.func.id for call in ast.walk(node)
-                      if isinstance(call, ast.Call) and isinstance(call.func, ast.Name)}
-            if "build_path" not in called:
-                continue
-            found |= {word.value for word in ast.walk(node.test)
-                      if isinstance(word, ast.Constant) and isinstance(word.value, str)}
-        return sorted(found)
-
     def test_no_build_path_skips_the_gate(self):
         """And so no build path skips resolution (ADR 0019, decision 14).
 
         Resolution hangs off the build's gate, so a build the gate cannot see is
         a rebuild that invalidates a mark with nobody asked and no rays cast —
-        the mid-typing failure the whole mechanism exists to delete. Every way
-        into `build_path` must therefore classify as one category.
+        the mid-typing failure the whole mechanism exists to delete. Every
+        command the table files under `build` must therefore classify as one.
+        The table is what `lib/cli.py` dispatches from, so a build command added
+        later arrives here by being added at all (issue 24).
         """
-        found = self.builds()
-        self.assertTrue(found, "the launcher's build dispatch was not found")
+        found = [c.name for c in commands.TABLE if c.category == "build"]
+        self.assertEqual(found, ["check", "render", "export"])
         for cmd in found:
             self.assertEqual(intent.classify("Bash", {"command": f"./contour {cmd}"}),
                              "build", cmd)
+
+    def test_nothing_the_table_leaves_out_of_build_is_gated_as_one(self):
+        """The converse, and the half a hard-coded tuple could drift on: a
+        command the gate stops as a build that the launcher does not build with
+        is a click the user pays for nothing."""
+        for c in commands.TABLE:
+            if c.category != "build":
+                self.assertNotEqual(
+                    intent.classify("Bash", {"command": f"./contour {c.name}"}),
+                    "build", c.name)
+
+    def test_a_build_command_added_to_the_table_is_gated_without_more(self):
+        """The table is the one copy (issue 24). A second list of build
+        commands inside the gate would pass every test above until the day the
+        two disagreed, so this adds one and expects the gate to follow."""
+        was = commands.TABLE
+        commands.TABLE = was + (was[0]._replace(name="bake"),)
+        try:
+            self.assertEqual(intent.classify("Bash", {"command": "./contour bake"}),
+                             "build")
+        finally:
+            commands.TABLE = was
+
+    def test_every_category_the_table_names_is_one_the_gate_knows(self):
+        """A category the vocabulary does not print cannot be put on an
+        ask-list, so a command filed under one would be ungateable."""
+        for c in commands.TABLE:
+            if c.category is not None:
+                self.assertIn(c.category, intent.categories(), c.name)
 
 
 class EnumerateTest(unittest.TestCase):

@@ -118,6 +118,10 @@ and the builds inside that session are not refused by their own hold.
 `canvas` and `mark` deliberately take nothing: both only append to `marks.json`,
 and a canvas session is a person at a page, which would be a hold nobody is
 watching.
+That decision is a column now — `holds` in `lib/commands.py`, applied in one
+place by `lib/cli.py` and asserted per command in `tests/test_commands.py`
+(issue 24). `resolve` holds for the reason a build does, and `run` because it
+is the unit the hold is scoped to.
 
 A hold whose process is gone is taken over, with a line saying whose it was, so
 a killed run does not wedge the space behind a file the user has to know about.

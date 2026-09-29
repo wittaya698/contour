@@ -13,6 +13,8 @@ import re
 import shlex
 from pathlib import Path
 
+from lib import commands
+
 # Every category the toolkit knows, in the order ADR 0019 names them: the two
 # writes rule 1 is about, then the build, then the two rule 5 is about. The
 # order is declared rather than derived so that an audit against the user's
@@ -44,9 +46,6 @@ INSIDE = re.compile(r"\$\(([^()]*)\)|`([^`]*)`")
 # anything that splits the outer line into words.
 SHELLS = ("sh", "bash", "zsh", "dash", "ksh")
 
-
-# The launcher subcommands that run Blender and write `out/`.
-BUILD = ("check", "render", "export")
 
 # git's verbs that carry an intent. A commit is local and a push leaves the
 # machine, so they are two categories and not one.
@@ -167,6 +166,14 @@ def strictest(found):
     return None
 
 
+def launched(name):
+    """The category a launcher subcommand carries, read from the launcher's own
+    table — the one copy there is, so a build command cannot be added to the
+    launcher and missed here (issue 24). None for a name the table does not
+    hold, which is no intent rather than an unreadable one."""
+    return next((c.category for c in commands.TABLE if c.name == name), None)
+
+
 def classify(tool, payload):
     """The category this call belongs to, or None if it carries no intent.
 
@@ -186,8 +193,7 @@ def classify(tool, payload):
     for at, word in enumerate(words):
         program = word.rsplit("/", 1)[-1]
         if program == "contour" and at + 1 < len(words):
-            if words[at + 1] in BUILD:
-                found.add("build")
+            found.add(launched(words[at + 1]))
         if program in SHELLS:
             inner = after("-c", words[at + 1:])
             if inner:

@@ -34,9 +34,9 @@ print(" ".join(sorted({n.split(".")[0] for n in set(sys.modules) - before}
 
 # Runs outside Blender: the launcher, the canvas, the stores. Standard library
 # only, because `./contour` has to work on a clone with nothing installed.
-FREE = ("agent", "badges", "canvas", "checks", "git", "glb", "intent", "lock",
-        "marks", "mask", "miniyaml", "ops_whitelist", "panel", "policy",
-        "refs", "signals", "space", "span", "store", "views")
+FREE = ("agent", "badges", "canvas", "checks", "cli", "commands", "git",
+        "glb", "intent", "lock", "marks", "mask", "miniyaml", "ops_whitelist",
+        "panel", "policy", "refs", "signals", "space", "span", "store", "views")
 
 # Runs inside Blender, and may import anything in FREE — the ban is one way.
 # Two of these are here by role rather than by their imports: `entry` is
@@ -285,9 +285,13 @@ class LibSplitTest(unittest.TestCase):
     def test_nothing_the_launcher_runs_imports_the_console(self):
         """The live check on the other direction. `contour` and `verify.py` are
         in it because they are the two files a bare clone runs, and `lib/*.py`
-        because that is everything they reach."""
-        self.assertEqual(into_console(ROOT, "lib/*.py", "contour", "verify.py"),
-                         [])
+        because that is everything they reach. The launcher's code is
+        `lib/cli.py` now and `contour` a shim that calls it (issue 24), so the
+        file that matters most here is named on its own: a glob that stopped
+        matching it would pass by checking nothing."""
+        self.assertTrue(list(ROOT.glob("lib/cli*.py")))
+        self.assertEqual(into_console(ROOT, "lib/cli*.py", "lib/*.py", "contour",
+                                      "verify.py"), [])
 
     def test_the_console_and_its_shim_keep_out_of_the_blender_half(self):
         """The live check on the layer above the launcher (ADR 0019, decision
