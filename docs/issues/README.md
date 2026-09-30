@@ -147,6 +147,43 @@ second fits around the other. Neither blocks 24, and 24 does not block them.
 
 **36 before 37,** because creating a space ends by entering it.
 
+## Batch 4 — agent spans
+
+From [ADR 0022](../adr/0022-the-agent-reads-the-references-in-spans.md), which is
+Proposed. The agent draws spans on the references, with ends placed by
+measurement; the user answers each one; and a number from a reference names the
+span it came from. Two HITL slices and five AFK.
+
+Batch 3 is the lobby, slices 28–38, from ADR 0021, and 39 was found in flight,
+which is why these start at 40.
+
+| # | Slice | Type | Blocked by |
+|---|---|---|---|
+| [40](40-a-snapped-agent-span-from-a-scanline.md) | A snapped agent span from a scanline | AFK | — |
+| [41](41-snapped-spans-from-a-silhouette-or-a-region.md) | Snapped spans from a silhouette or a region | AFK | 40 |
+| [42](42-the-user-answers-an-agent-span.md) | The user answers an agent span | AFK | 40 |
+| [43](43-accept-adr-0022.md) | Accept ADR 0022 | HITL | 41, 42 |
+| [44](44-a-by-eye-agent-span.md) | A by-eye agent span | AFK | 43 |
+| [45](45-contour-worksheet.md) | `contour worksheet`: the spans drawn onto the references | AFK | 43 |
+| [46](46-the-proposal-names-its-spans.md) | The proposal names its spans | HITL | 44, 45 |
+
+### Shape of the graph
+
+**40–42 are ADR 0022's tracer bullet,** and 43 is the verdict on it. The three
+numbers the bullet reproduces need both kinds of reading — 168 is a scanline, 888
+and 597 are silhouette extents — which is why 40 and 41 are both in it.
+
+**40 is unblocked and already visible.** The canvas draws an agent's marks in
+their own colour, so the first snapped span shows on the page with no page work.
+
+**46 is last on purpose,** as 14 was. Rule 1's new clause names by-eye spans, and
+the skills tell the agent to look at the worksheet; a rule describing a mechanism
+that does not exist is worse than the wording it replaces.
+
+**Nothing here checks a proposal mechanically.** A proposal is prose in a
+conversation, so there is no file for a command to read. That waits for proposals
+to be data, which is the scaffold ADR 0022 sets aside.
+
 ## Found in flight
 
 Not from either review — a defect the work turned up, filed where the rest of the
