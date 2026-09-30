@@ -27,3 +27,4 @@ works — the alternative you are about to suggest is probably here with a reaso
 | [0019](0019-console-a-driven-agent-behind-a-gate.md) | The console: a driven agent behind a gate — amends [0010](0010-miniyaml-no-dependencies.md), [0018](0018-marks-a-canvas-over-the-sheet.md) |
 | [0020](0020-checks-are-pure-over-a-measurement.md) | Checks are pure over a measurement — extends [0009](0009-verifier-proves-its-own-teeth.md) |
 | [0021](0021-the-lobby.md) | The lobby: a page above the spaces |
+| [0022](0022-the-agent-reads-the-references-in-spans.md) | The agent reads the references in spans — *Proposed*; amends [0017](0017-scaffold-measured-from-references.md), [0018](0018-marks-a-canvas-over-the-sheet.md) |
