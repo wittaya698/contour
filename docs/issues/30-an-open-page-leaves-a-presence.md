@@ -25,11 +25,31 @@ space?* has no answer today.
 
 ## Acceptance criteria
 
-- [ ] An open console and an open `contour canvas` each leave a presence record, removed when the session ends normally, on SIGTERM, on SIGHUP and on Ctrl-C
-- [ ] A presence whose process is gone is reported as absent, with no manual cleanup
-- [ ] `contour spaces --json` reports each space's live presences: which kind of page, and which pid
-- [ ] Nothing refuses, waits or changes behaviour because of a presence; the run-lock tests pass unchanged
-- [ ] The presence file is ignored by the space's git, like the run lock
+- [x] An open console and an open `contour canvas` each leave a presence record, removed when the session ends normally, on SIGTERM, on SIGHUP and on Ctrl-C
+- [x] A presence whose process is gone is reported as absent, with no manual cleanup
+- [x] `contour spaces --json` reports each space's live presences: which kind of page, and which pid
+- [x] Nothing refuses, waits or changes behaviour because of a presence; the run-lock tests pass unchanged
+- [x] The presence file is ignored by the space's git, like the run lock
+
+## What it came to
+
+- `lib/presence.py`, stdlib-only: `present(space, kind)` writes one file per
+  session under `.contour/presence/` — one per session rather than one per
+  space, since two canvases can be open on one space — and removes it on every
+  path out; `live(space)` judges each record with `lock.alive`, the hold's own
+  rule, and deletes nothing, because the lobby that asks promises to write
+  nothing.
+- `contour spaces --json` reports `presence: [{kind, pid, host}]` per space; the
+  text form is unchanged.
+- The console server writes its presence before printing its URL, inside the
+  signal handling issue 27 added. `contour canvas` had only Ctrl-C: SIGTERM or
+  a closed terminal killed it where it stood. It now has all three raised and
+  ends on them as it does on Ctrl-C, with the same report.
+- Already ignored: the space template's `.gitignore` ignores `.contour/*`
+  except the marker, so this pins that rule rather than adding one.
+- `tests/test_presence.py`, 9 tests. Six mutants run against them (alive
+  ignored, other host judged gone, no `finally`, presence refusing a check,
+  `.contour/*` narrowed to the run lock, wrong pid); all six caught.
 
 ## Blocked by
 

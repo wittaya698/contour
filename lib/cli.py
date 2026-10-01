@@ -25,7 +25,7 @@ import sys
 import time
 from pathlib import Path
 
-from lib import commands, git, space     # stdlib-only by test (ADR 0019, 29)
+from lib import commands, git, presence, space     # stdlib-only by test (ADR 0019, 29)
 
 ROOT = Path(__file__).resolve().parent.parent
 BLENDER = os.environ.get("BLENDER", "/Applications/Blender.app/Contents/MacOS/Blender")
@@ -265,12 +265,18 @@ def on_measure(cmd, rest, held):
 
 
 def on_canvas(cmd, rest, held):
-    from lib import canvas, panel
-    return emit(canvas.serve(HERE.sheet, HERE.marks, HERE.mask, HERE.parts,
-                             resolve=lambda: stage(["resolve"]),
-                             refs=HERE.refs, views=HERE.views,
-                             blend=HERE.blend,
-                             verdict=HERE.dot / panel.NAME))
+    from lib import canvas, panel, signals
+    # All three, and not only Ctrl-C: the presence below is taken back only on
+    # a path out of the session, and SIGTERM or a closed terminal would
+    # otherwise end the process where it stood (issue 27, issue 30).
+    signals.raising(*signals.STOPPING)
+    with presence.present(PROJECT, "canvas"):
+        report = canvas.serve(HERE.sheet, HERE.marks, HERE.mask, HERE.parts,
+                              resolve=lambda: stage(["resolve"]),
+                              refs=HERE.refs, views=HERE.views,
+                              blend=HERE.blend,
+                              verdict=HERE.dot / panel.NAME)
+    return emit(report)
 
 
 def on_resolve(cmd, rest, held):
@@ -601,7 +607,8 @@ def reading(root, now):
             "commits": git.commits(root), "remotes": git.remotes(root),
             "scaffold": {"drift": [r for r, s in found.items() if s == "drift"],
                          "missing": [r for r, s in found.items() if s == "missing"]},
-            "rules": sees_rules(root)}
+            "rules": sees_rules(root),
+            "presence": presence.live(root)}
 
 
 def listing():

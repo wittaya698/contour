@@ -18,6 +18,7 @@ from lib import panel as panel_state
 from lib import marks as marks_store
 from lib import mask as mask_store
 from lib import refs as refs_store
+from lib import signals
 from lib.page import TOKEN_HEADER, TOKEN_PARAM, Blob, Page  # noqa: F401  (re-exported)
 
 PAGE = Path(__file__).resolve().parent / "canvas.html"
@@ -194,7 +195,9 @@ def serve(sheet, marks, mask=None, parts=None, resolve=None, refs=None,
 
     The first Contour command that waits rather than shoots, so it is also the
     first that can be interrupted: Ctrl-C closes the port and keeps whatever
-    marks already landed, because each one was written as it arrived.
+    marks already landed, because each one was written as it arrived. A
+    terminated canvas or a closed terminal ends the same way, once the caller
+    has had them raised (issue 30).
     """
     sheet = Path(sheet)
     if not sheet.exists():
@@ -210,7 +213,7 @@ def serve(sheet, marks, mask=None, parts=None, resolve=None, refs=None,
         webbrowser.open(url)
     try:
         return canvas.wait()
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, signals.Arrived):
         canvas.stop()
         return canvas.report(
             f"interrupted, {marks_store.phrase(len(canvas.captured))} kept",

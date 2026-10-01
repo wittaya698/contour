@@ -17,7 +17,7 @@ from console import run as run_lib
 from console import vetoes as veto_store
 from lib import canvas as canvas_lib
 from lib import panel as panel_state
-from lib import signals
+from lib import presence, signals
 from lib import space as space_lib
 
 
@@ -187,15 +187,22 @@ def main(argv, space):
     # build it is showing, and none is an answer (ADR 0019, decision 13).
     console = Console(space, grace=seconds("CONTOUR_CONSOLE_GRACE", GRACE_S),
                       idle=seconds("CONTOUR_CONSOLE_IDLE", IDLE_S))
+    # All three, and not only the SIGINT the interpreter raises for: a console
+    # is stopped by a closed terminal and by anything tidying up as often as by
+    # a person, and the port, the hold and the presence below are given back
+    # only on a path out of `wait` (issue 27).
+    signals.raising(*signals.STOPPING)
+    # Before the URL is printed, so nothing can have opened the page while the
+    # space still looked unattended (issue 30).
+    with presence.present(space, "console"):
+        return serving(console, argv)
+
+
+def serving(console, argv):
     url = console.start()
     print(f"console at {url}", flush=True)
     if "--no-browser" not in argv:
         webbrowser.open(url)
-    # All three, and not only the SIGINT the interpreter raises for: a console
-    # is stopped by a closed terminal and by anything tidying up as often as by
-    # a person, and the port and the hold below are given back only on a path
-    # out of `wait` (issue 27).
-    signals.raising(*signals.STOPPING)
     try:
         try:
             console.wait()
