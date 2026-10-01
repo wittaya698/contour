@@ -319,6 +319,17 @@ def on_spaces(cmd, rest, held):
     return emit(spaces(rest[0] if rest else None))
 
 
+def on_lobby(cmd, rest, held):
+    from lib import lobby
+    return emit(lobby.serve(listing, grace=seconds("CONTOUR_LOBBY_GRACE", lobby.GRACE_S)))
+
+
+def seconds(name, fallback):
+    """A timeout from the environment, so a test proving what a silence means
+    does not have to wait out the real one."""
+    return float(os.environ.get(name) or fallback)
+
+
 def on_intents(cmd, rest, held):
     from lib import intent
     print("\n".join(intent.categories()))
@@ -593,15 +604,21 @@ def reading(root, now):
             "rules": sees_rules(root)}
 
 
+def listing():
+    """Every space and its health, as `contour spaces --json` prints it and the
+    lobby serves it: one reading, so the two cannot disagree."""
+    now = toolkit_commit()
+    return {"roots": [str(r) for r in space.roots(ROOT)],
+            "spaces": [reading(s, now) for s in space.spaces(space.roots(ROOT))]}
+
+
 def spaces(name=None, as_json=False):
     """List the model spaces, or print one's path for `cd $(contour spaces x)`."""
     found = space.spaces(space.roots(ROOT))
     if as_json:
-        now = toolkit_commit()
-        rows = [reading(s, now) for s in found]
-        return {"ok": not any(r["remotes"] for r in rows),
-                "lines": [json.dumps({"roots": [str(r) for r in space.roots(ROOT)],
-                                      "spaces": rows}, indent=2)]}
+        said = listing()
+        return {"ok": not any(s["remotes"] for s in said["spaces"]),
+                "lines": [json.dumps(said, indent=2)]}
     if name:
         hits = [s for s in found if s.name == name]
         if len(hits) != 1:

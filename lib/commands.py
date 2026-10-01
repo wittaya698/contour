@@ -71,6 +71,8 @@ TABLE = (
             (("spaces [name]", "list model spaces, or print one's path"),
              ("spaces --json", "the same list and its health, for a client to read")),
             "on_spaces"),
+    Command("lobby", NONE, False, False, None,
+            (("lobby", "every space on this machine, on one page"),), "on_lobby"),
     Command("intents", NONE, False, False, None,
             (("intents", "the call categories a gate can ask about"),), "on_intents"),
     Command("asks", NONE, False, False, None,

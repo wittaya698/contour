@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Contour lobby</title>
+<style>
+  :root { --bg: #fafaf8; --fg: #1d1d1b; --muted: #6b6b66; --line: #e2e2dc;
+          --warn: #a3470d; --ok: #2f6b3a; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #18181a; --fg: #ececea; --muted: #9a9a94; --line: #2e2e31;
+            --warn: #f0a46b; --ok: #8fcf98; }
+  }
+  body { margin: 0; background: var(--bg); color: var(--fg);
+         font: 15px/1.5 system-ui, -apple-system, sans-serif; }
+  main { max-width: 960px; margin: 0 auto; padding: 32px 16px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .muted { color: var(--muted); }
+  table { width: 100%; border-collapse: collapse; margin-top: 24px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line);
+           vertical-align: top; }
+  th { font-weight: 600; font-size: 13px; color: var(--muted); }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  code { font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .warn { color: var(--warn); }
+  .ok { color: var(--ok); }
+  .wrap { overflow-x: auto; }
+  #onboarding { margin-top: 24px; max-width: 640px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Model spaces</h1>
+  <p class="muted" id="roots"></p>
+  <div class="wrap" id="list" hidden>
+    <table>
+      <thead><tr><th>Space</th><th>Toolkit</th><th class="num">Commits</th><th>Health</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+  <section id="onboarding" hidden>
+    <p>There are no model spaces here yet.</p>
+    <p>A <strong>model space</strong> is one model: its own directory and its own
+      git repository, holding <code>spec.yaml</code>, the reference images in
+      <code>refs/</code>, and the <code>build.py</code> that makes it. It is
+      never pushed anywhere.</p>
+    <p>To make one, run <code>contour init &lt;name&gt;</code> inside
+      <span id="where">the directory spaces live in</span>, then reload this page.</p>
+  </section>
+</main>
+<script>
+const TOKEN = new URLSearchParams(location.search).get('t');
+
+// One place, so there is one place to get it wrong. A fetch sends the token as
+// a header, which makes the request non-simple and therefore unreachable from
+// another site without a preflight the server refuses; a body makes it a POST
+// and declares JSON, which is the content type the server insists on.
+function ask(path, body) {
+  const init = { headers: { 'X-Contour-Token': TOKEN } };
+  if (body !== undefined) {
+    init.method = 'POST';
+    init.headers['Content-Type'] = 'application/json';
+    init.body = JSON.stringify(body);
+  }
+  return fetch(path, init);
+}
+
+function cell(text, cls) {
+  const td = document.createElement('td');
+  td.textContent = text;
+  if (cls) td.className = cls;
+  return td;
+}
+
+// What a row says about health: the drift `contour doctor` would report, and
+// any remote, which a model space must never have (rule 8).
+function health(s) {
+  const said = [];
+  for (const r of s.remotes) said.push(['warn', 'has a remote (' + r + ') — never pushed']);
+  if (!s.rules) said.push(['warn', 'cannot see the rules']);
+  if (s.scaffold.missing.length) said.push(['warn', 'missing ' + s.scaffold.missing.join(', ')]);
+  if (s.scaffold.drift.length) said.push(['', 'differs from the template: ' + s.scaffold.drift.join(', ')]);
+  if (!said.length) said.push(['ok', 'in step']);
+  const td = document.createElement('td');
+  for (const [cls, text] of said) {
+    const line = document.createElement('div');
+    line.className = cls;
+    line.textContent = text;
+    td.append(line);
+  }
+  return td;
+}
+
+// Empty is onboarding, not an empty table: someone with no spaces is standing
+// where someone with ten is (ADR 0021, decision 1).
+function render({ roots, spaces }) {
+  document.getElementById('roots').textContent = 'Looking in ' + roots.join(', ');
+  document.getElementById('where').textContent = roots.join(' or ');
+  document.getElementById('list').hidden = spaces.length === 0;
+  document.getElementById('onboarding').hidden = spaces.length !== 0;
+  const rows = document.getElementById('rows');
+  rows.replaceChildren(...spaces.map(s => {
+    const tr = document.createElement('tr');
+    const name = cell('');
+    const strong = document.createElement('strong');
+    strong.textContent = s.name;
+    const path = document.createElement('div');
+    path.className = 'muted';
+    path.textContent = s.path;
+    name.append(strong, path);
+    tr.append(name,
+              cell((s.toolkit.commit || '?') + ' (' + s.toolkit.state + ')'),
+              cell(String(s.commits), 'num'),
+              health(s));
+    return tr;
+  }));
+}
+
+ask('/spaces').then(r => r.json()).then(render);
+
+// What this host can do. Nothing yet at this slice; each action arrives as a
+// capability with the command that performs it, and an element declaring one
+// the host lacks is removed.
+ask('/can').then(r => r.json()).then(({ can }) => {
+  const has = new Set(can);
+  for (const el of document.querySelectorAll('[data-needs]'))
+    if (!has.has(el.dataset.needs)) el.remove();
+});
+
+// Proof this tab is still on screen. The lobby ends when the beats stop,
+// because a closed tab and a tab nobody is looking at differ only in how long
+// you wait — and `beforeunload` cannot be relied on to arrive at all.
+const BEAT_MS = 3000;
+ask('/beat', {}).catch(() => {});
+setInterval(() => { ask('/beat', {}).catch(() => {}); }, BEAT_MS);
+</script>
+</body>
+</html>

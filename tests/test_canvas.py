@@ -386,10 +386,14 @@ class CanvasTest(unittest.TestCase):
         abandoned — and the sheet stops being the one surface both parties point
         at, which is ADR 0018's whole argument. If the page does outgrow one
         file, the console's extra views are served beside it, not bundled in.
+
+        The lobby is the one other page, and it is not a second surface for a
+        space: it sits above the spaces and shows no sheet (ADR 0021). Named
+        here so any other page still fails this.
         """
         from lib import canvas as canvas_lib
         pages = sorted(Path(canvas_lib.__file__).parent.glob("*.html"))
-        self.assertEqual([p.name for p in pages], ["canvas.html"])
+        self.assertEqual([p.name for p in pages], ["canvas.html", "lobby.html"])
 
     def test_no_affordance_is_shown_before_the_host_has_answered(self):
         """`/can` is a request, so there is a moment before the answer arrives.
