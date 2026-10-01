@@ -24,12 +24,43 @@ so they cannot disagree about which spaces exist or which ones are behind.
 
 ## Acceptance criteria
 
-- [ ] `contour spaces --json` prints one JSON document listing every space the text form lists, and no others
-- [ ] Each entry carries name, path, toolkit state, commit count, remotes, and doctor's drift findings
-- [ ] A space with a remote is reported in the JSON too, and the command still exits non-zero, as the text form does
-- [ ] No spaces is an empty list and exit 0, not an error
-- [ ] `contour spaces` and `contour spaces <name>` print byte-identical output to before
-- [ ] Tests cover both forms from spaces built in a temporary directory, with no Blender
+- [x] `contour spaces --json` prints one JSON document listing every space the text form lists, and no others
+- [x] Each entry carries name, path, toolkit state, commit count, remotes, and doctor's drift findings
+- [x] A space with a remote is reported in the JSON too, and the command still exits non-zero, as the text form does
+- [x] No spaces is an empty list and exit 0, not an error
+- [x] `contour spaces` and `contour spaces <name>` print byte-identical output to before
+- [x] Tests cover both forms from spaces built in a temporary directory, with no Blender
+
+## What it came to
+
+**One reading, two renderings.** `reading(root)` in `lib/cli.py` reads one space;
+the text form and `--json` both print it. The text form was pinned byte for byte
+against the old code before anything moved, and still matches.
+
+```json
+{"roots": ["…"],
+ "spaces": [{"name": "beaky", "path": "…/project/beaky",
+             "toolkit": {"commit": "72876fe", "state": "behind"},
+             "commits": 8, "remotes": [],
+             "scaffold": {"drift": ["CLAUDE.md"], "missing": []},
+             "rules": true}]}
+```
+
+`state` is `current`, `behind` or `unknown`; `commit` is null when the marker
+names no toolkit. **Doctor's scaffold comparison is `scaffold(root)`**, asked by
+`doctor` of the space it stands in and by `spaces` of every space. **`rules`** is
+open question 13 as data: the space has a `CLAUDE.md` of its own, or the
+toolkit's is above it.
+
+`SpacesTest` in `tests/test_launcher.py`: 8 tests over spaces `contour init`
+makes in a temporary directory. Five mutants, each caught. The suite runs 518
+tests, 6 skipped.
+
+**Found, not fixed:** every space on this machine has drifted in three or four
+scaffold files, `CLAUDE.md` and `.claude/settings.json` among them, which the
+text form never showed. A marker that literally says `toolkit: unknown` (what
+`init` writes when git cannot say) still reads as `behind`, because changing it
+would change the text form.
 
 ## Blocked by
 
