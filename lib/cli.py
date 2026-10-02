@@ -25,7 +25,7 @@ import sys
 import time
 from pathlib import Path
 
-from lib import commands, delete, git, presence, rename, revision, space     # stdlib-only by test (ADR 0019, 29)
+from lib import commands, delete, git, presence, rename, restore, revision, space     # stdlib-only by test (ADR 0019, 29)
 
 ROOT = Path(__file__).resolve().parent.parent
 BLENDER = os.environ.get("BLENDER", "/Applications/Blender.app/Contents/MacOS/Blender")
@@ -359,6 +359,49 @@ def on_delete(cmd, rest, held):
     return emit({"ok": True, "lines": delete.lines(said)})
 
 
+def on_restore(cmd, rest, held):
+    """A deleted space, cloned back from its bundle (ADR 0021, decision 6)."""
+    words = list(rest)
+    as_json = "--json" in words
+    if as_json:
+        words.remove("--json")
+    to = None
+    if "--to" in words:
+        i = words.index("--to")
+        if i + 1 >= len(words):
+            print(usage(), file=sys.stderr)
+            return 2
+        to = words.pop(i + 1)
+        words.pop(i)
+    if len(words) != 1:
+        print(usage(), file=sys.stderr)
+        return 2
+    said = restore.restore(words[0], ROOT, to)
+    if as_json:
+        return emit({"ok": not said["refused"], "lines": [json.dumps(said, indent=2)]})
+    if said["refused"]:
+        return emit({"ok": False, "lines": [f"FAIL restore  {said['refused']}"]})
+    return emit({"ok": True, "lines": [f"ok   restored {said['path']}",
+                                       f"     cd {said['path']}"]})
+
+
+def on_purge(cmd, rest, held):
+    """Proposes removing a bundle from the trash, or with `--yes` removes it.
+    The id is the first word whatever it says, as `delete`'s name is."""
+    typed, flags = rest[0], rest[1:]
+    if not set(flags) <= {"--yes", "--json"}:
+        print(usage(), file=sys.stderr)
+        return 2
+    said = (restore.purge if "--yes" in flags else restore.proposed_purge)(typed)
+    if "--json" in flags:
+        return emit({"ok": not said["refused"], "lines": [json.dumps(said, indent=2)]})
+    if said["refused"]:
+        return emit({"ok": False, "lines": [f"FAIL purge  {said['refused']}"]})
+    if "--yes" in flags:
+        return emit({"ok": True, "lines": [f"ok   removed {said['bundle']}"]})
+    return emit({"ok": True, "lines": restore.purge_lines(said)})
+
+
 def seconds(name, fallback):
     """A timeout from the environment, so a test proving what a silence means
     does not have to wait out the real one."""
@@ -422,6 +465,7 @@ def main(argv):
 
 SCAFFOLD = space.SCAFFOLD
 template = space.template      # `init` names its new space `space`
+stub = space.stub
 
 
 def toolkit_commit():
@@ -464,12 +508,9 @@ def init(name):
     failed = git.start(space)
     if failed:
         return {"ok": False, "lines": [f"FAIL git init: {failed}"]}
-    dst = git.hooks_dir(space)
-    if dst is None:
-        return {"ok": False, "lines": ["FAIL git made no repository to hook"]}
-    dst.mkdir(parents=True, exist_ok=True)
-    (dst / "pre-push").write_bytes((tpl / "pre-push").read_bytes())
-    (dst / "pre-push").chmod(0o755)
+    failed = stub(space, ROOT)
+    if failed:
+        return {"ok": False, "lines": [f"FAIL {failed}"]}
     lines += ["ok   git init, pre-push stub installed (this space is never pushed)",
               f"ok   scaffolding copied from toolkit {toolkit_commit()}"]
     if kept:
@@ -642,7 +683,8 @@ def listing():
     lobby serves it: one reading, so the two cannot disagree."""
     now = toolkit_commit()
     return {"roots": [str(r) for r in space.roots(ROOT)],
-            "spaces": [reading(s, now) for s in space.spaces(space.roots(ROOT))]}
+            "spaces": [reading(s, now) for s in space.spaces(space.roots(ROOT))],
+            "deleted": restore.deleted()}
 
 
 def spaces(name=None, as_json=False):
@@ -661,7 +703,8 @@ def spaces(name=None, as_json=False):
     if not found:
         return {"ok": True, "lines": [f"no model spaces under "
                                       f"{', '.join(str(r) for r in space.roots(ROOT))}",
-                                      "(set $CONTOUR_SPACES to look elsewhere)"]}
+                                      "(set $CONTOUR_SPACES to look elsewhere)"]
+                + deleted_lines()}
     now, lines, ok = toolkit_commit(), [], True
     for s in (reading(s, now) for s in found):
         home = s["path"].replace(str(Path.home()), "~")
@@ -672,7 +715,18 @@ def spaces(name=None, as_json=False):
         for r in s["remotes"]:
             lines.append(f"  WARN {s['name']} has a remote ({r}) — a model space is never pushed")
             ok = False
-    return {"ok": ok, "lines": lines}
+    return {"ok": ok, "lines": lines + deleted_lines()}
+
+
+def deleted_lines():
+    """The trash, under the live list and apart from it (ADR 0021, decision 6)."""
+    gone = restore.deleted()
+    if not gone:
+        return []
+    return ["", "deleted (restore with contour restore <id> [--to <dir>]):"] + [
+        f"  {d['name'] or '?':<12} deleted {d['deleted'] or '?'}  "
+        + (f"restored, live at {d['live']}" if d["live"] else f"contour restore {d['id']}")
+        for d in gone]
 
 
 def unit_tests():

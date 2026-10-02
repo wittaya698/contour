@@ -15,6 +15,7 @@
          font: 15px/1.5 system-ui, -apple-system, sans-serif; }
   main { max-width: 960px; margin: 0 auto; padding: 32px 16px; }
   h1 { font-size: 20px; margin: 0 0 4px; }
+  h2 { font-size: 16px; margin: 32px 0 4px; }
   .muted { color: var(--muted); }
   table { width: 100%; border-collapse: collapse; margin-top: 24px; }
   th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line);
@@ -49,6 +50,17 @@
       <tbody id="rows"></tbody>
     </table>
   </div>
+  <section id="trash" hidden>
+    <h2>Deleted</h2>
+    <p class="muted">Each is a bundle of the space's whole history, in the trash on
+      this disk. Restoring clones it back; the bundle stays until you remove it.</p>
+    <div class="wrap">
+      <table>
+        <thead><tr><th>Space</th><th>Deleted</th><th></th></tr></thead>
+        <tbody id="gone"></tbody>
+      </table>
+    </div>
+  </section>
   <section id="onboarding" hidden>
     <p>There are no model spaces here yet.</p>
     <p>A <strong>model space</strong> is one model: its own directory and its own
@@ -261,14 +273,99 @@ function deleting(s, room, p) {
   typed.focus();
 }
 
+// One deleted space: a bundle in the trash, and where it stood. Restoring is
+// `contour restore`, to where it stood or into a folder typed here; the
+// command refuses a taken path or name, worded as it words it.
+function gone(d, can) {
+  const tr = document.createElement('tr');
+  const name = cell('');
+  const strong = document.createElement('strong');
+  strong.textContent = d.name || d.id;
+  const path = document.createElement('div');
+  path.className = 'muted';
+  path.textContent = d.live ? 'restored, live at ' + d.live
+                   : d.path || 'where it stood is not recorded: give a folder';
+  const note = document.createElement('div');
+  note.className = 'warn';
+  name.append(strong, path, note);
+  const actions = cell('');
+  if (can.has('restore') && !d.live) {
+    const to = document.createElement('input');
+    to.placeholder = d.path ? 'folder (blank: where it stood)' : 'folder to restore into';
+    to.setAttribute('aria-label', 'Folder to restore ' + (d.name || d.id) + ' into');
+    const b = button('Restore', () => {
+      b.disabled = true;
+      ask('/restore', { id: d.id, to: to.value || undefined }).then(r => r.json()).then(done => {
+        b.disabled = false;
+        if (done.refused) { note.textContent = 'Not restored: ' + done.refused; return; }
+        load();
+      });
+    });
+    const row = document.createElement('div');
+    row.className = 'actions';
+    row.append(to, b);
+    actions.append(row);
+  }
+  const under = document.createElement('tr');
+  under.hidden = true;
+  const room = document.createElement('td');
+  room.colSpan = 3;
+  room.className = 'panel';
+  under.append(room);
+  if (can.has('purge')) {
+    actions.append(button('Remove bundle…', () => { under.hidden = false; purging(d, room); }));
+  }
+  tr.append(name, cell(d.deleted || '?'), actions);
+  return [tr, under];
+}
+
+// Removing a bundle, the one act in the trash nothing undoes: what
+// `contour purge` proposes — whether a live space still stands where this one
+// stood, or this is the only copy — and under it a box the id is typed into.
+// The button is dead until it matches, and the server confirms that bundle only.
+function purging(d, room, p) {
+  if (!p) {
+    ask('/purge', { id: d.id }).then(r => r.json()).then(p => purging(d, room, p));
+    return;
+  }
+  const cancel = button('Cancel', () => { room.parentElement.hidden = true; });
+  if (p.refused) {
+    room.replaceChildren(para('Not removed: ' + p.refused, 'warn'), cancel);
+    return;
+  }
+  const parts = [para('Remove ' + p.bundle + '?'),
+                 para(p.copy, p.live ? 'muted' : 'warn'), para(p.gone, 'warn'),
+                 para('Type ' + d.id + ' to confirm.')];
+  const typed = document.createElement('input');
+  typed.autocomplete = 'off';
+  typed.setAttribute('aria-label', 'Type ' + d.id + ' to remove its bundle');
+  const go = button('Remove for good', () => {
+    go.disabled = true;
+    ask('/purge', { id: d.id, typed: typed.value }).then(r => r.json()).then(done => {
+      if (done.refused) return purging(d, room, done);
+      load();
+    });
+  }, 'danger');
+  go.disabled = true;
+  typed.oninput = () => { go.disabled = typed.value !== d.id; };
+  const row = document.createElement('div');
+  row.className = 'actions';
+  row.append(typed, go, cancel);
+  room.replaceChildren(...parts, row);
+  typed.focus();
+}
+
 // Empty is onboarding, not an empty table: someone with no spaces is standing
-// where someone with ten is (ADR 0021, decision 1).
-function render({ roots, spaces }, can) {
+// where someone with ten is (ADR 0021, decision 1). The trash is its own list,
+// so a deleted space never reads as a live one.
+function render({ roots, spaces, deleted }, can) {
   document.getElementById('roots').textContent = 'Looking in ' + roots.join(', ');
   document.getElementById('where').textContent = roots.join(' or ');
   document.getElementById('list').hidden = spaces.length === 0;
   document.getElementById('onboarding').hidden = spaces.length !== 0;
   document.getElementById('rows').replaceChildren(...spaces.flatMap(s => row(s, can)));
+  document.getElementById('trash').hidden = deleted.length === 0;
+  document.getElementById('gone').replaceChildren(...deleted.flatMap(d => gone(d, can)));
 }
 
 // What this host can do, asked once: each action arrives as a capability with

@@ -35,6 +35,7 @@ class CanvasPresenceTest(unittest.TestCase):
         quiet.write_text("#!/bin/sh\nexit 0\n")     # $BROWSER, so none opens
         quiet.chmod(0o755)
         self.env = dict(os.environ, CONTOUR_SPACES=str(self.spaces),
+                        CONTOUR_HOME=str(self.tmp / "home"),
                         BROWSER=str(quiet))
         r = self.contour("init", "alpha", cwd=self.spaces)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)

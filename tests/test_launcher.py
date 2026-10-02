@@ -310,17 +310,21 @@ class LauncherTest(unittest.TestCase):
 
 class SpacesTest(unittest.TestCase):
     """`contour spaces`, in both its forms, over spaces `contour init` made in
-    a temporary directory that `$CONTOUR_SPACES` points at (slice 28)."""
+    a temporary directory that `$CONTOUR_SPACES` points at (slice 28), with
+    `$CONTOUR_HOME` beside it so the trash listed is the test's and not the
+    user's (issue 35)."""
 
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp()).resolve()
+        self.home = Path(tempfile.mkdtemp()).resolve()
         self.head = subprocess.run(["git", "-C", str(ROOT), "rev-parse", "--short", "HEAD"],
                                    capture_output=True, text=True).stdout.strip()
 
     def contour(self, *args, cwd=None):
         return subprocess.run([sys.executable, str(CONTOUR), *args],
                               cwd=str(cwd or self.tmp),
-                              env=dict(os.environ, CONTOUR_SPACES=str(self.tmp)),
+                              env=dict(os.environ, CONTOUR_SPACES=str(self.tmp),
+                                       CONTOUR_HOME=str(self.home)),
                               capture_output=True, text=True, timeout=60)
 
     def init(self, name):

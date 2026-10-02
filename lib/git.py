@@ -197,3 +197,24 @@ def bundle(repo, to):
     if missing - {""}:
         return f"the bundle does not carry {', '.join(sorted(missing - {''}))}"
     return None
+
+
+def clone(bundle, to):
+    """Make a repository at `to` from `bundle`, with no remote. Returns None,
+    or what git said if it could not.
+
+    A write, so `start`'s policy. A clone names its source as `origin`, and a
+    model space with a remote is the thing rule 8 forbids; here the remote is
+    a file in the trash, but `doctor` and `spaces` would rightly warn about it,
+    so it is removed before the space is handed back.
+    """
+    for args in (("clone", "-q", str(bundle), str(to)),
+                 ("-C", str(to), "remote", "remove", "origin")):
+        try:
+            done = subprocess.run(["git", *args], capture_output=True, text=True,
+                                  timeout=120)
+        except (OSError, subprocess.SubprocessError) as e:
+            return str(e)
+        if done.returncode != 0:
+            return done.stderr.strip() or f"git {args[0]} failed"
+    return None

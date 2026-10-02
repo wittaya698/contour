@@ -183,6 +183,28 @@ def template(toolkit, rel, name):
     return (Path(toolkit) / "templates" / "space" / rel).read_text().replace("<NAME>", name)
 
 
+def stub(root, toolkit):
+    """Install the toolkit's `pre-push` stub in the repository at `root`.
+    Returns None, or what stopped it.
+
+    Into wherever git keeps this repository's hooks, asked rather than
+    assumed. Written by `init` into a new space, and again by `restore`,
+    because `.git/hooks` is the one part of a space no clone carries: a
+    restored space without it could push (rule 8)."""
+    from . import git
+    hooks = git.hooks_dir(root)
+    if hooks is None:
+        return "git made no repository to hook"
+    try:
+        hooks.mkdir(parents=True, exist_ok=True)
+        (hooks / "pre-push").write_bytes(
+            (Path(toolkit) / "templates" / "space" / "pre-push").read_bytes())
+        (hooks / "pre-push").chmod(0o755)
+    except OSError as e:
+        return f"could not install the pre-push stub: {e}"
+    return None
+
+
 def transcripts(root):
     """Where Claude Code files the transcripts of sessions run in `root`: a
     second key on the path (open question 12), so a space that moves leaves its

@@ -79,6 +79,12 @@ TABLE = (
     Command("delete", (1, 3), True, False, "ref-write",
             (("delete <name>", "propose deleting this space; --yes deletes it, leaving "
                                "a bundle, --json says it for a client"),), "on_delete"),
+    Command("restore", (1, 4), False, False, None,
+            (("restore <id> [--to <dir>]", "clone a deleted space back from its bundle; "
+                                           "--json says it for a client"),), "on_restore"),
+    Command("purge", (1, 3), False, False, "ref-write",
+            (("purge <id>", "propose removing a deleted space's bundle; --yes removes "
+                            "it for good, --json says it for a client"),), "on_purge"),
     Command("intents", NONE, False, False, None,
             (("intents", "the call categories a gate can ask about"),), "on_intents"),
     Command("asks", NONE, False, False, None,

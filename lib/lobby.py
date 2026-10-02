@@ -21,7 +21,7 @@ PAGE = Path(__file__).resolve().parent / "lobby.html"
 CONTOUR = PAGE.parent.parent / "contour"
 GRACE_S = 10          # beats are seconds apart; this is several missed ones
 
-CAN = ("rename", "delete")
+CAN = ("rename", "delete", "restore", "purge")
 """What the lobby can do beyond listing, for the page to ask about. Each action
 arrives as a capability with the command that performs it — create and enter
 are still to come — and a button for one the host cannot perform is a
@@ -39,7 +39,9 @@ class Lobby(Page):
     def served(self):
         return {("GET", "/spaces"): lambda q: self.listing(),
                 ("POST", "/rename"): self.rename,
-                ("POST", "/delete"): self.delete}
+                ("POST", "/delete"): self.delete,
+                ("POST", "/restore"): self.restore,
+                ("POST", "/purge"): self.purge}
 
     def rename(self, asked):
         """`contour rename` in the space the page named, its answer as it
@@ -74,6 +76,31 @@ class Lobby(Page):
         if "name" not in asked:
             return contour(asked["path"], "delete", listed[asked["path"]], "--json")
         return contour(asked["path"], "delete", str(asked["name"]), "--yes", "--json")
+
+    def restore(self, asked):
+        """`contour restore` of a bundle the listing holds, its answer as it
+        gave it. Run from the toolkit, since there is no space to stand in
+        until it has been restored. An id the listing does not hold is None:
+        not found."""
+        if asked.get("id") not in {d["id"] for d in self.listing()["deleted"]}:
+            return None
+        to = ["--to", str(asked["to"])] if asked.get("to") else []
+        return contour(CONTOUR.parent, "restore", asked["id"], *to, "--json")
+
+    def purge(self, asked):
+        """`contour purge` of a bundle the listing holds. Asked with no typed
+        id, the proposal; with one, the removal — but only of the bundle the
+        page showed. The command takes any id it is given, so a typed id that
+        names some other bundle is refused here, before it can remove that one.
+        An id the listing does not hold is None: not found."""
+        if asked.get("id") not in {d["id"] for d in self.listing()["deleted"]}:
+            return None
+        now = contour(CONTOUR.parent, "purge", asked["id"], "--json")
+        if "typed" not in asked or now["refused"]:
+            return now
+        if asked["typed"] != asked["id"]:
+            return dict(now, refused=f"to remove this bundle, type {asked['id']}")
+        return contour(CONTOUR.parent, "purge", asked["id"], "--yes", "--json")
 
 
 def contour(space, *args):

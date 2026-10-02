@@ -10,6 +10,7 @@ would list as a live one (ADR 0015).
 own name as the confirm — the command line's spelling of typing it.
 """
 import contextlib
+import json
 import shutil
 import time
 from pathlib import Path
@@ -32,6 +33,23 @@ def destination(root):
         n += 1
         to = trash() / f"{stem}-{n}.bundle"
     return to
+
+
+def about(bundle):
+    """The record beside a bundle of where its space stood, for restore."""
+    return bundle.with_suffix(".json")
+
+
+def record(root, bundle):
+    """Write down where the space stood and when it went, beside its bundle:
+    the bundle carries the history and not the path, and restoring to the old
+    location needs the path. Returns None, or what went wrong."""
+    try:
+        about(bundle).write_text(json.dumps(
+            {"name": root.name, "path": str(root), "deleted": time.strftime("%Y-%m-%d")}))
+    except OSError as e:
+        return f"could not write {about(bundle)}: {e}"
+    return None
 
 
 def refusal(root, name, mine=None):
@@ -90,10 +108,11 @@ def perform(root, name):
         except OSError as e:
             failed = f"could not make {to.parent}: {e}"
         else:
-            failed = git.bundle(root, to)
+            failed = git.bundle(root, to) or record(root, to)
         if failed:
-            with contextlib.suppress(OSError):
-                to.unlink(missing_ok=True)     # half a bundle is no bundle
+            for f in (to, about(to)):
+                with contextlib.suppress(OSError):
+                    f.unlink(missing_ok=True)  # half a bundle is no bundle
             proposal["refused"] = f"no bundle, so nothing was deleted: {failed}"
             return proposal
         try:

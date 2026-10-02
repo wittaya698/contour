@@ -35,6 +35,7 @@ class LobbyTest(unittest.TestCase):
         quiet.write_text("#!/bin/sh\nexit 0\n")     # $BROWSER, so none opens
         quiet.chmod(0o755)
         self.env = dict(os.environ, CONTOUR_SPACES=str(self.spaces),
+                        CONTOUR_HOME=str(self.tmp / "home"),
                         BROWSER=str(quiet))
 
     def contour(self, *args, cwd=None):
@@ -101,7 +102,7 @@ class LobbyTest(unittest.TestCase):
         proc = self.lobby(CONTOUR_LOBBY_GRACE="0.2")
         with self.assertRaises(subprocess.TimeoutExpired):
             proc.wait(timeout=1.5)
-        self.assertEqual(self.get("/can"), {"can": ["rename", "delete"]})
+        self.assertEqual(self.get("/can"), {"can": ["rename", "delete", "restore", "purge"]})
 
 
 class LobbyPageTest(unittest.TestCase):
@@ -194,6 +195,46 @@ class LobbyPageTest(unittest.TestCase):
         self.assertIn("p.refused", shown[refused:shown.index("return", refused)])
         self.assertLess(refused, shown.index("'Delete for good'"))
 
+    def test_the_trash_is_its_own_list_under_the_live_one(self):
+        """Apart from the live spaces, so a deleted one never reads as live,
+        and shown only when there is something in it."""
+        shown = self.function("render")
+        self.assertIn("deleted", shown)
+        self.assertIn("getElementById('trash').hidden = deleted.length === 0", shown)
+        self.assertIn('id="trash"', self.page)
+
+    def test_restore_is_offered_only_where_the_host_can_do_it(self):
+        gone = self.function("gone")
+        self.assertIn("can.has('restore')", gone)
+        self.assertIn("ask('/restore', { id: d.id", gone)
+
+    def test_a_bundle_whose_space_is_live_says_so_and_offers_no_restore(self):
+        gone = self.function("gone")
+        self.assertIn("'restored, live at ' + d.live", gone)
+        self.assertIn("can.has('restore') && !d.live", gone)
+
+    def test_removing_a_bundle_is_offered_only_where_the_host_can_do_it(self):
+        self.assertIn("can.has('purge')", self.function("gone"))
+
+    def test_removing_a_bundle_is_enabled_only_once_its_id_is_typed(self):
+        shown = self.function("purging")
+        self.assertEqual(self.page.count("'Remove for good'"), 1)
+        self.assertIn("go.disabled = true", shown)
+        self.assertIn("go.disabled = typed.value !== d.id", shown)
+        self.assertIn("typed: typed.value", shown)
+
+    def test_the_purge_confirm_says_whether_this_is_the_only_copy(self):
+        shown = self.function("purging")
+        made = shown.index("'Remove for good'")
+        for part in ("p.copy", "p.gone", "p.bundle"):
+            self.assertLess(shown.index(part), made, part)
+        refused = shown.index("if (p.refused)")
+        self.assertLess(refused, made)
+
+    def test_a_restore_refusal_is_shown_as_the_command_worded_it(self):
+        gone = self.function("gone")
+        self.assertIn("'Not restored: ' + done.refused", gone)
+
 
 class LobbyProtectionTest(unittest.TestCase):
     """Issue 01's protections, held by the lobby itself and not only inherited
@@ -203,7 +244,7 @@ class LobbyProtectionTest(unittest.TestCase):
     request that is turned away never reaches the listing they check a path
     against."""
 
-    LISTED = {"roots": ["/nowhere"], "spaces": []}
+    LISTED = {"roots": ["/nowhere"], "spaces": [], "deleted": []}
 
     def setUp(self):
         self.asked = 0
@@ -268,6 +309,24 @@ class LobbyProtectionTest(unittest.TestCase):
                      **{"Content-Type": "text/plain;charset=UTF-8"})
         self.refused(403, "/delete", self.DELETE, Origin="https://example.com")
         self.refused(403, "/delete", self.DELETE, **{"Sec-Fetch-Site": "cross-site"})
+        self.assertEqual(self.asked, 0)
+
+    RESTORE = {"id": "alpha-2026-10-02"}
+
+    def test_without_the_token_or_from_another_origin_nothing_is_restored(self):
+        self.refused(403, "/restore", self.RESTORE, token=False)
+        self.refused(415, "/restore", self.RESTORE,
+                     **{"Content-Type": "text/plain;charset=UTF-8"})
+        self.refused(403, "/restore", self.RESTORE, Origin="https://example.com")
+        self.assertEqual(self.asked, 0)
+
+    PURGE = {"id": "alpha-2026-10-02", "typed": "alpha-2026-10-02"}
+
+    def test_without_the_token_or_from_another_origin_nothing_is_purged(self):
+        self.refused(403, "/purge", self.PURGE, token=False)
+        self.refused(415, "/purge", self.PURGE,
+                     **{"Content-Type": "text/plain;charset=UTF-8"})
+        self.refused(403, "/purge", self.PURGE, Origin="https://example.com")
         self.assertEqual(self.asked, 0)
 
     def test_a_post_that_is_not_json_ends_nothing(self):

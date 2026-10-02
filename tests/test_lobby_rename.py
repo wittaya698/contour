@@ -76,7 +76,7 @@ class LobbyProposalTest(LobbyRenameCase):
         self.assertEqual(said, proposed)
 
     def test_it_offers_rename(self):
-        self.assertEqual(self.ask("/can"), {"can": ["rename", "delete"]})
+        self.assertEqual(self.ask("/can"), {"can": ["rename", "delete", "restore", "purge"]})
 
     def test_a_directory_the_lobby_does_not_list_is_not_a_space_to_rename(self):
         """The page names a space by its path, so the path is checked against
