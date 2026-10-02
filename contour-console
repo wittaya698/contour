@@ -14,9 +14,9 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-VENV = ROOT / ".venv"
-MAKE_IT = ("python3 -m venv .venv && "
-           ".venv/bin/pip install -r console/requirements.txt")
+sys.path.insert(0, str(ROOT))
+from lib.enter import MAKE_IT, interpreter    # noqa: E402  stdlib-only, as is this file
+
 USAGE = """contour-console            drive a run from the browser, in this space
   --no-browser             serve, print the URL, and open nothing
   $CONTOUR_CONSOLE_PYTHON  the interpreter to run under (default .venv/bin/python)
@@ -24,20 +24,10 @@ USAGE = """contour-console            drive a run from the browser, in this spac
 """
 
 
-def interpreter():
-    """The Python the console runs under. `$CONTOUR_CONSOLE_PYTHON` overrides,
-    the way `$BLENDER` does for the launcher: one escape hatch, named after the
-    thing it replaces, so a test never has to build an environment to prove
-    something that is not about environments."""
-    told = os.environ.get("CONTOUR_CONSOLE_PYTHON")
-    return Path(told) if told else VENV / "bin" / "python"
-
-
 def space():
     """The model space this was typed in, or None. The walk-up rule is the
     launcher's, imported rather than restated: two definitions of what a space
     is would be two things to keep in step about a question with one answer."""
-    sys.path.insert(0, str(ROOT))
     from lib import space as space_lib
     return space_lib.find()
 

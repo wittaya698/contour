@@ -102,7 +102,7 @@ class LobbyTest(unittest.TestCase):
         proc = self.lobby(CONTOUR_LOBBY_GRACE="0.2")
         with self.assertRaises(subprocess.TimeoutExpired):
             proc.wait(timeout=1.5)
-        self.assertEqual(self.get("/can"), {"can": ["rename", "delete", "restore", "purge"]})
+        self.assertIn("rename", self.get("/can")["can"])
 
 
 class LobbyPageTest(unittest.TestCase):
@@ -235,6 +235,34 @@ class LobbyPageTest(unittest.TestCase):
         gone = self.function("gone")
         self.assertIn("'Not restored: ' + done.refused", gone)
 
+    def test_enter_is_offered_only_where_the_host_can_do_it(self):
+        row = self.function("row")
+        self.assertIn("can.has('enter')", row)
+        self.assertIn("ask('/enter'", self.page)
+
+    def test_without_enter_the_row_shows_the_line_that_makes_an_environment(self):
+        """The line is the host's, asked once, so it is the one
+        `contour-console` prints and never a copy kept in the page."""
+        self.assertIn("ask('/environment')", self.page)
+        row = self.function("row")
+        self.assertIn("environment.console", row)
+        self.assertNotIn(".venv", self.page)
+
+    def test_a_space_open_in_a_console_says_so_and_offers_no_second_one(self):
+        row = self.function("row")
+        self.assertIn("p.kind === 'console'", row)
+        self.assertIn("open in a console", row)
+        self.assertIn("!open", row)
+
+    def test_an_enter_refusal_is_shown_as_the_host_worded_it(self):
+        self.assertIn("'Not entered: ' + done.refused", self.function("entering"))
+
+    def test_open_in_finder_is_offered_only_where_the_host_can_do_it(self):
+        row = self.function("row")
+        self.assertIn("can.has('reveal')", row)
+        self.assertIn("Open in Finder", row)
+        self.assertIn("ask('/reveal'", self.page)
+
 
 class LobbyProtectionTest(unittest.TestCase):
     """Issue 01's protections, held by the lobby itself and not only inherited
@@ -327,6 +355,18 @@ class LobbyProtectionTest(unittest.TestCase):
         self.refused(415, "/purge", self.PURGE,
                      **{"Content-Type": "text/plain;charset=UTF-8"})
         self.refused(403, "/purge", self.PURGE, Origin="https://example.com")
+        self.assertEqual(self.asked, 0)
+
+    ENTER = {"path": "/nowhere/alpha"}
+
+    def test_without_the_token_or_from_another_origin_nothing_is_entered_or_opened(self):
+        for path in ("/enter", "/reveal"):
+            with self.subTest(path=path):
+                self.refused(403, path, self.ENTER, token=False)
+                self.refused(415, path, self.ENTER,
+                             **{"Content-Type": "text/plain;charset=UTF-8"})
+                self.refused(403, path, self.ENTER, Origin="https://example.com")
+                self.refused(403, path, self.ENTER, **{"Sec-Fetch-Site": "cross-site"})
         self.assertEqual(self.asked, 0)
 
     def test_a_post_that_is_not_json_ends_nothing(self):

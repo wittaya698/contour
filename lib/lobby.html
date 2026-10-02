@@ -115,7 +115,8 @@ function health(s) {
 }
 
 // One space's row, and under it the room a rename or a delete lays itself out in.
-function row(s, can) {
+// `environment` is the host's answer to whether a console can run here.
+function row(s, can, environment) {
   const tr = document.createElement('tr');
   const name = cell('');
   const strong = document.createElement('strong');
@@ -132,6 +133,12 @@ function row(s, can) {
     note.textContent = 'renamed from ' + s.renamed.from + ', uncommitted';
     name.append(note);
   }
+  // A console already serving the space, from its presence. Entering again
+  // would start a second one, and the lobby never sees the first one's URL.
+  const open = s.presence.some(p => p.kind === 'console');
+  if (open) name.append(para('open in a console — its tab is the way in', 'ok'));
+  const said = para('', 'warn');
+  name.append(said);
   const actions = cell('');
   const under = document.createElement('tr');
   under.hidden = true;
@@ -151,11 +158,43 @@ function row(s, can) {
     b.onclick = () => { under.hidden = false; deleting(s, room); };
     actions.append(b);
   }
+  // Entering needs the console's environment; where there is none, the line
+  // that makes one, as `contour-console` prints it, stands where the button would.
+  if (can.has('enter') && !open) {
+    actions.append(entering(s, said));
+  } else if (!can.has('enter') && environment.console) {
+    const how = para('to enter, make the console environment: ', 'muted');
+    const code = document.createElement('code');
+    code.textContent = environment.console;
+    how.append(code);
+    actions.append(how);
+  }
+  if (can.has('reveal')) {
+    actions.append(button('Open in Finder', () => {
+      ask('/reveal', { path: s.path }).then(r => r.json()).then(done => {
+        said.textContent = done.refused ? 'Not opened: ' + done.refused : '';
+      });
+    }));
+  }
   tr.append(name,
             cell((s.toolkit.commit || '?') + ' (' + s.toolkit.state + ')'),
             cell(String(s.commits), 'num'),
             health(s), actions);
   return [tr, under];
+}
+
+// Enter: `contour-console` started in the space, which opens its own tab. The
+// list is asked again once it has had time to say it is there.
+function entering(s, said) {
+  const b = button('Enter', () => {
+    b.disabled = true;
+    ask('/enter', { path: s.path }).then(r => r.json()).then(done => {
+      if (done.refused) { b.disabled = false; said.textContent = 'Not entered: ' + done.refused; return; }
+      said.textContent = '';
+      setTimeout(load, 2000);
+    });
+  });
+  return b;
 }
 
 function button(text, onclick, cls) {
@@ -358,12 +397,12 @@ function purging(d, room, p) {
 // Empty is onboarding, not an empty table: someone with no spaces is standing
 // where someone with ten is (ADR 0021, decision 1). The trash is its own list,
 // so a deleted space never reads as a live one.
-function render({ roots, spaces, deleted }, can) {
+function render({ roots, spaces, deleted }, can, environment) {
   document.getElementById('roots').textContent = 'Looking in ' + roots.join(', ');
   document.getElementById('where').textContent = roots.join(' or ');
   document.getElementById('list').hidden = spaces.length === 0;
   document.getElementById('onboarding').hidden = spaces.length !== 0;
-  document.getElementById('rows').replaceChildren(...spaces.flatMap(s => row(s, can)));
+  document.getElementById('rows').replaceChildren(...spaces.flatMap(s => row(s, can, environment)));
   document.getElementById('trash').hidden = deleted.length === 0;
   document.getElementById('gone').replaceChildren(...deleted.flatMap(d => gone(d, can)));
 }
@@ -372,10 +411,11 @@ function render({ roots, spaces, deleted }, can) {
 // the command that performs it, and a host that lacks one shows no button for
 // it (ADR 0021, decision 2).
 const CAN = ask('/can').then(r => r.json()).then(({ can }) => new Set(can));
+const ENVIRONMENT = ask('/environment').then(r => r.json());
 
 function load() {
-  Promise.all([ask('/spaces').then(r => r.json()), CAN])
-    .then(([listed, can]) => render(listed, can));
+  Promise.all([ask('/spaces').then(r => r.json()), CAN, ENVIRONMENT])
+    .then(([listed, can, environment]) => render(listed, can, environment));
 }
 load();
 

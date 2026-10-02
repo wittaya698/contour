@@ -155,6 +155,7 @@ sliced work is.
 | # | Slice | Type | Blocked by |
 |---|---|---|---|
 | [27](27-a-terminated-console-lets-go.md) | A terminated console lets go of the space | AFK | — |
+| [39](39-a-background-tab-is-not-a-closed-one.md) | A background tab is not a closed one | AFK | — |
 
 **27 came out of slice 17's own suite runs.** `contour-console` forwards `SIGINT`
 and not `SIGTERM`, so every console a test terminates leaves its server running —
@@ -162,3 +163,9 @@ holding a port, and holding the space if a run was under way. About 57 per suite
 run, and at a thousand the machine stops forking and the suite goes red for
 reasons that have nothing to do with the change being tested. It is placed before
 24 for that reason: a wide slice wants a suite whose red means something.
+
+**39 came out of checking 36 by hand.** The lobby and the console take 10 seconds
+without a beat to mean their tab closed, and browsers stop the beats of a tab in the
+background. So entering a space and going back to the list killed the console, and
+leaving the browser behind the terminal killed the lobby. 36's manual check waits on
+it.

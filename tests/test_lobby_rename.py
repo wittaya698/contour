@@ -44,13 +44,19 @@ class LobbyRenameCase(RenameCase):
         quiet.write_text("#!/bin/sh\nexit 0\n")     # $BROWSER, so none opens
         quiet.chmod(0o755)
         self.env["BROWSER"] = str(quiet)
+        self.open()
+
+    def open(self, **popen):
+        """`contour lobby` over the test's environment, as it stands now."""
         proc = subprocess.Popen([sys.executable, str(CONTOUR), "lobby"],
                                 cwd=str(self.tmp), env=self.env, text=True,
-                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                **popen)
         self.addCleanup(proc.stdout.close)
         self.addCleanup(proc.kill)
         url = re.search(r"http://\S+", proc.stdout.readline()).group(0)
         self.origin, self.token = url.split("/?")[0], url.split("t=")[1]
+        return proc
 
     def ask(self, path, body=None):
         """As the page asks: the token as a header, a POST as JSON."""
@@ -76,7 +82,7 @@ class LobbyProposalTest(LobbyRenameCase):
         self.assertEqual(said, proposed)
 
     def test_it_offers_rename(self):
-        self.assertEqual(self.ask("/can"), {"can": ["rename", "delete", "restore", "purge"]})
+        self.assertIn("rename", self.ask("/can")["can"])
 
     def test_a_directory_the_lobby_does_not_list_is_not_a_space_to_rename(self):
         """The page names a space by its path, so the path is checked against
