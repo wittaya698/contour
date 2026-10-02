@@ -80,13 +80,6 @@ class LobbyTest(unittest.TestCase):
         self.lobby(cwd=alpha)
         self.assertEqual([s["name"] for s in self.get("/spaces")["spaces"]], ["alpha"])
 
-    def test_it_offers_no_action_yet(self):
-        """Each action arrives with the command that performs it, as a
-        capability the page asks for; at this slice there is none to offer
-        (ADR 0021, decision 2)."""
-        self.lobby()
-        self.assertEqual(self.get("/can"), {"can": []})
-
     def beat(self):
         req = urllib.request.Request(
             self.origin + "/beat", data=b"{}", method="POST",
@@ -108,7 +101,7 @@ class LobbyTest(unittest.TestCase):
         proc = self.lobby(CONTOUR_LOBBY_GRACE="0.2")
         with self.assertRaises(subprocess.TimeoutExpired):
             proc.wait(timeout=1.5)
-        self.assertEqual(self.get("/can"), {"can": []})
+        self.assertEqual(self.get("/can"), {"can": ["rename"]})
 
 
 class LobbyPageTest(unittest.TestCase):
@@ -141,12 +134,46 @@ class LobbyPageTest(unittest.TestCase):
     def test_it_asks_the_host_what_it_can_do(self):
         self.assertIn("ask('/can')", self.page)
 
+    def function(self, name):
+        """One top-level function's source, to its closing brace at column 0."""
+        return self.page.split(f"function {name}(")[1].split("\n}\n")[0]
+
+    def test_rename_is_offered_only_where_the_host_can_do_it(self):
+        self.assertIn("can.has('rename')", self.function("row"))
+
+    def test_the_confirm_exists_only_under_the_whole_proposal(self):
+        """The one place a confirm is made is the function that lays out the
+        proposal, after every part of it, so the page cannot confirm a rename
+        it has not shown (ADR 0021, decision 5)."""
+        self.assertEqual(self.page.count("'Confirm rename'"), 1)
+        shown = self.function("proposal")
+        made = shown.index("'Confirm rename'")
+        for part in ("p.changes", "p.untouched", "p.leaves", "p.unseen"):
+            self.assertLess(shown.index(part), made, part)
+
+    def test_the_confirm_sends_back_what_it_showed(self):
+        """The server confirms that proposal only, and refuses if the command
+        no longer says the same."""
+        self.assertIn("shown: p", self.function("proposal"))
+
+    def test_a_refusal_is_shown_as_the_command_worded_it_with_no_confirm(self):
+        shown = self.function("proposal")
+        refused = shown.index("if (p.refused)")
+        self.assertIn("p.refused", shown[refused:shown.index("return", refused)])
+        self.assertLess(refused, shown.index("'Confirm rename'"))
+
+    def test_a_renamed_space_says_so_until_it_is_committed(self):
+        row = self.function("row")
+        self.assertIn("s.renamed", row)
+        self.assertIn("uncommitted", row)
+
 
 class LobbyProtectionTest(unittest.TestCase):
     """Issue 01's protections, held by the lobby itself and not only inherited
     on paper: each is asked of a running `Lobby` the way an attacker's page
-    would ask it. `/done` is the state-changing POST, because ending the
-    session is the one thing a lobby's page can do to it at this slice."""
+    would ask it. `/done` and `/rename` are the state-changing POSTs: one ends
+    the session, the other moves a space, and a request that is turned away
+    never reaches the listing `/rename` checks its path against."""
 
     LISTED = {"roots": ["/nowhere"], "spaces": []}
 
@@ -185,6 +212,22 @@ class LobbyProtectionTest(unittest.TestCase):
     def test_without_the_token_nothing_ends(self):
         self.refused(403, "/done", {}, token=False)
         self.assertFalse(self.lobby.done)
+
+    RENAME = {"path": "/nowhere/alpha", "name": "beta"}
+
+    def test_without_the_token_nothing_is_renamed(self):
+        self.refused(403, "/rename", self.RENAME, token=False)
+        self.assertEqual(self.asked, 0)
+
+    def test_a_rename_that_is_not_json_goes_nowhere(self):
+        self.refused(415, "/rename", self.RENAME,
+                     **{"Content-Type": "text/plain;charset=UTF-8"})
+        self.assertEqual(self.asked, 0)
+
+    def test_a_rename_from_another_origin_goes_nowhere(self):
+        self.refused(403, "/rename", self.RENAME, Origin="https://example.com")
+        self.refused(403, "/rename", self.RENAME, **{"Sec-Fetch-Site": "cross-site"})
+        self.assertEqual(self.asked, 0)
 
     def test_a_post_that_is_not_json_ends_nothing(self):
         self.refused(415, "/done", {}, **{"Content-Type": "text/plain;charset=UTF-8"})

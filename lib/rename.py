@@ -12,7 +12,7 @@ says, so what the user read is what was written.
 """
 import re
 
-from . import lock, policy, presence, revision
+from . import git, lock, policy, presence, revision
 from . import space as space_lib
 
 MODEL = re.compile(r"^model:[^\n]*$", re.M)
@@ -41,6 +41,26 @@ def respelled(text, name):
     if revision.FIELD.search(text):
         return REVISION.sub(f"revision: {bumped}", text, count=1)
     return MODEL.sub(lambda m: f"{m.group(0)}\nrevision: {bumped}", text, count=1)
+
+
+def model(text):
+    """The name a spec gives its model, or None."""
+    m = MODEL.search(text or "")
+    return m.group(0).split(":", 1)[1].strip() if m else None
+
+
+def uncommitted(root):
+    """`{"from": old name}` while a rename is not yet in a commit, else None.
+
+    Read from git each time and stored nowhere: the spec at HEAD names one
+    model and the spec on disk another. A space with no commit has nothing to
+    have been renamed from."""
+    spec = space_lib.layout(root).spec
+    was = git.show(root, "HEAD", "spec.yaml")
+    if was is None or not spec.exists():
+        return None
+    old, now = model(was), model(spec.read_text(encoding="utf-8"))
+    return {"from": old} if old != now else None
 
 
 def rewritten(root, change, toolkit):
@@ -87,9 +107,7 @@ def propose(root, name, toolkit, mine=None):
     spec = space_lib.layout(root).spec
     if spec.exists():
         text = spec.read_text(encoding="utf-8")
-        was = MODEL.search(text)
-        changes += [{"what": "model:", "from": was.group(0).split(":", 1)[1].strip()
-                     if was else None, "to": name},
+        changes += [{"what": "model:", "from": model(text), "to": name},
                     {"what": "revision:", "from": revision.of(text),
                      "to": revision.of(text) + 1}]
     untouched = []

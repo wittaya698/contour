@@ -26,6 +26,15 @@
   .ok { color: var(--ok); }
   .wrap { overflow-x: auto; }
   #onboarding { margin-top: 24px; max-width: 640px; }
+  button { font: inherit; padding: 4px 10px; border: 1px solid var(--line);
+           border-radius: 6px; background: transparent; color: var(--fg); cursor: pointer; }
+  button.go { border-color: var(--fg); font-weight: 600; }
+  input { font: inherit; padding: 4px 8px; border: 1px solid var(--line);
+          border-radius: 6px; background: transparent; color: var(--fg); }
+  .panel { padding: 12px 10px 16px; }
+  .panel h3 { font-size: 13px; color: var(--muted); margin: 12px 0 4px; font-weight: 600; }
+  .panel ul { margin: 0; padding-left: 18px; }
+  .panel .actions { margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
 </style>
 </head>
 <body>
@@ -34,7 +43,7 @@
   <p class="muted" id="roots"></p>
   <div class="wrap" id="list" hidden>
     <table>
-      <thead><tr><th>Space</th><th>Toolkit</th><th class="num">Commits</th><th>Health</th></tr></thead>
+      <thead><tr><th>Space</th><th>Toolkit</th><th class="num">Commits</th><th>Health</th><th></th></tr></thead>
       <tbody id="rows"></tbody>
     </table>
   </div>
@@ -91,41 +100,142 @@ function health(s) {
   return td;
 }
 
+// One space's row, and under it the room a rename lays itself out in.
+function row(s, can) {
+  const tr = document.createElement('tr');
+  const name = cell('');
+  const strong = document.createElement('strong');
+  strong.textContent = s.name;
+  const path = document.createElement('div');
+  path.className = 'muted';
+  path.textContent = s.path;
+  name.append(strong, path);
+  // Until a commit in the space carries the rename, which the lobby never
+  // makes (rule 5): the listing reads this from git each time.
+  if (s.renamed) {
+    const note = document.createElement('div');
+    note.className = 'warn';
+    note.textContent = 'renamed from ' + s.renamed.from + ', uncommitted';
+    name.append(note);
+  }
+  const actions = cell('');
+  const under = document.createElement('tr');
+  under.hidden = true;
+  const room = document.createElement('td');
+  room.colSpan = 5;
+  room.className = 'panel';
+  under.append(room);
+  if (can.has('rename')) {
+    const b = document.createElement('button');
+    b.textContent = 'Rename…';
+    b.onclick = () => { under.hidden = false; askName(s, room); };
+    actions.append(b);
+  }
+  tr.append(name,
+            cell((s.toolkit.commit || '?') + ' (' + s.toolkit.state + ')'),
+            cell(String(s.commits), 'num'),
+            health(s), actions);
+  return [tr, under];
+}
+
+function button(text, onclick, cls) {
+  const b = document.createElement('button');
+  b.textContent = text;
+  b.onclick = onclick;
+  if (cls) b.className = cls;
+  return b;
+}
+
+function para(text, cls) {
+  const p = document.createElement('p');
+  p.textContent = text;
+  if (cls) p.className = cls;
+  return p;
+}
+
+function list(title, items) {
+  const h = document.createElement('h3');
+  h.textContent = title;
+  const ul = document.createElement('ul');
+  for (const text of items) {
+    const li = document.createElement('li');
+    li.textContent = text;
+    ul.append(li);
+  }
+  return [h, ul];
+}
+
+function askName(s, room) {
+  const input = document.createElement('input');
+  input.value = s.name;
+  input.setAttribute('aria-label', 'New name for ' + s.name);
+  const show = () => ask('/rename', { path: s.path, name: input.value })
+    .then(r => r.json()).then(p => proposal(p, s, input.value, room));
+  input.onkeydown = e => { if (e.key === 'Enter') show(); };
+  const row = document.createElement('div');
+  row.className = 'actions';
+  row.append(input, button('Show what it does', show),
+             button('Cancel', () => { room.parentElement.hidden = true; }));
+  room.replaceChildren(para('Rename ' + s.name + ' to:'), row);
+  input.focus();
+  input.select();
+}
+
+// The proposal, every part of it, as `contour rename` said it — and only under
+// all of it, the confirm. The click confirms this proposal and no other: it
+// goes back with the request, and the server refuses it if the command now
+// says something else (ADR 0021, decision 5; rule 1).
+function proposal(p, s, name, room) {
+  const back = button('Back', () => askName(s, room));
+  if (p.refused) {
+    room.replaceChildren(para('Not renamed: ' + p.refused, 'warn'), back);
+    return;
+  }
+  const parts = [para('Rename ' + s.name + ' → ' + name)];
+  // `model:` and `revision:` are named as the spec spells them, colon and all.
+  parts.push(...list('Changes', p.changes.map(c =>
+    c.what + (c.what.endsWith(':') ? ' ' : ': ') + c.from + ' → ' + c.to
+    + (c.only === 'header' ? ' (its header only: the rest is yours)' : ''))));
+  if (p.untouched.length)
+    parts.push(...list('Untouched (drifted from the template; may still say the old name)',
+                       p.untouched));
+  if (p.leaves.length)
+    parts.push(...list('Leaves behind', p.leaves.map(l => l.what + ': ' + l.path + ' — ' + l.why)));
+  parts.push(para(p.unseen, 'warn'),
+             para('Nothing is committed: the space lists as renamed until you commit in it.', 'muted'));
+  const go = button('Confirm rename', () => {
+    go.disabled = true;
+    ask('/rename', { path: s.path, name, shown: p }).then(r => r.json()).then(done => {
+      if (done.refused) return proposal(done, s, name, room);
+      load();
+    });
+  }, 'go');
+  const row = document.createElement('div');
+  row.className = 'actions';
+  row.append(go, back);
+  room.replaceChildren(...parts, row);
+}
+
 // Empty is onboarding, not an empty table: someone with no spaces is standing
 // where someone with ten is (ADR 0021, decision 1).
-function render({ roots, spaces }) {
+function render({ roots, spaces }, can) {
   document.getElementById('roots').textContent = 'Looking in ' + roots.join(', ');
   document.getElementById('where').textContent = roots.join(' or ');
   document.getElementById('list').hidden = spaces.length === 0;
   document.getElementById('onboarding').hidden = spaces.length !== 0;
-  const rows = document.getElementById('rows');
-  rows.replaceChildren(...spaces.map(s => {
-    const tr = document.createElement('tr');
-    const name = cell('');
-    const strong = document.createElement('strong');
-    strong.textContent = s.name;
-    const path = document.createElement('div');
-    path.className = 'muted';
-    path.textContent = s.path;
-    name.append(strong, path);
-    tr.append(name,
-              cell((s.toolkit.commit || '?') + ' (' + s.toolkit.state + ')'),
-              cell(String(s.commits), 'num'),
-              health(s));
-    return tr;
-  }));
+  document.getElementById('rows').replaceChildren(...spaces.flatMap(s => row(s, can)));
 }
 
-ask('/spaces').then(r => r.json()).then(render);
+// What this host can do, asked once: each action arrives as a capability with
+// the command that performs it, and a host that lacks one shows no button for
+// it (ADR 0021, decision 2).
+const CAN = ask('/can').then(r => r.json()).then(({ can }) => new Set(can));
 
-// What this host can do. Nothing yet at this slice; each action arrives as a
-// capability with the command that performs it, and an element declaring one
-// the host lacks is removed.
-ask('/can').then(r => r.json()).then(({ can }) => {
-  const has = new Set(can);
-  for (const el of document.querySelectorAll('[data-needs]'))
-    if (!has.has(el.dataset.needs)) el.remove();
-});
+function load() {
+  Promise.all([ask('/spaces').then(r => r.json()), CAN])
+    .then(([listed, can]) => render(listed, can));
+}
+load();
 
 // Proof this tab is still on screen. The lobby ends when the beats stop,
 // because a closed tab and a tab nobody is looking at differ only in how long

@@ -25,7 +25,7 @@ import sys
 import time
 from pathlib import Path
 
-from lib import commands, git, presence, revision, space     # stdlib-only by test (ADR 0019, 29)
+from lib import commands, git, presence, rename, revision, space     # stdlib-only by test (ADR 0019, 29)
 
 ROOT = Path(__file__).resolve().parent.parent
 BLENDER = os.environ.get("BLENDER", "/Applications/Blender.app/Contents/MacOS/Blender")
@@ -321,7 +321,6 @@ def on_rename(cmd, rest, held):
     the lock file moves with the directory, so it has to be released at the
     new path, which `main` does not know.
     """
-    from lib import rename
     names = [w for w in rest if not w.startswith("--")]
     if len(names) != 1:
         print(usage(), file=sys.stderr)
@@ -611,7 +610,8 @@ def reading(root, now):
             "scaffold": {"drift": [r for r, s in found.items() if s == "drift"],
                          "missing": [r for r, s in found.items() if s == "missing"]},
             "rules": sees_rules(root),
-            "presence": presence.live(root)}
+            "presence": presence.live(root),
+            "renamed": rename.uncommitted(root)}
 
 
 def listing():

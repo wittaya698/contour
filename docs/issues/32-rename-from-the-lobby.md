@@ -18,12 +18,33 @@ space is renamed, which happens only when the user clicks confirm.
 
 ## Acceptance criteria
 
-- [ ] The confirm step shows every line of the proposal, and the page cannot confirm without showing it
-- [ ] A refused rename (held, open in a console or canvas, name taken) shows the command's reason and changes nothing
-- [ ] After a rename, the list shows the new name, and the row says renamed-uncommitted until the space's next commit
-- [ ] The confirm text says that a terminal agent session in the space cannot be seen
-- [ ] End to end on a throwaway space: rename from the page, then `contour check` in it is green with `revision:` bumped
-- [ ] With a console open on that space, the same rename is refused
+- [x] The confirm step shows every line of the proposal, and the page cannot confirm without showing it
+- [x] A refused rename (held, open in a console or canvas, name taken) shows the command's reason and changes nothing
+- [x] After a rename, the list shows the new name, and the row says renamed-uncommitted until the space's next commit
+- [x] The confirm text says that a terminal agent session in the space cannot be seen
+- [x] End to end on a throwaway space: rename from the page, then `contour check` in it is green with `revision:` bumped
+- [x] With a console open on that space, the same rename is refused
+
+## What it came to
+
+- The lobby's server gained `POST /rename` and the `rename` capability. It runs
+  `contour rename <name> --json` in the space the page named, and returns the
+  command's answer unchanged. A path the listing does not hold gets a 404, so the
+  page cannot point the command anywhere it was not shown.
+- The confirm carries the proposal the page showed. The server proposes again,
+  and if the command no longer says the same, the confirm is refused with "the
+  proposal changed since it was shown". This makes "cannot confirm without
+  showing it" something the server enforces, not just how the page is built.
+  Only then does it run `--yes`.
+- "Renamed, uncommitted" is a `renamed` field in the listing (`contour spaces
+  --json` too). It is read from git each time: the spec at HEAD names one model
+  and the spec on disk another. Nothing is stored, so it survives a lobby restart
+  and clears on the next commit.
+- End to end means `contour check` gets past its revision check with `$BLENDER`
+  pointing nowhere, as in issue 31. A fully green check needs Blender, which the
+  suite does not have. The page itself was driven through a real rename and a
+  refusal in headless Chrome over a throwaway space. The suite's page tests are
+  structural.
 
 ## Blocked by
 

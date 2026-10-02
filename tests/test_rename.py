@@ -62,6 +62,15 @@ class RenameCase(unittest.TestCase):
         slug = "-" + str(self.space).lstrip("/").replace("/", "-")
         (self.home / ".claude" / "projects" / slug).mkdir(parents=True)
 
+    def revision_check(self, space):
+        """What `contour check` says about the revision. `$BLENDER` points
+        nowhere: the revision check runs before Blender is asked for."""
+        r = subprocess.run([sys.executable, str(CONTOUR), "check"], cwd=str(space),
+                           env=dict(self.env, BLENDER="/nowhere/blender"),
+                           capture_output=True, text=True, timeout=60)
+        self.assertIn("no Blender at", r.stdout, r.stdout + r.stderr)   # it got past
+        return [l for l in r.stdout.splitlines() if "revision" in l]
+
 
 class ProposalTest(RenameCase):
 
@@ -137,15 +146,6 @@ class PerformTest(RenameCase):
         from lib import lock
         self.contour("rename", "beta", "--yes")
         self.assertIsNone(lock.holder(self.spaces / "beta"))
-
-    def revision_check(self, space):
-        """What `contour check` says about the revision. `$BLENDER` points
-        nowhere: the revision check runs before Blender is asked for."""
-        r = subprocess.run([sys.executable, str(CONTOUR), "check"], cwd=str(space),
-                           env=dict(self.env, BLENDER="/nowhere/blender"),
-                           capture_output=True, text=True, timeout=60)
-        self.assertIn("no Blender at", r.stdout, r.stdout + r.stderr)   # it got past
-        return [l for l in r.stdout.splitlines() if "revision" in l]
 
     def test_the_renamed_space_passes_its_revision_check(self):
         self.contour("rename", "beta", "--yes")
