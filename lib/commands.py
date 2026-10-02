@@ -76,6 +76,9 @@ TABLE = (
     Command("rename", (1, 3), True, False, "spec-write",
             (("rename <name>", "propose renaming this space; --yes does it, --json "
                                "says it for a client"),), "on_rename"),
+    Command("delete", (1, 3), True, False, "ref-write",
+            (("delete <name>", "propose deleting this space; --yes deletes it, leaving "
+                               "a bundle, --json says it for a client"),), "on_delete"),
     Command("intents", NONE, False, False, None,
             (("intents", "the call categories a gate can ask about"),), "on_intents"),
     Command("asks", NONE, False, False, None,

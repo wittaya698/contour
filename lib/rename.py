@@ -26,8 +26,7 @@ the newline of a spec whose last line it is."""
 # dot: Claude Code files transcripts under the path with its dots respelled.
 LEGAL = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}")
 
-UNSEEN = ("contour cannot see a terminal agent session in this space; "
-          "if one is open, close it first")
+UNSEEN = presence.UNSEEN
 
 
 def respelled(text, name):
@@ -88,15 +87,9 @@ def refusal(root, name, mine=None):
         return (f"spec.yaml differs from HEAD, revision still {unbumped[1]}: confirm "
                 f"or undo that change first, or this rename's bump would pass it "
                 f"as confirmed (rule 1, ADR 0016)")
-    theirs = lock.holder(root)
-    if theirs and lock.alive(theirs) and (mine or {}).get("run") != theirs.get("run"):
-        return (f"this space is held by pid {theirs.get('pid', '?')} running "
-                f"{theirs.get('command', 'something')}; rename it once that run ends")
-    pages = presence.live(root)
-    if pages:
-        return ("a page is open on this space: "
-                + ", ".join(f"{p['kind']} (pid {p['pid']})" for p in pages)
-                + "; close it, then rename")
+    occupied = presence.occupied(root, "rename", mine)
+    if occupied:
+        return occupied
     return None
 
 

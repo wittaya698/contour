@@ -25,7 +25,7 @@ import sys
 import time
 from pathlib import Path
 
-from lib import commands, git, presence, rename, revision, space     # stdlib-only by test (ADR 0019, 29)
+from lib import commands, delete, git, presence, rename, revision, space     # stdlib-only by test (ADR 0019, 29)
 
 ROOT = Path(__file__).resolve().parent.parent
 BLENDER = os.environ.get("BLENDER", "/Applications/Blender.app/Contents/MacOS/Blender")
@@ -334,6 +334,29 @@ def on_rename(cmd, rest, held):
         return emit({"ok": True, "lines": [f"ok   renamed to {said['to']}",
                                            f"     cd {said['to']}"]})
     return emit({"ok": True, "lines": rename.lines(said)})
+
+
+def on_delete(cmd, rest, held):
+    """Proposes, or with `--yes` deletes, leaving a bundle (ADR 0021, decision 6).
+
+    `holds` is False in the table and the hold is taken in `delete.perform`:
+    the lock file is inside the space, and goes with it. The name is the
+    first word whatever it says, because what a page sends is whatever was
+    typed, and a typed `--yes` must be a wrong name and not a confirm.
+    """
+    typed, flags = rest[0], rest[1:]
+    if not set(flags) <= {"--yes", "--json"}:
+        print(usage(), file=sys.stderr)
+        return 2
+    said = (delete.perform if "--yes" in flags else delete.propose)(PROJECT, typed)
+    if "--json" in flags:
+        return emit({"ok": not said["refused"], "lines": [json.dumps(said, indent=2)]})
+    if said["refused"]:
+        return emit({"ok": False, "lines": [f"FAIL delete  {said['refused']}"]})
+    if "--yes" in flags:
+        return emit({"ok": True, "lines": [f"ok   deleted {said['path']}",
+                                           f"     its bundle: {said['bundle']}"]})
+    return emit({"ok": True, "lines": delete.lines(said)})
 
 
 def seconds(name, fallback):

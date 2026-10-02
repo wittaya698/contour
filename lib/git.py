@@ -115,6 +115,18 @@ def remotes(repo):
     return out.split() if ok else []
 
 
+def changes(repo):
+    """Every path with a change no commit holds, untracked ones included, or
+    None when git cannot say.
+
+    None is not `[]`: the one caller deletes a space on an empty answer, so
+    *could not ask* must never read as *nothing to lose*. Ignored files are
+    not changes — they are what a bundle is allowed to leave behind.
+    """
+    ok, out = _ask(repo, "status", "--porcelain", "--untracked-files=all")
+    return [line[3:] for line in out.splitlines() if line] if ok else None
+
+
 def hooks_dir(repo):
     """Where this repository keeps its hooks, absolute, or None.
 
@@ -155,3 +167,33 @@ def start(repo):
     except (OSError, subprocess.SubprocessError) as e:
         return str(e)
     return None if done.returncode == 0 else (done.stderr.strip() or "git init failed")
+
+
+def bundle(repo, to):
+    """Write every ref of `repo` into one file at `to`, and prove the file
+    carries them. Returns None, or what went wrong.
+
+    A write, so the policy is `start`'s and not the questions': a delete
+    removes the space only on a None from here, and a bundle git could not
+    write, or wrote and cannot read back whole, must stop it. Proved twice:
+    git verifies the file, and the heads it lists are every ref the
+    repository has, so a bundle missing a branch is not mistaken for one
+    holding it.
+    """
+    for args in (("bundle", "create", "-q", str(to), "--all"),
+                 ("bundle", "verify", "-q", str(to))):
+        try:
+            done = subprocess.run(["git", "-C", str(repo), *args],
+                                  capture_output=True, text=True, timeout=120)
+        except (OSError, subprocess.SubprocessError) as e:
+            return str(e)
+        if done.returncode != 0:
+            return done.stderr.strip() or f"git {' '.join(args[:2])} failed"
+    ok, heads = _ask(repo, "bundle", "list-heads", str(to))
+    ok_refs, refs = _ask(repo, "for-each-ref", "--format=%(objectname) %(refname)")
+    if not (ok and ok_refs):
+        return "git could not list what the bundle holds"
+    missing = set(refs.split("\n")) - set(heads.split("\n"))
+    if missing - {""}:
+        return f"the bundle does not carry {', '.join(sorted(missing - {''}))}"
+    return None

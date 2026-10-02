@@ -14,14 +14,20 @@ from pathlib import Path
 from lib import intent, miniyaml
 
 
+def home():
+    """`~/.contour`: the user's own, outside the toolkit and every model space.
+    `$CONTOUR_HOME` moves the whole directory, which is how a test reads a
+    policy, or writes a trash, that is not the user's own."""
+    told = os.environ.get("CONTOUR_HOME")
+    return Path(told) if told else Path.home() / ".contour"
+
+
 def ask_list():
     """Where the ask-list lives: `~/.contour/ask-list.yaml`, outside the toolkit
     and outside every model space, so an agent working in a space has no
-    in-scope reason to touch it. `$CONTOUR_HOME` moves the whole directory,
-    which is how a test reads a policy that is not the user's own.
+    in-scope reason to touch it.
     """
-    home = os.environ.get("CONTOUR_HOME")
-    return (Path(home) if home else Path.home() / ".contour") / "ask-list.yaml"
+    return home() / "ask-list.yaml"
 
 
 def here(path):

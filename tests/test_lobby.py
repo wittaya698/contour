@@ -101,7 +101,7 @@ class LobbyTest(unittest.TestCase):
         proc = self.lobby(CONTOUR_LOBBY_GRACE="0.2")
         with self.assertRaises(subprocess.TimeoutExpired):
             proc.wait(timeout=1.5)
-        self.assertEqual(self.get("/can"), {"can": ["rename"]})
+        self.assertEqual(self.get("/can"), {"can": ["rename", "delete"]})
 
 
 class LobbyPageTest(unittest.TestCase):
@@ -167,13 +167,41 @@ class LobbyPageTest(unittest.TestCase):
         self.assertIn("s.renamed", row)
         self.assertIn("uncommitted", row)
 
+    def test_delete_is_offered_only_where_the_host_can_do_it(self):
+        self.assertIn("can.has('delete')", self.function("row"))
+
+    def test_the_delete_is_enabled_only_once_the_typed_name_matches(self):
+        """Typing the name is the confirm (ADR 0021, decision 6): the button
+        starts disabled, and every keystroke enables it only on an exact match."""
+        shown = self.function("deleting")
+        self.assertEqual(self.page.count("'Delete for good'"), 1)
+        self.assertIn("go.disabled = true", shown)
+        self.assertIn("go.disabled = typed.value !== s.name", shown)
+        self.assertIn("typed.oninput", shown)
+
+    def test_the_delete_confirm_says_what_it_cannot_undo_and_cannot_see(self):
+        shown = self.function("deleting")
+        made = shown.index("'Delete for good'")
+        for part in ("p.bundle", "p.disk", "p.left", "p.unseen"):
+            self.assertLess(shown.index(part), made, part)
+
+    def test_the_delete_sends_what_was_typed_and_the_command_judges_it(self):
+        self.assertIn("name: typed.value", self.function("deleting"))
+
+    def test_a_delete_refusal_is_shown_as_the_command_worded_it_with_no_confirm(self):
+        shown = self.function("deleting")
+        refused = shown.index("if (p.refused)")
+        self.assertIn("p.refused", shown[refused:shown.index("return", refused)])
+        self.assertLess(refused, shown.index("'Delete for good'"))
+
 
 class LobbyProtectionTest(unittest.TestCase):
     """Issue 01's protections, held by the lobby itself and not only inherited
     on paper: each is asked of a running `Lobby` the way an attacker's page
-    would ask it. `/done` and `/rename` are the state-changing POSTs: one ends
-    the session, the other moves a space, and a request that is turned away
-    never reaches the listing `/rename` checks its path against."""
+    would ask it. `/done`, `/rename` and `/delete` are the state-changing
+    POSTs: one ends the session, the others move or remove a space, and a
+    request that is turned away never reaches the listing they check a path
+    against."""
 
     LISTED = {"roots": ["/nowhere"], "spaces": []}
 
@@ -227,6 +255,19 @@ class LobbyProtectionTest(unittest.TestCase):
     def test_a_rename_from_another_origin_goes_nowhere(self):
         self.refused(403, "/rename", self.RENAME, Origin="https://example.com")
         self.refused(403, "/rename", self.RENAME, **{"Sec-Fetch-Site": "cross-site"})
+        self.assertEqual(self.asked, 0)
+
+    DELETE = {"path": "/nowhere/alpha", "name": "alpha"}
+
+    def test_without_the_token_nothing_is_deleted(self):
+        self.refused(403, "/delete", self.DELETE, token=False)
+        self.assertEqual(self.asked, 0)
+
+    def test_a_delete_that_is_not_json_or_from_another_origin_goes_nowhere(self):
+        self.refused(415, "/delete", self.DELETE,
+                     **{"Content-Type": "text/plain;charset=UTF-8"})
+        self.refused(403, "/delete", self.DELETE, Origin="https://example.com")
+        self.refused(403, "/delete", self.DELETE, **{"Sec-Fetch-Site": "cross-site"})
         self.assertEqual(self.asked, 0)
 
     def test_a_post_that_is_not_json_ends_nothing(self):

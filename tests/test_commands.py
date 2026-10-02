@@ -54,7 +54,7 @@ class SpaceTest(unittest.TestCase):
         self.assertEqual(names(space=True),
                          ["check", "render", "export", "measure", "canvas",
                           "resolve", "mark", "run", "doctor", "migrate-marks",
-                          "rename"])
+                          "rename", "delete"])
 
 
 class ArityTest(unittest.TestCase):

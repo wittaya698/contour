@@ -29,6 +29,8 @@
   button { font: inherit; padding: 4px 10px; border: 1px solid var(--line);
            border-radius: 6px; background: transparent; color: var(--fg); cursor: pointer; }
   button.go { border-color: var(--fg); font-weight: 600; }
+  button.danger { border-color: var(--warn); color: var(--warn); font-weight: 600; }
+  button:disabled { opacity: 0.45; cursor: default; }
   input { font: inherit; padding: 4px 8px; border: 1px solid var(--line);
           border-radius: 6px; background: transparent; color: var(--fg); }
   .panel { padding: 12px 10px 16px; }
@@ -100,7 +102,7 @@ function health(s) {
   return td;
 }
 
-// One space's row, and under it the room a rename lays itself out in.
+// One space's row, and under it the room a rename or a delete lays itself out in.
 function row(s, can) {
   const tr = document.createElement('tr');
   const name = cell('');
@@ -129,6 +131,12 @@ function row(s, can) {
     const b = document.createElement('button');
     b.textContent = 'Rename…';
     b.onclick = () => { under.hidden = false; askName(s, room); };
+    actions.append(b);
+  }
+  if (can.has('delete')) {
+    const b = document.createElement('button');
+    b.textContent = 'Delete…';
+    b.onclick = () => { under.hidden = false; deleting(s, room); };
     actions.append(b);
   }
   tr.append(name,
@@ -214,6 +222,43 @@ function proposal(p, s, name, room) {
   row.className = 'actions';
   row.append(go, back);
   room.replaceChildren(...parts, row);
+}
+
+// A delete, as `contour delete` proposes it, and under all of it a box the
+// space's name is typed into. Typing the name is the confirm, so the button
+// is dead until it matches; the command checks the name again, and its
+// refusal comes back worded as it worded it (ADR 0021, decision 6).
+function deleting(s, room, p) {
+  if (!p) {
+    ask('/delete', { path: s.path }).then(r => r.json()).then(p => deleting(s, room, p));
+    return;
+  }
+  const cancel = button('Cancel', () => { room.parentElement.hidden = true; });
+  if (p.refused) {
+    room.replaceChildren(para('Not deleted: ' + p.refused, 'warn'), cancel);
+    return;
+  }
+  const parts = [para('Delete ' + s.name + '?'),
+                 ...list('What it leaves', ['a bundle of its whole history: ' + p.bundle]),
+                 para(p.disk, 'muted'), para(p.left, 'muted'), para(p.unseen, 'warn'),
+                 para('Type ' + s.name + ' to confirm.')];
+  const typed = document.createElement('input');
+  typed.autocomplete = 'off';
+  typed.setAttribute('aria-label', 'Type ' + s.name + ' to delete it');
+  const go = button('Delete for good', () => {
+    go.disabled = true;
+    ask('/delete', { path: s.path, name: typed.value }).then(r => r.json()).then(done => {
+      if (done.refused) return deleting(s, room, done);
+      load();
+    });
+  }, 'danger');
+  go.disabled = true;
+  typed.oninput = () => { go.disabled = typed.value !== s.name; };
+  const row = document.createElement('div');
+  row.className = 'actions';
+  row.append(typed, go, cancel);
+  room.replaceChildren(...parts, row);
+  typed.focus();
 }
 
 // Empty is onboarding, not an empty table: someone with no spaces is standing

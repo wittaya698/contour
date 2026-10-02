@@ -21,10 +21,10 @@ PAGE = Path(__file__).resolve().parent / "lobby.html"
 CONTOUR = PAGE.parent.parent / "contour"
 GRACE_S = 10          # beats are seconds apart; this is several missed ones
 
-CAN = ("rename",)
+CAN = ("rename", "delete")
 """What the lobby can do beyond listing, for the page to ask about. Each action
-arrives as a capability with the command that performs it — delete, create and
-enter are still to come — and a button for one the host cannot perform is a
+arrives as a capability with the command that performs it — create and enter
+are still to come — and a button for one the host cannot perform is a
 button that fails (ADR 0021, decision 2)."""
 
 
@@ -38,7 +38,8 @@ class Lobby(Page):
 
     def served(self):
         return {("GET", "/spaces"): lambda q: self.listing(),
-                ("POST", "/rename"): self.rename}
+                ("POST", "/rename"): self.rename,
+                ("POST", "/delete"): self.delete}
 
     def rename(self, asked):
         """`contour rename` in the space the page named, its answer as it
@@ -59,6 +60,20 @@ class Lobby(Page):
             return dict(now, refused="the proposal changed since it was shown; "
                                      "read this one, then confirm it")
         return contour(asked["path"], "rename", asked["name"], "--yes", "--json")
+
+    def delete(self, asked):
+        """`contour delete` in the space the page named, its answer as it gave
+        it. Asked with no name, the proposal, for the space the listing names;
+        asked with the name the user typed, the delete — and the command, not
+        this, judges whether what was typed is the space's name.
+
+        A path the listing does not hold is None: not found."""
+        listed = {s["path"]: s["name"] for s in self.listing()["spaces"]}
+        if asked.get("path") not in listed:
+            return None
+        if "name" not in asked:
+            return contour(asked["path"], "delete", listed[asked["path"]], "--json")
+        return contour(asked["path"], "delete", str(asked["name"]), "--yes", "--json")
 
 
 def contour(space, *args):
