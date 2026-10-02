@@ -1,11 +1,27 @@
 # 0021 — The lobby: a page above the spaces
 
-**Status:** Proposed · 2026-09-29
+**Status:** Accepted · 2026-10-02
 
-> **Accept on a tracer bullet:** `contour lobby` listing the spaces on this
-> machine, and renaming a throwaway space end to end — the proposal shown, the
-> confirm, a green `contour check` afterwards with `revision:` bumped — while a
-> console left open on it makes the rename refuse.
+> **Accepted on its tracer bullet, as drafted** (issue 33). `contour lobby`
+> listed the spaces on this machine. A throwaway space was renamed end to end
+> from the page: the proposal shown, the confirm, the row back as
+> renamed-uncommitted, and `contour check` green afterwards with `revision:`
+> bumped. A page left open on it made the same rename refuse, worded as
+> `contour rename` words it. No decision moved.
+>
+> Two things the run showed, neither an amendment:
+> - The page held open was `contour canvas`. `contour-console` writes the same
+>   presence record through the same `presence.present`, so decision 8 covers
+>   both, but only the canvas's was watched refusing.
+> - `contour init` gives a space with no `spec.yaml` and no `build.py`, so a
+>   fresh space has nothing to rename's bump or `contour check`'s build. The
+>   bullet borrowed the smoke fixture's. That is decision 4 as drafted: the
+>   spec is drafted in the space's own console, never by the lobby.
+>
+> Drafted as: *accept on a tracer bullet — `contour lobby` listing the spaces
+> on this machine, and renaming a throwaway space end to end, the proposal
+> shown, the confirm, a green `contour check` afterwards with `revision:`
+> bumped, while a console left open on it makes the rename refuse.*
 
 ## Context
 

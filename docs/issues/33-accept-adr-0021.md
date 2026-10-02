@@ -26,10 +26,23 @@ Things the bullet may turn up, which would amend rather than withdraw:
 
 ## Acceptance criteria
 
-- [ ] The bullet was run on this machine, and the user watched the rename and the refusal
-- [ ] ADR 0021 is Accepted, amended or withdrawn, with the result recorded in it
-- [ ] `docs/adr/README.md` and the ADR state the same status
-- [ ] The decision numbers cited by slices 28–38 still exist and still mean what those slices say
+- [x] The bullet was run on this machine, and the user watched the rename and the refusal
+- [x] ADR 0021 is Accepted, amended or withdrawn, with the result recorded in it
+- [x] `docs/adr/README.md` and the ADR state the same status
+- [x] The decision numbers cited by slices 28–38 still exist and still mean what those slices say
+
+## What it came to
+
+- Accepted as drafted, 2026-10-02. The user ran the bullet on a throwaway space
+  under `project/`: listed, renamed from the page, `contour check` green with
+  `revision:` bumped, and the rename refused while `contour canvas` was open on
+  it.
+- `contour init` makes a space with nothing to build, so the space was given
+  the smoke fixture's `build.py` and a copy of its spec naming the space, and
+  committed, before the lobby was opened. The ADR records this as ADR 0021
+  decision 4 working as drafted, not as a gap.
+- No decision was renumbered or reworded, so the citations in slices 28–38
+  (ADR 0021, decisions 1–9) stand. Slices 34 and 36 are unblocked.
 
 ## Blocked by
 
