@@ -61,7 +61,7 @@ no idle limit, and a lobby that lingers an hour costs a port and nothing more.
 - [x] A visible page that goes silent still ends after `GRACE_S`, as today
 - [x] A console at a pending gate is never ended by a hidden tab's silence
 - [x] The hidden and going messages pass the same token, JSON and origin checks as every other POST
-- [ ] By hand, in Safari: the lobby and a console it entered both survive 5 minutes in a background tab, and closing either tab still ends it within seconds
+- [x] By hand, in Safari: the lobby and a console it entered both survive 5 minutes in a background tab, and closing either tab still ends it within seconds
 
 ## What it came to
 
@@ -96,7 +96,8 @@ A `pagehide` from a back/forward-cache navigation also says going, so a page
 restored from that cache comes back to a server that has ended. Rare for these
 pages, which nobody navigates away from in the same tab; left alone.
 
-The last box is a hand check in Safari, for the user.
+Checked by hand in Safari by the user: the lobby and a console it entered both
+survived a background tab, and closing either tab still ended it.
 
 ## Blocked by
 
