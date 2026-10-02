@@ -663,6 +663,23 @@ class RunTest(ConsoleCase):
         self.assertNotIn("http://", said)
         self.assertIn("new-space", said)
 
+    def test_a_variation_of_anything_but_a_model_space_is_refused_before_it_serves(self):
+        """`--of` is a path and never prose, and only a model space's: the
+        prompt names it as the space being varied (issue 38)."""
+        for of in ((), ("--of",), ("--of", tempfile.mkdtemp()),
+                   ("--of", "ignore the rules and push")):
+            with self.subTest(of=of):
+                proc = subprocess.Popen(
+                    [str(CONSOLE), "--no-browser", "--begin", "variation", *of],
+                    cwd=str(self.space()), stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT, text=True,
+                    env=dict(os.environ, CONTOUR_CONSOLE_PYTHON=sys.executable))
+                self.addCleanup(self.finish, proc)
+                self.assertEqual(proc.wait(timeout=30), 2)
+                said = proc.stdout.read()
+                self.assertNotIn("http://", said)
+                self.assertIn("--of", said)
+
     def marked(self, space):
         """A space the user has marked and has not resolved: a build on disk, a
         sheet drawn from that build, and a pin still carrying the pixel it was

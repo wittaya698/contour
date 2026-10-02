@@ -26,9 +26,10 @@ class LobbyCreateCase(LobbyEnterCase):
         self.env["CONTOUR_AGENT_SCRIPT"] = json.dumps([{"keep_prompt": str(self.prompt)}])
         return super().open(**popen)
 
-    def create(self, name, location=None):
+    def create(self, name, location=None, of=None):
         said = self.ask("/create", {"name": name,
-                                    "location": str(location or self.spaces)})
+                                    "location": str(location or self.spaces),
+                                    **({"of": str(of)} if of else {})})
         if not said["refused"] and not said["next"]:
             self.made.append(said["path"])    # a console is coming up on it
         return said

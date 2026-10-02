@@ -221,10 +221,27 @@ class LobbyPageTest(unittest.TestCase):
     def test_create_asks_for_a_name_and_a_location_and_says_what_happened(self):
         creating = self.function("creating")
         self.assertIn("ask('/location')", creating)
-        self.assertIn("ask('/create', { name: name.value, location: location.value })", creating)
+        self.assertIn("ask('/create', { name: name.value, location: location.value,", creating)
         self.assertIn("'Not created: ' + done.refused", creating)
         self.assertIn("done.next", creating)
         self.assertIn('className = \'go\'', creating)
+
+    def test_each_row_offers_a_variation_where_create_is_granted(self):
+        """A variation is a new space, never a copy (ADR 0015): create, with the
+        source named, so its console's first prompt can point at it (issue 38)."""
+        row = self.function("row")
+        self.assertIn("'Variation of this…'", row)
+        self.assertIn("can.has('create')", row.split("'Variation of this…'")[0].rsplit("if (", 1)[1])
+        self.assertIn("creating(room, s)", row)
+        self.assertIn("of: of && of.path", self.function("creating"))
+
+    def test_a_variation_s_name_starts_as_the_source_s_and_must_be_edited(self):
+        """`<source>-` is a legal name, so only the page can insist it is not
+        the one made."""
+        creating = self.function("creating")
+        self.assertIn("name.value = stem = of.name + '-'", creating)
+        self.assertIn("b.disabled = name.value === stem", creating)
+        self.assertIn("name.oninput", creating)
 
     def test_it_asks_the_host_what_it_can_do(self):
         self.assertIn("ask('/can')", self.page)

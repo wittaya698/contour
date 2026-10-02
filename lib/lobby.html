@@ -158,6 +158,14 @@ function row(s, can, environment) {
     b.onclick = () => { under.hidden = false; askName(s, room); };
     actions.append(b);
   }
+  // A variation is a new space, never a copy (ADR 0015): create, with this
+  // space named as what its console's first prompt points at (issue 38).
+  if (can.has('create')) {
+    const b = document.createElement('button');
+    b.textContent = 'Variation of this…';
+    b.onclick = () => { under.hidden = false; room.replaceChildren(); creating(room, s); };
+    actions.append(b);
+  }
   if (can.has('delete')) {
     const b = document.createElement('button');
     b.textContent = 'Delete…';
@@ -206,19 +214,29 @@ function entering(s, said) {
 // `contour init`, then the new space's console on the new-space flow (ADR 0021,
 // decision 4). The lobby drafts nothing: the spec is drafted in the console,
 // under its gates. Built once, so a reload of the list keeps what was typed.
-function creating(room) {
+// Given `of`, a listed space, it makes a variation of it: beside it, and begun
+// on a prompt that points at its spec and build, which are not copied.
+function creating(room, of) {
   if (room.childElementCount) return;
   const name = document.createElement('input');
   name.placeholder = 'name, like oak-chair';
-  name.setAttribute('aria-label', 'Name of the new model');
+  name.setAttribute('aria-label', of ? 'Name of the variation of ' + of.name : 'Name of the new model');
   const location = document.createElement('input');
   location.size = 40;
   location.setAttribute('aria-label', 'Folder to make it in');
-  ask('/location').then(r => r.json()).then(({ default: where }) => { location.value = where; });
+  let stem = null;
+  if (of) {
+    // `<source>-` is a legal name, so the page is what insists it is edited.
+    name.value = stem = of.name + '-';
+    location.value = of.path.slice(0, of.path.lastIndexOf('/'));
+  } else {
+    ask('/location').then(r => r.json()).then(({ default: where }) => { location.value = where; });
+  }
   const said = para('', 'warn');
-  const b = button('Create', () => {
+  const b = button(of ? 'Create variation' : 'Create', () => {
     b.disabled = true;
-    ask('/create', { name: name.value, location: location.value }).then(r => r.json()).then(done => {
+    ask('/create', { name: name.value, location: location.value,
+                     of: of && of.path }).then(r => r.json()).then(done => {
       b.disabled = false;
       if (done.refused) { said.className = 'warn'; said.textContent = 'Not created: ' + done.refused; return; }
       name.value = '';
@@ -229,7 +247,10 @@ function creating(room) {
     });
   });
   b.className = 'go';
-  name.onkeydown = e => { if (e.key === 'Enter') b.click(); };
+  const editable = () => { b.disabled = name.value === stem; };
+  name.oninput = editable;
+  editable();
+  name.onkeydown = e => { if (e.key === 'Enter' && !b.disabled) b.click(); };
   const row = document.createElement('div');
   row.className = 'actions';
   row.append(name, location, b);

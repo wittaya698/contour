@@ -34,8 +34,7 @@ HIDDEN_GRACE_S = IDLE_S   # a background tab's timers may stop; no longer than
 
 TOOLKIT = Path(__file__).resolve().parent.parent
 
-BEGIN = {
-    "new-space": (
+NEW_SPACE = (
         "This space was just made with `contour init`, and nothing is in it "
         "yet. Start the model with the new-space flow, as the toolkit's skill "
         f"describes it ({TOOLKIT}/.claude/skills/new-space/SKILL.md); the space "
@@ -48,13 +47,46 @@ BEGIN = {
         "Never guess it.\n"
         "4. Draft spec.yaml, and flag every number you chose rather than the "
         "user, tolerances loudest. Propose it; the user confirms it before it "
-        "is written (rule 1)."),
-}
+        "is written (rule 1).")
+
+
+def variation(of):
+    """The new-space flow, for a space made as a variation of `of`: its spec and
+    its build named for reference, and neither copied (ADR 0021, decision 4). A
+    copied spec would arrive already agreed to, and this one is confirmed as its
+    own."""
+    source = space_lib.layout(of)
+    return (
+        f"This space is a variation of {source.name}, at {source.root}. Read its "
+        f"{source.spec} and {source.build} for reference only: copy neither, and "
+        "never write in that space. This space's spec.yaml is its own contract, "
+        "drafted and confirmed here like any new one; reference images it needs "
+        "the user brings into this space's refs/.\n" + NEW_SPACE)
+
+
+BEGIN = {"new-space": lambda of: NEW_SPACE, "variation": variation}
 """The runs a console can be begun on, by name (ADR 0021, decision 4). A name
 and never a prompt's text: the launch line is the one way into a console that
 is not its own page, so it carries the choice of a flow the toolkit wrote, and
-nothing anybody could put words in. The prompt is the run's first line in the
-transcript like any other."""
+nothing anybody could put words in. A variation's `--of` is a path, and only a
+model space's: the prompt is still the toolkit's words about it. The prompt is
+the run's first line in the transcript like any other."""
+
+
+def begun(argv):
+    """The first prompt `argv` asks for, or None; and why it cannot be had."""
+    def value(flag):
+        at = argv.index(flag) + 1 if flag in argv else None
+        return argv[at] if at is not None and at < len(argv) else None
+    if "--begin" not in argv:
+        return None, None
+    flow = value("--begin")
+    if flow not in BEGIN:
+        return None, f"--begin takes one of: {', '.join(BEGIN)}"
+    of = value("--of")
+    if flow == "variation" and not (of and (Path(of) / space_lib.MARKER).is_file()):
+        return None, "--begin variation takes --of <the model space it varies>"
+    return BEGIN[flow](of), None
 
 CAN = canvas_lib.MARKS_ONLY + ("drive",)
 """What the page may offer when the console is the one serving it.
@@ -216,13 +248,10 @@ def main(argv, space):
     # exists to make one, and refusing would mean the surface that can produce a
     # first build cannot be opened until something else has. The panel says which
     # build it is showing, and none is an answer (ADR 0019, decision 13).
-    begin = None
-    if "--begin" in argv:
-        flow = argv[argv.index("--begin") + 1] if argv.index("--begin") + 1 < len(argv) else None
-        if flow not in BEGIN:
-            print(f"--begin takes one of: {', '.join(BEGIN)}", file=sys.stderr)
-            return 2
-        begin = BEGIN[flow]
+    begin, refused = begun(argv)
+    if refused:
+        print(refused, file=sys.stderr)
+        return 2
     console = Console(space, grace=seconds("CONTOUR_CONSOLE_GRACE", GRACE_S),
                       idle=seconds("CONTOUR_CONSOLE_IDLE", IDLE_S),
                       hidden_grace=seconds("CONTOUR_CONSOLE_HIDDEN_GRACE", HIDDEN_GRACE_S))

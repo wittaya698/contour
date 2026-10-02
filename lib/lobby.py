@@ -86,6 +86,14 @@ class Lobby(Page):
                                f"and {location} is not inside it, so the new space would "
                                f"not be listed; make it there, or set $CONTOUR_SPACES "
                                f"to look elsewhere"}
+        # A variation's source is a space of the page's, as a rename's path is:
+        # the first prompt is about it, so it has to be one (issue 38).
+        of = asked.get("of")
+        if of and of not in {s["path"] for s in self.listing()["spaces"]}:
+            return {"path": None, "next": None,
+                    "refused": f"{of} is not a space this lobby lists, so there is "
+                               f"nothing to make a variation of"}
+        flow = "variation" if of else "new-space"
         said = contour(CONTOUR.parent, "init", str(asked.get("name") or ""), "--to", str(location),
                        "--new", "--json")
         if said["refused"]:
@@ -94,8 +102,9 @@ class Lobby(Page):
         if missing:
             return dict(said, next=f"no console environment to open it in; make one, "
                                    f"from {enter.ROOT}: {missing}, then: cd {said['path']} "
-                                   f"&& {enter.CONSOLE} --begin new-space")
-        enter.console(said["path"], begin="new-space")
+                                   f"&& {enter.CONSOLE} --begin {flow}"
+                                   + (f" --of {of}" if of else ""))
+        enter.console(said["path"], begin=flow, of=of)
         return dict(said, next=None)
 
     def rename(self, asked):
