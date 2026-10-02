@@ -53,9 +53,9 @@ does not do.
   pressed Enter in Safari and watched it open.
 - Checking the rest by hand turned up [39](39-a-background-tab-is-not-a-closed-one.md):
   the lobby and the console take a background tab's paused beats for a closed
-  tab, and end. The hand check that closing the lobby leaves its consoles
-  running, and that a console stays shown as open, waits on 39. The tests cover
-  both.
+  tab, and end. Once 39 landed, the user checked the rest by hand in Safari:
+  closing the lobby left its console running, and a reopened lobby showed the
+  space as open in a console.
 
 ## Blocked by
 
