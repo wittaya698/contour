@@ -41,7 +41,7 @@ own.
 - The new console's presence is on the new space only, and the source is
   byte-for-byte unchanged, both tested. Nothing was copied in the first place,
   so those tests guard rather than drive.
-- Not checked by hand yet: a real variation starts a real agent run.
+- Checked by hand by the user before the lobby branch landed, as was 37.
 
 ## Blocked by
 

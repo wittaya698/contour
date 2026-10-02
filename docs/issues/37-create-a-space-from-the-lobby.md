@@ -59,6 +59,7 @@ the run's first line, like any other.
   above the table.
 - The test stand-in agent gained a `keep_prompt` step, because a console the
   lobby starts never tells anybody its URL, so its transcript cannot be read.
+- Checked by hand by the user before the lobby branch landed.
 
 ## Blocked by
 
