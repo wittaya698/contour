@@ -166,6 +166,41 @@ materials from hex, boxes, spheres, cylinders, and `add()` to turn a bmesh
 into a placed object. `fixtures/smoke/build.py` is a complete example in ten
 lines.
 
+## The lobby: every space on one page
+
+```sh
+contour lobby                      # from anywhere; no space needed
+```
+
+The lobby is a page above the spaces (ADR 0021). It lists every space it finds
+with the health `contour spaces` and `contour doctor` already compute, and does
+to them what you would otherwise do in a terminal:
+
+- **create** runs `contour init`, defaulting to `project/` under the toolkit,
+  then opens the new space's console with the new-space flow as its first
+  prompt. The lobby never drafts a spec itself: that happens in the console,
+  behind its gates.
+- **variation of this** is create, with a first prompt that points at the
+  source's `spec.yaml` and `build.py` for reference. Nothing is copied, so the
+  variation's spec is agreed as its own.
+- **enter** opens a space's console in a tab of its own. Closing the lobby
+  ends none of them.
+- **rename** shows everything it will change before it changes anything, and
+  never commits; the space lists as renamed until you do.
+- **delete** writes a `git bundle` of the space into `~/.contour/trash` first,
+  and you confirm by typing its name. Deleted spaces are listed, and can be
+  restored or purged from there.
+- **open in Finder**, for anything else.
+
+Every action is the command of the same name, run for you; the refusals are the
+command's own. A space open in a canvas or a console says so in the list, and
+cannot be renamed or deleted from under it. Only enter and create's handover
+need the console's environment; without one, the lobby shows the line that
+makes it.
+
+The lobby looks where `contour spaces` does: the directory holding the toolkit,
+or the folders in `$CONTOUR_SPACES`, separated by `:`.
+
 ## Commands
 
 | Command | Does |
@@ -175,9 +210,14 @@ lines.
 | `contour export` | `.glb`, re-imported into a clean Blender and re-measured |
 | `contour api <symbol>` | the real signature from the installed Blender |
 | `contour selftest` | the fixture through every stage, plus 19 mutants |
-| `contour init <name>` | create a model space |
+| `contour init <name> [--to <dir>]` | create a model space here, or in `<dir>` |
 | `contour doctor` | is this space still in step with the toolkit |
 | `contour spaces [name]` | list model spaces, or print one's path |
+| `contour lobby` | every space on this machine, on one page |
+| `contour rename <name>` | propose renaming this space; `--yes` does it |
+| `contour delete <name>` | propose deleting this space; `--yes` does it, leaving a bundle |
+| `contour restore <id>` | clone a deleted space back from its bundle |
+| `contour purge <id>` | propose removing a deleted space's bundle; `--yes` does it |
 | `contour install-hooks` | install the push guard into this clone |
 | `contour canvas` | the sheet and the references in a browser, to mark on |
 | `contour mark --part <p>` | pin a finding on the sheet, for the user to see |
@@ -187,8 +227,11 @@ lines.
 | `contour asks` | what this space lets through, and what asks |
 | `contour intents` | the call categories a gate can ask about |
 | `contour-console` | drive a run from the browser, behind a gate |
+| `contour-console --begin <flow>` | the same, its run begun on `new-space` or `variation --of <space>` |
 
-The model commands run inside a model space and take no model name. Outside one
+The commands a client reads — `init`, `spaces`, `rename`, `delete`, `restore`,
+`purge` — take `--json`, which is how the lobby runs them. The model commands
+run inside a model space and take no model name. Outside one
 they refuse and say so, rather than guessing. Every one of them is stdlib except
 `contour-console`, which is a separate executable for exactly that reason.
 
