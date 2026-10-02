@@ -363,6 +363,34 @@ class ServesTest(ConsoleCase):
         self.assertNotIn("Traceback", said)
         self.assertEqual(code, 130)
 
+    def test_ctrl_c_while_the_browser_is_still_opening_is_handled_too(self):
+        """A browser can take seconds to come up, and a Ctrl-C in those
+        seconds is the same Ctrl-C: the lobby had it escape as a traceback, and
+        so did this (issue 36). `$BROWSER` stands in for one that has not
+        answered yet."""
+        space = self.space()
+        opening = space / "browser-opening"
+        slow = Path(tempfile.mkdtemp()) / "browser"
+        slow.write_text(f"#!/bin/sh\ntouch {opening}\nsleep 30\n")
+        slow.chmod(0o755)
+        proc = subprocess.Popen(
+            [str(CONSOLE)], cwd=str(space), stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT, text=True,
+            env=dict(os.environ, CONTOUR_CONSOLE_PYTHON=sys.executable,
+                     BROWSER=str(slow)))
+        self.addCleanup(self.finish, proc)
+        deadline = time.monotonic() + 30
+        while not opening.exists() and time.monotonic() < deadline:
+            time.sleep(0.1)
+        self.assertTrue(opening.exists(), "the browser was never asked to open")
+        proc.send_signal(signal.SIGINT)
+        code = proc.wait(timeout=30)
+        said = proc.stdout.read()
+        self.assertNotIn("Traceback", said)
+        self.assertIn("interrupted", said)
+        self.assertEqual(code, 130)
+        self.assertFalse((space / ".contour" / "run.lock").exists())
+
 
     def test_the_panel_says_which_build_the_sheet_is_of(self):
         """The console labels the sheet from the same two files the launcher

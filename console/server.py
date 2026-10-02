@@ -271,10 +271,12 @@ def serving(console, argv, begin=None):
     if begin:
         console.run.start(begin)
     print(f"console at {url}", flush=True)
-    if "--no-browser" not in argv:
-        webbrowser.open(url)
     try:
         try:
+            # Inside: a browser can take seconds to answer, and a Ctrl-C in
+            # them is the same Ctrl-C (issue 36 found it in the lobby first).
+            if "--no-browser" not in argv:
+                webbrowser.open(url)
             console.wait()
         except (KeyboardInterrupt, signals.Arrived) as which:
             number = signals.number(which)

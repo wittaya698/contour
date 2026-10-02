@@ -46,8 +46,8 @@ does not do.
   Linux `open` is `openvt`, so the route refuses where it is not granted.
 - Found on the way: a Ctrl-C while the lobby was still opening its browser
   escaped as a traceback, because `webbrowser.open` sat outside the `try`. It is
-  inside now. `console/server.py` has the same shape and is left for its own
-  slice.
+  inside now. `console/server.py` had the same shape; it was fixed after 38,
+  with a test that holds `$BROWSER` open and sends the Ctrl-C then.
 - The first criterion is tested as far as a console starting on the space and
   the lobby still answering. The tab itself is the console's own: the user
   pressed Enter in Safari and watched it open.
