@@ -21,6 +21,8 @@ from lib.page import Page
 PAGE = Path(__file__).resolve().parent / "lobby.html"
 CONTOUR = PAGE.parent.parent / "contour"
 GRACE_S = 10          # beats are seconds apart; this is several missed ones
+HIDDEN_GRACE_S = 60 * 60   # a background tab's timers may stop; a quit browser
+                           # is caught here, and a lingering lobby costs a port
 
 CAN = ("rename", "delete", "restore", "purge")
 """What the lobby can do beyond listing, for the page to ask about. Each action
@@ -42,8 +44,9 @@ class Lobby(Page):
     """One lobby session. `listing` is called on every request for the list,
     because the list is derived and never stored."""
 
-    def __init__(self, listing, can=None, grace=GRACE_S):
-        super().__init__(PAGE, can=granted() if can is None else can, grace=grace)
+    def __init__(self, listing, can=None, grace=GRACE_S, hidden_grace=HIDDEN_GRACE_S):
+        super().__init__(PAGE, can=granted() if can is None else can, grace=grace,
+                         hidden_grace=hidden_grace)
         self.listing = listing
 
     def served(self):
@@ -154,9 +157,9 @@ def contour(space, *args):
     return json.loads(r.stdout)
 
 
-def serve(listing, grace=GRACE_S, open_browser=True):
+def serve(listing, grace=GRACE_S, hidden_grace=HIDDEN_GRACE_S, open_browser=True):
     """One lobby session, start to last line. Blocks until the tab closes."""
-    lobby = Lobby(listing, grace=grace)
+    lobby = Lobby(listing, grace=grace, hidden_grace=hidden_grace)
     url = lobby.start()
     print(f"lobby at {url}", flush=True)
     try:

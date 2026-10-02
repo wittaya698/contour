@@ -311,7 +311,9 @@ def on_spaces(cmd, rest, held):
 
 def on_lobby(cmd, rest, held):
     from lib import lobby
-    return emit(lobby.serve(listing, grace=seconds("CONTOUR_LOBBY_GRACE", lobby.GRACE_S)))
+    return emit(lobby.serve(
+        listing, grace=seconds("CONTOUR_LOBBY_GRACE", lobby.GRACE_S),
+        hidden_grace=seconds("CONTOUR_LOBBY_HIDDEN_GRACE", lobby.HIDDEN_GRACE_S)))
 
 
 def on_rename(cmd, rest, held):

@@ -29,6 +29,8 @@ def phrase(secs):
 
 GRACE_S = 10          # beats are seconds apart; this is several missed ones
 IDLE_S = 60 * 60      # the tab left open on Friday, ended before Monday
+HIDDEN_GRACE_S = IDLE_S   # a background tab's timers may stop; no longer than
+                          # an idle console already lives (issue 39)
 
 CAN = canvas_lib.MARKS_ONLY + ("drive",)
 """What the page may offer when the console is the one serving it.
@@ -47,9 +49,10 @@ class Console:
     server records the beat, and this decides what a silence means.
     """
 
-    def __init__(self, space, grace=GRACE_S, idle=IDLE_S):
+    def __init__(self, space, grace=GRACE_S, idle=IDLE_S, hidden_grace=HIDDEN_GRACE_S):
         self.space = Path(space)
         self.grace = grace
+        self.hidden_grace = hidden_grace
         self.idle = idle
         self.ended = None                     # why it ended, for the last line
         # Who launched this. The shim cannot forward a SIGKILL — nothing runs
@@ -146,8 +149,12 @@ class Console:
                 # die — it is the page closing, seen from the other end.
                 self.ended = "the console that launched it is gone"
                 return self.canvas.finish()
-            beat = self.canvas.last_beat
-            if beat is not None and time.monotonic() - beat > self.grace:
+            # A hidden tab's silence never ends a console at a gate: that
+            # would decide the gate by silence, which ADR 0019 rules out. A
+            # tab that closed — said so, or went quiet while on screen — still
+            # does; it is the page closing, as above (issue 39).
+            at_gate = self.run.pending is not None and self.canvas.hidden
+            if self.canvas.closed(self.grace, None if at_gate else self.hidden_grace):
                 self.ended = "the page closed"
                 return self.canvas.finish()
             # A pending gate suppresses the idle clock. The console never
@@ -186,7 +193,8 @@ def main(argv, space):
     # first build cannot be opened until something else has. The panel says which
     # build it is showing, and none is an answer (ADR 0019, decision 13).
     console = Console(space, grace=seconds("CONTOUR_CONSOLE_GRACE", GRACE_S),
-                      idle=seconds("CONTOUR_CONSOLE_IDLE", IDLE_S))
+                      idle=seconds("CONTOUR_CONSOLE_IDLE", IDLE_S),
+                      hidden_grace=seconds("CONTOUR_CONSOLE_HIDDEN_GRACE", HIDDEN_GRACE_S))
     # All three, and not only the SIGINT the interpreter raises for: a console
     # is stopped by a closed terminal and by anything tidying up as often as by
     # a person, and the port, the hold and the presence below are given back

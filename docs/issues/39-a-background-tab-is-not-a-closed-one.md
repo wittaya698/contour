@@ -55,13 +55,48 @@ no idle limit, and a lobby that lingers an hour costs a port and nothing more.
 
 ## Acceptance criteria
 
-- [ ] A page that has said it is hidden, then goes silent past `GRACE_S`, does not end its server, for both the lobby and the console
-- [ ] It still ends after the long grace if it never comes back
-- [ ] A page that says it is going ends its server promptly, without waiting out any grace
-- [ ] A visible page that goes silent still ends after `GRACE_S`, as today
-- [ ] A console at a pending gate is never ended by a hidden tab's silence
-- [ ] The hidden and going messages pass the same token, JSON and origin checks as every other POST
+- [x] A page that has said it is hidden, then goes silent past `GRACE_S`, does not end its server, for both the lobby and the console
+- [x] It still ends after the long grace if it never comes back
+- [x] A page that says it is going ends its server promptly, without waiting out any grace
+- [x] A visible page that goes silent still ends after `GRACE_S`, as today
+- [x] A console at a pending gate is never ended by a hidden tab's silence
+- [x] The hidden and going messages pass the same token, JSON and origin checks as every other POST
 - [ ] By hand, in Safari: the lobby and a console it entered both survive 5 minutes in a background tab, and closing either tab still ends it within seconds
+
+## What it came to
+
+The rule for what a silence means now lives in one place, `Page.closed`, and
+both watchers ask it: `Page`'s own, which ends the lobby, and the console's,
+which used to restate it. A tab has closed when it said it is going, or when it
+has been silent past `grace` while on screen, or past `hidden_grace` after it
+said it is hidden. The canvas under the launcher has no grace, so it records
+both new words and acts on neither; its lifetime is still its Done button.
+
+- **Hidden** rides on the beat: `POST /beat` carries `{"hidden": true}`, and
+  any beat without it puts the tab back on the short grace. Each page sends
+  `hidden: document.hidden` on every beat and once more from
+  `visibilitychange`, while a tab about to be throttled can still send it.
+- **Going** is a new shared endpoint, `POST /going`, sent from `pagehide`
+  through the page's one `ask` helper with `keepalive`. So it carries the token
+  header, and stands behind the same token, JSON and origin checks as every
+  other POST.
+- **The long grace is an hour** for both, as proposed: the console's `IDLE_S`,
+  so a hidden console lives no longer than an idle one already could, and for
+  the lobby a port held an hour at worst. `$CONTOUR_LOBBY_HIDDEN_GRACE` and
+  `$CONTOUR_CONSOLE_HIDDEN_GRACE` shorten it for tests, beside the existing
+  grace hatches.
+- **A gate under a hidden tab has no silence limit at all.** The trade, stated:
+  a browser that crashes while hidden at a gate leaves the console waiting
+  until the terminal that launched it closes. That is the cost of never
+  deciding a gate by silence, and the parent check still ends it. A tab that
+  says it is going, or goes quiet while visible, still ends a console at a
+  gate, as before: that is the page closing.
+
+A `pagehide` from a back/forward-cache navigation also says going, so a page
+restored from that cache comes back to a server that has ended. Rare for these
+pages, which nobody navigates away from in the same tab; left alone.
+
+The last box is a hand check in Safari, for the user.
 
 ## Blocked by
 

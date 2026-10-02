@@ -11,7 +11,8 @@ The endpoints every page has, and which no host may replace:
 
     GET  /          the page itself
     GET  /can       what this host can do, for the page to ask about
-    POST /beat      the tab saying it is still on screen
+    POST /beat      the tab saying it is still open, and whether it is hidden
+    POST /going     the tab saying it is closing, as it closes
     POST /done      the page saying it is finished
 """
 import json
@@ -104,7 +105,9 @@ class _Handler(BaseHTTPRequestHandler):
         n = int(self.headers.get("Content-Length") or 0)
         body = json.loads(self.rfile.read(n) or b"{}")
         if self.path == "/beat":
-            return self._json(page.beat())
+            return self._json(page.beat(hidden=bool(body.get("hidden"))))
+        if self.path == "/going":
+            return self._json(page.going())
         if self.path == "/done":
             self._json({"done": True})
             return page.finish()
@@ -148,14 +151,19 @@ class Page:
     host's own content, as {(method, path): handler}. `grace`, when given, is
     how long a silence after the first beat may last before the session ends:
     a page that stopped beating is a tab that closed. None leaves the lifetime
-    to whoever owns it.
+    to whoever owns it. `hidden_grace` is the longer silence allowed a tab
+    that said it is hidden, whose timers the browser may slow or stop
+    (issue 39).
     """
 
-    def __init__(self, html, can=(), routes=None, grace=None):
+    def __init__(self, html, can=(), routes=None, grace=None, hidden_grace=None):
         self.html = html
         self.can = tuple(can)
         self.routes = dict(routes or {})
         self.grace = grace
+        self.hidden_grace = hidden_grace
+        self.hidden = False                   # the tab's last word on being seen
+        self.gone = False                     # the tab said it is closing
         self.ended = None                     # why it ended, for the last line
         self.token = secrets.token_urlsafe(32)
         self.last_beat = None                 # nothing has said it is watching
@@ -200,11 +208,25 @@ class Page:
         beat: before one, nothing has opened the page yet, and ending then
         would make a slow browser look like a closed tab."""
         while not self.done:
-            beat = self.last_beat
-            if beat is not None and time.monotonic() - beat > self.grace:
+            if self.closed(self.grace, self.hidden_grace):
                 self.ended = "the page closed"
                 return self.finish()
             time.sleep(min(0.25, self.grace / 4))
+
+    def closed(self, grace, hidden_grace=None):
+        """Has the tab closed? Yes once it said it is going; otherwise judged
+        by its silence: `grace` for a tab on
+        screen; `hidden_grace` for one that said it is hidden, because a
+        browser slows or stops a background tab's timers and its silence is
+        not a closed tab's. None for that leaves a hidden tab never closed by
+        silence. Never before a first beat."""
+        if self.gone:
+            return True
+        beat = self.last_beat
+        if beat is None:
+            return False
+        allowed = hidden_grace if self.hidden else grace
+        return allowed is not None and time.monotonic() - beat > allowed
 
     @property
     def done(self):
@@ -218,11 +240,20 @@ class Page:
         the page breathing and this is the clock an idle timeout reads."""
         self.last_touch = time.monotonic()
 
-    def beat(self):
-        """The page saying it is still on screen. Recorded; acted on only by a
-        session given a `grace`, or by a caller watching `last_beat`."""
+    def beat(self, hidden=False):
+        """The page saying it is still open, and whether anybody can see it.
+        Recorded; acted on only by a session given a `grace`, or by a caller
+        asking `closed`."""
         self.last_beat = time.monotonic()
+        self.hidden = hidden
         return {"beat": True}
+
+    def going(self):
+        """The tab saying it is closing — `pagehide`, sent so it outlives the
+        page. Recorded, like a beat; acted on by whoever owns the lifetime,
+        so the canvas, whose lifetime is its Done button, ignores it."""
+        self.gone = True
+        return {"going": True}
 
     def finish(self):
         """The session is over. The port closes from `wait`, on the caller's

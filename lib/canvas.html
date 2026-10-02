@@ -216,8 +216,8 @@ const TOKEN = new URLSearchParams(location.search).get('t') || '';
 // a header, which makes the request non-simple and therefore unreachable from
 // another site without a preflight the server refuses; a body makes it a POST
 // and declares JSON, which is the content type the server insists on.
-function ask(path, body) {
-  const init = { headers: { 'X-Contour-Token': TOKEN } };
+function ask(path, body, more) {
+  const init = { headers: { 'X-Contour-Token': TOKEN }, ...more };
   if (body !== undefined) {
     init.method = 'POST';
     init.headers['Content-Type'] = 'application/json';
@@ -699,13 +699,22 @@ entry.addEventListener('submit', async e => {
   draw();
 });
 
-// Proof this tab is still on screen. The console ends a run when the beats
-// stop, because a closed tab and a tab nobody is looking at differ only in how
-// long you wait — and `beforeunload` cannot be relied on to arrive at all. The
-// canvas records the beat and acts on nothing, so this costs it a request every
-// few seconds and changes none of its behaviour.
+// Proof this tab is still open. The console ends a run when the beats stop,
+// because `beforeunload` cannot be relied on to arrive at all. The canvas
+// records the beat, and the word that the tab is going, and acts on neither, so
+// this costs it a request every few seconds and changes none of its behaviour.
+// A hidden tab is not a closed one: a browser slows or stops the timers of a
+// tab nobody is looking at, so every beat says which it is, and hiding is said
+// at once, while the tab can still say it. Closing is said as the page goes,
+// with `keepalive` so the request outlives it — through `ask`, so it carries
+// the token header, which a beacon cannot carry (issue 39).
+const beat = () => ask('/beat', { hidden: document.hidden }).catch(() => {});
+document.addEventListener('visibilitychange', beat);
+window.addEventListener('pagehide', () => {
+  ask('/going', {}, { keepalive: true }).catch(() => {});
+});
 const BEAT_MS = 3000;
-setInterval(() => { ask('/beat', {}).catch(() => {}); }, BEAT_MS);
+setInterval(beat, BEAT_MS);
 
 // Closing the whole thing, which under the launcher is Done and under the
 // console is the tab itself. Selected rather than fetched by id — an ending the

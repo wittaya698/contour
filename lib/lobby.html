@@ -78,8 +78,8 @@ const TOKEN = new URLSearchParams(location.search).get('t');
 // a header, which makes the request non-simple and therefore unreachable from
 // another site without a preflight the server refuses; a body makes it a POST
 // and declares JSON, which is the content type the server insists on.
-function ask(path, body) {
-  const init = { headers: { 'X-Contour-Token': TOKEN } };
+function ask(path, body, more) {
+  const init = { headers: { 'X-Contour-Token': TOKEN }, ...more };
   if (body !== undefined) {
     init.method = 'POST';
     init.headers['Content-Type'] = 'application/json';
@@ -419,12 +419,21 @@ function load() {
 }
 load();
 
-// Proof this tab is still on screen. The lobby ends when the beats stop,
-// because a closed tab and a tab nobody is looking at differ only in how long
-// you wait — and `beforeunload` cannot be relied on to arrive at all.
+// Proof this tab is still open. The lobby ends when the beats stop, because
+// `beforeunload` cannot be relied on to arrive at all.
+// A hidden tab is not a closed one: a browser slows or stops the timers of a
+// tab nobody is looking at, so every beat says which it is, and hiding is said
+// at once, while the tab can still say it. Closing is said as the page goes,
+// with `keepalive` so the request outlives it — through `ask`, so it carries
+// the token header, which a beacon cannot carry (issue 39).
+const beat = () => ask('/beat', { hidden: document.hidden }).catch(() => {});
+document.addEventListener('visibilitychange', beat);
+window.addEventListener('pagehide', () => {
+  ask('/going', {}, { keepalive: true }).catch(() => {});
+});
 const BEAT_MS = 3000;
-ask('/beat', {}).catch(() => {});
-setInterval(() => { ask('/beat', {}).catch(() => {}); }, BEAT_MS);
+beat();
+setInterval(beat, BEAT_MS);
 </script>
 </body>
 </html>

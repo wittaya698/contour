@@ -81,12 +81,51 @@ class LobbyTest(unittest.TestCase):
         self.lobby(cwd=alpha)
         self.assertEqual([s["name"] for s in self.get("/spaces")["spaces"]], ["alpha"])
 
-    def beat(self):
+    def beat(self, **body):
+        self.post("/beat", body)
+
+    def post(self, path, body):
         req = urllib.request.Request(
-            self.origin + "/beat", data=b"{}", method="POST",
+            self.origin + path, data=json.dumps(body).encode(), method="POST",
             headers={TOKEN_HEADER: self.token, "Content-Type": "application/json"})
         with urllib.request.urlopen(req, timeout=10) as r:
             r.read()
+
+    def test_a_tab_that_said_it_is_hidden_outlives_the_grace(self):
+        """A browser slows or stops the timers of a tab nobody is looking at, so
+        a hidden tab's silence is not a closed tab's (issue 39)."""
+        proc = self.lobby(CONTOUR_LOBBY_GRACE="0.5")
+        self.beat(hidden=True)
+        with self.assertRaises(subprocess.TimeoutExpired):
+            proc.wait(timeout=2)
+        self.assertIn("rename", self.get("/can")["can"])
+
+    def test_a_hidden_tab_that_never_comes_back_still_ends(self):
+        """A browser that quit with the tab in the background sends no word of
+        it, so the long grace is what bounds a lobby that outlived its tab."""
+        proc = self.lobby(CONTOUR_LOBBY_GRACE="0.2", CONTOUR_LOBBY_HIDDEN_GRACE="1.5")
+        self.beat(hidden=True)
+        with self.assertRaises(subprocess.TimeoutExpired):
+            proc.wait(timeout=0.8)
+        self.assertEqual(proc.wait(timeout=30), 0)
+        self.assertEqual(proc.stdout.read(), "lobby closed — the page closed\n")
+
+    def test_a_tab_seen_again_is_back_on_the_short_grace(self):
+        proc = self.lobby(CONTOUR_LOBBY_GRACE="0.5")
+        self.beat(hidden=True)
+        self.beat()
+        self.assertEqual(proc.wait(timeout=30), 0)
+
+    def test_a_tab_that_says_it_is_going_ends_it_promptly(self):
+        """Closing the tab still ends the lobby within seconds, hidden or not:
+        the page says so as it goes, and no grace is waited out."""
+        for hidden in (False, True):
+            with self.subTest(hidden=hidden):
+                proc = self.lobby(CONTOUR_LOBBY_GRACE="60")
+                self.beat(hidden=hidden)
+                self.post("/going", {})
+                self.assertEqual(proc.wait(timeout=5), 0)
+                self.assertEqual(proc.stdout.read(), "lobby closed — the page closed\n")
 
     def test_closing_the_tab_ends_it_with_one_terse_line(self):
         """A page that stopped beating is a tab that closed. There is no Done
@@ -105,6 +144,40 @@ class LobbyTest(unittest.TestCase):
         self.assertIn("rename", self.get("/can")["can"])
 
 
+class HiddenTabPageTest(unittest.TestCase):
+    """Both pages that beat tell a hidden tab from a closed one (issue 39). The
+    source, since there is no browser here: it shows the page is built to say
+    so, not that a browser delivers it."""
+
+    PAGES = (PAGE, ROOT / "lib" / "canvas.html")
+
+    def test_every_beat_says_whether_the_tab_is_hidden(self):
+        for page in self.PAGES:
+            with self.subTest(page=page.name):
+                source = page.read_text(encoding="utf-8")
+                self.assertIn("ask('/beat', { hidden: document.hidden })", source)
+                self.assertNotIn("ask('/beat', {})", source)
+
+    def test_hiding_is_said_at_once_while_the_tab_can_still_say_it(self):
+        """A hidden tab's timers may already be stopped, so the word goes out
+        from the event and not from the next interval."""
+        for page in self.PAGES:
+            with self.subTest(page=page.name):
+                source = page.read_text(encoding="utf-8")
+                self.assertRegex(source, r"addEventListener\('visibilitychange', beat\)")
+
+    def test_going_is_said_through_the_one_helper_and_outlives_the_page(self):
+        """`keepalive` so the request survives the page; through `ask`, so it
+        carries the token header a `sendBeacon` cannot."""
+        for page in self.PAGES:
+            with self.subTest(page=page.name):
+                source = page.read_text(encoding="utf-8")
+                self.assertIn("addEventListener('pagehide'", source)
+                self.assertIn("ask('/going', {}, { keepalive: true })", source)
+                self.assertNotIn("sendBeacon", source)
+                self.assertEqual(source.count("fetch("), 1)
+
+
 class LobbyPageTest(unittest.TestCase):
     """The page's source, because there is no browser here: structural where
     the tests above are behavioural, as `test_canvas_auth` is about the canvas
@@ -121,7 +194,7 @@ class LobbyPageTest(unittest.TestCase):
         self.assertIn("application/json", self.page)
 
     def test_it_beats(self):
-        self.assertRegex(self.page, r"ask\('/beat', \{\}\)")
+        self.assertIn("ask('/beat', { hidden: document.hidden })", self.page)
 
     def test_no_spaces_is_onboarding_and_not_an_empty_table(self):
         """The table and the onboarding copy are shown for exactly opposite
@@ -368,6 +441,19 @@ class LobbyProtectionTest(unittest.TestCase):
                 self.refused(403, path, self.ENTER, Origin="https://example.com")
                 self.refused(403, path, self.ENTER, **{"Sec-Fetch-Site": "cross-site"})
         self.assertEqual(self.asked, 0)
+
+    def test_without_the_token_or_from_another_origin_no_tab_hides_or_goes(self):
+        """Saying it is going ends the lobby, and saying it is hidden keeps one
+        alive, so both stand behind the same checks as every other POST."""
+        for path, body in (("/going", {}), ("/beat", {"hidden": True})):
+            with self.subTest(path=path):
+                self.refused(403, path, body, token=False)
+                self.refused(415, path, body,
+                             **{"Content-Type": "text/plain;charset=UTF-8"})
+                self.refused(403, path, body, Origin="https://example.com")
+                self.refused(403, path, body, **{"Sec-Fetch-Site": "cross-site"})
+        self.assertEqual((self.lobby.gone, self.lobby.hidden, self.lobby.last_beat),
+                         (False, False, None))
 
     def test_a_post_that_is_not_json_ends_nothing(self):
         self.refused(415, "/done", {}, **{"Content-Type": "text/plain;charset=UTF-8"})
