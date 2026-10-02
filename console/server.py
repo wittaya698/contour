@@ -32,6 +32,30 @@ IDLE_S = 60 * 60      # the tab left open on Friday, ended before Monday
 HIDDEN_GRACE_S = IDLE_S   # a background tab's timers may stop; no longer than
                           # an idle console already lives (issue 39)
 
+TOOLKIT = Path(__file__).resolve().parent.parent
+
+BEGIN = {
+    "new-space": (
+        "This space was just made with `contour init`, and nothing is in it "
+        "yet. Start the model with the new-space flow, as the toolkit's skill "
+        f"describes it ({TOOLKIT}/.claude/skills/new-space/SKILL.md); the space "
+        "is made, so its naming and placing step is done.\n"
+        "1. Get the intent first: what the object is, its dimensions with a "
+        "tolerance each, a triangle budget, its named parts. Write nothing "
+        "until you have it.\n"
+        "2. Save the user's reference images in refs/.\n"
+        "3. Ask for the anchor: one real-world dimension for those images. "
+        "Never guess it.\n"
+        "4. Draft spec.yaml, and flag every number you chose rather than the "
+        "user, tolerances loudest. Propose it; the user confirms it before it "
+        "is written (rule 1)."),
+}
+"""The runs a console can be begun on, by name (ADR 0021, decision 4). A name
+and never a prompt's text: the launch line is the one way into a console that
+is not its own page, so it carries the choice of a flow the toolkit wrote, and
+nothing anybody could put words in. The prompt is the run's first line in the
+transcript like any other."""
+
 CAN = canvas_lib.MARKS_ONLY + ("drive",)
 """What the page may offer when the console is the one serving it.
 
@@ -192,6 +216,13 @@ def main(argv, space):
     # exists to make one, and refusing would mean the surface that can produce a
     # first build cannot be opened until something else has. The panel says which
     # build it is showing, and none is an answer (ADR 0019, decision 13).
+    begin = None
+    if "--begin" in argv:
+        flow = argv[argv.index("--begin") + 1] if argv.index("--begin") + 1 < len(argv) else None
+        if flow not in BEGIN:
+            print(f"--begin takes one of: {', '.join(BEGIN)}", file=sys.stderr)
+            return 2
+        begin = BEGIN[flow]
     console = Console(space, grace=seconds("CONTOUR_CONSOLE_GRACE", GRACE_S),
                       idle=seconds("CONTOUR_CONSOLE_IDLE", IDLE_S),
                       hidden_grace=seconds("CONTOUR_CONSOLE_HIDDEN_GRACE", HIDDEN_GRACE_S))
@@ -203,11 +234,13 @@ def main(argv, space):
     # Before the URL is printed, so nothing can have opened the page while the
     # space still looked unattended (issue 30).
     with presence.present(space, "console"):
-        return serving(console, argv)
+        return serving(console, argv, begin)
 
 
-def serving(console, argv):
+def serving(console, argv, begin=None):
     url = console.start()
+    if begin:
+        console.run.start(begin)
     print(f"console at {url}", flush=True)
     if "--no-browser" not in argv:
         webbrowser.open(url)

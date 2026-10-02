@@ -21,10 +21,6 @@ REVISION = re.compile(r"^revision:[^\n]*$", re.M)
 and may run past the end of its line, which is right for reading and would eat
 the newline of a spec whose last line it is."""
 
-# A space's name is a directory, a git tag prefix and a path key in two files
-# outside the space, so it is held to the spelling all of those agree on. No
-# dot: Claude Code files transcripts under the path with its dots respelled.
-LEGAL = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}")
 
 UNSEEN = presence.UNSEEN
 
@@ -75,9 +71,9 @@ def rewritten(root, change, toolkit):
 def refusal(root, name, mine=None):
     """Why this rename may not happen, or None. `mine` is the hold `perform`
     took, which is not somebody else's run."""
-    if not LEGAL.fullmatch(name):
-        return (f"{name!r} is not a name a space can have: letters, digits, - and _, "
-                f"starting with a letter or digit, at most 64")
+    illegal = space_lib.illegal(name)
+    if illegal:
+        return illegal
     if name == root.name:
         return f"{name!r} is not a name to rename to: it is this space's name now"
     if (root.parent / name).exists() or (root.parent / name).is_symlink():

@@ -638,6 +638,31 @@ class RunTest(ConsoleCase):
         self.ask(url, "/going", {})
         self.assertEqual(proc.wait(timeout=10), 0)
 
+    def test_begun_on_the_new_space_flow_the_run_opens_with_its_prompt(self):
+        """A console the lobby opens on a space it just made starts the run
+        itself, and the prompt is the transcript's first line like any other
+        (ADR 0021, decision 4; issue 37). It names the flow, never a prompt's
+        text, so nothing can hand a console arbitrary prose on its command
+        line."""
+        proc, url = self.launch(None, "--begin", "new-space",
+                                CONTOUR_HOME=tempfile.mkdtemp(),
+                                CONTOUR_CONSOLE_AGENT=f"{STAND_IN}:drive")
+        said = self.transcript(url, lambda ev: bool(ev))
+        self.assertEqual(said[0]["kind"], "prompt")
+        for step in ("intent", "refs/", "anchor", "spec.yaml", "flag", "new-space"):
+            self.assertIn(step, said[0]["text"])
+
+    def test_a_flow_the_console_does_not_know_is_refused_before_it_serves(self):
+        proc = subprocess.Popen(
+            [str(CONSOLE), "--no-browser", "--begin", "a prompt of my own"],
+            cwd=str(self.space()), stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, env=dict(os.environ, CONTOUR_CONSOLE_PYTHON=sys.executable))
+        self.addCleanup(self.finish, proc)
+        self.assertEqual(proc.wait(timeout=30), 2)
+        said = proc.stdout.read()
+        self.assertNotIn("http://", said)
+        self.assertIn("new-space", said)
+
     def marked(self, space):
         """A space the user has marked and has not resolved: a build on disk, a
         sheet drawn from that build, and a pin still carrying the pixel it was

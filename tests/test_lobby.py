@@ -205,6 +205,27 @@ class LobbyPageTest(unittest.TestCase):
         self.assertIn("model space", onboarding)
         self.assertIn("contour init", onboarding)
 
+    def test_with_no_spaces_create_is_the_primary_action(self):
+        """*Name your first model* (ADR 0021, decision 4): a form, before the
+        terminal's way, which stays beneath it."""
+        onboarding = self.page.split('id="onboarding"')[1].split("</section>")[0]
+        self.assertIn('id="first"', onboarding)
+        self.assertLess(onboarding.index('id="first"'), onboarding.index("contour init"))
+        self.assertIn("creating(document.getElementById('first'))", self.function("render"))
+
+    def test_with_spaces_create_sits_above_the_table(self):
+        self.assertLess(self.page.index('id="create"'), self.page.index('id="list"'))
+        self.assertIn("creating(document.getElementById('create'))", self.function("render"))
+        self.assertIn("can.has('create')", self.function("render"))
+
+    def test_create_asks_for_a_name_and_a_location_and_says_what_happened(self):
+        creating = self.function("creating")
+        self.assertIn("ask('/location')", creating)
+        self.assertIn("ask('/create', { name: name.value, location: location.value })", creating)
+        self.assertIn("'Not created: ' + done.refused", creating)
+        self.assertIn("done.next", creating)
+        self.assertIn('className = \'go\'', creating)
+
     def test_it_asks_the_host_what_it_can_do(self):
         self.assertIn("ask('/can')", self.page)
 
@@ -440,6 +461,16 @@ class LobbyProtectionTest(unittest.TestCase):
                              **{"Content-Type": "text/plain;charset=UTF-8"})
                 self.refused(403, path, self.ENTER, Origin="https://example.com")
                 self.refused(403, path, self.ENTER, **{"Sec-Fetch-Site": "cross-site"})
+        self.assertEqual(self.asked, 0)
+
+    CREATE = {"name": "beta", "location": "/nowhere"}
+
+    def test_without_the_token_or_from_another_origin_nothing_is_created(self):
+        self.refused(403, "/create", self.CREATE, token=False)
+        self.refused(415, "/create", self.CREATE,
+                     **{"Content-Type": "text/plain;charset=UTF-8"})
+        self.refused(403, "/create", self.CREATE, Origin="https://example.com")
+        self.refused(403, "/create", self.CREATE, **{"Sec-Fetch-Site": "cross-site"})
         self.assertEqual(self.asked, 0)
 
     def test_without_the_token_or_from_another_origin_no_tab_hides_or_goes(self):

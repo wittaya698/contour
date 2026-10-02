@@ -24,10 +24,10 @@ GRACE_S = 10          # beats are seconds apart; this is several missed ones
 HIDDEN_GRACE_S = 60 * 60   # a background tab's timers may stop; a quit browser
                            # is caught here, and a lingering lobby costs a port
 
-CAN = ("rename", "delete", "restore", "purge")
+CAN = ("create", "rename", "delete", "restore", "purge")
 """What the lobby can do beyond listing, for the page to ask about. Each action
-arrives as a capability with the command that performs it — create is still
-to come — and a button for one the host cannot perform is a button that fails
+arrives as a capability with the command that performs it, and a button
+for one the host cannot perform is a button that fails
 (ADR 0021, decision 2). `enter` and `reveal` are added by `granted`, where
 they can be."""
 
@@ -51,6 +51,8 @@ class Lobby(Page):
 
     def served(self):
         return {("GET", "/spaces"): lambda q: self.listing(),
+                ("POST", "/create"): self.create,
+                ("GET", "/location"): lambda q: {"default": str(self.location())},
                 ("POST", "/rename"): self.rename,
                 ("POST", "/delete"): self.delete,
                 ("POST", "/restore"): self.restore,
@@ -58,6 +60,43 @@ class Lobby(Page):
                 ("GET", "/environment"): lambda q: {"console": enter.environment()},
                 ("POST", "/enter"): self.enter,
                 ("POST", "/reveal"): self.reveal}
+
+    def location(self):
+        """Where the page offers to make a space: the toolkit's `project/`,
+        which this repo ignores and the push guard blocks (ADR 0021, decision
+        4), when this lobby looks there; otherwise the first place it looks."""
+        roots = [Path(r) for r in self.listing()["roots"]]
+        project = CONTOUR.parent / "project"
+        if any(project.resolve().is_relative_to(r.resolve()) for r in roots):
+            return project
+        return roots[0]
+
+    def create(self, asked):
+        """`contour init` in the location the page named, its answer as it gave
+        it, then the new space's console on the new-space flow (ADR 0021,
+        decision 4). The lobby drafts nothing: the drafting is the console's,
+        under its gates. With no console environment the space is still made,
+        and `next` says how to go on from a terminal."""
+        location = Path(str(asked.get("location") or "")).expanduser()
+        roots = [Path(r) for r in self.listing()["roots"]]
+        if not location.is_absolute() or not any(
+                location.resolve().is_relative_to(r.resolve()) for r in roots):
+            return {"path": None, "next": None,
+                    "refused": f"this lobby looks in {' and '.join(map(str, roots))}, "
+                               f"and {location} is not inside it, so the new space would "
+                               f"not be listed; make it there, or set $CONTOUR_SPACES "
+                               f"to look elsewhere"}
+        said = contour(CONTOUR.parent, "init", str(asked.get("name") or ""), "--to", str(location),
+                       "--new", "--json")
+        if said["refused"]:
+            return dict(said, next=None)
+        missing = enter.environment()
+        if missing:
+            return dict(said, next=f"no console environment to open it in; make one, "
+                                   f"from {enter.ROOT}: {missing}, then: cd {said['path']} "
+                                   f"&& {enter.CONSOLE} --begin new-space")
+        enter.console(said["path"], begin="new-space")
+        return dict(said, next=None)
 
     def rename(self, asked):
         """`contour rename` in the space the page named, its answer as it

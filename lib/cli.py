@@ -292,7 +292,25 @@ def on_install_hooks(cmd, rest, held):
 
 
 def on_init(cmd, rest, held):
-    return emit(init(rest[0]))
+    words = [w for w in rest if w not in ("--json", "--new")]
+    to = None
+    if "--to" in words:
+        i = words.index("--to")
+        if i + 1 >= len(words):
+            print(usage(), file=sys.stderr)
+            return 2
+        to = words.pop(i + 1)
+        words.pop(i)
+    if len(words) != 1:
+        print(usage(), file=sys.stderr)
+        return 2
+    said = init(words[0], new="--new" in rest, to=to)
+    if "--json" in rest:
+        return emit({"ok": said["ok"], "lines": [json.dumps(
+            {"path": said["path"],
+             "refused": None if said["ok"] else said["lines"][0].removeprefix("FAIL ")},
+            indent=2)]})
+    return emit(said)
 
 
 def on_doctor(cmd, rest, held):
@@ -476,16 +494,25 @@ def toolkit_commit():
     return git.head(ROOT) or "unknown"
 
 
-def init(name):
+def init(name, new=False, to=None):
     """Create a model space (ADR 0015): its own directory, its own git repo.
 
     Copies only what the agent must read from the working directory. The
     guards are never copied — settings.json and the pre-push stub call the
     installed toolkit, so there is one implementation and nothing to drift.
+
+    An existing directory is adopted, never clobbered, unless `new` says the
+    space must be made from nothing — what the lobby asks, since a name typed
+    into a form that matches somebody's folder is no reason to make that
+    folder a repository. `to` is the directory the space goes in, made if it
+    is not there yet; here, if not given. Every refusal comes before anything
+    is written.
     """
-    space = (Path.cwd() / name).resolve()
-    if (space / MARKER).exists():
-        return {"ok": False, "lines": [f"FAIL {space} is already a model space"]}
+    base = Path(to).expanduser() if to else Path.cwd()
+    refused = init_refusal(name, new, base)
+    if refused:
+        return {"ok": False, "path": None, "lines": [f"FAIL {refused}"]}
+    space = (base / name).resolve()
     tpl = ROOT / "templates" / "space"
     (space / ".contour").mkdir(parents=True, exist_ok=True)
     (space / "refs").mkdir(exist_ok=True)
@@ -509,10 +536,10 @@ def init(name):
     lines = [f"ok   {space}"]
     failed = git.start(space)
     if failed:
-        return {"ok": False, "lines": [f"FAIL git init: {failed}"]}
+        return {"ok": False, "path": str(space), "lines": [f"FAIL git init: {failed}"]}
     failed = stub(space, ROOT)
     if failed:
-        return {"ok": False, "lines": [f"FAIL {failed}"]}
+        return {"ok": False, "path": str(space), "lines": [f"FAIL {failed}"]}
     lines += ["ok   git init, pre-push stub installed (this space is never pushed)",
               f"ok   scaffolding copied from toolkit {toolkit_commit()}"]
     if kept:
@@ -522,7 +549,23 @@ def init(name):
               "next: write spec.yaml (schema: %s)" % (ROOT / "schema" / "spec.schema.yaml"),
               "      put the user's reference images in refs/",
               "      write build.py, then run: contour check"]
-    return {"ok": True, "lines": lines}
+    return {"ok": True, "path": str(space), "lines": lines}
+
+
+def init_refusal(name, new, base):
+    """Why `contour init <name>` may not make a space in `base`, or None."""
+    illegal = space.illegal(name)
+    if illegal:
+        return illegal
+    where = base / name
+    if (where / MARKER).exists():
+        return f"{where.resolve()} is already a model space"
+    if any(s.name == name for s in space.spaces(space.roots(ROOT))):
+        return (f"a live space is already called {name}; a space's name is its "
+                f"identity, so pick another")
+    if new and (where.exists() or where.is_symlink()):
+        return f"{where.resolve()} already exists; pick another name"
+    return None
 
 
 def scaffold(root):

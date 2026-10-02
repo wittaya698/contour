@@ -38,12 +38,16 @@
   .panel h3 { font-size: 13px; color: var(--muted); margin: 12px 0 4px; font-weight: 600; }
   .panel ul { margin: 0; padding-left: 18px; }
   .panel .actions { margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
+  #create, #first { margin-top: 16px; }
+  #create .actions, #first .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  #create input, #first input { min-width: 0; flex: 1 1 160px; }
 </style>
 </head>
 <body>
 <main>
   <h1>Model spaces</h1>
   <p class="muted" id="roots"></p>
+  <div id="create" hidden></div>
   <div class="wrap" id="list" hidden>
     <table>
       <thead><tr><th>Space</th><th>Toolkit</th><th class="num">Commits</th><th>Health</th><th></th></tr></thead>
@@ -67,7 +71,9 @@
       git repository, holding <code>spec.yaml</code>, the reference images in
       <code>refs/</code>, and the <code>build.py</code> that makes it. It is
       never pushed anywhere.</p>
-    <p>To make one, run <code>contour init &lt;name&gt;</code> inside
+    <p><strong>Name your first model.</strong></p>
+    <div id="first"></div>
+    <p class="muted">Or, from a terminal, run <code>contour init &lt;name&gt;</code> inside
       <span id="where">the directory spaces live in</span>, then reload this page.</p>
   </section>
 </main>
@@ -195,6 +201,39 @@ function entering(s, said) {
     });
   });
   return b;
+}
+
+// `contour init`, then the new space's console on the new-space flow (ADR 0021,
+// decision 4). The lobby drafts nothing: the spec is drafted in the console,
+// under its gates. Built once, so a reload of the list keeps what was typed.
+function creating(room) {
+  if (room.childElementCount) return;
+  const name = document.createElement('input');
+  name.placeholder = 'name, like oak-chair';
+  name.setAttribute('aria-label', 'Name of the new model');
+  const location = document.createElement('input');
+  location.size = 40;
+  location.setAttribute('aria-label', 'Folder to make it in');
+  ask('/location').then(r => r.json()).then(({ default: where }) => { location.value = where; });
+  const said = para('', 'warn');
+  const b = button('Create', () => {
+    b.disabled = true;
+    ask('/create', { name: name.value, location: location.value }).then(r => r.json()).then(done => {
+      b.disabled = false;
+      if (done.refused) { said.className = 'warn'; said.textContent = 'Not created: ' + done.refused; return; }
+      name.value = '';
+      said.className = 'muted';
+      said.textContent = done.next ? 'Made ' + done.path + '; ' + done.next
+                       : 'Made ' + done.path + '; its console is opening in a new tab.';
+      setTimeout(load, 2000);
+    });
+  });
+  b.className = 'go';
+  name.onkeydown = e => { if (e.key === 'Enter') b.click(); };
+  const row = document.createElement('div');
+  row.className = 'actions';
+  row.append(name, location, b);
+  room.replaceChildren(row, said);
 }
 
 function button(text, onclick, cls) {
@@ -400,6 +439,12 @@ function purging(d, room, p) {
 function render({ roots, spaces, deleted }, can, environment) {
   document.getElementById('roots').textContent = 'Looking in ' + roots.join(', ');
   document.getElementById('where').textContent = roots.join(' or ');
+  const may = can.has('create');
+  document.getElementById('create').hidden = !may || spaces.length === 0;
+  if (may) {
+    creating(document.getElementById('create'));
+    creating(document.getElementById('first'));
+  }
   document.getElementById('list').hidden = spaces.length === 0;
   document.getElementById('onboarding').hidden = spaces.length !== 0;
   document.getElementById('rows').replaceChildren(...spaces.flatMap(s => row(s, can, environment)));

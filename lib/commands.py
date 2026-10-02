@@ -60,8 +60,10 @@ TABLE = (
     Command("install-hooks", NONE, False, False, None,
             (("install-hooks", "install the pre-push guard (ADR 0011)"),),
             "on_install_hooks"),
-    Command("init", (1, 1), False, False, None,
-            (("init <name>", "create a model space here"),), "on_init"),
+    Command("init", (1, 5), False, False, None,
+            (("init <name> [--to <dir>]", "create a model space here, or in <dir>; --new "
+                                          "refuses an existing directory, --json says "
+                                          "it for a client"),), "on_init"),
     Command("doctor", NONE, True, False, None,
             (("doctor", "is this space in step with the toolkit"),), "on_doctor"),
     Command("migrate-marks", NONE, True, False, None,

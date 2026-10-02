@@ -19,6 +19,7 @@ from lib.enter import MAKE_IT, interpreter    # noqa: E402  stdlib-only, as is t
 
 USAGE = """contour-console            drive a run from the browser, in this space
   --no-browser             serve, print the URL, and open nothing
+  --begin new-space        start the run on the new-space flow, as the lobby does
   $CONTOUR_CONSOLE_PYTHON  the interpreter to run under (default .venv/bin/python)
   $CONTOUR_CONSOLE_IDLE    seconds of nothing happening before the run ends
 """

@@ -31,13 +31,15 @@ def environment():
     return None if interpreter().exists() else MAKE_IT
 
 
-def console(space):
+def console(space, begin=None):
     """Start `contour-console` in `space`, and return without waiting for it.
 
-    Given nothing but where to stand. In a session of its own, so nothing that
+    Given nothing but where to stand, and `begin`, the name of a flow for its
+    run to start on (ADR 0021, decision 4). In a session of its own, so nothing that
     ends the lobby — a closed tab, a Ctrl-C, a closed terminal — reaches it: the
     console has its own lifetime, its own port and its own tab."""
-    subprocess.Popen([str(CONSOLE)], cwd=str(space), start_new_session=True,
+    subprocess.Popen([str(CONSOLE), *(("--begin", begin) if begin else ())],
+                     cwd=str(space), start_new_session=True,
                      stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                      stderr=subprocess.DEVNULL)
 

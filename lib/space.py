@@ -14,6 +14,7 @@ could ask it, and the launcher and the console re-derived the same conventions b
 hand. Ask it about the space you have.
 """
 import os
+import re
 from pathlib import Path
 from typing import NamedTuple
 
@@ -155,6 +156,22 @@ def parse(args):
         raise SystemExit("not in a model space: no .contour/project found here "
                          "or above (ADR 0015)")
     return layout(here, toolkit)
+
+
+# A space's name is a directory, a git tag prefix and a path key in two files
+# outside the space, so it is held to the spelling all of those agree on. No
+# dot: Claude Code files transcripts under the path with its dots respelled.
+LEGAL = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}")
+
+
+def illegal(name):
+    """Why `name` is no name a space can have, or None. Asked by `init` and by
+    `rename`, so a space cannot be made under a name it could not be renamed
+    to."""
+    if LEGAL.fullmatch(name):
+        return None
+    return (f"{name!r} is not a name a space can have: letters, digits, - and _, "
+            f"starting with a letter or digit, at most 64")
 
 
 def roots(toolkit):
