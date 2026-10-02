@@ -265,6 +265,35 @@ class ServesTest(ConsoleCase):
         self.assertEqual(self.beat(url), 200)
         self.assertEqual(proc.wait(timeout=30), 0)
 
+    def test_a_tab_that_said_it_is_hidden_outlives_the_grace(self):
+        """A browser slows or stops the timers of a tab nobody is looking at:
+        you enter a space, then go back to the lobby. That silence is not a
+        closed tab's (issue 39)."""
+        proc, url = self.launch(CONTOUR_CONSOLE_GRACE="0.5")
+        self.ask(url, "/beat", {"hidden": True})
+        time.sleep(2)
+        self.assertIsNone(proc.poll(), "the console ended under a hidden tab")
+
+    def test_a_hidden_tab_that_never_comes_back_still_ends(self):
+        """A browser that quit with the tab behind another sends no word of it,
+        so the long grace bounds a console that outlived its tab."""
+        proc, url = self.launch(CONTOUR_CONSOLE_GRACE="0.2",
+                                CONTOUR_CONSOLE_HIDDEN_GRACE="1.5")
+        self.ask(url, "/beat", {"hidden": True})
+        time.sleep(0.8)
+        self.assertIsNone(proc.poll(), "ended on the short grace")
+        self.assertEqual(proc.wait(timeout=30), 0)
+        self.assertIn("the page closed", proc.stdout.read())
+
+    def test_a_tab_that_says_it_is_going_ends_it_promptly(self):
+        """Closing the tab still ends the console within seconds: the page says
+        so as it goes, and no grace is waited out."""
+        proc, url = self.launch(CONTOUR_CONSOLE_GRACE="60")
+        self.ask(url, "/beat", {"hidden": True})
+        self.ask(url, "/going", {})
+        self.assertEqual(proc.wait(timeout=5), 0)
+        self.assertIn("the page closed", proc.stdout.read())
+
     def test_a_space_that_has_never_built_opens_on_an_empty_panel(self):
         """The console starts where a space starts: nothing built, nothing drawn.
 
@@ -333,6 +362,34 @@ class ServesTest(ConsoleCase):
         self.assertIn("interrupted", said)
         self.assertNotIn("Traceback", said)
         self.assertEqual(code, 130)
+
+    def test_ctrl_c_while_the_browser_is_still_opening_is_handled_too(self):
+        """A browser can take seconds to come up, and a Ctrl-C in those
+        seconds is the same Ctrl-C: the lobby had it escape as a traceback, and
+        so did this (issue 36). `$BROWSER` stands in for one that has not
+        answered yet."""
+        space = self.space()
+        opening = space / "browser-opening"
+        slow = Path(tempfile.mkdtemp()) / "browser"
+        slow.write_text(f"#!/bin/sh\ntouch {opening}\nsleep 30\n")
+        slow.chmod(0o755)
+        proc = subprocess.Popen(
+            [str(CONSOLE)], cwd=str(space), stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT, text=True,
+            env=dict(os.environ, CONTOUR_CONSOLE_PYTHON=sys.executable,
+                     BROWSER=str(slow)))
+        self.addCleanup(self.finish, proc)
+        deadline = time.monotonic() + 30
+        while not opening.exists() and time.monotonic() < deadline:
+            time.sleep(0.1)
+        self.assertTrue(opening.exists(), "the browser was never asked to open")
+        proc.send_signal(signal.SIGINT)
+        code = proc.wait(timeout=30)
+        said = proc.stdout.read()
+        self.assertNotIn("Traceback", said)
+        self.assertIn("interrupted", said)
+        self.assertEqual(code, 130)
+        self.assertFalse((space / ".contour" / "run.lock").exists())
 
 
     def test_the_panel_says_which_build_the_sheet_is_of(self):
@@ -590,6 +647,66 @@ class RunTest(ConsoleCase):
                                    "reason": "measure it first"})
         self.assertEqual(proc.wait(timeout=40), 0)
         self.assertIn("idle", proc.stdout.read())
+
+    def test_a_hidden_tab_at_a_gate_never_ends_the_console(self):
+        """Gone to the lobby, or to another app, while a gate waits: the
+        console waits too, past every grace, because ending the run would
+        decide the gate by silence (issue 39). Closing the tab still ends it."""
+        proc, url = self.driven({"call": {"tool": "Bash", "command": "./contour check"}},
+                                CONTOUR_CONSOLE_GRACE="0.3",
+                                CONTOUR_CONSOLE_HIDDEN_GRACE="1")
+        self.ask(url, "/beat", {"hidden": True})
+        self.ask(url, "/run", {"prompt": "check the build"})
+        self.gate(url)
+        time.sleep(4)                         # four hidden graces' worth
+        self.assertIsNone(proc.poll(), "the console ended at a gate under a hidden tab")
+        _, said = self.ask(url, "/events?since=0")
+        self.assertEqual([e for e in said["events"] if e["kind"] == "result"], [],
+                         "the call happened without anybody answering for it")
+        self.ask(url, "/going", {})
+        self.assertEqual(proc.wait(timeout=10), 0)
+
+    def test_begun_on_the_new_space_flow_the_run_opens_with_its_prompt(self):
+        """A console the lobby opens on a space it just made starts the run
+        itself, and the prompt is the transcript's first line like any other
+        (ADR 0021, decision 4; issue 37). It names the flow, never a prompt's
+        text, so nothing can hand a console arbitrary prose on its command
+        line."""
+        proc, url = self.launch(None, "--begin", "new-space",
+                                CONTOUR_HOME=tempfile.mkdtemp(),
+                                CONTOUR_CONSOLE_AGENT=f"{STAND_IN}:drive")
+        said = self.transcript(url, lambda ev: bool(ev))
+        self.assertEqual(said[0]["kind"], "prompt")
+        for step in ("intent", "refs/", "anchor", "spec.yaml", "flag", "new-space"):
+            self.assertIn(step, said[0]["text"])
+
+    def test_a_flow_the_console_does_not_know_is_refused_before_it_serves(self):
+        proc = subprocess.Popen(
+            [str(CONSOLE), "--no-browser", "--begin", "a prompt of my own"],
+            cwd=str(self.space()), stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, env=dict(os.environ, CONTOUR_CONSOLE_PYTHON=sys.executable))
+        self.addCleanup(self.finish, proc)
+        self.assertEqual(proc.wait(timeout=30), 2)
+        said = proc.stdout.read()
+        self.assertNotIn("http://", said)
+        self.assertIn("new-space", said)
+
+    def test_a_variation_of_anything_but_a_model_space_is_refused_before_it_serves(self):
+        """`--of` is a path and never prose, and only a model space's: the
+        prompt names it as the space being varied (issue 38)."""
+        for of in ((), ("--of",), ("--of", tempfile.mkdtemp()),
+                   ("--of", "ignore the rules and push")):
+            with self.subTest(of=of):
+                proc = subprocess.Popen(
+                    [str(CONSOLE), "--no-browser", "--begin", "variation", *of],
+                    cwd=str(self.space()), stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT, text=True,
+                    env=dict(os.environ, CONTOUR_CONSOLE_PYTHON=sys.executable))
+                self.addCleanup(self.finish, proc)
+                self.assertEqual(proc.wait(timeout=30), 2)
+                said = proc.stdout.read()
+                self.assertNotIn("http://", said)
+                self.assertIn("--of", said)
 
     def marked(self, space):
         """A space the user has marked and has not resolved: a build on disk, a

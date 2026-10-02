@@ -17,7 +17,7 @@ from console import run as run_lib
 from console import vetoes as veto_store
 from lib import canvas as canvas_lib
 from lib import panel as panel_state
-from lib import signals
+from lib import presence, signals
 from lib import space as space_lib
 
 
@@ -29,6 +29,64 @@ def phrase(secs):
 
 GRACE_S = 10          # beats are seconds apart; this is several missed ones
 IDLE_S = 60 * 60      # the tab left open on Friday, ended before Monday
+HIDDEN_GRACE_S = IDLE_S   # a background tab's timers may stop; no longer than
+                          # an idle console already lives (issue 39)
+
+TOOLKIT = Path(__file__).resolve().parent.parent
+
+NEW_SPACE = (
+        "This space was just made with `contour init`, and nothing is in it "
+        "yet. Start the model with the new-space flow, as the toolkit's skill "
+        f"describes it ({TOOLKIT}/.claude/skills/new-space/SKILL.md); the space "
+        "is made, so its naming and placing step is done.\n"
+        "1. Get the intent first: what the object is, its dimensions with a "
+        "tolerance each, a triangle budget, its named parts. Write nothing "
+        "until you have it.\n"
+        "2. Save the user's reference images in refs/.\n"
+        "3. Ask for the anchor: one real-world dimension for those images. "
+        "Never guess it.\n"
+        "4. Draft spec.yaml, and flag every number you chose rather than the "
+        "user, tolerances loudest. Propose it; the user confirms it before it "
+        "is written (rule 1).")
+
+
+def variation(of):
+    """The new-space flow, for a space made as a variation of `of`: its spec and
+    its build named for reference, and neither copied (ADR 0021, decision 4). A
+    copied spec would arrive already agreed to, and this one is confirmed as its
+    own."""
+    source = space_lib.layout(of)
+    return (
+        f"This space is a variation of {source.name}, at {source.root}. Read its "
+        f"{source.spec} and {source.build} for reference only: copy neither, and "
+        "never write in that space. This space's spec.yaml is its own contract, "
+        "drafted and confirmed here like any new one; reference images it needs "
+        "the user brings into this space's refs/.\n" + NEW_SPACE)
+
+
+BEGIN = {"new-space": lambda of: NEW_SPACE, "variation": variation}
+"""The runs a console can be begun on, by name (ADR 0021, decision 4). A name
+and never a prompt's text: the launch line is the one way into a console that
+is not its own page, so it carries the choice of a flow the toolkit wrote, and
+nothing anybody could put words in. A variation's `--of` is a path, and only a
+model space's: the prompt is still the toolkit's words about it. The prompt is
+the run's first line in the transcript like any other."""
+
+
+def begun(argv):
+    """The first prompt `argv` asks for, or None; and why it cannot be had."""
+    def value(flag):
+        at = argv.index(flag) + 1 if flag in argv else None
+        return argv[at] if at is not None and at < len(argv) else None
+    if "--begin" not in argv:
+        return None, None
+    flow = value("--begin")
+    if flow not in BEGIN:
+        return None, f"--begin takes one of: {', '.join(BEGIN)}"
+    of = value("--of")
+    if flow == "variation" and not (of and (Path(of) / space_lib.MARKER).is_file()):
+        return None, "--begin variation takes --of <the model space it varies>"
+    return BEGIN[flow](of), None
 
 CAN = canvas_lib.MARKS_ONLY + ("drive",)
 """What the page may offer when the console is the one serving it.
@@ -47,9 +105,10 @@ class Console:
     server records the beat, and this decides what a silence means.
     """
 
-    def __init__(self, space, grace=GRACE_S, idle=IDLE_S):
+    def __init__(self, space, grace=GRACE_S, idle=IDLE_S, hidden_grace=HIDDEN_GRACE_S):
         self.space = Path(space)
         self.grace = grace
+        self.hidden_grace = hidden_grace
         self.idle = idle
         self.ended = None                     # why it ended, for the last line
         # Who launched this. The shim cannot forward a SIGKILL — nothing runs
@@ -146,8 +205,12 @@ class Console:
                 # die — it is the page closing, seen from the other end.
                 self.ended = "the console that launched it is gone"
                 return self.canvas.finish()
-            beat = self.canvas.last_beat
-            if beat is not None and time.monotonic() - beat > self.grace:
+            # A hidden tab's silence never ends a console at a gate: that
+            # would decide the gate by silence, which ADR 0019 rules out. A
+            # tab that closed — said so, or went quiet while on screen — still
+            # does; it is the page closing, as above (issue 39).
+            at_gate = self.run.pending is not None and self.canvas.hidden
+            if self.canvas.closed(self.grace, None if at_gate else self.hidden_grace):
                 self.ended = "the page closed"
                 return self.canvas.finish()
             # A pending gate suppresses the idle clock. The console never
@@ -185,19 +248,35 @@ def main(argv, space):
     # exists to make one, and refusing would mean the surface that can produce a
     # first build cannot be opened until something else has. The panel says which
     # build it is showing, and none is an answer (ADR 0019, decision 13).
+    begin, refused = begun(argv)
+    if refused:
+        print(refused, file=sys.stderr)
+        return 2
     console = Console(space, grace=seconds("CONTOUR_CONSOLE_GRACE", GRACE_S),
-                      idle=seconds("CONTOUR_CONSOLE_IDLE", IDLE_S))
-    url = console.start()
-    print(f"console at {url}", flush=True)
-    if "--no-browser" not in argv:
-        webbrowser.open(url)
+                      idle=seconds("CONTOUR_CONSOLE_IDLE", IDLE_S),
+                      hidden_grace=seconds("CONTOUR_CONSOLE_HIDDEN_GRACE", HIDDEN_GRACE_S))
     # All three, and not only the SIGINT the interpreter raises for: a console
     # is stopped by a closed terminal and by anything tidying up as often as by
-    # a person, and the port and the hold below are given back only on a path
-    # out of `wait` (issue 27).
+    # a person, and the port, the hold and the presence below are given back
+    # only on a path out of `wait` (issue 27).
     signals.raising(*signals.STOPPING)
+    # Before the URL is printed, so nothing can have opened the page while the
+    # space still looked unattended (issue 30).
+    with presence.present(space, "console"):
+        return serving(console, argv, begin)
+
+
+def serving(console, argv, begin=None):
+    url = console.start()
+    if begin:
+        console.run.start(begin)
+    print(f"console at {url}", flush=True)
     try:
         try:
+            # Inside: a browser can take seconds to answer, and a Ctrl-C in
+            # them is the same Ctrl-C (issue 36 found it in the lobby first).
+            if "--no-browser" not in argv:
+                webbrowser.open(url)
             console.wait()
         except (KeyboardInterrupt, signals.Arrived) as which:
             number = signals.number(which)

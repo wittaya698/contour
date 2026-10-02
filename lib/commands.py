@@ -60,15 +60,33 @@ TABLE = (
     Command("install-hooks", NONE, False, False, None,
             (("install-hooks", "install the pre-push guard (ADR 0011)"),),
             "on_install_hooks"),
-    Command("init", (1, 1), False, False, None,
-            (("init <name>", "create a model space here"),), "on_init"),
+    Command("init", (1, 5), False, False, None,
+            (("init <name> [--to <dir>]", "create a model space here, or in <dir>; --new "
+                                          "refuses an existing directory, --json says "
+                                          "it for a client"),), "on_init"),
     Command("doctor", NONE, True, False, None,
             (("doctor", "is this space in step with the toolkit"),), "on_doctor"),
     Command("migrate-marks", NONE, True, False, None,
             (("migrate-marks", "rewrite this space's marks into one spelling"),),
             "on_migrate_marks"),
     Command("spaces", (0, 1), False, False, None,
-            (("spaces [name]", "list model spaces, or print one's path"),), "on_spaces"),
+            (("spaces [name]", "list model spaces, or print one's path"),
+             ("spaces --json", "the same list and its health, for a client to read")),
+            "on_spaces"),
+    Command("lobby", NONE, False, False, None,
+            (("lobby", "every space on this machine, on one page"),), "on_lobby"),
+    Command("rename", (1, 3), True, False, "spec-write",
+            (("rename <name>", "propose renaming this space; --yes does it, --json "
+                               "says it for a client"),), "on_rename"),
+    Command("delete", (1, 3), True, False, "ref-write",
+            (("delete <name>", "propose deleting this space; --yes deletes it, leaving "
+                               "a bundle, --json says it for a client"),), "on_delete"),
+    Command("restore", (1, 4), False, False, None,
+            (("restore <id> [--to <dir>]", "clone a deleted space back from its bundle; "
+                                           "--json says it for a client"),), "on_restore"),
+    Command("purge", (1, 3), False, False, "ref-write",
+            (("purge <id>", "propose removing a deleted space's bundle; --yes removes "
+                            "it for good, --json says it for a client"),), "on_purge"),
     Command("intents", NONE, False, False, None,
             (("intents", "the call categories a gate can ask about"),), "on_intents"),
     Command("asks", NONE, False, False, None,

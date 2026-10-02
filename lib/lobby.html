@@ -1,0 +1,505 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Contour lobby</title>
+<style>
+  :root { --bg: #fafaf8; --fg: #1d1d1b; --muted: #6b6b66; --line: #e2e2dc;
+          --warn: #a3470d; --ok: #2f6b3a; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #18181a; --fg: #ececea; --muted: #9a9a94; --line: #2e2e31;
+            --warn: #f0a46b; --ok: #8fcf98; }
+  }
+  body { margin: 0; background: var(--bg); color: var(--fg);
+         font: 15px/1.5 system-ui, -apple-system, sans-serif; }
+  main { max-width: 960px; margin: 0 auto; padding: 32px 16px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  h2 { font-size: 16px; margin: 32px 0 4px; }
+  .muted { color: var(--muted); }
+  table { width: 100%; border-collapse: collapse; margin-top: 24px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line);
+           vertical-align: top; }
+  th { font-weight: 600; font-size: 13px; color: var(--muted); }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  code { font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .warn { color: var(--warn); }
+  .ok { color: var(--ok); }
+  .wrap { overflow-x: auto; }
+  #onboarding { margin-top: 24px; max-width: 640px; }
+  button { font: inherit; padding: 4px 10px; border: 1px solid var(--line);
+           border-radius: 6px; background: transparent; color: var(--fg); cursor: pointer; }
+  button.go { border-color: var(--fg); font-weight: 600; }
+  button.danger { border-color: var(--warn); color: var(--warn); font-weight: 600; }
+  button:disabled { opacity: 0.45; cursor: default; }
+  input { font: inherit; padding: 4px 8px; border: 1px solid var(--line);
+          border-radius: 6px; background: transparent; color: var(--fg); }
+  .panel { padding: 12px 10px 16px; }
+  .panel h3 { font-size: 13px; color: var(--muted); margin: 12px 0 4px; font-weight: 600; }
+  .panel ul { margin: 0; padding-left: 18px; }
+  .panel .actions { margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
+  #create, #first { margin-top: 16px; }
+  #create .actions, #first .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  #create input, #first input { min-width: 0; flex: 1 1 160px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Model spaces</h1>
+  <p class="muted" id="roots"></p>
+  <div id="create" hidden></div>
+  <div class="wrap" id="list" hidden>
+    <table>
+      <thead><tr><th>Space</th><th>Toolkit</th><th class="num">Commits</th><th>Health</th><th></th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+  <section id="trash" hidden>
+    <h2>Deleted</h2>
+    <p class="muted">Each is a bundle of the space's whole history, in the trash on
+      this disk. Restoring clones it back; the bundle stays until you remove it.</p>
+    <div class="wrap">
+      <table>
+        <thead><tr><th>Space</th><th>Deleted</th><th></th></tr></thead>
+        <tbody id="gone"></tbody>
+      </table>
+    </div>
+  </section>
+  <section id="onboarding" hidden>
+    <p>There are no model spaces here yet.</p>
+    <p>A <strong>model space</strong> is one model: its own directory and its own
+      git repository, holding <code>spec.yaml</code>, the reference images in
+      <code>refs/</code>, and the <code>build.py</code> that makes it. It is
+      never pushed anywhere.</p>
+    <p><strong>Name your first model.</strong></p>
+    <div id="first"></div>
+    <p class="muted">Or, from a terminal, run <code>contour init &lt;name&gt;</code> inside
+      <span id="where">the directory spaces live in</span>, then reload this page.</p>
+  </section>
+</main>
+<script>
+const TOKEN = new URLSearchParams(location.search).get('t');
+
+// One place, so there is one place to get it wrong. A fetch sends the token as
+// a header, which makes the request non-simple and therefore unreachable from
+// another site without a preflight the server refuses; a body makes it a POST
+// and declares JSON, which is the content type the server insists on.
+function ask(path, body, more) {
+  const init = { headers: { 'X-Contour-Token': TOKEN }, ...more };
+  if (body !== undefined) {
+    init.method = 'POST';
+    init.headers['Content-Type'] = 'application/json';
+    init.body = JSON.stringify(body);
+  }
+  return fetch(path, init);
+}
+
+function cell(text, cls) {
+  const td = document.createElement('td');
+  td.textContent = text;
+  if (cls) td.className = cls;
+  return td;
+}
+
+// What a row says about health: the drift `contour doctor` would report, and
+// any remote, which a model space must never have (rule 8).
+function health(s) {
+  const said = [];
+  for (const r of s.remotes) said.push(['warn', 'has a remote (' + r + ') — never pushed']);
+  if (!s.rules) said.push(['warn', 'cannot see the rules']);
+  if (s.scaffold.missing.length) said.push(['warn', 'missing ' + s.scaffold.missing.join(', ')]);
+  if (s.scaffold.drift.length) said.push(['', 'differs from the template: ' + s.scaffold.drift.join(', ')]);
+  if (!said.length) said.push(['ok', 'in step']);
+  const td = document.createElement('td');
+  for (const [cls, text] of said) {
+    const line = document.createElement('div');
+    line.className = cls;
+    line.textContent = text;
+    td.append(line);
+  }
+  return td;
+}
+
+// One space's row, and under it the room a rename or a delete lays itself out in.
+// `environment` is the host's answer to whether a console can run here.
+function row(s, can, environment) {
+  const tr = document.createElement('tr');
+  const name = cell('');
+  const strong = document.createElement('strong');
+  strong.textContent = s.name;
+  const path = document.createElement('div');
+  path.className = 'muted';
+  path.textContent = s.path;
+  name.append(strong, path);
+  // Until a commit in the space carries the rename, which the lobby never
+  // makes (rule 5): the listing reads this from git each time.
+  if (s.renamed) {
+    const note = document.createElement('div');
+    note.className = 'warn';
+    note.textContent = 'renamed from ' + s.renamed.from + ', uncommitted';
+    name.append(note);
+  }
+  // A console already serving the space, from its presence. Entering again
+  // would start a second one, and the lobby never sees the first one's URL.
+  const open = s.presence.some(p => p.kind === 'console');
+  if (open) name.append(para('open in a console — its tab is the way in', 'ok'));
+  const said = para('', 'warn');
+  name.append(said);
+  const actions = cell('');
+  const under = document.createElement('tr');
+  under.hidden = true;
+  const room = document.createElement('td');
+  room.colSpan = 5;
+  room.className = 'panel';
+  under.append(room);
+  if (can.has('rename')) {
+    const b = document.createElement('button');
+    b.textContent = 'Rename…';
+    b.onclick = () => { under.hidden = false; askName(s, room); };
+    actions.append(b);
+  }
+  // A variation is a new space, never a copy (ADR 0015): create, with this
+  // space named as what its console's first prompt points at (issue 38).
+  if (can.has('create')) {
+    const b = document.createElement('button');
+    b.textContent = 'Variation of this…';
+    b.onclick = () => { under.hidden = false; room.replaceChildren(); creating(room, s); };
+    actions.append(b);
+  }
+  if (can.has('delete')) {
+    const b = document.createElement('button');
+    b.textContent = 'Delete…';
+    b.onclick = () => { under.hidden = false; deleting(s, room); };
+    actions.append(b);
+  }
+  // Entering needs the console's environment; where there is none, the line
+  // that makes one, as `contour-console` prints it, stands where the button would.
+  if (can.has('enter') && !open) {
+    actions.append(entering(s, said));
+  } else if (!can.has('enter') && environment.console) {
+    const how = para('to enter, make the console environment: ', 'muted');
+    const code = document.createElement('code');
+    code.textContent = environment.console;
+    how.append(code);
+    actions.append(how);
+  }
+  if (can.has('reveal')) {
+    actions.append(button('Open in Finder', () => {
+      ask('/reveal', { path: s.path }).then(r => r.json()).then(done => {
+        said.textContent = done.refused ? 'Not opened: ' + done.refused : '';
+      });
+    }));
+  }
+  tr.append(name,
+            cell((s.toolkit.commit || '?') + ' (' + s.toolkit.state + ')'),
+            cell(String(s.commits), 'num'),
+            health(s), actions);
+  return [tr, under];
+}
+
+// Enter: `contour-console` started in the space, which opens its own tab. The
+// list is asked again once it has had time to say it is there.
+function entering(s, said) {
+  const b = button('Enter', () => {
+    b.disabled = true;
+    ask('/enter', { path: s.path }).then(r => r.json()).then(done => {
+      if (done.refused) { b.disabled = false; said.textContent = 'Not entered: ' + done.refused; return; }
+      said.textContent = '';
+      setTimeout(load, 2000);
+    });
+  });
+  return b;
+}
+
+// `contour init`, then the new space's console on the new-space flow (ADR 0021,
+// decision 4). The lobby drafts nothing: the spec is drafted in the console,
+// under its gates. Built once, so a reload of the list keeps what was typed.
+// Given `of`, a listed space, it makes a variation of it: beside it, and begun
+// on a prompt that points at its spec and build, which are not copied.
+function creating(room, of) {
+  if (room.childElementCount) return;
+  const name = document.createElement('input');
+  name.placeholder = 'name, like oak-chair';
+  name.setAttribute('aria-label', of ? 'Name of the variation of ' + of.name : 'Name of the new model');
+  const location = document.createElement('input');
+  location.size = 40;
+  location.setAttribute('aria-label', 'Folder to make it in');
+  let stem = null;
+  if (of) {
+    // `<source>-` is a legal name, so the page is what insists it is edited.
+    name.value = stem = of.name + '-';
+    location.value = of.path.slice(0, of.path.lastIndexOf('/'));
+  } else {
+    ask('/location').then(r => r.json()).then(({ default: where }) => { location.value = where; });
+  }
+  const said = para('', 'warn');
+  const b = button(of ? 'Create variation' : 'Create', () => {
+    b.disabled = true;
+    ask('/create', { name: name.value, location: location.value,
+                     of: of && of.path }).then(r => r.json()).then(done => {
+      b.disabled = false;
+      if (done.refused) { said.className = 'warn'; said.textContent = 'Not created: ' + done.refused; return; }
+      name.value = '';
+      said.className = 'muted';
+      said.textContent = done.next ? 'Made ' + done.path + '; ' + done.next
+                       : 'Made ' + done.path + '; its console is opening in a new tab.';
+      setTimeout(load, 2000);
+    });
+  });
+  b.className = 'go';
+  const editable = () => { b.disabled = name.value === stem; };
+  name.oninput = editable;
+  editable();
+  name.onkeydown = e => { if (e.key === 'Enter' && !b.disabled) b.click(); };
+  const row = document.createElement('div');
+  row.className = 'actions';
+  row.append(name, location, b);
+  room.replaceChildren(row, said);
+}
+
+function button(text, onclick, cls) {
+  const b = document.createElement('button');
+  b.textContent = text;
+  b.onclick = onclick;
+  if (cls) b.className = cls;
+  return b;
+}
+
+function para(text, cls) {
+  const p = document.createElement('p');
+  p.textContent = text;
+  if (cls) p.className = cls;
+  return p;
+}
+
+function list(title, items) {
+  const h = document.createElement('h3');
+  h.textContent = title;
+  const ul = document.createElement('ul');
+  for (const text of items) {
+    const li = document.createElement('li');
+    li.textContent = text;
+    ul.append(li);
+  }
+  return [h, ul];
+}
+
+function askName(s, room) {
+  const input = document.createElement('input');
+  input.value = s.name;
+  input.setAttribute('aria-label', 'New name for ' + s.name);
+  const show = () => ask('/rename', { path: s.path, name: input.value })
+    .then(r => r.json()).then(p => proposal(p, s, input.value, room));
+  input.onkeydown = e => { if (e.key === 'Enter') show(); };
+  const row = document.createElement('div');
+  row.className = 'actions';
+  row.append(input, button('Show what it does', show),
+             button('Cancel', () => { room.parentElement.hidden = true; }));
+  room.replaceChildren(para('Rename ' + s.name + ' to:'), row);
+  input.focus();
+  input.select();
+}
+
+// The proposal, every part of it, as `contour rename` said it — and only under
+// all of it, the confirm. The click confirms this proposal and no other: it
+// goes back with the request, and the server refuses it if the command now
+// says something else (ADR 0021, decision 5; rule 1).
+function proposal(p, s, name, room) {
+  const back = button('Back', () => askName(s, room));
+  if (p.refused) {
+    room.replaceChildren(para('Not renamed: ' + p.refused, 'warn'), back);
+    return;
+  }
+  const parts = [para('Rename ' + s.name + ' → ' + name)];
+  // `model:` and `revision:` are named as the spec spells them, colon and all.
+  parts.push(...list('Changes', p.changes.map(c =>
+    c.what + (c.what.endsWith(':') ? ' ' : ': ') + c.from + ' → ' + c.to
+    + (c.only === 'header' ? ' (its header only: the rest is yours)' : ''))));
+  if (p.untouched.length)
+    parts.push(...list('Untouched (drifted from the template; may still say the old name)',
+                       p.untouched));
+  if (p.leaves.length)
+    parts.push(...list('Leaves behind', p.leaves.map(l => l.what + ': ' + l.path + ' — ' + l.why)));
+  parts.push(para(p.unseen, 'warn'),
+             para('Nothing is committed: the space lists as renamed until you commit in it.', 'muted'));
+  const go = button('Confirm rename', () => {
+    go.disabled = true;
+    ask('/rename', { path: s.path, name, shown: p }).then(r => r.json()).then(done => {
+      if (done.refused) return proposal(done, s, name, room);
+      load();
+    });
+  }, 'go');
+  const row = document.createElement('div');
+  row.className = 'actions';
+  row.append(go, back);
+  room.replaceChildren(...parts, row);
+}
+
+// A delete, as `contour delete` proposes it, and under all of it a box the
+// space's name is typed into. Typing the name is the confirm, so the button
+// is dead until it matches; the command checks the name again, and its
+// refusal comes back worded as it worded it (ADR 0021, decision 6).
+function deleting(s, room, p) {
+  if (!p) {
+    ask('/delete', { path: s.path }).then(r => r.json()).then(p => deleting(s, room, p));
+    return;
+  }
+  const cancel = button('Cancel', () => { room.parentElement.hidden = true; });
+  if (p.refused) {
+    room.replaceChildren(para('Not deleted: ' + p.refused, 'warn'), cancel);
+    return;
+  }
+  const parts = [para('Delete ' + s.name + '?'),
+                 ...list('What it leaves', ['a bundle of its whole history: ' + p.bundle]),
+                 para(p.disk, 'muted'), para(p.left, 'muted'), para(p.unseen, 'warn'),
+                 para('Type ' + s.name + ' to confirm.')];
+  const typed = document.createElement('input');
+  typed.autocomplete = 'off';
+  typed.setAttribute('aria-label', 'Type ' + s.name + ' to delete it');
+  const go = button('Delete for good', () => {
+    go.disabled = true;
+    ask('/delete', { path: s.path, name: typed.value }).then(r => r.json()).then(done => {
+      if (done.refused) return deleting(s, room, done);
+      load();
+    });
+  }, 'danger');
+  go.disabled = true;
+  typed.oninput = () => { go.disabled = typed.value !== s.name; };
+  const row = document.createElement('div');
+  row.className = 'actions';
+  row.append(typed, go, cancel);
+  room.replaceChildren(...parts, row);
+  typed.focus();
+}
+
+// One deleted space: a bundle in the trash, and where it stood. Restoring is
+// `contour restore`, to where it stood or into a folder typed here; the
+// command refuses a taken path or name, worded as it words it.
+function gone(d, can) {
+  const tr = document.createElement('tr');
+  const name = cell('');
+  const strong = document.createElement('strong');
+  strong.textContent = d.name || d.id;
+  const path = document.createElement('div');
+  path.className = 'muted';
+  path.textContent = d.live ? 'restored, live at ' + d.live
+                   : d.path || 'where it stood is not recorded: give a folder';
+  const note = document.createElement('div');
+  note.className = 'warn';
+  name.append(strong, path, note);
+  const actions = cell('');
+  if (can.has('restore') && !d.live) {
+    const to = document.createElement('input');
+    to.placeholder = d.path ? 'folder (blank: where it stood)' : 'folder to restore into';
+    to.setAttribute('aria-label', 'Folder to restore ' + (d.name || d.id) + ' into');
+    const b = button('Restore', () => {
+      b.disabled = true;
+      ask('/restore', { id: d.id, to: to.value || undefined }).then(r => r.json()).then(done => {
+        b.disabled = false;
+        if (done.refused) { note.textContent = 'Not restored: ' + done.refused; return; }
+        load();
+      });
+    });
+    const row = document.createElement('div');
+    row.className = 'actions';
+    row.append(to, b);
+    actions.append(row);
+  }
+  const under = document.createElement('tr');
+  under.hidden = true;
+  const room = document.createElement('td');
+  room.colSpan = 3;
+  room.className = 'panel';
+  under.append(room);
+  if (can.has('purge')) {
+    actions.append(button('Remove bundle…', () => { under.hidden = false; purging(d, room); }));
+  }
+  tr.append(name, cell(d.deleted || '?'), actions);
+  return [tr, under];
+}
+
+// Removing a bundle, the one act in the trash nothing undoes: what
+// `contour purge` proposes — whether a live space still stands where this one
+// stood, or this is the only copy — and under it a box the id is typed into.
+// The button is dead until it matches, and the server confirms that bundle only.
+function purging(d, room, p) {
+  if (!p) {
+    ask('/purge', { id: d.id }).then(r => r.json()).then(p => purging(d, room, p));
+    return;
+  }
+  const cancel = button('Cancel', () => { room.parentElement.hidden = true; });
+  if (p.refused) {
+    room.replaceChildren(para('Not removed: ' + p.refused, 'warn'), cancel);
+    return;
+  }
+  const parts = [para('Remove ' + p.bundle + '?'),
+                 para(p.copy, p.live ? 'muted' : 'warn'), para(p.gone, 'warn'),
+                 para('Type ' + d.id + ' to confirm.')];
+  const typed = document.createElement('input');
+  typed.autocomplete = 'off';
+  typed.setAttribute('aria-label', 'Type ' + d.id + ' to remove its bundle');
+  const go = button('Remove for good', () => {
+    go.disabled = true;
+    ask('/purge', { id: d.id, typed: typed.value }).then(r => r.json()).then(done => {
+      if (done.refused) return purging(d, room, done);
+      load();
+    });
+  }, 'danger');
+  go.disabled = true;
+  typed.oninput = () => { go.disabled = typed.value !== d.id; };
+  const row = document.createElement('div');
+  row.className = 'actions';
+  row.append(typed, go, cancel);
+  room.replaceChildren(...parts, row);
+  typed.focus();
+}
+
+// Empty is onboarding, not an empty table: someone with no spaces is standing
+// where someone with ten is (ADR 0021, decision 1). The trash is its own list,
+// so a deleted space never reads as a live one.
+function render({ roots, spaces, deleted }, can, environment) {
+  document.getElementById('roots').textContent = 'Looking in ' + roots.join(', ');
+  document.getElementById('where').textContent = roots.join(' or ');
+  const may = can.has('create');
+  document.getElementById('create').hidden = !may || spaces.length === 0;
+  if (may) {
+    creating(document.getElementById('create'));
+    creating(document.getElementById('first'));
+  }
+  document.getElementById('list').hidden = spaces.length === 0;
+  document.getElementById('onboarding').hidden = spaces.length !== 0;
+  document.getElementById('rows').replaceChildren(...spaces.flatMap(s => row(s, can, environment)));
+  document.getElementById('trash').hidden = deleted.length === 0;
+  document.getElementById('gone').replaceChildren(...deleted.flatMap(d => gone(d, can)));
+}
+
+// What this host can do, asked once: each action arrives as a capability with
+// the command that performs it, and a host that lacks one shows no button for
+// it (ADR 0021, decision 2).
+const CAN = ask('/can').then(r => r.json()).then(({ can }) => new Set(can));
+const ENVIRONMENT = ask('/environment').then(r => r.json());
+
+function load() {
+  Promise.all([ask('/spaces').then(r => r.json()), CAN, ENVIRONMENT])
+    .then(([listed, can, environment]) => render(listed, can, environment));
+}
+load();
+
+// Proof this tab is still open. The lobby ends when the beats stop, because
+// `beforeunload` cannot be relied on to arrive at all.
+// A hidden tab is not a closed one: a browser slows or stops the timers of a
+// tab nobody is looking at, so every beat says which it is, and hiding is said
+// at once, while the tab can still say it. Closing is said as the page goes,
+// with `keepalive` so the request outlives it — through `ask`, so it carries
+// the token header, which a beacon cannot carry (issue 39).
+const beat = () => ask('/beat', { hidden: document.hidden }).catch(() => {});
+document.addEventListener('visibilitychange', beat);
+window.addEventListener('pagehide', () => {
+  ask('/going', {}, { keepalive: true }).catch(() => {});
+});
+const BEAT_MS = 3000;
+beat();
+setInterval(beat, BEAT_MS);
+</script>
+</body>
+</html>

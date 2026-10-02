@@ -17,6 +17,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from console import spend
+from lib.space import transcripts as transcript_dir
 
 # Wrappers the CLI injects around a prompt; none of them are what the user typed.
 NOISE = re.compile(
@@ -30,11 +31,6 @@ NOISE = re.compile(
 # watched there must not come out as two prices, and a key the SDK renames must
 # not break one reader while silently miscounting the other (ADR 0019,
 # decision 37).
-
-
-def transcript_dir(project: Path) -> Path:
-    slug = "-" + str(project).lstrip("/").replace("/", "-")
-    return Path.home() / ".claude" / "projects" / slug
 
 
 def load(path: Path):

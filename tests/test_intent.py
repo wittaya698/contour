@@ -39,6 +39,13 @@ class ClassifyTest(unittest.TestCase):
                 intent.classify(tool, {"file_path": "/m/widget/spec.yaml"}),
                 "spec-write", tool)
 
+    def test_a_rename_writes_the_spec(self):
+        """`model:` and `revision:` move with the name (ADR 0021, decision 5),
+        so an agent reaching for it under a console meets the spec's gate."""
+        for call in ("contour rename beta", "./contour rename beta --yes"):
+            self.assertEqual(intent.classify("Bash", {"command": call}),
+                             "spec-write", call)
+
     def test_writing_a_reference_is_its_own_category(self):
         """Not because it is approvable — rule 1 says no measurement argument
         justifies rewriting a reference, and the guard keeps denying it. It is
@@ -216,6 +223,10 @@ INTENTLESS = {
                      "when they ask for it by name; the diff it makes is theirs "
                      "to read and reaches a remote only past the commit gate",
     "spaces": "lists spaces on this machine",
+    "lobby": "serves that list on a page and writes nothing; rename and delete "
+             "arrive as commands of their own, classified there (ADR 0021)",
+    "restore": "creates a space from its bundle, as init creates one, and "
+               "refuses any path or name already taken, so it overwrites nothing",
     "intents": "prints this very vocabulary",
     "asks": "prints the ask-list; gating the audit would gate reading the gate",
     "hook": "is a guard, run by git and Claude Code rather than by an agent",

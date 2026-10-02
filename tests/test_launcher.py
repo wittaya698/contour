@@ -308,5 +308,117 @@ class LauncherTest(unittest.TestCase):
         self.assertEqual(self.stages(), ["build"])
 
 
+class SpacesTest(unittest.TestCase):
+    """`contour spaces`, in both its forms, over spaces `contour init` made in
+    a temporary directory that `$CONTOUR_SPACES` points at (slice 28), with
+    `$CONTOUR_HOME` beside it so the trash listed is the test's and not the
+    user's (issue 35)."""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp()).resolve()
+        self.home = Path(tempfile.mkdtemp()).resolve()
+        self.head = subprocess.run(["git", "-C", str(ROOT), "rev-parse", "--short", "HEAD"],
+                                   capture_output=True, text=True).stdout.strip()
+
+    def contour(self, *args, cwd=None):
+        return subprocess.run([sys.executable, str(CONTOUR), *args],
+                              cwd=str(cwd or self.tmp),
+                              env=dict(os.environ, CONTOUR_SPACES=str(self.tmp),
+                                       CONTOUR_HOME=str(self.home)),
+                              capture_output=True, text=True, timeout=60)
+
+    def init(self, name):
+        r = self.contour("init", name)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        return self.tmp / name
+
+    def listing(self):
+        r = self.contour("spaces", "--json")
+        self.assertEqual(r.returncode in (0, 1), True, r.stderr)
+        return json.loads(r.stdout)["spaces"]
+
+    def test_the_text_form_reads_exactly_as_it_did(self):
+        """Pinned before the JSON form existed, against the code as it was:
+        the lobby is a second rendering of one reading and must not move the
+        first (ADR 0021, decision 3)."""
+        alpha, beta = self.init("alpha"), self.init("beta")
+        (alpha / ".contour" / "project").write_text("# no toolkit line\n")
+        subprocess.run(["git", "-C", str(beta), "remote", "add", "origin", "x"], check=True)
+        r = self.contour("spaces")
+        self.assertEqual(r.returncode, 1)
+        self.assertEqual(r.stdout, "".join([
+            f"  alpha        {str(alpha):<34} toolkit ? (unknown)     0 commits\n",
+            f"  beta         {str(beta):<34} toolkit {self.head} (current)     0 commits\n",
+            "  WARN beta has a remote (origin) — a model space is never pushed\n"]))
+        r = self.contour("spaces", "beta")
+        self.assertEqual((r.returncode, r.stdout), (0, f"{beta}\n"))
+
+    def test_the_json_form_lists_every_space_the_text_form_lists(self):
+        """Name and path, and no others: a directory that only looks like a
+        space, with no marker, is in neither."""
+        alpha, beta = self.init("alpha"), self.init("beta")
+        (self.tmp / "gamma" / ".contour").mkdir(parents=True)
+        self.assertEqual([(s["name"], s["path"]) for s in self.listing()],
+                         [("alpha", str(alpha)), ("beta", str(beta))])
+
+    def test_a_fresh_space_is_current_and_in_step(self):
+        """What `contour init` leaves behind is the healthy row: this toolkit,
+        nothing committed, no remote, scaffolding as the template wrote it, and
+        a copy of the rules of its own."""
+        self.init("alpha")
+        [row] = self.listing()
+        self.assertEqual({k: row[k] for k in ("toolkit", "commits", "remotes",
+                                              "scaffold", "rules")},
+                         {"toolkit": {"commit": self.head, "state": "current"},
+                          "commits": 0, "remotes": [],
+                          "scaffold": {"drift": [], "missing": []}, "rules": True})
+
+    def test_drifted_and_missing_scaffolding_is_what_doctor_would_say(self):
+        """The same findings `contour doctor` prints in that space, as data."""
+        alpha = self.init("alpha")
+        with open(alpha / "CLAUDE.md", "a") as f:
+            f.write("\nan edit the template never made\n")
+        (alpha / ".claude" / "skills" / "release-model" / "SKILL.md").unlink()
+        [row] = self.listing()
+        self.assertEqual(row["scaffold"],
+                         {"drift": ["CLAUDE.md"],
+                          "missing": [".claude/skills/release-model/SKILL.md"]})
+        said = self.contour("doctor", cwd=alpha).stdout
+        self.assertIn("DRIFT CLAUDE.md", said)
+        self.assertIn("MISS .claude/skills/release-model/SKILL.md", said)
+
+    def test_a_space_with_a_remote_is_reported_and_fails_the_listing(self):
+        """Rule 8 is a warning in the text form and an exit code in both: a
+        client reading the JSON gets the same non-zero a person does."""
+        beta = self.init("beta")
+        subprocess.run(["git", "-C", str(beta), "remote", "add", "origin", "x"], check=True)
+        r = self.contour("spaces", "--json")
+        self.assertEqual(r.returncode, 1)
+        self.assertEqual(json.loads(r.stdout)["spaces"][0]["remotes"], ["origin"])
+
+    def test_no_spaces_is_an_empty_list_and_not_an_error(self):
+        """The lobby's empty state is onboarding, not a failure (ADR 0021,
+        decision 1)."""
+        r = self.contour("spaces", "--json")
+        self.assertEqual((r.returncode, json.loads(r.stdout)["spaces"]), (0, []))
+
+    def test_a_marker_that_names_no_toolkit_is_unknown(self):
+        """No commit to compare, so neither current nor behind; the text form
+        prints `?` for the same reading."""
+        alpha = self.init("alpha")
+        (alpha / ".contour" / "project").write_text("# no toolkit line\n")
+        [row] = self.listing()
+        self.assertEqual(row["toolkit"], {"commit": None, "state": "unknown"})
+
+    def test_a_space_outside_the_toolkit_with_no_rules_of_its_own_cannot_see_them(self):
+        """Open question 13: Claude Code walks up for `CLAUDE.md`, and from a
+        temporary directory the toolkit's is not on the way."""
+        alpha = self.init("alpha")
+        (alpha / "CLAUDE.md").unlink()
+        [row] = self.listing()
+        self.assertFalse(row["rules"])
+        self.assertEqual(row["scaffold"]["missing"], ["CLAUDE.md"])
+
+
 if __name__ == "__main__":
     unittest.main()

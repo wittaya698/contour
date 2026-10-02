@@ -25,7 +25,7 @@ import sys
 import time
 from pathlib import Path
 
-from lib import commands, git, space     # stdlib-only by test (ADR 0019, 29)
+from lib import commands, delete, git, presence, rename, restore, revision, space     # stdlib-only by test (ADR 0019, 29)
 
 ROOT = Path(__file__).resolve().parent.parent
 BLENDER = os.environ.get("BLENDER", "/Applications/Blender.app/Contents/MacOS/Blender")
@@ -101,15 +101,7 @@ def need_project(cmd):
     return 2
 
 
-REVISION = re.compile(r"^revision:\s*(\d+)\s*$", re.M)
-
-
-def spec_revision(text):
-    """The contract's revision number. Absent means 0, so a spec written before
-    ADR 0016 is revision 0 and its first correction is 1. Anchored at column 0,
-    so the word inside an indented block scalar is not mistaken for the field."""
-    m = REVISION.search(text or "")
-    return int(m.group(1)) if m else 0
+spec_revision = revision.of
 
 
 def check_revision():
@@ -121,18 +113,10 @@ def check_revision():
     change that was. Returns None when there is nothing to say — this runs on
     every model command, so it is silent on success and costs nothing.
     """
-    spec = HERE.spec
-    if not spec.exists():
+    found = revision.unbumped(PROJECT)
+    if found is None:
         return None
-    was_text = git.show(PROJECT, "HEAD", "spec.yaml")
-    if was_text is None:          # untracked, or no commit yet: creation is not mutation
-        return None
-    now = spec.read_text(encoding="utf-8")
-    if now == was_text:
-        return None
-    was, is_ = spec_revision(was_text), spec_revision(now)
-    if is_ > was:
-        return None
+    was, is_ = found
     return {"ok": False, "lines": [
         f"FAIL revision  spec.yaml differs from HEAD, revision still {is_}",
         "  The spec is the user's intent. It may be revised once they have",
@@ -265,12 +249,18 @@ def on_measure(cmd, rest, held):
 
 
 def on_canvas(cmd, rest, held):
-    from lib import canvas, panel
-    return emit(canvas.serve(HERE.sheet, HERE.marks, HERE.mask, HERE.parts,
-                             resolve=lambda: stage(["resolve"]),
-                             refs=HERE.refs, views=HERE.views,
-                             blend=HERE.blend,
-                             verdict=HERE.dot / panel.NAME))
+    from lib import canvas, panel, signals
+    # All three, and not only Ctrl-C: the presence below is taken back only on
+    # a path out of the session, and SIGTERM or a closed terminal would
+    # otherwise end the process where it stood (issue 27, issue 30).
+    signals.raising(*signals.STOPPING)
+    with presence.present(PROJECT, "canvas"):
+        report = canvas.serve(HERE.sheet, HERE.marks, HERE.mask, HERE.parts,
+                              resolve=lambda: stage(["resolve"]),
+                              refs=HERE.refs, views=HERE.views,
+                              blend=HERE.blend,
+                              verdict=HERE.dot / panel.NAME)
+    return emit(report)
 
 
 def on_resolve(cmd, rest, held):
@@ -302,7 +292,25 @@ def on_install_hooks(cmd, rest, held):
 
 
 def on_init(cmd, rest, held):
-    return emit(init(rest[0]))
+    words = [w for w in rest if w not in ("--json", "--new")]
+    to = None
+    if "--to" in words:
+        i = words.index("--to")
+        if i + 1 >= len(words):
+            print(usage(), file=sys.stderr)
+            return 2
+        to = words.pop(i + 1)
+        words.pop(i)
+    if len(words) != 1:
+        print(usage(), file=sys.stderr)
+        return 2
+    said = init(words[0], new="--new" in rest, to=to)
+    if "--json" in rest:
+        return emit({"ok": said["ok"], "lines": [json.dumps(
+            {"path": said["path"],
+             "refused": None if said["ok"] else said["lines"][0].removeprefix("FAIL ")},
+            indent=2)]})
+    return emit(said)
 
 
 def on_doctor(cmd, rest, held):
@@ -314,7 +322,110 @@ def on_migrate_marks(cmd, rest, held):
 
 
 def on_spaces(cmd, rest, held):
+    if rest == ["--json"]:
+        return emit(spaces(as_json=True))
     return emit(spaces(rest[0] if rest else None))
+
+
+def on_lobby(cmd, rest, held):
+    from lib import lobby
+    return emit(lobby.serve(
+        listing, grace=seconds("CONTOUR_LOBBY_GRACE", lobby.GRACE_S),
+        hidden_grace=seconds("CONTOUR_LOBBY_HIDDEN_GRACE", lobby.HIDDEN_GRACE_S)))
+
+
+def on_rename(cmd, rest, held):
+    """Proposes, or with `--yes` does what it proposed (ADR 0021, decision 5).
+
+    `holds` is False in the table and the hold is taken in `rename.perform`:
+    the lock file moves with the directory, so it has to be released at the
+    new path, which `main` does not know.
+    """
+    names = [w for w in rest if not w.startswith("--")]
+    if len(names) != 1:
+        print(usage(), file=sys.stderr)
+        return 2
+    said = (rename.perform if "--yes" in rest else rename.propose)(PROJECT, names[0], ROOT)
+    if "--json" in rest:
+        return emit({"ok": not said["refused"], "lines": [json.dumps(said, indent=2)]})
+    if said["refused"]:
+        return emit({"ok": False, "lines": [f"FAIL rename  {said['refused']}"]})
+    if "--yes" in rest:
+        return emit({"ok": True, "lines": [f"ok   renamed to {said['to']}",
+                                           f"     cd {said['to']}"]})
+    return emit({"ok": True, "lines": rename.lines(said)})
+
+
+def on_delete(cmd, rest, held):
+    """Proposes, or with `--yes` deletes, leaving a bundle (ADR 0021, decision 6).
+
+    `holds` is False in the table and the hold is taken in `delete.perform`:
+    the lock file is inside the space, and goes with it. The name is the
+    first word whatever it says, because what a page sends is whatever was
+    typed, and a typed `--yes` must be a wrong name and not a confirm.
+    """
+    typed, flags = rest[0], rest[1:]
+    if not set(flags) <= {"--yes", "--json"}:
+        print(usage(), file=sys.stderr)
+        return 2
+    said = (delete.perform if "--yes" in flags else delete.propose)(PROJECT, typed)
+    if "--json" in flags:
+        return emit({"ok": not said["refused"], "lines": [json.dumps(said, indent=2)]})
+    if said["refused"]:
+        return emit({"ok": False, "lines": [f"FAIL delete  {said['refused']}"]})
+    if "--yes" in flags:
+        return emit({"ok": True, "lines": [f"ok   deleted {said['path']}",
+                                           f"     its bundle: {said['bundle']}"]})
+    return emit({"ok": True, "lines": delete.lines(said)})
+
+
+def on_restore(cmd, rest, held):
+    """A deleted space, cloned back from its bundle (ADR 0021, decision 6)."""
+    words = list(rest)
+    as_json = "--json" in words
+    if as_json:
+        words.remove("--json")
+    to = None
+    if "--to" in words:
+        i = words.index("--to")
+        if i + 1 >= len(words):
+            print(usage(), file=sys.stderr)
+            return 2
+        to = words.pop(i + 1)
+        words.pop(i)
+    if len(words) != 1:
+        print(usage(), file=sys.stderr)
+        return 2
+    said = restore.restore(words[0], ROOT, to)
+    if as_json:
+        return emit({"ok": not said["refused"], "lines": [json.dumps(said, indent=2)]})
+    if said["refused"]:
+        return emit({"ok": False, "lines": [f"FAIL restore  {said['refused']}"]})
+    return emit({"ok": True, "lines": [f"ok   restored {said['path']}",
+                                       f"     cd {said['path']}"]})
+
+
+def on_purge(cmd, rest, held):
+    """Proposes removing a bundle from the trash, or with `--yes` removes it.
+    The id is the first word whatever it says, as `delete`'s name is."""
+    typed, flags = rest[0], rest[1:]
+    if not set(flags) <= {"--yes", "--json"}:
+        print(usage(), file=sys.stderr)
+        return 2
+    said = (restore.purge if "--yes" in flags else restore.proposed_purge)(typed)
+    if "--json" in flags:
+        return emit({"ok": not said["refused"], "lines": [json.dumps(said, indent=2)]})
+    if said["refused"]:
+        return emit({"ok": False, "lines": [f"FAIL purge  {said['refused']}"]})
+    if "--yes" in flags:
+        return emit({"ok": True, "lines": [f"ok   removed {said['bundle']}"]})
+    return emit({"ok": True, "lines": restore.purge_lines(said)})
+
+
+def seconds(name, fallback):
+    """A timeout from the environment, so a test proving what a silence means
+    does not have to wait out the real one."""
+    return float(os.environ.get(name) or fallback)
 
 
 def on_intents(cmd, rest, held):
@@ -372,10 +483,9 @@ def main(argv):
         free(record)
 
 
-SCAFFOLD = ("CLAUDE.md", ".claude/settings.json",
-            ".claude/skills/build-model/SKILL.md",
-            ".claude/skills/build-model/references/bpy-recipes.md",
-            ".claude/skills/release-model/SKILL.md")
+SCAFFOLD = space.SCAFFOLD
+template = space.template      # `init` names its new space `space`
+stub = space.stub
 
 
 def toolkit_commit():
@@ -384,16 +494,25 @@ def toolkit_commit():
     return git.head(ROOT) or "unknown"
 
 
-def init(name):
+def init(name, new=False, to=None):
     """Create a model space (ADR 0015): its own directory, its own git repo.
 
     Copies only what the agent must read from the working directory. The
     guards are never copied — settings.json and the pre-push stub call the
     installed toolkit, so there is one implementation and nothing to drift.
+
+    An existing directory is adopted, never clobbered, unless `new` says the
+    space must be made from nothing — what the lobby asks, since a name typed
+    into a form that matches somebody's folder is no reason to make that
+    folder a repository. `to` is the directory the space goes in, made if it
+    is not there yet; here, if not given. Every refusal comes before anything
+    is written.
     """
-    space = (Path.cwd() / name).resolve()
-    if (space / MARKER).exists():
-        return {"ok": False, "lines": [f"FAIL {space} is already a model space"]}
+    base = Path(to).expanduser() if to else Path.cwd()
+    refused = init_refusal(name, new, base)
+    if refused:
+        return {"ok": False, "path": None, "lines": [f"FAIL {refused}"]}
+    space = (base / name).resolve()
     tpl = ROOT / "templates" / "space"
     (space / ".contour").mkdir(parents=True, exist_ok=True)
     (space / "refs").mkdir(exist_ok=True)
@@ -404,7 +523,7 @@ def init(name):
             kept.append(rel)
             continue
         dst.parent.mkdir(parents=True, exist_ok=True)
-        dst.write_text((tpl / rel).read_text().replace("<NAME>", space.name))
+        dst.write_text(template(ROOT, rel, space.name))
     if not (space / ".gitignore").exists():
         (space / ".gitignore").write_text((tpl / "gitignore").read_text())
     else:
@@ -417,13 +536,10 @@ def init(name):
     lines = [f"ok   {space}"]
     failed = git.start(space)
     if failed:
-        return {"ok": False, "lines": [f"FAIL git init: {failed}"]}
-    dst = git.hooks_dir(space)
-    if dst is None:
-        return {"ok": False, "lines": ["FAIL git made no repository to hook"]}
-    dst.mkdir(parents=True, exist_ok=True)
-    (dst / "pre-push").write_bytes((tpl / "pre-push").read_bytes())
-    (dst / "pre-push").chmod(0o755)
+        return {"ok": False, "path": str(space), "lines": [f"FAIL git init: {failed}"]}
+    failed = stub(space, ROOT)
+    if failed:
+        return {"ok": False, "path": str(space), "lines": [f"FAIL {failed}"]}
     lines += ["ok   git init, pre-push stub installed (this space is never pushed)",
               f"ok   scaffolding copied from toolkit {toolkit_commit()}"]
     if kept:
@@ -433,19 +549,52 @@ def init(name):
               "next: write spec.yaml (schema: %s)" % (ROOT / "schema" / "spec.schema.yaml"),
               "      put the user's reference images in refs/",
               "      write build.py, then run: contour check"]
-    return {"ok": True, "lines": lines}
+    return {"ok": True, "path": str(space), "lines": lines}
+
+
+def init_refusal(name, new, base):
+    """Why `contour init <name>` may not make a space in `base`, or None."""
+    illegal = space.illegal(name)
+    if illegal:
+        return illegal
+    where = base / name
+    if (where / MARKER).exists():
+        return f"{where.resolve()} is already a model space"
+    if any(s.name == name for s in space.spaces(space.roots(ROOT))):
+        return (f"a live space is already called {name}; a space's name is its "
+                f"identity, so pick another")
+    if new and (where.exists() or where.is_symlink()):
+        return f"{where.resolve()} already exists; pick another name"
+    return None
+
+
+def scaffold(root):
+    """Each scaffold file in `root` against the toolkit's template: `missing`,
+    `drift` (present, but not what the template writes for this space's name),
+    or `ok`. Asked by `doctor` of the space it stands in and by `spaces` of
+    every space, so the two cannot disagree about which files have drifted."""
+    return {rel: "missing" if not (root / rel).exists()
+            else "ok" if (root / rel).read_text() == space.template(ROOT, rel, root.name)
+            else "drift"
+            for rel in SCAFFOLD}
+
+
+def sees_rules(root):
+    """Whether an agent working in `root` is given the hard rules (open
+    question 13): a `CLAUDE.md` of its own, or the toolkit's above it, which
+    Claude Code finds by walking up."""
+    return ((root / "CLAUDE.md").is_file()
+            or (ROOT in root.parents and (ROOT / "CLAUDE.md").is_file()))
 
 
 def doctor():
     """Is this space still in step with the toolkit, and still unpushable."""
-    tpl = ROOT / "templates" / "space"
     lines, ok = [], True
-    for rel in SCAFFOLD:
-        here, there = PROJECT / rel, tpl / rel
-        if not here.exists():
+    for rel, state in scaffold(PROJECT).items():
+        if state == "missing":
             lines.append(f"MISS {rel} — run contour init in a fresh dir to see it")
             ok = False
-        elif here.read_text() != there.read_text().replace("<NAME>", PROJECT.name):
+        elif state == "drift":
             lines.append(f"DRIFT {rel} — differs from the toolkit's template")
             ok = False
         else:
@@ -554,9 +703,42 @@ def install_hooks():
     return {"ok": not override, "lines": lines}
 
 
-def spaces(name=None):
+def reading(root, now):
+    """One space as `spaces` reports it, derived from the space on every call
+    and never stored. The text form and the JSON form both print this, so they
+    cannot disagree about which spaces exist or which are behind (slice 28)."""
+    marker = (root / MARKER).read_text()
+    was = next((l.split(":", 1)[1].strip() for l in marker.splitlines()
+                if l.startswith("toolkit:")), None)
+    found = scaffold(root)
+    return {"name": root.name, "path": str(root),
+            "toolkit": {"commit": was,
+                        "state": "unknown" if was is None
+                        else "current" if was == now else "behind"},
+            "commits": git.commits(root), "remotes": git.remotes(root),
+            "scaffold": {"drift": [r for r, s in found.items() if s == "drift"],
+                         "missing": [r for r, s in found.items() if s == "missing"]},
+            "rules": sees_rules(root),
+            "presence": presence.live(root),
+            "renamed": rename.uncommitted(root)}
+
+
+def listing():
+    """Every space and its health, as `contour spaces --json` prints it and the
+    lobby serves it: one reading, so the two cannot disagree."""
+    now = toolkit_commit()
+    return {"roots": [str(r) for r in space.roots(ROOT)],
+            "spaces": [reading(s, now) for s in space.spaces(space.roots(ROOT))],
+            "deleted": restore.deleted()}
+
+
+def spaces(name=None, as_json=False):
     """List the model spaces, or print one's path for `cd $(contour spaces x)`."""
     found = space.spaces(space.roots(ROOT))
+    if as_json:
+        said = listing()
+        return {"ok": not any(s["remotes"] for s in said["spaces"]),
+                "lines": [json.dumps(said, indent=2)]}
     if name:
         hits = [s for s in found if s.name == name]
         if len(hits) != 1:
@@ -566,20 +748,30 @@ def spaces(name=None):
     if not found:
         return {"ok": True, "lines": [f"no model spaces under "
                                       f"{', '.join(str(r) for r in space.roots(ROOT))}",
-                                      "(set $CONTOUR_SPACES to look elsewhere)"]}
+                                      "(set $CONTOUR_SPACES to look elsewhere)"]
+                + deleted_lines()}
     now, lines, ok = toolkit_commit(), [], True
-    for s in found:
-        marker = (s / MARKER).read_text()
-        was = next((l.split(":", 1)[1].strip() for l in marker.splitlines()
-                    if l.startswith("toolkit:")), "?")
-        n = git.commits(s)
-        home = str(s).replace(str(Path.home()), "~")
-        state = "(unknown)" if was == "?" else "(current)" if was == now else "(behind)"
-        lines.append(f"  {s.name:<12} {home:<34} toolkit {was} {state:<10} {n:>4} commits")
-        for r in git.remotes(s):
-            lines.append(f"  WARN {s.name} has a remote ({r}) — a model space is never pushed")
+    for s in (reading(s, now) for s in found):
+        home = s["path"].replace(str(Path.home()), "~")
+        tk = s["toolkit"]
+        state = f"({tk['state']})"
+        lines.append(f"  {s['name']:<12} {home:<34} toolkit {tk['commit'] or '?'} "
+                     f"{state:<10} {s['commits']:>4} commits")
+        for r in s["remotes"]:
+            lines.append(f"  WARN {s['name']} has a remote ({r}) — a model space is never pushed")
             ok = False
-    return {"ok": ok, "lines": lines}
+    return {"ok": ok, "lines": lines + deleted_lines()}
+
+
+def deleted_lines():
+    """The trash, under the live list and apart from it (ADR 0021, decision 6)."""
+    gone = restore.deleted()
+    if not gone:
+        return []
+    return ["", "deleted (restore with contour restore <id> [--to <dir>]):"] + [
+        f"  {d['name'] or '?':<12} deleted {d['deleted'] or '?'}  "
+        + (f"restored, live at {d['live']}" if d["live"] else f"contour restore {d['id']}")
+        for d in gone]
 
 
 def unit_tests():

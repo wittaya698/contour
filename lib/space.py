@@ -14,6 +14,7 @@ could ask it, and the launcher and the console re-derived the same conventions b
 hand. Ask it about the space you have.
 """
 import os
+import re
 from pathlib import Path
 from typing import NamedTuple
 
@@ -157,6 +158,22 @@ def parse(args):
     return layout(here, toolkit)
 
 
+# A space's name is a directory, a git tag prefix and a path key in two files
+# outside the space, so it is held to the spelling all of those agree on. No
+# dot: Claude Code files transcripts under the path with its dots respelled.
+LEGAL = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}")
+
+
+def illegal(name):
+    """Why `name` is no name a space can have, or None. Asked by `init` and by
+    `rename`, so a space cannot be made under a name it could not be renamed
+    to."""
+    if LEGAL.fullmatch(name):
+        return None
+    return (f"{name!r} is not a name a space can have: letters, digits, - and _, "
+            f"starting with a letter or digit, at most 64")
+
+
 def roots(toolkit):
     """Where to look for spaces. `$CONTOUR_SPACES` overrides; otherwise the
     directory holding the toolkit, which is where spaces live by convention.
@@ -167,6 +184,50 @@ def roots(toolkit):
     told = os.environ.get("CONTOUR_SPACES")
     return ([Path(p).expanduser() for p in told.split(":") if p] if told
             else [Path(toolkit).parent])
+
+
+SCAFFOLD = ("CLAUDE.md", ".claude/settings.json",
+            ".claude/skills/build-model/SKILL.md",
+            ".claude/skills/build-model/references/bpy-recipes.md",
+            ".claude/skills/release-model/SKILL.md")
+"""What `contour init` copies into a space for the agent to read there."""
+
+
+def template(toolkit, rel, name):
+    """What the toolkit's template writes at `rel` for a space called `name`:
+    the one spelling of it, so what `init` writes, what `doctor` compares
+    against and what `rename` rewrites cannot drift apart."""
+    return (Path(toolkit) / "templates" / "space" / rel).read_text().replace("<NAME>", name)
+
+
+def stub(root, toolkit):
+    """Install the toolkit's `pre-push` stub in the repository at `root`.
+    Returns None, or what stopped it.
+
+    Into wherever git keeps this repository's hooks, asked rather than
+    assumed. Written by `init` into a new space, and again by `restore`,
+    because `.git/hooks` is the one part of a space no clone carries: a
+    restored space without it could push (rule 8)."""
+    from . import git
+    hooks = git.hooks_dir(root)
+    if hooks is None:
+        return "git made no repository to hook"
+    try:
+        hooks.mkdir(parents=True, exist_ok=True)
+        (hooks / "pre-push").write_bytes(
+            (Path(toolkit) / "templates" / "space" / "pre-push").read_bytes())
+        (hooks / "pre-push").chmod(0o755)
+    except OSError as e:
+        return f"could not install the pre-push stub: {e}"
+    return None
+
+
+def transcripts(root):
+    """Where Claude Code files the transcripts of sessions run in `root`: a
+    second key on the path (open question 12), so a space that moves leaves its
+    **spend** history behind under the old one."""
+    slug = "-" + str(root).lstrip("/").replace("/", "-")
+    return Path.home() / ".claude" / "projects" / slug
 
 
 SKIP = {"node_modules", "venv", ".venv", "target", "Library", "Pictures", "Music"}

@@ -26,6 +26,11 @@ def drive(prompt, options, gate, say):
     for step in json.loads(os.environ.get("CONTOUR_AGENT_SCRIPT") or "[]"):
         if "say" in step:
             say("text", text=step["say"])
+        if "keep_prompt" in step:
+            # The prompt this run was given, where a test that cannot see the
+            # console's transcript can read it: a console the lobby started
+            # never told anybody its URL.
+            Path(step["keep_prompt"]).write_text(prompt)
         if "limit" in step:
             # What the harness says when it compacts. Said and not acted on: a
             # limit the user did not choose must not interrupt work they were
