@@ -169,6 +169,28 @@ def roots(toolkit):
             else [Path(toolkit).parent])
 
 
+SCAFFOLD = ("CLAUDE.md", ".claude/settings.json",
+            ".claude/skills/build-model/SKILL.md",
+            ".claude/skills/build-model/references/bpy-recipes.md",
+            ".claude/skills/release-model/SKILL.md")
+"""What `contour init` copies into a space for the agent to read there."""
+
+
+def template(toolkit, rel, name):
+    """What the toolkit's template writes at `rel` for a space called `name`:
+    the one spelling of it, so what `init` writes, what `doctor` compares
+    against and what `rename` rewrites cannot drift apart."""
+    return (Path(toolkit) / "templates" / "space" / rel).read_text().replace("<NAME>", name)
+
+
+def transcripts(root):
+    """Where Claude Code files the transcripts of sessions run in `root`: a
+    second key on the path (open question 12), so a space that moves leaves its
+    **spend** history behind under the old one."""
+    slug = "-" + str(root).lstrip("/").replace("/", "-")
+    return Path.home() / ".claude" / "projects" / slug
+
+
 SKIP = {"node_modules", "venv", ".venv", "target", "Library", "Pictures", "Music"}
 
 

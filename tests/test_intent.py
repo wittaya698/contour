@@ -39,6 +39,13 @@ class ClassifyTest(unittest.TestCase):
                 intent.classify(tool, {"file_path": "/m/widget/spec.yaml"}),
                 "spec-write", tool)
 
+    def test_a_rename_writes_the_spec(self):
+        """`model:` and `revision:` move with the name (ADR 0021, decision 5),
+        so an agent reaching for it under a console meets the spec's gate."""
+        for call in ("contour rename beta", "./contour rename beta --yes"):
+            self.assertEqual(intent.classify("Bash", {"command": call}),
+                             "spec-write", call)
+
     def test_writing_a_reference_is_its_own_category(self):
         """Not because it is approvable — rule 1 says no measurement argument
         justifies rewriting a reference, and the guard keeps denying it. It is

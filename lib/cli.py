@@ -25,7 +25,7 @@ import sys
 import time
 from pathlib import Path
 
-from lib import commands, git, presence, space     # stdlib-only by test (ADR 0019, 29)
+from lib import commands, git, presence, revision, space     # stdlib-only by test (ADR 0019, 29)
 
 ROOT = Path(__file__).resolve().parent.parent
 BLENDER = os.environ.get("BLENDER", "/Applications/Blender.app/Contents/MacOS/Blender")
@@ -101,15 +101,7 @@ def need_project(cmd):
     return 2
 
 
-REVISION = re.compile(r"^revision:\s*(\d+)\s*$", re.M)
-
-
-def spec_revision(text):
-    """The contract's revision number. Absent means 0, so a spec written before
-    ADR 0016 is revision 0 and its first correction is 1. Anchored at column 0,
-    so the word inside an indented block scalar is not mistaken for the field."""
-    m = REVISION.search(text or "")
-    return int(m.group(1)) if m else 0
+spec_revision = revision.of
 
 
 def check_revision():
@@ -121,18 +113,10 @@ def check_revision():
     change that was. Returns None when there is nothing to say — this runs on
     every model command, so it is silent on success and costs nothing.
     """
-    spec = HERE.spec
-    if not spec.exists():
+    found = revision.unbumped(PROJECT)
+    if found is None:
         return None
-    was_text = git.show(PROJECT, "HEAD", "spec.yaml")
-    if was_text is None:          # untracked, or no commit yet: creation is not mutation
-        return None
-    now = spec.read_text(encoding="utf-8")
-    if now == was_text:
-        return None
-    was, is_ = spec_revision(was_text), spec_revision(now)
-    if is_ > was:
-        return None
+    was, is_ = found
     return {"ok": False, "lines": [
         f"FAIL revision  spec.yaml differs from HEAD, revision still {is_}",
         "  The spec is the user's intent. It may be revised once they have",
@@ -330,6 +314,29 @@ def on_lobby(cmd, rest, held):
     return emit(lobby.serve(listing, grace=seconds("CONTOUR_LOBBY_GRACE", lobby.GRACE_S)))
 
 
+def on_rename(cmd, rest, held):
+    """Proposes, or with `--yes` does what it proposed (ADR 0021, decision 5).
+
+    `holds` is False in the table and the hold is taken in `rename.perform`:
+    the lock file moves with the directory, so it has to be released at the
+    new path, which `main` does not know.
+    """
+    from lib import rename
+    names = [w for w in rest if not w.startswith("--")]
+    if len(names) != 1:
+        print(usage(), file=sys.stderr)
+        return 2
+    said = (rename.perform if "--yes" in rest else rename.propose)(PROJECT, names[0], ROOT)
+    if "--json" in rest:
+        return emit({"ok": not said["refused"], "lines": [json.dumps(said, indent=2)]})
+    if said["refused"]:
+        return emit({"ok": False, "lines": [f"FAIL rename  {said['refused']}"]})
+    if "--yes" in rest:
+        return emit({"ok": True, "lines": [f"ok   renamed to {said['to']}",
+                                           f"     cd {said['to']}"]})
+    return emit({"ok": True, "lines": rename.lines(said)})
+
+
 def seconds(name, fallback):
     """A timeout from the environment, so a test proving what a silence means
     does not have to wait out the real one."""
@@ -391,10 +398,8 @@ def main(argv):
         free(record)
 
 
-SCAFFOLD = ("CLAUDE.md", ".claude/settings.json",
-            ".claude/skills/build-model/SKILL.md",
-            ".claude/skills/build-model/references/bpy-recipes.md",
-            ".claude/skills/release-model/SKILL.md")
+SCAFFOLD = space.SCAFFOLD
+template = space.template      # `init` names its new space `space`
 
 
 def toolkit_commit():
@@ -423,7 +428,7 @@ def init(name):
             kept.append(rel)
             continue
         dst.parent.mkdir(parents=True, exist_ok=True)
-        dst.write_text((tpl / rel).read_text().replace("<NAME>", space.name))
+        dst.write_text(template(ROOT, rel, space.name))
     if not (space / ".gitignore").exists():
         (space / ".gitignore").write_text((tpl / "gitignore").read_text())
     else:
@@ -460,10 +465,8 @@ def scaffold(root):
     `drift` (present, but not what the template writes for this space's name),
     or `ok`. Asked by `doctor` of the space it stands in and by `spaces` of
     every space, so the two cannot disagree about which files have drifted."""
-    tpl = ROOT / "templates" / "space"
     return {rel: "missing" if not (root / rel).exists()
-            else "ok" if (root / rel).read_text()
-            == (tpl / rel).read_text().replace("<NAME>", root.name)
+            else "ok" if (root / rel).read_text() == space.template(ROOT, rel, root.name)
             else "drift"
             for rel in SCAFFOLD}
 

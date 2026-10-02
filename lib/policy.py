@@ -77,6 +77,20 @@ def named(space, file=None):
     return tuple(scope.get("allow") or ())
 
 
+def names(space, file=None):
+    """Whether the file has an entry for this space's path — the one thing a
+    rename leaves behind here, since the key is the path and the renamed space
+    then falls back to asking about everything (open question 12)."""
+    file = Path(file or ask_list())
+    if not file.exists():
+        return False
+    try:
+        whole = miniyaml.load(file)
+    except (miniyaml.YamlError, OSError) as e:
+        raise PolicyError(f"cannot read {file} as an ask-list: {e}") from e
+    return here(space) in {here(k) for k in (whole.get("spaces") or {})}
+
+
 def split(names):
     """What the file named, as (categories the toolkit knows, the rest).
 

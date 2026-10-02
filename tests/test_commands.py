@@ -53,7 +53,8 @@ class SpaceTest(unittest.TestCase):
         toolkit's own directory would build something nobody asked for."""
         self.assertEqual(names(space=True),
                          ["check", "render", "export", "measure", "canvas",
-                          "resolve", "mark", "run", "doctor", "migrate-marks"])
+                          "resolve", "mark", "run", "doctor", "migrate-marks",
+                          "rename"])
 
 
 class ArityTest(unittest.TestCase):
