@@ -26,10 +26,22 @@ The probe runs in a scratch build, never in `beaky`.
 
 ## Acceptance criteria
 
-- [ ] Which of the three holds on 5.2.1 is shown by a build that ran, and its result is recorded under ADR 0023
-- [ ] If the whitelist gains `object.mode_set`, the user has approved that line and its reason before it lands
-- [ ] If neither works, ADR 0023 and slice 51 say node animation instead
-- [ ] No `bpy.ops` call outside the whitelist was made to find out
+- [x] Which of the three holds on 5.2.1 is shown by a build that ran, and its result is recorded under ADR 0023
+- [x] If the whitelist gains `object.mode_set`, the user has approved that line and its reason before it lands
+- [x] If neither works, ADR 0023 and slice 51 say node animation instead
+- [x] No `bpy.ops` call outside the whitelist was made to find out
+
+## What it came to
+
+The second of the three. `edit_bones.new` outside edit mode raises, and
+`Armature.bones` has no `new()`, so the data API alone cannot make a bone. One
+`object.mode_set`, through `lib.ctx_override.call` with the rig made active by the
+data API, makes them — no change to `ctx_override`. A rigid bind built all through
+the data API follows a posed bone. The numbers are under ADR 0023's evidence.
+
+The whitelist's fourth line was approved by the user before the call that used it.
+Node animation is not needed; slice 51 builds an armature, and now also owns the
+probe's one red, `parts unexpected: rig`.
 
 ## Blocked by
 

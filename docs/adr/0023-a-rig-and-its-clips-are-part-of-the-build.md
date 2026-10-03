@@ -8,6 +8,23 @@
 > carries a rig and an on-the-spot `walk`, green on every check below, round-tripped
 > through `.glb`, and approved from its filmstrip.
 
+## Evidence: the probe, 2026-10-03 (issue 47)
+
+A scratch space, never `beaky`: one 100 mm cube, one armature.
+
+| step | asked | found |
+|---|---|---|
+| data API alone | `edit_bones.new` in object mode | `RuntimeError: Armature 'rig' not in edit mode, cannot add an editbone`; `Armature.bones` is read-only and has no `new()` |
+| one operator | `object.mode_set` through `lib.ctx_override.call`, rig made active through the data API | into edit and back; two bones made, parented, at the heads asked — no change to `ctx_override` needed |
+| rigid bind | vertex group at weight 1, armature modifier, all data API | posing the bone 45° about X moves the cube's Z range from 0..0.1 to −0.021..0.121 — 0.05 ± 0.0707, as the geometry predicts |
+
+So the armature holds, at the cost of the whitelist's fourth line, `object.mode_set`,
+approved by the user on 2026-10-03. Node animation is not needed.
+
+The probe also found that verify counts every object as a part — `parts unexpected:
+rig` — so the armature object must be recognised as the rig rather than an
+undeclared part. That falls to slice 51.
+
 ## Context
 
 `beaky`'s spec has said *"Rigged later: each part's pivot at its joint, neutral pose

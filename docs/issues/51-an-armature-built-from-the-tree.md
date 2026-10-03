@@ -13,8 +13,14 @@ The rest pose is the model as shaped, so every shape check is unchanged and stil
 measures at rest. Verify adds that the bones match the tree: one per part, the
 same parents.
 
-Built however slice 47 found bones can be made — or as node animation, if 47
-amended the ADR.
+Slice 47 found bones are made in edit mode, entered and left by the whitelisted
+`object.mode_set` through `lib.ctx_override`, with the rig made the active object
+through the data API; the bind itself — vertex groups, the armature modifier — is
+all data API. See ADR 0023's evidence.
+
+The armature is an object, and verify counts every object as a part: the probe
+went red on `parts unexpected: rig`. The rig's object is recognised as the rig,
+not as an undeclared part.
 
 ## Acceptance criteria
 
@@ -22,6 +28,7 @@ amended the ADR.
 - [ ] Every part is weighted wholly to its own bone
 - [ ] Every shape check reads the same at rest as without the armature
 - [ ] A bone count or parent that disagrees with the tree is red, shown by a fixture
+- [ ] The armature object is not reported as an unexpected part
 
 ## Blocked by
 
