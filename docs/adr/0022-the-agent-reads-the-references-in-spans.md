@@ -1,11 +1,39 @@
 # 0022 — The agent reads the references in spans
 
-**Status:** Proposed · 2026-09-30 · **amends [ADR 0017](0017-scaffold-measured-from-references.md) and [ADR 0018](0018-marks-a-canvas-over-the-sheet.md)**
+**Status:** Accepted · 2026-10-03 (proposed 2026-09-30) · **amends [ADR 0017](0017-scaffold-measured-from-references.md) and [ADR 0018](0018-marks-a-canvas-over-the-sheet.md)**
 
 > **Accept on a tracer bullet:** agent-drawn **snapped** spans on `beaky`'s
 > references reproduce the three numbers ADR 0017 measured — width 888, depth 597,
 > legs 168 — within their error bars, and the user adopts one, corrects one and
 > rejects one on the canvas.
+
+## Evidence: the tracer bullet, 2026-10-03
+
+Three snapped agent spans on `beaky`'s references, anchored on 1700 mm. No end
+was typed as a pixel; the agent named the query and picked from what it found:
+
+| | span | asked | reads | ADR 0017 |
+|---|---|---|---|---|
+| width | m2 | `--silhouette --extent across` on `front.jpg` | **888 ±3** | 888 |
+| depth | m4 | `--silhouette --extent across` on `side.jpg` | **597 ±3** | 597 |
+| legs, centre to centre | m6 | `--scanline 250 --of #3B3F72 --runs 1,2 --between centres` | **168 ±3** | 168 |
+
+`--again` on m2 and m4 placed the same ends. The user then answered each once,
+on the canvas: adopted m2, corrected m4 (dragged across the head, reading 169 mm,
+the old reading closed), rejected m6 with a reason (span and reading closed,
+marked unused).
+
+What it shows, and what it does not:
+
+- **The numbers match exactly, as they should.** It is the same arithmetic on
+  the same pictures; agreement shows that naming *which* edges loses nothing
+  against ADR 0017's hand-run queries, not that the queries are right.
+- **Picking runs by number was not tested hard.** The leg scanline found exactly
+  two runs, and the agent read the report before picking. `beaky` is flat
+  colours on white paper; a busier reference is where picks go wrong.
+- **Correcting by drag works, and left a display fault.** After the correction
+  the user saw the picture go blank; the record was right. Not reproduced in
+  headless Chrome, under the same sequence. Open.
 
 ## Context
 
@@ -91,10 +119,11 @@ ADR 0017's evidence: the agent must not become the source of a number.
    > behind it is not an argument, and a by-eye agent span argues nothing until
    > the user has answered it.
 
-   It is written into `CLAUDE.md`, and into the space template, in the slice that
-   makes agent spans drawable. Until then an agent cannot draw a span at all, and
-   a rule naming a mechanism that does not exist would stop every agent proposing
-   anything.
+   It is written into `CLAUDE.md`, and into the space template, in slice 46,
+   once by-eye spans exist: the clause names them, and a rule naming a mechanism
+   that does not exist would stop every agent proposing anything. Until then
+   snapped spans are governed by decision 6. (Amended on acceptance, 2026-10-03:
+   this said "the slice that makes agent spans drawable", which was 40.)
 
 ## Consequences
 

@@ -34,12 +34,28 @@ was expected, and that disagreement was the reason to accept it.
 
 ## Acceptance criteria
 
-- [ ] The three spans were drawn by the agent in `beaky`, with no pixel typed for any end
-- [ ] Each number is compared with ADR 0017's, and the comparison is recorded in ADR 0022
-- [ ] The user gave each of the three answers once, on the canvas
-- [ ] ADR 0022 is Accepted, amended or withdrawn, with the result recorded in it
-- [ ] `docs/adr/README.md` and the ADR state the same status
-- [ ] Nothing in `beaky` was committed without the user's say (rule 5)
+- [x] The three spans were drawn by the agent in `beaky`, with no pixel typed for any end
+- [x] Each number is compared with ADR 0017's, and the comparison is recorded in ADR 0022
+- [x] The user gave each of the three answers once, on the canvas
+- [x] ADR 0022 is Accepted, amended or withdrawn, with the result recorded in it
+- [x] `docs/adr/README.md` and the ADR state the same status
+- [x] Nothing in `beaky` was committed without the user's say (rule 5)
+
+## What it came to
+
+**Accepted**, 2026-10-03. The three snapped spans read 888, 597 and 168 — ADR
+0017's numbers exactly — with no end typed as a pixel. The user adopted the
+width, corrected the depth and rejected the legs, once each, on the canvas.
+
+None of the three expected amendments turned up. Picking runs by number was not
+tested hard: the leg scanline found two runs, on flat colours. Two things are
+left open in the ADR:
+- the picture went blank after a correction, though the record was right; not
+  reproduced in headless Chrome;
+- decision 9 was amended to put the rule 1 clause in 46, where the issues
+  README already had it.
+
+Nothing in `beaky` was committed; its `marks.json` holds the answers, untracked.
 
 ## Blocked by
 

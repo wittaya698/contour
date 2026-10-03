@@ -149,8 +149,8 @@ second fits around the other. Neither blocks 24, and 24 does not block them.
 
 ## Batch 4 — agent spans
 
-From [ADR 0022](../adr/0022-the-agent-reads-the-references-in-spans.md), which is
-Proposed. The agent draws spans on the references, with ends placed by
+From [ADR 0022](../adr/0022-the-agent-reads-the-references-in-spans.md), accepted
+2026-10-03 (issue 43). The agent draws spans on the references, with ends placed by
 measurement; the user answers each one; and a number from a reference names the
 span it came from. Two HITL slices and five AFK.
 
