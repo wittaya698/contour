@@ -72,6 +72,10 @@
   li.unanswered { border-left: 2px dashed var(--agent); padding-left: 6px; }
   li.adopted .verdict, li.corrected .verdict { color: var(--pin); }
   li.rejected .why { display: block; font-size: 12px; text-decoration: none; }
+  /* By eye: the agent placed the ends itself, where nothing would snap (ADR
+     0022, decision 3). Its line is broken on the picture and it says so in the
+     list, so a number nothing measured never passes for one that was. */
+  li.byeye .how { color: var(--agent); font-style: italic; }
   .verdict { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; opacity: .7; }
   .shut { border: 0; padding: 0 0 0 6px; font-size: 12px; opacity: .6; text-decoration: underline; }
   /* A veto: the sentence is the point, so it is the part that reads normally.
@@ -551,11 +555,13 @@ function draw() {
   marks.forEach((mark, i) => {
     const closed = mark.status === 'closed';
     const here = (mark.ref || null) === showing;
+    const eyed = mark.placed === 'by eye';
     if (cv.width && mark.to && here) {
       ctx.save();
       ctx.strokeStyle = mark.author === 'agent' ? '#2f6fd8' : '#d8442f';
       ctx.lineWidth = Math.max(2, cv.width / 400);
       ctx.lineCap = 'round';
+      if (eyed) ctx.setLineDash([ctx.lineWidth * 3, ctx.lineWidth * 3]);
       ctx.beginPath();
       ctx.moveTo(mark.pixel[0], mark.pixel[1]);
       ctx.lineTo(mark.to[0], mark.to[1]);
@@ -582,7 +588,8 @@ function draw() {
     const state = spanState(mark);
     li.className = [closed && 'closed', mark.ref && 'ref',
                     mark.author === 'agent' && 'agent',
-                    mark.addressed && 'done', state].filter(Boolean).join(' ');
+                    mark.addressed && 'done', eyed && 'byeye',
+                    state].filter(Boolean).join(' ');
     const view = document.createElement('span');
     view.className = 'view';
     view.textContent = mark.ref || mark.view || '';
@@ -598,6 +605,12 @@ function draw() {
       who.className = 'who';
       who.textContent = mark.addressed ? ' agent · addressed' : ' agent';
       li.append(who);
+    }
+    if (eyed) {
+      const how = document.createElement('span');
+      how.className = 'how';
+      how.textContent = ' by eye';
+      li.append(how);
     }
     if (state) {
       const verdict = document.createElement('span');

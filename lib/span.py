@@ -215,17 +215,44 @@ def draw_extent(path, ref, question, box, height, k, text):
 
 
 def pinned(path, ref, question, ends, k, text):
-    """A snapped span on file, and its answer pinned between its ends. One
-    record for every query that places one, so nothing that reads a span
-    needs to know which did."""
+    """A snapped span on file, and its answer pinned between its ends: the
+    one record every query that places one makes."""
     a, b = ends
-    answer = reads(a, b, k)
-    drawn, said = marks.spanned(path, {"ref": ref, "pixel": a, "to": b,
-                                       "text": text, "placed": "snapped",
-                                       "question": question, "scale": k},
-                                answer, midpoint(a, b))
-    return {"ok": True, "lines": [f"ok   measure {drawn['id']} {ref}  {text}  "
-                                  f"{answer}  (answer {said['id']})"]}
+    return _drawn(path, {"ref": ref, "pixel": a, "to": b, "text": text,
+                         "placed": "snapped", "question": question, "scale": k},
+                  reads(a, b, k))
+
+
+def by_eye(path, ref, ends, k, text):
+    """An agent span with free ends, where nothing would snap (ADR 0022,
+    decision 3; issue 44). Returns a report.
+
+    There was no question, so none is stored and `--again` has nothing to ask.
+    What it keeps instead is the fact: `placed: by eye`.
+    """
+    a, b = ends
+    if list(a) == list(b):
+        return {"ok": False, "lines": [
+            "FAIL measure  a span needs two different ends: both are the same "
+            "pixel, so there is no distance to read"]}
+    return _drawn(path, {"ref": ref, "pixel": list(a), "to": list(b), "text": text,
+                         "placed": "by eye", "scale": k},
+                  f"{reads(a, b, k)}  {BY_EYE}")
+
+
+BY_EYE = ("by eye: the bar covers the arithmetic between the ends, not the "
+          "placing of them")
+"""What a by-eye span's answer says beside its number. The bar is a pixel at
+each end; left unsaid, it would read as covering where the agent put them."""
+
+
+def _drawn(path, mark, answer):
+    """An agent span on file, and its answer pinned between its ends. One
+    record for every way one is placed, so nothing that reads a span needs to
+    know which did."""
+    drawn, said = marks.spanned(path, mark, answer, midpoint(mark["pixel"], mark["to"]))
+    return {"ok": True, "lines": [f"ok   measure {drawn['id']} {mark['ref']}  "
+                                  f"{mark['text']}  {answer}  (answer {said['id']})"]}
 
 
 def reads(a, b, k):
@@ -245,6 +272,41 @@ def unscaled(a, b, why=NO_ANCHOR):
     return f"{math.dist(a, b):.0f} px \u00b12 px  ({why})"
 
 
+def standing(path, mark_id):
+    """Whether this span's number may go into a proposal, and as whose (ADR
+    0022, decision 6). Writes nothing.
+
+    `proposable` says it for code; the line says it for the agent, with the
+    number beside it, so the reading that may be proposed and the reading
+    proposed are the same one.
+    """
+    found = marked(path, mark_id)
+    if found is None:
+        return {"ok": False, "lines": [f"FAIL measure  no mark {mark_id} on file"]}
+    if not (marks.reference(found) and marks.span_end(found)):
+        return {"ok": False, "lines": [
+            f"FAIL measure  {mark_id} is not a span: only a span on a reference "
+            f"has a number to propose"]}
+    said = found.get("answer")
+    if said == "rejected":
+        may, why = False, (f"rejected by the user ({found.get('why')}): its number "
+                           f"may not be proposed")
+    elif said or found.get("author") == "user":
+        may, why = True, (f"the user's span ({said or 'drawn by the user'}): its "
+                          f"number may be proposed, naming {mark_id}")
+    elif found.get("placed") == "by eye":
+        may, why = False, ("by eye, and the user has not answered it: its number "
+                           "may not be proposed until they do")
+    else:
+        may, why = True, (f"snapped, and the user has not answered it: its number "
+                          f"may be proposed as the agent's own reading, naming "
+                          f"{mark_id}")
+    number = marked(path, found.get("reading"))
+    number = marks.text(number) if number else "no reading on file"
+    return {"ok": True, "proposable": may,
+            "lines": [f"ok   measure {mark_id} {why}", f"  {number}"]}
+
+
 def asked(path, mark_id):
     """The reference a snapped span is on and the question that placed it, or
     a refusal. What `contour measure --again` runs before it can compare."""
@@ -252,9 +314,10 @@ def asked(path, mark_id):
     if found is None:
         return {"ok": False, "lines": [f"FAIL measure  no mark {mark_id} on file"]}
     if found.get("placed") != "snapped":
+        how = "by eye" if found.get("placed") == "by eye" else "by hand"
         return {"ok": False, "lines": [
             f"FAIL measure  {mark_id} is not a snapped span: its ends were "
-            f"placed by hand, so there is no question to ask again"]}
+            f"placed {how}, so there is no question to ask again"]}
     return {"ok": True, "ref": marks.reference(found), "question": found["question"]}
 
 

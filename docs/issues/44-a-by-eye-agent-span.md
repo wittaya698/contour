@@ -24,12 +24,33 @@ slice 40's, so a by-eye span is never made by accident.
 
 ## Acceptance criteria
 
-- [ ] The agent can create a span with two free ends, only through the by-eye spelling
-- [ ] The record, the pinned answer and the canvas each say the span is by eye
-- [ ] The answer's wording states what its error bar does not cover
-- [ ] An unanswered by-eye span reports that its number may not be proposed; an adopted or corrected one reports that it may
-- [ ] An unanswered snapped span reports that its number may be proposed as the agent's own
-- [ ] Nothing under `refs/` is written
+- [x] The agent can create a span with two free ends, only through the by-eye spelling
+- [x] The record, the pinned answer and the canvas each say the span is by eye
+- [x] The answer's wording states what its error bar does not cover
+- [x] An unanswered by-eye span reports that its number may not be proposed; an adopted or corrected one reports that it may
+- [x] An unanswered snapped span reports that its number may be proposed as the agent's own
+- [x] Nothing under `refs/` is written
+
+## What it came to
+
+- `contour measure <ref> --by-eye --from X,Y --to X,Y "what it is"` draws one.
+  Rows count from the bottom, as every height `contour measure` reports does.
+  `--from` or `--to` without `--by-eye` is refused on a bare query, and the
+  snapped spellings already refused both, so a free end is never placed by
+  accident.
+- The record is `placed: "by eye"`, with its scale and no question; `--again`
+  refuses it, saying it was placed by eye.
+- Its answer reads, after the number: *by eye: the bar covers the arithmetic
+  between the ends, not the placing of them*. The command's report says the same.
+- The canvas strokes it dashed and labels it *by eye* in the list. What that
+  looks like has not been seen by the user.
+- `contour measure --standing ID` says whether a span's number may be proposed,
+  and as whose, with the reading beside it: the user's (drawn, adopted or
+  corrected); the agent's own reading (snapped, unanswered); or not until the
+  user answers it (by eye, unanswered). A rejected span may not be proposed.
+  It reads `marks.json` only, so the launcher answers it without Blender.
+- A corrected by-eye span loses the label, as a corrected snapped one loses its
+  question: the ends are the user's.
 
 ## Blocked by
 

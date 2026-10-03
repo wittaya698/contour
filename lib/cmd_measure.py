@@ -27,6 +27,14 @@ model frame does: millimetres above the ground.
                        edges this reports for it, and pin the answer back
     --again ID         ask a snapped span's stored question again, and say
                        whether it still places the same ends. Writes nothing
+    --by-eye --from X,Y --to X,Y "what it is"
+                       draw an agent span with free ends, where nothing would
+                       snap: a photograph, a soft gradient (ADR 0022). Labelled
+                       by eye everywhere, and its answer says the bar does not
+                       cover the placing. The only spelling that takes a pixel
+    --standing ID      whether a span's number may be proposed, and as whose:
+                       the user's, the agent's own reading, or not until the
+                       user answers it. Reads marks.json only
     --anchor MM        the silhouette's height is MM; everything reports in mm
     --silhouette       bounding box of everything that is not background
     --region HEX       bounding box + centroid of one palette colour
@@ -146,6 +154,11 @@ EXTENT_FLAGS = ("--region", "--extent", "--anchor", "--tol", "--bg-tol")
 flag with no value."""
 
 
+BY_EYE_FLAGS = ("--from", "--to", "--anchor", "--bg-tol")
+"""The same, for a span placed by eye (issue 44): its two ends, and what the
+scale is read with. `--by-eye` is its one flag with no value, and is required."""
+
+
 def span_form(rest, takes, bare=(), e_g=""):
     """`(text, refusal)` for a span form's arguments: the one line it is asked
     to carry, or why the command as typed is not one. `takes` are its flags
@@ -191,6 +204,29 @@ def extent_form(rest):
     if flag(rest, "--extent") not in span.EXTENTS:
         return None, f"FAIL measure  --extent takes one of: {', '.join(span.EXTENTS)}"
     return text, None
+
+
+def by_eye_form(rest):
+    """`(text, refusal)` for a span whose ends the agent placed itself."""
+    text, refused = span_form(rest, BY_EYE_FLAGS, bare=("--by-eye",),
+                              e_g='--by-eye --from 400,250 --to 560,250 "the seat"')
+    if refused:
+        return None, refused
+    if any(point(flag(rest, f, str, "")) is None for f in ("--from", "--to")):
+        return None, ("FAIL measure  a by-eye span needs both ends, each as X,Y: "
+                      "--from X,Y --to X,Y, rows counted from the bottom")
+    return text, None
+
+
+def point(s):
+    """`X,Y` -> `[x, y]`, or None when it is not two numbers."""
+    try:
+        got = [float(t) for t in s.split(",")]
+    except ValueError:
+        return None
+    if len(got) != 2:
+        return None
+    return [int(v) if v.is_integer() else v for v in got]
 
 
 def extent(px, fg, of, tol):
@@ -246,7 +282,20 @@ def run(args):
     again = flag(rest, "--again")
     if again:
         return asked_again(P, store, again)
-    if "--runs" in rest:
+    eyed = "--by-eye" in rest
+    if eyed:
+        text, refused = by_eye_form(rest)
+        if refused:
+            return {"ok": False, "lines": [refused]}
+        rest = [a for a in rest if a != text]
+    elif "--runs" not in rest and "--extent" not in rest and (
+            "--from" in rest or "--to" in rest):
+        # A pixel for an end is by eye whatever it was meant as, and the
+        # spelling that says so is the only one that takes it (ADR 0022, decision 3).
+        return {"ok": False, "lines": [
+            "FAIL measure  an end given as a pixel is placed by eye: say --by-eye, "
+            "so the span is labelled as one"]}
+    elif "--runs" in rest:
         if "--scanline" not in rest:
             return {"ok": False, "lines": [
                 "FAIL measure  --runs picks from a scanline: give --scanline too"]}
@@ -284,7 +333,8 @@ def run(args):
     # retype it -- and to nothing else. Every other query keeps its old
     # behaviour of measuring in pixels until an anchor is given.
     anchor = flag(rest, "--anchor", float)
-    if (asked or "--runs" in rest or "--extent" in rest) and anchor is None:
+    spanned = asked or eyed or "--runs" in rest or "--extent" in rest
+    if spanned and anchor is None:
         anchor = span.anchor_mm(P.spec)
     px = load(path)
     h, w = px.shape[:2]
@@ -302,6 +352,18 @@ def run(args):
         # The scale is the only thing the image is asked for here: where the
         # span runs was decided by the user, on the picture, with a mouse.
         got = span.measure(store, asked, S.k)
+        return {**got, "lines": lines + got["lines"]}
+
+    if eyed:
+        ends = [point(flag(rest, f)) for f in ("--from", "--to")]
+        if not all(0 <= x < w and 0 <= y < h for x, y in ends):
+            return {"ok": False, "lines": lines + [
+                f"FAIL measure  an end is outside {name}, which is {w}x{h}px: "
+                f"nothing was drawn"]}
+        # Rows from the bottom, as every height here reads; a mark's pixel
+        # counts from the top, as the canvas draws it.
+        got = span.by_eye(store, Path(name).name,
+                          [[x, h - 1 - y] for x, y in ends], k=S.k, text=text)
         return {**got, "lines": lines + got["lines"]}
 
     if "--runs" in rest:

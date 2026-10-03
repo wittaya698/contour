@@ -52,7 +52,7 @@ tested hard: the leg scanline found two runs, on flat colours. Two things are
 left open in the ADR:
 - the picture went blank after a correction, though the record was right; not
   reproduced in headless Chrome;
-- decision 9 was amended to put the rule 1 clause in 46, where the issues
+- ADR 0022 decision 9 was amended to put the rule 1 clause in 46, where the issues
   README already had it.
 
 Nothing in `beaky` was committed; its `marks.json` holds the answers, untracked.

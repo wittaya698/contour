@@ -245,6 +245,11 @@ def on_api(cmd, rest, held):
 
 
 def on_measure(cmd, rest, held):
+    if rest[:1] == ["--standing"] and len(rest) == 2:
+        # Whether a span's number may be proposed is read off `marks.json`
+        # alone, so it is answered here and costs no Blender start.
+        from lib import span
+        return emit(span.standing(HERE.marks, rest[1]))
     return emit(stage(["measure", *rest]))
 
 
