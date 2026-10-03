@@ -150,6 +150,28 @@ def snap(runs, picked, between, row, height):
     return [x[0], y], [x[1], y]
 
 
+EXTENTS = ("across", "up")
+"""The two ways a span can run over an extent: side to side, or bottom to top."""
+
+
+def edges(box, extent, height):
+    """Two ends on the edges of an extent `contour measure` reported (ADR
+    0022, decision 2; issue 41).
+
+    `box` is `x0, x1, y0, y1` as `cmd_measure.bbox` gives it, rows counted
+    from the bottom, specks already ignored — the extent the report prints,
+    so a span reads the report's own number and never a second one. Across
+    runs at the middle of its height, up through the middle of its width; the
+    ends sit on pixel edges, half a pixel out, as `snap`'s gap and extent do.
+    """
+    x0, x1, y0, y1 = box
+    if extent == "across":
+        y = height - 1 - (y0 + y1) / 2
+        return [x0 - 0.5, y], [x1 + 0.5, y]
+    x = (x0 + x1) / 2
+    return [x, height - 1 - y1 - 0.5], [x, height - 1 - y0 + 0.5]
+
+
 def found_runs(runs):
     """A scanline's runs as its report numbers them, for a refusal to hand
     back: the agent picks from these, so these are what it is shown."""
@@ -171,6 +193,32 @@ def draw(path, ref, question, runs, row, height, k, text):
             f"FAIL measure  pick two different runs of the {len(runs)} the "
             f"scanline found: {found_runs(runs) or 'none'}"]}
     a, b = snap(runs, picked, question["between"], row, height)
+    return pinned(path, ref, question, (a, b), k, text)
+
+
+def draw_extent(path, ref, question, box, height, k, text):
+    """An agent span across an extent, snapped to its edges (issue 41).
+    Returns a report.
+
+    `box` is the extent the question found, or None when its colour is not in
+    the picture at that tolerance: then there are no edges, and nothing is
+    drawn. `question` names the extent and the colour, None for the
+    silhouette, and is stored with the span as `draw`'s is.
+    """
+    if box is None:
+        return {"ok": False, "lines": [
+            f"FAIL measure  {question['of']} is not in {ref} at --tol "
+            f"{question['tol']:g}: there is no extent to draw a span across, "
+            f"so nothing was drawn"]}
+    return pinned(path, ref, question, edges(box, question["extent"], height),
+                  k, text)
+
+
+def pinned(path, ref, question, ends, k, text):
+    """A snapped span on file, and its answer pinned between its ends. One
+    record for every query that places one, so nothing that reads a span
+    needs to know which did."""
+    a, b = ends
     drawn = marks.append(path, {"ref": ref, "pixel": a, "to": b, "text": text,
                                 "placed": "snapped", "question": question},
                          author="agent")
@@ -215,7 +263,25 @@ def again(path, mark_id, runs, row, height):
             f"FAIL measure  {mark_id}: the reference no longer gives these ends; "
             f"runs {picked[0]} and {picked[1]} were asked for, and the scanline "
             f"now finds {found_runs(runs) or 'none'}"]}
-    a, b = snap(runs, picked, q["between"], row, height)
+    return same(found, mark_id, snap(runs, picked, q["between"], row, height))
+
+
+def again_extent(path, mark_id, box, height):
+    """`again`, for a span drawn across an extent: `box` is what its question
+    finds now, or None when the colour no longer matches. Writes nothing."""
+    found = marked(path, mark_id)
+    q = found["question"]
+    if box is None:
+        return {"ok": False, "lines": [
+            f"FAIL measure  {mark_id}: the reference no longer gives these ends; "
+            f"{q['of']} is not in it at --tol {q['tol']:g}"]}
+    return same(found, mark_id, edges(box, q["extent"], height))
+
+
+def same(found, mark_id, ends):
+    """Whether a snapped span's question still places the ends it was drawn
+    on, said either way."""
+    a, b = ends
     if [a, b] != [marks.pixel(found), marks.span_end(found)]:
         return {"ok": False, "lines": [
             f"FAIL measure  {mark_id}: the reference no longer gives these ends; "

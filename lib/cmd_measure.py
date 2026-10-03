@@ -22,6 +22,9 @@ model frame does: millimetres above the ground.
                        their numbers in its report, and pin the answer back
                        (ADR 0022). Its ends are placed on what was measured;
                        there is no spelling of this that takes a pixel
+    --silhouette|--region HEX --extent across|up "what it is"
+                       draw an agent span across or up that extent, on the
+                       edges this reports for it, and pin the answer back
     --again ID         ask a snapped span's stored question again, and say
                        whether it still places the same ends. Writes nothing
     --anchor MM        the silhouette's height is MM; everything reports in mm
@@ -138,29 +141,62 @@ SPAN_FLAGS = ("--scanline", "--of", "--runs", "--between", "--anchor", "--tol",
 not ignored: an end given as a pixel would otherwise be dropped silently, and
 the agent would believe it had placed one (ADR 0022, decision 2)."""
 
+EXTENT_FLAGS = ("--region", "--extent", "--anchor", "--tol", "--bg-tol")
+"""The same, for a span across an extent (issue 41); `--silhouette` is its one
+flag with no value."""
 
-def span_form(rest):
-    """`(text, refusal)` for the span form's arguments: the one line it is
-    asked to carry, or why the command as typed is not one."""
+
+def span_form(rest, takes, bare=(), e_g=""):
+    """`(text, refusal)` for a span form's arguments: the one line it is asked
+    to carry, or why the command as typed is not one. `takes` are its flags
+    with a value, `bare` those without; any other flag is refused."""
     text, i = [], 0
     while i < len(rest):
         if rest[i].startswith("--"):
-            if rest[i] not in SPAN_FLAGS:
+            if rest[i] not in takes + bare:
                 return None, (f"FAIL measure  {rest[i]} is not part of a span: the "
-                              f"agent picks runs and a distance, and code places "
+                              f"agent names what was measured, and code places "
                               f"the ends, so no end is ever given as a pixel")
-            i += 2
+            i += 1 if rest[i] in bare else 2
             continue
         text.append(rest[i])
         i += 1
     if len(text) != 1:
-        return None, ('FAIL measure  say in one line what the distance is, e.g. '
-                      '--runs 1,2 --between centres "the legs, centre to centre"')
+        return None, f"FAIL measure  say in one line what the distance is, e.g. {e_g}"
+    return text[0], None
+
+
+def scanline_form(rest):
+    """`(text, refusal)` for a span between two runs of one scanline."""
+    text, refused = span_form(rest, SPAN_FLAGS,
+                              e_g='--runs 1,2 --between centres "the legs, centre to centre"')
+    if refused:
+        return None, refused
     if "," in flag(rest, "--scanline", str, ""):
         return None, "FAIL measure  a span is drawn on one scanline: give one height"
     if flag(rest, "--between") not in span.BETWEEN:
         return None, f"FAIL measure  --between takes one of: {', '.join(span.BETWEEN)}"
-    return text[0], None
+    return text, None
+
+
+def extent_form(rest):
+    """`(text, refusal)` for a span across the silhouette or one colour."""
+    text, refused = span_form(rest, EXTENT_FLAGS, bare=("--silhouette",),
+                              e_g='--silhouette --extent across "the body, side to side"')
+    if refused:
+        return None, refused
+    if ("--silhouette" in rest) == ("--region" in rest):
+        return None, ("FAIL measure  a span runs over one extent: give --silhouette "
+                      "or --region HEX, and not both")
+    if flag(rest, "--extent") not in span.EXTENTS:
+        return None, f"FAIL measure  --extent takes one of: {', '.join(span.EXTENTS)}"
+    return text, None
+
+
+def extent(px, fg, of, tol):
+    """The extent a report prints for the silhouette (`of` None) or one
+    colour: the box a span across it snaps to, or None for no such colour."""
+    return bbox(colour_mask(px, fg, of, tol) if of else fg)
 
 
 class Scale:
@@ -214,7 +250,12 @@ def run(args):
         if "--scanline" not in rest:
             return {"ok": False, "lines": [
                 "FAIL measure  --runs picks from a scanline: give --scanline too"]}
-        text, refused = span_form(rest)
+        text, refused = scanline_form(rest)
+        if refused:
+            return {"ok": False, "lines": [refused]}
+        rest = [a for a in rest if a != text]
+    elif "--extent" in rest:
+        text, refused = extent_form(rest)
         if refused:
             return {"ok": False, "lines": [refused]}
         rest = [a for a in rest if a != text]
@@ -243,7 +284,7 @@ def run(args):
     # retype it -- and to nothing else. Every other query keeps its old
     # behaviour of measuring in pixels until an anchor is given.
     anchor = flag(rest, "--anchor", float)
-    if (asked or "--runs" in rest) and anchor is None:
+    if (asked or "--runs" in rest or "--extent" in rest) and anchor is None:
         anchor = span.anchor_mm(P.spec)
     px = load(path)
     h, w = px.shape[:2]
@@ -274,6 +315,13 @@ def run(args):
             return {"ok": False, "lines": lines + [
                 f"FAIL measure  scanline {q['scanline']:g} is row {row}, outside the image"]}
         got = span.draw(store, Path(name).name, q, rr, row=row, height=h, k=S.k, text=text)
+        return {**got, "lines": lines + got["lines"]}
+
+    if "--extent" in rest:
+        q = {"extent": flag(rest, "--extent"), "of": flag(rest, "--region"),
+             "anchor": anchor, "tol": tol, "bg_tol": bg_tol}
+        got = span.draw_extent(store, Path(name).name, q,
+                               extent(px, fg, q["of"], tol), height=h, k=S.k, text=text)
         return {**got, "lines": lines + got["lines"]}
 
     if "--silhouette" in rest or not any(f in rest for f in ("--region", "--scanline", "--profile")):
@@ -351,6 +399,9 @@ def asked_again(P, store, mark_id):
     sil = bbox(fg)
     if sil is None:
         return {"ok": False, "lines": [f"FAIL measure  {name} is entirely background"]}
+    if "extent" in q:
+        return span.again_extent(store, mark_id, extent(px, fg, q["of"], q["tol"]),
+                                 height=px.shape[0])
     row, rr = scan(px, fg, Scale(q["anchor"], sil), q["scanline"], q["of"],
                    q["tol"], q["min_run"])
     return span.again(store, mark_id, rr or [], row=row, height=px.shape[0])

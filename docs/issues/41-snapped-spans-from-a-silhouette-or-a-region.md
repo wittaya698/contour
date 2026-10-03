@@ -19,11 +19,31 @@ one `contour measure` already reports, specks ignored, and not a second reading.
 
 ## Acceptance criteria
 
-- [ ] The agent can create a snapped span across or up a silhouette, and across or up one colour's region
-- [ ] The span's ends are the edges `contour measure` reports for that query, and its stored question re-runs to the same ends
-- [ ] A colour the reference does not contain is refused, and draws nothing
-- [ ] On `beaky`'s references, the front silhouette reads 888 across and the side silhouette 597, each within its error bar
-- [ ] The record has the same shape as slice 40's; nothing that reads a span needs to know which query placed it
+- [x] The agent can create a snapped span across or up a silhouette, and across or up one colour's region
+- [x] The span's ends are the edges `contour measure` reports for that query, and its stored question re-runs to the same ends
+- [x] A colour the reference does not contain is refused, and draws nothing
+- [x] On `beaky`'s references, the front silhouette reads 888 across and the side silhouette 597, each within its error bar
+- [x] The record has the same shape as slice 40's; nothing that reads a span needs to know which query placed it
+
+## What it came to
+
+`contour measure <ref> --silhouette --extent across|up "what it is"`, or
+`--region HEX` in place of `--silhouette`. The ends sit on the pixel edges of
+the box `bbox` already reports, with specks ignored: across at its mid-height
+and up through its mid-column. So the span reads the report's own `w` or `h`
+and never a second number. As in slice 40, any flag the form does not name is
+refused, so `--pixel`, `--to`, a stray `--scanline`, or both `--silhouette` and
+`--region` at once draw nothing.
+
+The record is slice 40's: it goes through the same `span.pinned`, and the
+stored question is `{extent, of, anchor, tol, bg_tol}`, with `of: null` for the
+silhouette. Only `--again` looks inside the question, to choose between
+re-scanning and re-boxing.
+
+On copies of `beaky`'s references, with the spec height at 1700, the front reads
+`888 mm ±3 mm (593 px at 1.498 mm/px)` and the side `597 mm ±3 mm (391 px at
+1.526 mm/px)`. Asked again, each says `same ends`. A colour that is not there
+(`#00FF00`) is refused, naming its tolerance.
 
 ## Blocked by
 

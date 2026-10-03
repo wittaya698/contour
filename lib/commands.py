@@ -44,6 +44,7 @@ TABLE = (
             (("measure <ref> ...", "real pixel geometry from a reference image"),
              ("measure --span <m>", "read the distance two pins on a reference mean"),
              ("measure <ref> --runs A,B", "draw an agent span between two runs of a scanline"),
+             ("measure <ref> --extent across|up", "draw an agent span across the silhouette or a colour"),
              ("measure --again <m>", "ask a snapped span's question again")),
             "on_measure"),
     Command("canvas", NONE, True, False, None,
