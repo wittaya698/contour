@@ -17,6 +17,8 @@ Run `contour doctor` to find out whether that copy has gone stale.
 | `contour render` | 4-view sheet → `sheet.png` | ~1400 tok |
 | `contour export` | `.glb` + round-trip re-measure | ~80 tok |
 | `contour canvas` | the sheet in a browser, to mark on; waits for you | ~20 tok |
+| `contour measure` | pixel geometry off a reference; draws and reads spans | ~60 tok |
+| `contour worksheet` | every span drawn onto its reference → `worksheet.png` | ~1400 tok |
 | `contour doctor` | is this space still in step with the toolkit | ~20 tok |
 
 Run them from inside this directory; they take no model name. Full Blender
@@ -30,8 +32,11 @@ output goes to `.contour/last-build.log`. Read it **only on failure**.
    is the argument — the measurement that shows the contract is wrong — and it
    comes before the write wherever the confirm lands: prose in a terminal, a
    gate under a console. A gate is a confirm and never a proposal; it can stop a
-   write, it cannot make the case for one. Never propose one while a check is
-   red; fix `build.py` or report the failure.
+   write, it cannot make the case for one. A measurement read off a reference
+   is a **span** — the user's, or an agent span — and the proposal names it. A
+   number from a reference with no span behind it is not an argument, and a
+   by-eye agent span argues nothing until the user has answered it. Never
+   propose one while a check is red; fix `build.py` or report the failure.
    `contour check` fails if the spec moved and `revision:` did not (ADR 0016).
    A *new* spec may be drafted when the user asks — scale needs an anchor they
    give you, every number you chose flagged as yours, tolerances loudest, since

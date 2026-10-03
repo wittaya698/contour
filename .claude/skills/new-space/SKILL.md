@@ -85,13 +85,41 @@ placeholder.
 Start `NOTES.md` for deferred refinements and open questions, in the format of
 the toolkit's `docs/OPEN-QUESTIONS.md`.
 
-**Measure the images; never recall them.** Work mm-per-pixel out from the
-anchor, then read every other dimension off the pixels. `beaky`'s `NOTES.md`
-records three claims made by eye, all wrong, all caught only by measuring:
-legs called bowed that are straight, a toon render pass read as geometry, and a
-beak called too long that was merely thin.
+**Measure the images with `contour measure`; never recall them.** It works
+mm per pixel out from the anchor and reads every other dimension off the pixels.
+`beaky`'s `NOTES.md` records three claims made by eye, all wrong, all caught only
+by measuring: legs called bowed that are straight, a toon render pass read as
+geometry, and a beak called too long that was merely thin.
 
-**Propose each measured number with its error bar.** `depth 620 ±6 measured,
+**Every number you read off a reference is a span** (ADR 0022). Draw it with
+`contour measure`, and let code place its ends wherever an edge can be found:
+
+```sh
+contour measure refs/side.jpg --silhouette --extent across "depth, front to back"
+contour measure refs/front.jpg --scanline 250 --of '#3B3F72' --runs 1,2 \
+    --between centres "the legs, centre to centre"
+```
+
+You say *which* edges; the command says *where*. Only where nothing snaps — a
+photograph of a real object, a soft gradient — place the ends yourself, with
+`--by-eye --from X,Y --to X,Y`, and the span is labelled by eye wherever it shows.
+
+**Every number in the draft names its source**, and there are three:
+- a span, by id: `depth 640 ±3 (span m4)`;
+- the user, who gave it;
+- *not measurable*, said plainly — a depth hidden behind the body, say.
+
+A number from an unanswered **snapped** span is listed as the agent's own
+reading, beside its id. A number from an unanswered **by-eye** span is not
+proposed: ask the user to answer that span on the canvas first.
+`contour measure --standing <id>` says which a span is.
+
+**Look at the worksheet once, before you propose.** When you believe your
+reading is finished, run `contour worksheet` and look at `worksheet.png`: every
+span drawn on its reference, with its id and its number. Check each one measures
+what its label says it does. Once, at that checkpoint — not after every span.
+
+**Propose each measured number with its error bar.** `depth 640 ±3 (span m4),
 proposing tol 15` is something the user can argue with; `tol: 20` alone is not.
 A tolerance says how far the build may stray from intent — it is not a place to
 hide how roughly you measured. State both; only the tolerance reaches the spec

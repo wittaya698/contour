@@ -32,12 +32,25 @@ pass. While a check is red the spec is not on the table at all: fix `build.py`,
 or report the failure and stop.
 
 **When the spec itself is wrong**, and the check is *green*, say so — and bring
-the measurement that shows it. `beaky` sat at `depth 612.4` inside a tolerance
-of 600 ±20, for a reference that measures about 620: the build was right and
-the contract was not. That is the case this route exists for. Propose the
-change, wait for the user to confirm it, then write it with `revision:` bumped
-in the same edit. `contour check` goes red if the spec moved and the number did
-not (ADR 0016).
+the measurement that shows it. Illustratively: *depth reads 640 mm ±3 on span
+m4, against a tolerance of 600 ±20*. That is the case this route exists for.
+
+The measurement is a span, drawn with `contour measure` and named in the
+proposal (rule 1). Every number in the proposal names its source, one of three:
+- a span, by id;
+- the user, who gave it;
+- *not measurable*, said plainly.
+
+A number from an unanswered **snapped** span is proposed as the agent's own
+reading, beside its id. A number from an unanswered **by-eye** span is not
+proposed until the user has answered it on the canvas.
+`contour measure --standing <id>` says which a span is.
+
+Run `contour worksheet` and look at it once, before you propose: every span on
+its reference, with its id and number, so you can see each measures what it
+says. Then propose the change, wait for the user to confirm it, and write it
+with `revision:` bumped in the same edit. `contour check` goes red if the spec
+moved and the number did not (ADR 0016).
 
 ## Writing geometry
 

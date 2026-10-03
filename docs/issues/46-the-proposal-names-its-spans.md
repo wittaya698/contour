@@ -42,12 +42,32 @@ repository, under rule 5.
 
 ## Acceptance criteria
 
-- [ ] Rule 1 carries the approved clause, in the toolkit's `CLAUDE.md` and in the space template, identically
-- [ ] The new-space skill and the build-model skill state the three sources, the two span rules, and the worksheet checkpoint
-- [ ] The new-space skill names `contour measure` as how a reference is measured
-- [ ] No skill or rule states that `beaky`'s reference depth is 620, or that its contract was wrong about depth
-- [ ] The user chose the replacement for the 620 example
+- [x] Rule 1 carries the approved clause, in the toolkit's `CLAUDE.md` and in the space template, identically
+- [x] The new-space skill and the build-model skill state the three sources, the two span rules, and the worksheet checkpoint
+- [x] The new-space skill names `contour measure` as how a reference is measured
+- [x] No skill or rule states that `beaky`'s reference depth is 620, or that its contract was wrong about depth
+- [x] The user chose the replacement for the 620 example
 - [ ] `contour doctor` reports the drift in each existing space, and each is refreshed only on the user's say
+
+## What it came to
+
+- Rule 1 carries the clause, word for word, in the toolkit's `CLAUDE.md` and the
+  space template, after the sentence on gates. `tests/test_rule_one_spans.py`
+  holds both to the wording ADR 0022 records.
+- The user chose wording that is plainly an illustration over a real case,
+  since none is on record (2026-10-03). Rule 1's example is now *depth reads
+  640 mm ±3 on span m4, against a tolerance of 600 ±20*, and the two skills use
+  the same numbers. Nothing names `beaky`, or says its contract was wrong.
+- The new-space skill names `contour measure` with a snapped example of each
+  kind and the by-eye spelling, then the three sources, the two span rules with
+  `--standing`, and the worksheet checkpoint. The build-model skill says the
+  same for arguing a revision.
+- The space template's command table gains `contour measure` and
+  `contour worksheet`, the second held back from slice 45.
+- `contour doctor` reports `CLAUDE.md` and the build-model skill as drift in all
+  six spaces. Four also had older drift in `.claude/settings.json`, and `beaky`
+  in its release-model skill. No space has been refreshed: each is a commit in
+  that space's own repository, waiting on the user.
 
 ## Blocked by
 

@@ -25,11 +25,14 @@ Full Blender output goes to `.contour/last-build.log`. Read it **only on failure
    Measure them; never rewrite one. **A `spec.yaml` changes only as: propose →
    user confirms → write, bumping `revision:` in that same write.** The proposal
    is the argument — the measurement that shows the contract is wrong, *depth
-   measures 620 against a tolerance of 600 ±20* — and it comes before the write
-   wherever the confirm lands: prose in a terminal, a gate under a console. A
-   gate is a confirm and never a proposal; it can stop a write, it cannot make
-   the case for one. Never propose one while a check is red; fix `build.py` or
-   report the failure.
+   reads 640 mm ±3 on span m4, against a tolerance of 600 ±20* — and it comes
+   before the write wherever the confirm lands: prose in a terminal, a gate
+   under a console. A gate is a confirm and never a proposal; it can stop a
+   write, it cannot make the case for one. A measurement read off a reference
+   is a **span** — the user's, or an agent span — and the proposal names it. A
+   number from a reference with no span behind it is not an argument, and a
+   by-eye agent span argues nothing until the user has answered it. Never
+   propose one while a check is red; fix `build.py` or report the failure.
    `contour check` fails if the spec moved and `revision:` did not (ADR 0016).
    A *new* spec may be drafted when the user asks — scale needs an anchor they
    give you, every number you chose flagged as yours, tolerances loudest, since
