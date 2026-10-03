@@ -184,6 +184,44 @@ that does not exist is worse than the wording it replaces.
 conversation, so there is no file for a command to read. That waits for proposals
 to be data, which is the scaffold ADR 0022 sets aside.
 
+## Batch 5 — a rig and its clips
+
+From [ADR 0023](../adr/0023-a-rig-and-its-clips-are-part-of-the-build.md), proposed
+2026-10-03. A model's rig and clips are built, checked and exported with its shape:
+the spec states the tree and the key poses, pivots are measured from seams, and the
+agent sees motion as a filmstrip. Three HITL slices and seven AFK.
+
+| # | Slice | Type | Blocked by |
+|---|---|---|---|
+| [47](47-bones-without-operators.md) | Bones without operators, probed on 5.2.1 | HITL | — |
+| [48](48-the-spec-carries-a-rig-tree.md) | The spec carries a rig tree | AFK | — |
+| [49](49-seams-and-pivots-measured-at-rest.md) | Seams and pivots measured at rest | AFK | 48 |
+| [50](50-beaky-gets-its-rig.md) | `beaky` gets its rig | HITL | 49 |
+| [51](51-an-armature-built-from-the-tree.md) | An armature built from the tree | AFK | 47, 49 |
+| [52](52-clips-keyed-from-the-spec.md) | Clips keyed from the spec | AFK | 51 |
+| [53](53-no-part-enters-another.md) | No part enters another, at any frame | AFK | 52 |
+| [54](54-the-round-trip-carries-the-rig.md) | The round-trip carries the rig | AFK | 52 |
+| [55](55-the-filmstrip.md) | The filmstrip | AFK | 52 |
+| [56](56-beaky-walks.md) | `beaky` walks, and ADR 0023 is accepted | HITL | 50, 53, 54, 55 |
+
+### Shape of the graph
+
+**47 and 48 are both unblocked, and only 51 waits on the probe.** The tree, the
+seams and the pivots are geometry at rest, so 48–50 go ahead whatever 47 finds —
+and `beaky`'s real faults, a head with no seam and four origins off their pivots,
+surface in 50 before any armature exists. They are worth fixing even if the
+animation never lands.
+
+**52 fans out.** The collision check, the round-trip and the filmstrip each need a
+keyed clip and nothing from each other.
+
+**The HITL slices are where a rule needs the user:** 47 may add a line to the
+operator whitelist (rule 4), and 50 and 56 write `beaky`'s spec (rule 1), each
+with tolerances the agent may draft but not choose. 56 is the verdict on ADR 0023,
+as 43 was on ADR 0022.
+
+**Every new check ships with a fixture that makes it fail** (ADR 0009).
+
 ## Found in flight
 
 Not from either review — a defect the work turned up, filed where the rest of the
