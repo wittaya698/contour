@@ -284,7 +284,8 @@ def pivots(spec, m):
         off = _mm(sum((a - b) ** 2 for a, b in zip(origins[name], centre)) ** 0.5)
         worst = max(worst, off)
         if off > tol:
-            bad.append(f"{name} origin {off:.1f}mm off its pivot")
+            at = ", ".join(f"{_mm(c):.1f}" for c in centre)
+            bad.append(f"{name} origin {off:.1f}mm off its pivot at ({at})mm")
     return [result("pivots", not bad, f"{worst:.1f}/{tol}mm",
                    "; ".join(bad) + f" (tolerance {tol}mm)")]
 

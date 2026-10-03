@@ -440,12 +440,13 @@ class SeamTest(unittest.TestCase):
         got = self.judge(self.crossing(), neck=(0, 0, .5004))["pivots"]
         self.assertTrue(got["ok"], got["msg"])
 
-    def test_an_origin_off_its_pivot_beyond_tolerance_says_by_how_much(self):
+    def test_an_origin_off_its_pivot_beyond_tolerance_says_by_how_much_and_where(self):
         """beaky's neck, whose origin is its sphere's centre, ~137 mm from
-        where it meets the torso."""
+        where it meets the torso. Where the pivot is, so the fix in
+        `build.py` has a number to move the origin to."""
         got = self.judge(self.crossing(), neck=(0, .003, .637))["pivots"]
         self.assertFalse(got["ok"])
-        self.assertIn("neck origin 137.0mm off its pivot", got["msg"])
+        self.assertIn("neck origin 137.0mm off its pivot at (0.0, 0.0, 500.0)mm", got["msg"])
 
     def test_a_rig_with_no_pivot_tolerance_is_red_for_the_missing_field(self):
         """The tolerance is the user's (ADR 0023); a default here would be a
