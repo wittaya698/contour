@@ -219,23 +219,30 @@ def pinned(path, ref, question, ends, k, text):
     record for every query that places one, so nothing that reads a span
     needs to know which did."""
     a, b = ends
-    drawn = marks.append(path, {"ref": ref, "pixel": a, "to": b, "text": text,
-                                "placed": "snapped", "question": question},
-                         author="agent")
-    answer = line(reading(a, b, k)) if k else unscaled(a, b)
-    said = agent.write(path, f"span {drawn['id']}: {answer}", ref=ref,
-                       pixel=midpoint(a, b))
+    answer = reads(a, b, k)
+    drawn, said = marks.spanned(path, {"ref": ref, "pixel": a, "to": b,
+                                       "text": text, "placed": "snapped",
+                                       "question": question, "scale": k},
+                                answer, midpoint(a, b))
     return {"ok": True, "lines": [f"ok   measure {drawn['id']} {ref}  {text}  "
                                   f"{answer}  (answer {said['id']})"]}
 
 
-def unscaled(a, b):
-    """A span's answer with no anchor: pixels, and why they are not mm. Where
+def reads(a, b, k):
+    """What a span between these ends reads: millimetres at scale `k`, the
+    mm per pixel it was drawn at, or pixels when there is none."""
+    return line(reading(a, b, k)) if k else unscaled(a, b)
+
+
+NO_ANCHOR = ("no anchor: this space states no dimensions.height, so the "
+             "picture gives proportion and not millimetres")
+
+
+def unscaled(a, b, why=NO_ANCHOR):
+    """A span's answer with no scale: pixels, and why they are not mm. Where
     the ends landed is still an answer; a millimetre figure would be a guess
     at the scale (ADR 0016), so none is given."""
-    return (f"{math.dist(a, b):.0f} px \u00b12 px  (no anchor: this space states "
-            f"no dimensions.height, so the picture gives proportion and not "
-            f"millimetres)")
+    return f"{math.dist(a, b):.0f} px \u00b12 px  ({why})"
 
 
 def asked(path, mark_id):

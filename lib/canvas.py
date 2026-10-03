@@ -19,6 +19,7 @@ from lib import marks as marks_store
 from lib import mask as mask_store
 from lib import refs as refs_store
 from lib import signals
+from lib import span
 from lib.page import TOKEN_HEADER, TOKEN_PARAM, Blob, Page  # noqa: F401  (re-exported)
 
 PAGE = Path(__file__).resolve().parent / "canvas.html"
@@ -87,7 +88,15 @@ class Canvas(Page):
                 ("GET", "/sheet.png"): lambda q: png(
                     self.sheet.read_bytes() if self.sheet.exists() else None),
                 ("POST", "/marks"): self.record,
-                ("POST", "/close"): lambda b: self.close(b.get("id")) or None}
+                ("POST", "/close"): lambda b: self.close(b.get("id")) or None,
+                # The user's three answers to an agent span (ADR 0022,
+                # decision 5). Here, so every host that serves the page has them.
+                ("POST", "/adopt"): lambda b: self.answer(
+                    marks_store.adopt, b.get("id")),
+                ("POST", "/correct"): lambda b: self.answer(
+                    self.corrected, b.get("id"), b.get("pixel"), b.get("to")),
+                ("POST", "/reject"): lambda b: self.answer(
+                    marks_store.reject, b.get("id"), b.get("why"))}
 
     def ref(self, name):
         """One of the user's photographs, or None when there is no such one."""
@@ -148,6 +157,28 @@ class Canvas(Page):
         the pipeline may move a mark to closed (ADR 0018)."""
         with self._lock:
             return marks_store.close(self.marks, mark_id)
+
+    def answer(self, transition, *args):
+        """The user's answer to an agent span: the mark as it now stands, or
+        `{"refused": why}`. Only ever reached from the page, as `close` is."""
+        with self._lock:
+            said = transition(self.marks, *args)
+        return said.get("mark") or said
+
+    def corrected(self, marks, mark_id, a, b):
+        """The user's correction: their ends, read afresh at the scale the
+        agent's reading was taken at. The ends are the user's, so no image is
+        read; the scale is the span's own, so no anchor is asked again."""
+        found = span.marked(marks, mark_id) or {}
+        if not (a and b and a != b):
+            said = ""                       # refused by the record, with why
+        elif "scale" not in found:
+            said = span.unscaled(a, b, f"drawn before spans kept their scale: "
+                                       f"contour measure --span {mark_id} reads "
+                                       f"it in millimetres")
+        else:
+            said = span.reads(a, b, found["scale"])
+        return marks_store.correct(marks, mark_id, a, b, said)
 
     def wait(self):
         """Serve until the page says done, then stop, anchor, and report."""

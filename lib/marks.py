@@ -337,6 +337,120 @@ def close(path, mark_id):
     return found
 
 
+def answered(mark):
+    """How the user answered this agent span — `adopted`, `corrected`,
+    `rejected` — or None while it is still a question (ADR 0022, decision 5)."""
+    return mark.get("answer")
+
+
+def _answering(path, mark_id, change):
+    """Give one agent span the user's answer. Returns `{"mark": ...}`, or
+    `{"refused": why}` with nothing written.
+
+    Only an open agent span with no answer yet is a question. Once adopted or
+    corrected it is the user's, so it cannot be answered twice; once rejected
+    it is closed. `change(mark, kept)` edits the record in place — and may add
+    to `kept`, which is saved with it — or returns why it refuses.
+    """
+    kept = load(path)
+    found = next((m for m in kept if m.get("id") == mark_id), None)
+    if found is None:
+        return {"refused": f"no mark {mark_id} on file"}
+    if not (found.get("author") == "agent" and reference(found)
+            and span_end(found) and is_open(found) and not answered(found)):
+        return {"refused": f"{mark_id} is not an agent span waiting on an "
+                           f"answer: only an open one the agent drew is a "
+                           f"question"}
+    refused = change(found, kept)
+    if refused:
+        return {"refused": refused}
+    save(path, kept)
+    return {"mark": found}
+
+
+def spanned(path, mark, answer, at):
+    """An agent span and the reading pinned beside it, stored together in one
+    write. Returns `(span, reading)`.
+
+    Linked from the start: the span keeps its reading's id, so whatever the
+    user answers can reach the number it gave without reading prose. `answer`
+    is the reading without the span's id, which only the store knows yet.
+    """
+    kept = load(path)
+    drawn = {"id": next_id(kept), **mark, "author": "agent", "status": "open"}
+    said = _reading(next_id(kept + [drawn]), drawn["id"], drawn["ref"], answer, at)
+    drawn["reading"] = said["id"]
+    save(path, kept + [drawn, said])
+    return drawn, said
+
+
+def _reading(mark_id, of, ref, answer, at):
+    """The agent mark that carries a span's number, pinned at `at`."""
+    return {"id": mark_id, "ref": ref, "pixel": at, "text": f"span {of}: {answer}",
+            "author": "agent", "status": "open"}
+
+
+def _superseded(kept, mark):
+    """Close the reading a span gave: its number no longer stands. Returns it,
+    or None for a span drawn before readings were linked."""
+    old = next((m for m in kept if m.get("id") == mark.get("reading")), None)
+    if old is not None:
+        old["status"] = "closed"
+    return old
+
+
+def adopt(path, mark_id):
+    """*It is right.* The span is the user's from then on, and still says who
+    drew it."""
+    def change(mark, kept):
+        mark.update(author="user", drawn_by="agent", answer="adopted")
+    return _answering(path, mark_id, change)
+
+
+def correct(path, mark_id, pixel, to, answer):
+    """*Not quite: here.* The span takes the user's ends and is theirs, keeps
+    the ends the agent drew, and is answered afresh. `answer` is the reading
+    at the new ends, worked out by the caller, which knows the scale.
+
+    No longer snapped: the user placed it, so no question would place these
+    ends again, and the agent's question goes with the flag.
+    """
+    def change(mark, kept):
+        if not (pixel and to) or list(pixel) == list(to):
+            return "a correction needs two different ends"
+        _superseded(kept, mark)
+        at = [round((pixel[0] + to[0]) / 2), round((pixel[1] + to[1]) / 2)]
+        said = _reading(next_id(kept), mark_id, mark["ref"], answer, at)
+        kept.append(said)
+        mark.update(author="user", drawn_by="agent", answer="corrected",
+                    agent_ends=[mark["pixel"], mark["to"]],
+                    pixel=list(pixel), to=list(to), reading=said["id"])
+        mark.pop("placed", None)
+        mark.pop("question", None)
+        return None
+    return _answering(path, mark_id, change)
+
+
+def reject(path, mark_id, why):
+    """*It measured the wrong thing.* Closed, with the user's one line of why,
+    and its number — on the span and on the reading — marked not to be used.
+
+    A reason is required: a rejection with none tells the agent only that it
+    was wrong, and the next span it draws would be drawn as blind.
+    """
+    why = (why or "").strip()
+
+    def change(mark, kept):
+        if not why:
+            return "a rejection needs a reason: one line of what it measured instead"
+        old = _superseded(kept, mark)
+        if old is not None:
+            old["unused"] = True
+        mark.update(status="closed", answer="rejected", why=why, unused=True)
+        return None
+    return _answering(path, mark_id, change)
+
+
 def _released(path):
     """The last release tag and the marks it holds — `(tag, marks)`, or
     `(None, [])` when there is no tag to archive anything.

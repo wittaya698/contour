@@ -7,8 +7,10 @@ of in a paragraph nobody reads.
 
 Two things this module deliberately cannot do. It cannot close a mark: only the
 user closes a finding, and a finding is not disposed of by the party it is aimed
-at. And it cannot touch the spec or the references: an agent mark is a proposal,
-and rule 1's propose -> confirm -> write is untouched by it.
+at — nor answer one of its own spans, which is a question put to the user
+(ADR 0022, decision 5). And it cannot touch the spec or the references: an
+agent mark is a proposal, and rule 1's propose -> confirm -> write is untouched
+by it.
 """
 import argparse
 import json

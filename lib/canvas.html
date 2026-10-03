@@ -66,6 +66,13 @@
      from would be the same findings in two places. */
   #list .seed { margin-right: 4px; }
   #seeds { font-size: 11px; opacity: .6; margin: 0 0 4px; }
+  /* An agent span is a question (ADR 0022, decision 5). Unanswered, it is
+     dashed and asks; answered, it says which answer it got. A rejected one is
+     closed already, and says why beside its struck-through number. */
+  li.unanswered { border-left: 2px dashed var(--agent); padding-left: 6px; }
+  li.adopted .verdict, li.corrected .verdict { color: var(--pin); }
+  li.rejected .why { display: block; font-size: 12px; text-decoration: none; }
+  .verdict { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; opacity: .7; }
   .shut { border: 0; padding: 0 0 0 6px; font-size: 12px; opacity: .6; text-decoration: underline; }
   /* A veto: the sentence is the point, so it is the part that reads normally.
      Bordered like nothing — it is a record and not a thing waiting for you. */
@@ -432,6 +439,9 @@ let down = null;
 // null means the sheet; otherwise the name of the reference on show. Only one
 // picture is ever displayed, so only its own marks are ever pinned to it.
 let showing = null;
+// The agent span the user is redrawing, or null. The next drag on its
+// reference becomes its ends, and nothing else does.
+let correcting = null;
 
 // The mask is read here, never fetched per mouse move: hover has to be instant.
 // It is the same size and the same four-tile layout as the sheet, so a sheet
@@ -569,9 +579,10 @@ function draw() {
       wrap.appendChild(pin);
     }
     const li = document.createElement('li');
+    const state = spanState(mark);
     li.className = [closed && 'closed', mark.ref && 'ref',
                     mark.author === 'agent' && 'agent',
-                    mark.addressed && 'done'].filter(Boolean).join(' ');
+                    mark.addressed && 'done', state].filter(Boolean).join(' ');
     const view = document.createElement('span');
     view.className = 'view';
     view.textContent = mark.ref || mark.view || '';
@@ -588,7 +599,30 @@ function draw() {
       who.textContent = mark.addressed ? ' agent · addressed' : ' agent';
       li.append(who);
     }
+    if (state) {
+      const verdict = document.createElement('span');
+      verdict.className = 'verdict';
+      verdict.textContent = ' ' + (state === 'unanswered' ? 'is this what you meant?'
+                                   : state + (mark.drawn_by ? ' · drawn by ' + mark.drawn_by : ''));
+      li.append(verdict);
+    }
     li.append(document.createElement('br'), body);
+    if (state === 'rejected') {
+      const why = document.createElement('span');
+      why.className = 'why';
+      why.textContent = 'rejected: ' + mark.why + ' — its number is not to be used';
+      li.append(why);
+    }
+    if (state === 'unanswered' && !closed) {
+      for (const [label, act] of [['adopt', adoptSpan], ['correct', correctSpan],
+                                  ['reject', rejectSpan]]) {
+        const b = document.createElement('button');
+        b.className = 'shut';
+        b.textContent = label;
+        b.addEventListener('click', () => act(mark));
+        li.append(b);
+      }
+    }
     if (!closed && seeding) {
       // Selectable only while open: a closed finding is not what a run is about,
       // and the server drops one anyway and says that it did.
@@ -653,6 +687,37 @@ function seedLine() {
     : '';
 }
 
+// Where an agent span stands: `unanswered` while it is a question, then the
+// answer it got. Not a span the agent drew, or not a span: no state at all.
+function spanState(mark) {
+  if (mark.answer) return mark.answer;
+  return mark.author === 'agent' && mark.ref && mark.to ? 'unanswered' : null;
+}
+
+// The user's three answers. Each goes to the server and the list is read back
+// whole: an answer can close a reading or add one, which is more than the one
+// mark the page clicked on.
+async function answered(path, body) {
+  correcting = null;
+  const said = await ask(path, body).then(r => r.json()).catch(() => null);
+  if (said && said.refused) hint.textContent = said.refused;
+  marks = await ask('/marks').then(r => r.json());
+  draw();
+}
+
+function adoptSpan(mark) { answered('/adopt', { id: mark.id }); }
+
+function rejectSpan(mark) {
+  const why = prompt('What did it measure instead? One line.');
+  if (why && why.trim()) answered('/reject', { id: mark.id, why: why.trim() });
+}
+
+function correctSpan(mark) {
+  if (showing !== mark.ref) show(mark.ref);
+  correcting = mark;
+  hint.textContent = 'Drag the span as it should be.';
+}
+
 // One click, no typing: only the user ever closes a mark.
 async function shutMark(mark) {
   const res = await ask('/close', { id: mark.id });
@@ -674,6 +739,12 @@ cv.addEventListener('click', e => {
   // Far enough to be meant. A hand is not steady on a click, and a span of
   // three pixels is a slip, not a distance the user chose.
   const drag = down && Math.hypot(x - down[0], y - down[1]) > cv.width / 100;
+  if (correcting && showing === correcting.ref) {
+    // The drag is the correction, not a new mark.
+    if (drag) answered('/correct', { id: correcting.id, pixel: down, to: [x, y] });
+    down = null;
+    return;
+  }
   pending = showing ? { ref: showing, pixel: drag ? down : [x, y] }
                     : { view: viewAt(x, y), pixel: [x, y] };
   if (drag) pending.to = [x, y];
