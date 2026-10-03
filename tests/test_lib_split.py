@@ -38,15 +38,15 @@ FREE = ("agent", "badges", "canvas", "checks", "cli", "commands", "delete", "ent
         "git", "glb", "intent", "lobby", "lock", "marks", "mask", "miniyaml",
         "ops_whitelist", "page", "panel", "policy", "presence", "refs",
         "rename", "restore", "revision", "signals", "space", "span", "store",
-        "units", "views")
+        "units", "views", "worksheet")
 
 # Runs inside Blender, and may import anything in FREE — the ban is one way.
 # Two of these are here by role rather than by their imports: `entry` is
 # stdlib-only but is the module Blender runs, and `cmd_api` imports only
 # `importlib` and `inspect` yet exists to resolve `bpy.*` symbols.
 BLENDER = ("cmd_api", "cmd_build", "cmd_export", "cmd_measure", "cmd_render",
-           "cmd_resolve", "cmd_roundtrip", "ctx_override", "entry", "kit",
-           "measure", "mutants", "scene")
+           "cmd_resolve", "cmd_roundtrip", "cmd_worksheet", "ctx_override",
+           "entry", "kit", "measure", "mutants", "scene", "worksheet_draw")
 
 
 def declared(path):

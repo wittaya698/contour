@@ -210,6 +210,8 @@ class ReferencesTest(unittest.TestCase):
 INTENTLESS = {
     "api": "reads a signature out of Blender and writes nothing",
     "measure": "reads pixels out of a reference image; never writes one",
+    "worksheet": "draws the spans onto copies of the references, into a file of "
+                 "its own; never writes a reference, a spec or the build",
     "canvas": "serves the sheet and takes marks — the user's own writes",
     "mark": "the agent pinning a finding, which is what it is for",
     "resolve": "casts rays for marks the user placed; changes no geometry, and "

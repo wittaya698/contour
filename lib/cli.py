@@ -253,6 +253,17 @@ def on_measure(cmd, rest, held):
     return emit(stage(["measure", *rest]))
 
 
+def on_worksheet(cmd, rest, held):
+    """The spans, drawn onto the references (ADR 0022, decision 8). With none
+    on file there is nothing to draw, which the marks alone can say: no
+    Blender, and no file left from the last time there were some."""
+    from lib import marks, worksheet
+    if not worksheet.spans(marks.load(HERE.marks)):
+        return emit({"ok": True, "lines": [
+            "ok   worksheet  no spans on file: nothing to draw, nothing written"]})
+    return emit(stage(["worksheet"]))
+
+
 def on_canvas(cmd, rest, held):
     from lib import canvas, panel, signals
     # All three, and not only Ctrl-C: the presence below is taken back only on

@@ -28,12 +28,38 @@ This slice makes the picture; it does not decide the moment.
 
 ## Acceptance criteria
 
-- [ ] `contour worksheet` writes one image showing every reference that has a span, with each span drawn and labelled as above
-- [ ] Rejected spans are drawn as rejected, not omitted, so the picture accounts for every span
-- [ ] No file under `refs/` changes; this is tested by checksum
-- [ ] A space with references and no spans says so, and writes nothing
-- [ ] The terse report names the file and the count of spans, and the command's cost is listed in the commands table of `CLAUDE.md`
-- [ ] Two runs over the same marks and references write identical images
+- [x] `contour worksheet` writes one image showing every reference that has a span, with each span drawn and labelled as above
+- [x] Rejected spans are drawn as rejected, not omitted, so the picture accounts for every span
+- [x] No file under `refs/` changes; this is tested by checksum
+- [x] A space with references and no spans says so, and writes nothing
+- [x] The terse report names the file and the count of spans, and the command's cost is listed in the commands table of `CLAUDE.md`
+- [x] Two runs over the same marks and references write identical images
+
+## What it came to
+
+- `contour worksheet` writes `worksheet.png` in the space, beside `sheet.png`,
+  and a space's git sees it as a file to track. Every reference with a span is
+  drawn 720 px tall, side by side, wrapping past 2160 px: `beaky`'s two came to
+  1650x772.
+- Each span is its line with a square at each end, coloured as the canvas
+  colours it: blue for the agent's, red for the user's, grey when rejected. A
+  by-eye span is dashed. Its id sits at the line's left end, and a label box
+  carries the rest: `m5 610 mm ±3` over `agent, by eye, unanswered`. The label
+  says *by hand* for a span the user placed, and *unanswered* for an agent span
+  with no answer yet.
+- A label moves off every span's line and every other label, so in a crowd it
+  can land a little away from its own line; the id at the line's left end is
+  what ties them together. Found on `beaky`'s side view, where one label
+  first sat on the line drawn above its own.
+- What each span says is `lib/worksheet.py`, standard library, so the launcher
+  can use it. Where it goes and how it is drawn is `lib/worksheet_draw.py`:
+  numpy and no bpy, testable without a scene, but in the Blender half of `lib/`
+  because a bare clone has no numpy. Only reading the references and saving
+  the PNG need Blender itself.
+- With no spans on file the launcher says so and starts no Blender. A span
+  whose reference is not in `refs/` is named in the report and left off.
+- The row is in the toolkit's `CLAUDE.md`. It is not in the space template yet:
+  slice 46 changes the template anyway, and one drift is better than two.
 
 ## Blocked by
 

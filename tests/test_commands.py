@@ -52,7 +52,7 @@ class SpaceTest(unittest.TestCase):
         about one has nowhere else to find it — and falling back to the
         toolkit's own directory would build something nobody asked for."""
         self.assertEqual(names(space=True),
-                         ["check", "render", "export", "measure", "canvas",
+                         ["check", "render", "export", "measure", "worksheet", "canvas",
                           "resolve", "mark", "run", "doctor", "migrate-marks",
                           "rename", "delete"])
 
