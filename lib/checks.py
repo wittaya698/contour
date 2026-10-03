@@ -17,7 +17,8 @@ SECTIONS = {
                  "loose_geometry", "normals", "doubles_tolerance_mm"},
     "uv": {"required", "overlap_allowed", "udim"},
     "materials": {"max_slots", "names"},
-    "transform": {"origin", "scale_applied", "rotation_applied", "up_axis"},
+    "transform": {"origin", "scale_applied", "rotation_applied", "up_axis",
+                  "pivot_tolerance_mm"},
     "render": {"grid_metres", "sheet_resolution"},
 }
 DIMS = ("height", "width", "depth")
@@ -216,6 +217,78 @@ def rig(spec):
                    "rig " + "; ".join(problems))]
 
 
+def _joints(spec):
+    """Every `(part, parent)` pair the rig names, in spec order."""
+    return [(p["name"], p["parent"]) for p in spec.get("parts") or [] if "parent" in p]
+
+
+def _gap_mm(a, b):
+    """How far apart two world boxes are, in mm; 0 when they touch or overlap.
+
+    A floor under the gap between the surfaces themselves, which is all the
+    message needs: a part this far off its parent is not near a seam.
+    """
+    return _mm(sum(max(0.0, b[0][i] - a[1][i], a[0][i] - b[1][i]) ** 2
+                   for i in range(3)) ** 0.5)
+
+
+def _no_seam(name, parent, boxes):
+    """Why a joint has no seam, as far as the boxes can say."""
+    said = f"{name} has no seam with {parent}"
+    if boxes.get(name) and boxes.get(parent):
+        gap = _gap_mm(boxes[name], boxes[parent])
+        said += f": floats {gap:.1f}mm off" if gap > 0 else ": touches at most, does not cross"
+    return said
+
+
+def seams(spec, m):
+    """A seam at every joint (ADR 0023): where a part turns is measured, so
+    it has to be there to measure.
+
+    A seam is the gather's crossing between the two parts, which a part that
+    floats off or only touches its parent at a point does not have.
+    """
+    joints = _joints(spec)
+    if not joints:
+        return []
+    crossed = {frozenset(c["parts"]) for c in m["contacts"]}
+    boxes = {p["name"]: p["bounds"] for p in m["parts"]}
+    bad = [_no_seam(name, parent, boxes) for name, parent in joints
+           if frozenset((name, parent)) not in crossed]
+    n = len(joints)
+    return [result("seams", not bad, f"{n} joint" + ("s" if n != 1 else ""),
+                   "; ".join(bad))]
+
+
+def pivots(spec, m):
+    """Each part's origin on its pivot, the centre of its seam (ADR 0023).
+
+    `build.py` places every origin by hand; this is what makes that placement
+    checked rather than trusted. A joint with no seam has no pivot to be on,
+    and `seams` has already said so.
+    """
+    joints = _joints(spec)
+    if not joints:
+        return []
+    tol = (spec.get("transform") or {}).get("pivot_tolerance_mm")
+    if tol is None:
+        return [result("pivots", False,
+                       msg="rig needs transform.pivot_tolerance_mm: the user's, not a default")]
+    centres = {frozenset(c["parts"]): c["centre"] for c in m["contacts"]}
+    origins = {p["name"]: p["origin"] for p in m["parts"]}
+    bad, worst = [], 0.0
+    for name, parent in joints:
+        centre = centres.get(frozenset((name, parent)))
+        if centre is None or name not in origins:
+            continue
+        off = _mm(sum((a - b) ** 2 for a, b in zip(origins[name], centre)) ** 0.5)
+        worst = max(worst, off)
+        if off > tol:
+            bad.append(f"{name} origin {off:.1f}mm off its pivot")
+    return [result("pivots", not bad, f"{worst:.1f}/{tol}mm",
+                   "; ".join(bad) + f" (tolerance {tol}mm)")]
+
+
 def uv(spec, parts):
     """UV coverage, and the two UV rules this verifier cannot yet enforce.
 
@@ -354,6 +427,7 @@ def run(doc, variant, m, only=None):
     out = spec(doc, variant) + rig(doc)
     for check, reads in SEQUENCE:
         out += check(doc, m[reads])
+    out += seams(doc, m) + pivots(doc, m)
     if only is not None:
         out = [r for r in out if r["id"] in only]
     return out

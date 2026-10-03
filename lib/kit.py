@@ -50,8 +50,17 @@ def cylinder_bm(radius_mm, depth_mm, segments=32, cap_tris=False):
     return bm
 
 
-def add(name, bm, at_mm=(0, 0, 0), mat=None, smooth=False):
-    """bmesh -> linked object named `name`. Frees the bmesh."""
+def add(name, bm, at_mm=(0, 0, 0), mat=None, smooth=False, pivot_mm=None):
+    """bmesh -> linked object named `name`. Frees the bmesh.
+
+    The mesh is centred on `at_mm`. The origin is there too, unless `pivot_mm`
+    puts it at the joint the part turns about — which a rigged part's must be,
+    on the centre of its seam (ADR 0023).
+    """
+    if pivot_mm is not None:
+        bmesh.ops.translate(bm, vec=mm(*(a - p for a, p in zip(at_mm, pivot_mm))),
+                            verts=bm.verts)
+        at_mm = pivot_mm
     for f in bm.faces:
         f.smooth = smooth
     me = bpy.data.meshes.new(name)

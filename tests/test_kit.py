@@ -21,7 +21,7 @@ PROMISED = {
     "box_bm": "(size_mm)",
     "sphere_bm": "(radius_mm, segments=32, rings=24)",
     "cylinder_bm": "(radius_mm, depth_mm, segments=32, cap_tris=False)",
-    "add": "(name, bm, at_mm=(0, 0, 0), mat=None, smooth=False)",
+    "add": "(name, bm, at_mm=(0, 0, 0), mat=None, smooth=False, pivot_mm=None)",
     "bake_transform": "(obj)",
 }
 

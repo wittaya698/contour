@@ -84,6 +84,9 @@ transform:
   scale_applied: true        # object scale must be 1,1,1 on export
   rotation_applied: true     # object rotation must be 0,0,0 on export
   up_axis: Z                 # Blender-native; per-target conversion happens at export
+  # pivot_tolerance_mm: 1    # required once any part has a parent: how far a
+  #                          # part's origin may sit from the centre of its seam
+  #                          # with its parent (ADR 0023). The user's number.
 
 # ---------------------------------------------------------------- render
 # Checkpoint sheet settings. Defaults live in lib/ — override only if the

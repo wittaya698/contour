@@ -2,6 +2,7 @@
 so each mutant breaks the fixture in one known way and must be caught by name."""
 import bmesh
 import bpy
+from mathutils import Matrix
 
 from . import kit, scene
 from .cmd_build import build
@@ -77,6 +78,24 @@ def _shift_all():
         o.location.x += 0.05
 
 
+def _float_plinth():
+    """10 mm down, past the 5 mm the pillar reaches into it: a gap of 5."""
+    _obj("plinth").location.z -= 0.010
+
+
+def _touch_plinth():
+    """5 mm down, so the plinth's top meets the pillar's bottom face to face
+    and nothing crosses."""
+    _obj("plinth").location.z -= 0.005
+
+
+def _pillar_origin_off():
+    """The pillar's origin 10 mm above its seam with the cap; the mesh stays."""
+    pillar = _obj("pillar")
+    pillar.location.z += 0.010
+    pillar.data.transform(Matrix.Translation((0.0, 0.0, -0.010)))
+
+
 # name, mutate, spec edit, check ids that must fail
 MUTANTS = [
     ("height", _raise_cap, None, {"height"}),
@@ -92,8 +111,12 @@ MUTANTS = [
     ("extra material", _rogue_material, None, {"mat_names", "mat_slots"}),
     ("origin off", _shift_all, None, {"origin"}),
     ("tri budget", lambda: None, lambda s: s["topology"].update(tri_budget=100), {"tris"}),
-    ("rig with two roots", lambda: None,
-     lambda s: s["parts"][1].update(parent=s["parts"][0]["name"]), {"rig"}),
+    ("rig with two roots", lambda: None, lambda s: s["parts"][1].pop("parent"), {"rig"}),
+    ("floating part", _float_plinth, None, {"seams"}),
+    ("tangent part", _touch_plinth, None, {"seams"}),
+    ("origin off its pivot", _pillar_origin_off, None, {"pivots"}),
+    ("no pivot tolerance", lambda: None,
+     lambda s: s["transform"].pop("pivot_tolerance_mm"), {"pivots"}),
 ]
 
 

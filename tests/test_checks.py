@@ -24,9 +24,13 @@ rebuild (issue 23):
     origin off            a model shifted off base_center
     tri budget            a model over the triangle budget
 
-and the rig's (ADR 0023), written as a spec rather than a measurement:
+and the rig's (ADR 0023): the tree written as a spec, the seams as contacts:
 
     rig with two roots    a tree whose second root is a forgotten parent
+    floating part         a joint whose boxes are apart and nothing crosses
+    tangent part          a joint whose boxes touch and nothing crosses
+    origin off its pivot  an origin 137 mm from its seam's centre
+    no pivot tolerance    a rig whose spec gives no pivot tolerance
 """
 import sys
 import unittest
@@ -48,7 +52,7 @@ def part(name="plinth", **fields):
             "non_manifold_edges": 0, "loose_verts": 0, "loose_edges": 0,
             "flipped_faces": 0, "nearest_pair_mm": None, "bounds": None,
             "scale": (1.0, 1.0, 1.0), "rotation_rad": 0.0, "uv_layers": 0,
-            "materials": (), **fields}
+            "materials": (), "origin": (0.0, 0.0, 0.0), **fields}
 
 
 def verdicts(results):
@@ -384,9 +388,82 @@ class RigTest(unittest.TestCase):
     def test_the_rig_is_judged_straight_after_the_spec(self):
         """A tree that is not a tree makes every later rig reading beside the
         point, as an unenforceable spec does for every reading."""
-        m = {"objects": ["torso", "neck"], "parts": [part("torso"), part("neck")]}
+        m = {"objects": ["torso", "neck"], "parts": [part("torso"), part("neck")],
+             "contacts": []}
         got = checks.run({"model": "smoke", "parts": self.TREE[:2]}, "smoke", m)
         self.assertEqual([r["id"] for r in got][:3], ["spec", "rig", "parts"])
+
+
+class SeamTest(unittest.TestCase):
+    """Where a part turns, measured at rest (ADR 0023, issue 49).
+
+    A joint's seam is where the two surfaces cross; the gather records, for
+    each pair of parts, the points where an edge of one passes from inside the
+    other to outside, and their centre. No crossing is no seam, which is what
+    a part that floats or only touches gives.
+    """
+    SPEC = {"model": "smoke",
+            "parts": [{"name": "torso"}, {"name": "neck", "parent": "torso"}],
+            "transform": {"pivot_tolerance_mm": 1}}
+
+    def judge(self, contacts, spec=SPEC, neck_box=([-.05, -.05, .45], [.05, .05, .7]),
+              neck=(0, 0, .5)):
+        """A torso 500 mm tall and a neck on it, origin at its seam unless
+        told otherwise."""
+        m = {"objects": ["torso", "neck"],
+             "parts": [part("torso", bounds=([-.1, -.1, 0], [.1, .1, .5])),
+                       part("neck", bounds=neck_box, origin=neck)],
+             "contacts": contacts}
+        return verdicts(checks.run(spec, "smoke", m))
+
+    def crossing(self, centre=(0, 0, .5), points=12):
+        return [{"parts": ("neck", "torso"), "centre": centre, "points": points}]
+
+    def test_a_joint_whose_surfaces_cross_has_a_seam(self):
+        got = self.judge(self.crossing())["seams"]
+        self.assertTrue(got["ok"], got["msg"])
+        self.assertEqual(got["info"], "1 joint")
+
+    def test_a_part_floating_off_its_parent_has_no_seam_and_says_how_far(self):
+        got = self.judge([], neck_box=([-.05, -.05, .55], [.05, .05, .7]))["seams"]
+        self.assertFalse(got["ok"])
+        self.assertIn("neck has no seam with torso: floats 50.0mm off", got["msg"])
+
+    def test_a_part_that_only_touches_its_parent_has_no_seam(self):
+        """beaky's head on its neck: the bottom of one is the top of the other,
+        a tangent point, and a tangent point is no seam (ADR 0023)."""
+        got = self.judge([], neck_box=([-.05, -.05, .5], [.05, .05, .7]))["seams"]
+        self.assertFalse(got["ok"])
+        self.assertIn("neck has no seam with torso: touches at most, does not cross", got["msg"])
+
+    def test_an_origin_on_its_seams_centre_is_on_its_pivot(self):
+        got = self.judge(self.crossing(), neck=(0, 0, .5004))["pivots"]
+        self.assertTrue(got["ok"], got["msg"])
+
+    def test_an_origin_off_its_pivot_beyond_tolerance_says_by_how_much(self):
+        """beaky's neck, whose origin is its sphere's centre, ~137 mm from
+        where it meets the torso."""
+        got = self.judge(self.crossing(), neck=(0, .003, .637))["pivots"]
+        self.assertFalse(got["ok"])
+        self.assertIn("neck origin 137.0mm off its pivot", got["msg"])
+
+    def test_a_rig_with_no_pivot_tolerance_is_red_for_the_missing_field(self):
+        """The tolerance is the user's (ADR 0023); a default here would be a
+        number nobody chose, and lenient by accident."""
+        for spec in ({**self.SPEC, "transform": {}}, {**self.SPEC, "transform": None},
+                     {k: v for k, v in self.SPEC.items() if k != "transform"}):
+            got = self.judge(self.crossing(), spec=spec)["pivots"]
+            self.assertFalse(got["ok"])
+            self.assertIn("rig needs transform.pivot_tolerance_mm", got["msg"])
+
+    def test_the_spec_check_knows_the_pivot_tolerance(self):
+        got = self.judge(self.crossing())["spec"]
+        self.assertTrue(got["ok"], got["msg"])
+
+    def test_an_unrigged_spec_is_judged_on_no_seam_and_no_pivot(self):
+        got = self.judge([], spec={"model": "smoke", "parts": [{"name": "torso"}]})
+        self.assertNotIn("seams", got)
+        self.assertNotIn("pivots", got)
 
 
 class RunTest(unittest.TestCase):

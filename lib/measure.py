@@ -27,11 +27,26 @@ The fields, per part:
     rotation_rad        the largest angle the object is turned by, in radians
     uv_layers           how many UV layers it carries
     materials           the material names in its slots, in slot order
+    origin              where the object's origin stands in the world, metres
 
 The measurement `scene()` returns holds those records under `parts`, and under
 `objects` the name of every object in the scene, mesh or not. A stray empty is
 a part list that does not match, and a check reading only meshes would not see
 it — so the two are gathered together and each check says which it reads.
+
+Under `contacts` it holds one record per pair of parts whose surfaces cross —
+a seam, wherever one exists, whether or not the spec calls it a joint (ADR
+0023). The gather reads no spec, so it cannot know which pairs are joints; the
+checks pick those out. Each record is
+
+    parts               the two part names, sorted
+    centre              the mean of the crossing points, metres: the pivot
+    points              how many crossing points there were
+
+A crossing point is where an edge of one part passes from strictly inside the
+other to strictly outside. A vertex within `ON_SURFACE` of the other surface
+is neither, so a part that sits flush on its parent or meets it at a tangent
+point has no crossing and no seam — which is the point (issue 49).
 
 `verts` and `edges` are gathered and no check reads them, which ADR 0020 says
 to expect and to list: a gather edited for every new check is a gather that
@@ -44,7 +59,14 @@ tolerance and says how close rather than how many (issue 22).
 """
 import bmesh
 import bpy
-from mathutils import kdtree
+from mathutils import Vector, kdtree
+from mathutils.bvhtree import BVHTree
+
+# Metres. Closer than this to a surface is on it: neither inside nor out.
+ON_SURFACE = 1e-6
+# Any direction serves to ask whether a point is inside a closed surface; an
+# untidy one keeps the ray off the edges and corners an axis-aligned part has.
+RAY = Vector((0.5741, 0.3112, 0.7573)).normalized()
 
 
 def _degrees(bm):
@@ -134,7 +156,8 @@ def part(obj, bm):
             "rotation_rad": _rotation(obj),
             "uv_layers": len(obj.data.uv_layers),
             "materials": tuple(s.material.name for s in obj.material_slots
-                               if s.material)}
+                               if s.material),
+            "origin": tuple(obj.matrix_world.translation)}
 
 
 def parts(objects=None):
@@ -162,15 +185,100 @@ def parts(objects=None):
     return out
 
 
+def _side(tree, co):
+    """1 inside the surface `tree` holds, -1 outside, 0 on it.
+
+    Inside is decided by the first face a ray meets: leaving a closed surface,
+    a ray goes out through a face that points the way it is going.
+    """
+    if tree.find_nearest(co)[3] <= ON_SURFACE:
+        return 0
+    hit, normal = tree.ray_cast(co, RAY)[:2]
+    return 1 if hit is not None and normal.dot(RAY) > 0 else -1
+
+
+def _crossings(bm, tree):
+    """Where the edges of `bm` pass from inside `tree`'s surface to outside."""
+    side = {v: _side(tree, v.co) for v in bm.verts}
+    out = []
+    for e in bm.edges:
+        a, b = e.verts
+        if side[a] * side[b] != -1:
+            continue
+        if side[a] < 0:
+            a, b = b, a
+        step = b.co - a.co
+        hit = tree.ray_cast(a.co, step, step.length)[0]
+        if hit is not None:
+            out.append(hit)
+    return out
+
+
+def _world(obj, dg):
+    """The evaluated mesh as a world-space bmesh, its BVH and its box."""
+    ev = obj.evaluated_get(dg)
+    me = ev.to_mesh()
+    bm = bmesh.new()
+    bm.from_mesh(me)
+    ev.to_mesh_clear()
+    bm.transform(obj.matrix_world)
+    box = _box_of(bm)
+    return bm, BVHTree.FromBMesh(bm), box
+
+
+def _box_of(bm):
+    if not bm.verts:
+        return None
+    return ([min(v.co[i] for v in bm.verts) for i in range(3)],
+            [max(v.co[i] for v in bm.verts) for i in range(3)])
+
+
+def _apart(a, b):
+    return any(b[0][i] > a[1][i] + ON_SURFACE or a[0][i] > b[1][i] + ON_SURFACE
+               for i in range(3))
+
+
+def contacts(objects=None):
+    """Every pair of parts whose surfaces cross, with the centre of the seam.
+
+    Every pair and not just the joints, because the gather reads no spec;
+    pairs whose boxes are apart are skipped, which is most of them.
+    """
+    bpy.context.view_layer.update()
+    dg = bpy.context.evaluated_depsgraph_get()
+    meshes = [o for o in (bpy.context.scene.objects if objects is None else objects)
+              if o.type == "MESH"]
+    worlds = {o.name: _world(o, dg) for o in meshes}
+    out = []
+    try:
+        names = sorted(worlds)
+        for i, a in enumerate(names):
+            for b in names[i + 1:]:
+                (bm_a, tree_a, box_a), (bm_b, tree_b, box_b) = worlds[a], worlds[b]
+                if box_a is None or box_b is None or _apart(box_a, box_b):
+                    continue
+                points = _crossings(bm_a, tree_b) + _crossings(bm_b, tree_a)
+                if points:
+                    centre = sum(points, Vector()) / len(points)
+                    out.append({"parts": (a, b), "centre": tuple(centre),
+                                "points": len(points)})
+    finally:
+        for bm, _, _ in worlds.values():
+            bm.free()
+    return out
+
+
 def scene(objects=None):
-    """The whole measurement: `{"objects": [name...], "parts": [record...]}`.
+    """The whole measurement: `{"objects": [name...], "parts": [record...],
+    "contacts": [record...]}`.
 
     What `verify.run` judges, and the only thing it judges. Nothing that has to
     be freed comes back, so there is no `release()` and no ordering obligation
     on the caller (ADR 0020, decision 2).
     """
     objs = list(bpy.context.scene.objects if objects is None else objects)
-    return {"objects": [o.name for o in objs], "parts": parts(objs)}
+    return {"objects": [o.name for o in objs], "parts": parts(objs),
+            "contacts": contacts(objs)}
 
 
 def bounds(objects=None):

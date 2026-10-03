@@ -12,9 +12,12 @@ dimensions:
   width:  { value: 120, tol: 1 }
   depth:  { value: 100, tol: 1 }
 
+# The rig hangs from the cap, not the plinth: a root has no pivot to sit on,
+# so the cap keeps its origin at its sphere's centre, which the fixture's
+# anchor tests measure from (tests/test_fixture.py).
 parts:
-  - { name: plinth, count: 1 }
-  - { name: pillar, count: 1 }
+  - { name: plinth, count: 1, parent: pillar }
+  - { name: pillar, count: 1, parent: cap }
   - { name: cap,    count: 1 }
 
 topology:
@@ -38,3 +41,4 @@ transform:
   scale_applied: true
   rotation_applied: true
   up_axis: Z
+  pivot_tolerance_mm: 1

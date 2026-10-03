@@ -49,6 +49,7 @@ def report(variant, results):
         stamp += f" | tris {info['tris'].split('/')[0]}"
     if "height" in info:
         stamp += f" | height {info['height'].split('.')[0]}mm"
-    rest = [f"{k} {info[k]}" for k in ("width", "depth", "quads", "parts", "mat_slots", "origin")
+    rest = [f"{k} {info[k]}" for k in ("width", "depth", "quads", "parts", "mat_slots", "origin",
+                                       "seams", "pivots")
             if k in info]
     return [f"{variant} PASS  {stamp}", "  " + " | ".join(rest)] if rest else [f"{variant} PASS  {stamp}"]
