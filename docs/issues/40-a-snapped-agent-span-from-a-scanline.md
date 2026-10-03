@@ -32,14 +32,40 @@ appears there with no page change.
 
 ## Acceptance criteria
 
-- [ ] The agent can create a span between two runs of a scanline, naming the runs and the distance wanted, and no form of the command takes a pixel for an end
-- [ ] The span is stored as the agent's, marked **snapped**, with the question that placed it
-- [ ] The millimetre answer is pinned back on the reference, with its error bar, as for a user's span
-- [ ] Re-running a span's stored question places the same ends, and says so when the reference no longer gives them
-- [ ] Picking a run the scanline did not find is refused, naming the runs it did find
-- [ ] With no **anchor** stated in the space, the span is still drawn and the answer is in pixels, saying why
-- [ ] On `beaky`'s front reference, the legs centre to centre read 168 within the error bar
-- [ ] Turning picked runs into two ends is tested with no Blender; nothing under `refs/` is written
+- [x] The agent can create a span between two runs of a scanline, naming the runs and the distance wanted, and no form of the command takes a pixel for an end
+- [x] The span is stored as the agent's, marked **snapped**, with the question that placed it
+- [x] The millimetre answer is pinned back on the reference, with its error bar, as for a user's span
+- [x] Re-running a span's stored question places the same ends, and says so when the reference no longer gives them
+- [x] Picking a run the scanline did not find is refused, naming the runs it did find
+- [x] With no **anchor** stated in the space, the span is still drawn and the answer is in pixels, saying why
+- [x] On `beaky`'s front reference, the legs centre to centre read 168 within the error bar
+- [x] Turning picked runs into two ends is tested with no Blender; nothing under `refs/` is written
+
+## What it came to
+
+- The span form is `contour measure <ref> --scanline V [--of HEX] --runs A,B
+  --between centres|gap|extent "what it is"`. The scanline's report now numbers
+  its runs, so the agent picks from exactly what it was shown.
+- `contour measure` used to ignore any flag it did not know, so `--to 560,700`
+  would have been dropped silently and the agent would have believed it placed
+  an end. The span form refuses every flag that is not its own, naming it.
+- The ends are pixel edges for `gap` and `extent` and run centres for
+  `centres`, so each reads the same number the scanline already printed for
+  it. They are stored counted from the top, as the canvas draws, which it does
+  with no change: any mark with a `to` is a line, blue when the agent wrote it.
+- The stored question holds the anchor it was asked under. Without an anchor a
+  scanline height is a fraction of the silhouette, so an anchor stated later
+  would otherwise move the row and asking again would place different ends.
+- `contour measure --again <m>` writes nothing. It says *same ends*, or what the
+  same question places now and why that differs; an answer is never moved
+  after it was given.
+- On a copy of `beaky`'s front, in a space of its own: the legs centre to
+  centre read **168 mm ±3 mm**, and asking again gives the same ends. The test
+  needs `$BLENDER` and beaky's reference, and skips without either.
+- Not done here: ADR 0022 decision 9 puts rule 1's new clause in "the slice
+  that makes agent spans drawable", which is this one, while the batch puts it
+  in 46. It changes `CLAUDE.md` and the space template, so it waits for the
+  user.
 
 ## Blocked by
 

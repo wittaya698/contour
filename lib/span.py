@@ -57,6 +57,11 @@ def anchor_mm(spec):
     return float(value) if isinstance(value, (int, float)) else None
 
 
+def marked(path, mark_id):
+    """The mark on file with this id, or None."""
+    return next((m for m in marks.load(path) if m.get("id") == mark_id), None)
+
+
 def midpoint(a, b):
     """Where the answer is pinned: between the two pins that asked."""
     return [round((a[0] + b[0]) / 2), round((a[1] + b[1]) / 2)]
@@ -70,7 +75,7 @@ def aim(path, mark_id, named=None):
     a second place to say it is a second place to say it wrong -- which is
     exactly how the first real drag on `beaky-solo` failed.
     """
-    found = next((m for m in marks.load(path) if m.get("id") == mark_id), None)
+    found = marked(path, mark_id)
     if found is None:
         return {"ok": False, "lines": [f"FAIL measure  no mark {mark_id} on file"]}
     ref = marks.reference(found)
@@ -94,7 +99,7 @@ def measure(path, mark_id, k):
     is wrong — and not a receipt the toolkit files away. Only the user closes
     it (ADR 0018).
     """
-    found = next((m for m in marks.load(path) if m.get("id") == mark_id), None)
+    found = marked(path, mark_id)
     if found is None:
         return {"ok": False, "lines": [f"FAIL measure  no mark {mark_id} on file"]}
     if not (marks.span_end(found) and marks.reference(found)):
@@ -116,3 +121,105 @@ def measure(path, mark_id, k):
     return {"ok": True, "lines": [f"ok   measure {said['id']} "
                                   f"{marks.reference(found)}  "
                                   f"{marks.text(found)}  {line(got)}"]}
+
+
+BETWEEN = ("centres", "gap", "extent")
+"""The distances a span can ask for between two runs: centre to centre, the gap
+between them, and the outer extent across them."""
+
+
+def snap(runs, picked, between, row, height):
+    """Two ends, placed on what a scanline measured (ADR 0022, decision 2).
+
+    `runs` are the scanline's, as inclusive pixel columns; `picked` names two
+    of them by their number in the scanline's report, counting from 1. The
+    agent answers *which*, and this answers *where*: there is no argument here
+    for a pixel, so no end can be one the agent chose.
+
+    `row` counts from the bottom of the image, as every height in `contour
+    measure` does; the ends come back counted from the top, as a mark's pixel
+    is, so the canvas draws them where they were measured.
+    """
+    (a0, a1), (b0, b1) = (runs[n - 1] for n in picked)
+    y = height - 1 - row
+    x = {"centres": ((a0 + a1) / 2, (b0 + b1) / 2),
+         # Pixel edges, half a pixel out from the last one in a run: a run's
+         # columns are inclusive, so this is what its width already counts.
+         "gap": (a1 + 0.5, b0 - 0.5),
+         "extent": (a0 - 0.5, b1 + 0.5)}[between]
+    return [x[0], y], [x[1], y]
+
+
+def found_runs(runs):
+    """A scanline's runs as its report numbers them, for a refusal to hand
+    back: the agent picks from these, so these are what it is shown."""
+    return ", ".join(f"run {n} x {a}..{b}px" for n, (a, b) in enumerate(runs, 1))
+
+
+def draw(path, ref, question, runs, row, height, k, text):
+    """An agent span, snapped to what a scanline found (ADR 0022, decisions 2
+    and 4). Returns a report.
+
+    `question` is what the agent asked, in full, and is stored with the span:
+    it is the re-runnable basis ADR 0017 asked for. `runs` is what the
+    scanline found asking it, and `k` the scale, or None with no anchor.
+    """
+    picked = question["runs"]
+    if (len(picked) != 2 or len(set(picked)) != 2
+            or not all(1 <= n <= len(runs) for n in picked)):
+        return {"ok": False, "lines": [
+            f"FAIL measure  pick two different runs of the {len(runs)} the "
+            f"scanline found: {found_runs(runs) or 'none'}"]}
+    a, b = snap(runs, picked, question["between"], row, height)
+    drawn = marks.append(path, {"ref": ref, "pixel": a, "to": b, "text": text,
+                                "placed": "snapped", "question": question},
+                         author="agent")
+    answer = line(reading(a, b, k)) if k else unscaled(a, b)
+    said = agent.write(path, f"span {drawn['id']}: {answer}", ref=ref,
+                       pixel=midpoint(a, b))
+    return {"ok": True, "lines": [f"ok   measure {drawn['id']} {ref}  {text}  "
+                                  f"{answer}  (answer {said['id']})"]}
+
+
+def unscaled(a, b):
+    """A span's answer with no anchor: pixels, and why they are not mm. Where
+    the ends landed is still an answer; a millimetre figure would be a guess
+    at the scale (ADR 0016), so none is given."""
+    return (f"{math.dist(a, b):.0f} px \u00b12 px  (no anchor: this space states "
+            f"no dimensions.height, so the picture gives proportion and not "
+            f"millimetres)")
+
+
+def asked(path, mark_id):
+    """The reference a snapped span is on and the question that placed it, or
+    a refusal. What `contour measure --again` runs before it can compare."""
+    found = marked(path, mark_id)
+    if found is None:
+        return {"ok": False, "lines": [f"FAIL measure  no mark {mark_id} on file"]}
+    if found.get("placed") != "snapped":
+        return {"ok": False, "lines": [
+            f"FAIL measure  {mark_id} is not a snapped span: its ends were "
+            f"placed by hand, so there is no question to ask again"]}
+    return {"ok": True, "ref": marks.reference(found), "question": found["question"]}
+
+
+def again(path, mark_id, runs, row, height):
+    """Compare what a snapped span's question finds now with the ends it was
+    drawn on. Writes nothing: the ends are what the span was answered on, and
+    moving them would change what an answer meant after it was given."""
+    found = marked(path, mark_id)
+    q = found["question"]
+    picked = q["runs"]
+    if not all(1 <= n <= len(runs) for n in picked):
+        return {"ok": False, "lines": [
+            f"FAIL measure  {mark_id}: the reference no longer gives these ends; "
+            f"runs {picked[0]} and {picked[1]} were asked for, and the scanline "
+            f"now finds {found_runs(runs) or 'none'}"]}
+    a, b = snap(runs, picked, q["between"], row, height)
+    if [a, b] != [marks.pixel(found), marks.span_end(found)]:
+        return {"ok": False, "lines": [
+            f"FAIL measure  {mark_id}: the reference no longer gives these ends; "
+            f"drawn at {marks.pixel(found)} to {marks.span_end(found)}, the same "
+            f"question now places {a} to {b}"]}
+    return {"ok": True, "lines": [f"ok   measure {mark_id} same ends: "
+                                  f"{a} to {b}"]}

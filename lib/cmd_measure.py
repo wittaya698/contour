@@ -17,6 +17,13 @@ model frame does: millimetres above the ground.
     --span ID          read the distance between the two ends of one span mark
                        and pin the answer back on the same reference (ADR 0018).
                        Needs no <ref>: the mark names the picture it is on
+    --scanline V --runs A,B --between centres|gap|extent "what it is"
+                       draw an agent span between two runs of one scanline, by
+                       their numbers in its report, and pin the answer back
+                       (ADR 0022). Its ends are placed on what was measured;
+                       there is no spelling of this that takes a pixel
+    --again ID         ask a snapped span's stored question again, and say
+                       whether it still places the same ends. Writes nothing
     --anchor MM        the silhouette's height is MM; everything reports in mm
     --silhouette       bounding box of everything that is not background
     --region HEX       bounding box + centroid of one palette colour
@@ -30,6 +37,8 @@ model frame does: millimetres above the ground.
     --min-run PX       ignore runs narrower than this (default 3; kills antialias
                        specks, which otherwise read as parts that are not there)
 """
+from pathlib import Path
+
 import numpy as np
 
 import bpy
@@ -112,6 +121,48 @@ def runs(row):
     return list(zip(idx[0::2], idx[1::2] - 1))
 
 
+def scan(px, fg, S, v, of, tol, minrun):
+    """One scanline: the image row a height crosses, and the runs on it, or
+    None for the row when it falls outside the image. The runs are numbered
+    from 1 in every report, which is how a span picks them."""
+    m = colour_mask(px, fg, of, tol) if of else fg
+    row = S.row_for(v)
+    if not (0 <= row < px.shape[0]):
+        return row, None
+    return row, [(int(a), int(b)) for a, b in runs(m[row]) if b - a + 1 >= minrun]
+
+
+SPAN_FLAGS = ("--scanline", "--of", "--runs", "--between", "--anchor", "--tol",
+              "--bg-tol", "--min-run")
+"""Every flag the span form takes, each with a value. Anything else is refused,
+not ignored: an end given as a pixel would otherwise be dropped silently, and
+the agent would believe it had placed one (ADR 0022, decision 2)."""
+
+
+def span_form(rest):
+    """`(text, refusal)` for the span form's arguments: the one line it is
+    asked to carry, or why the command as typed is not one."""
+    text, i = [], 0
+    while i < len(rest):
+        if rest[i].startswith("--"):
+            if rest[i] not in SPAN_FLAGS:
+                return None, (f"FAIL measure  {rest[i]} is not part of a span: the "
+                              f"agent picks runs and a distance, and code places "
+                              f"the ends, so no end is ever given as a pixel")
+            i += 2
+            continue
+        text.append(rest[i])
+        i += 1
+    if len(text) != 1:
+        return None, ('FAIL measure  say in one line what the distance is, e.g. '
+                      '--runs 1,2 --between centres "the legs, centre to centre"')
+    if "," in flag(rest, "--scanline", str, ""):
+        return None, "FAIL measure  a span is drawn on one scanline: give one height"
+    if flag(rest, "--between") not in span.BETWEEN:
+        return None, f"FAIL measure  --between takes one of: {', '.join(span.BETWEEN)}"
+    return text[0], None
+
+
 class Scale:
     """mm per pixel, from the one real dimension the user stated (ADR 0016)."""
 
@@ -156,6 +207,17 @@ def run(args):
     # the picture again means saying it twice, in two spellings -- the path
     # this resolves and the bare name a mark records -- and getting the second
     # one right. Every other query still has to be aimed by hand.
+    again = flag(rest, "--again")
+    if again:
+        return asked_again(P, store, again)
+    if "--runs" in rest:
+        if "--scanline" not in rest:
+            return {"ok": False, "lines": [
+                "FAIL measure  --runs picks from a scanline: give --scanline too"]}
+        text, refused = span_form(rest)
+        if refused:
+            return {"ok": False, "lines": [refused]}
+        rest = [a for a in rest if a != text]
     asked = flag(rest, "--span")
     if asked:
         aimed = span.aim(store, asked, named)
@@ -181,7 +243,7 @@ def run(args):
     # retype it -- and to nothing else. Every other query keeps its old
     # behaviour of measuring in pixels until an anchor is given.
     anchor = flag(rest, "--anchor", float)
-    if asked and anchor is None:
+    if (asked or "--runs" in rest) and anchor is None:
         anchor = span.anchor_mm(P.spec)
     px = load(path)
     h, w = px.shape[:2]
@@ -199,6 +261,19 @@ def run(args):
         # The scale is the only thing the image is asked for here: where the
         # span runs was decided by the user, on the picture, with a mouse.
         got = span.measure(store, asked, S.k)
+        return {**got, "lines": lines + got["lines"]}
+
+    if "--runs" in rest:
+        q = {"scanline": flag(rest, "--scanline", float),
+             "of": flag(rest, "--of"),
+             "runs": [int(n) for n in flag(rest, "--runs").split(",")],
+             "between": flag(rest, "--between"), "anchor": anchor,
+             "tol": tol, "bg_tol": bg_tol, "min_run": flag(rest, "--min-run", int, 3)}
+        row, rr = scan(px, fg, S, q["scanline"], q["of"], tol, q["min_run"])
+        if rr is None:
+            return {"ok": False, "lines": lines + [
+                f"FAIL measure  scanline {q['scanline']:g} is row {row}, outside the image"]}
+        got = span.draw(store, Path(name).name, q, rr, row=row, height=h, k=S.k, text=text)
         return {**got, "lines": lines + got["lines"]}
 
     if "--silhouette" in rest or not any(f in rest for f in ("--region", "--scanline", "--profile")):
@@ -222,18 +297,16 @@ def run(args):
     if vs is not None:
         of = flag(rest, "--of")
         minrun = flag(rest, "--min-run", int, 3)
-        m2 = colour_mask(px, fg, of, tol) if of else fg
         mid = (x0 + x1) / 2
         for v in [float(t) for t in vs.split(",")]:
-            row = S.row_for(v)
-            if not (0 <= row < h):
+            row, rr = scan(px, fg, S, v, of, tol, minrun)
+            if rr is None:
                 lines.append(f"  scanline {v:g}  SKIP row {row} outside the image")
                 continue
-            rr = [r for r in runs(m2[row]) if r[1] - r[0] + 1 >= minrun]
             tag = f"{of} " if of else ""
             lines.append(f"  scanline {v:g} {tag}row {row}  {len(rr)} run(s)")
-            for a, b in rr:
-                lines.append(f"    x {a}..{b}px  width {S.fmt(b - a + 1)}"
+            for n, (a, b) in enumerate(rr, 1):
+                lines.append(f"    run {n}  x {a}..{b}px  width {S.fmt(b - a + 1)}"
                              f"  centre {S.fmt((a + b) / 2 - mid)} from silhouette centre")
             if len(rr) == 2:
                 c0, c1 = (rr[0][0] + rr[0][1]) / 2, (rr[1][0] + rr[1][1]) / 2
@@ -260,3 +333,24 @@ def run(args):
                              f" {S.fmt((z - a + 1) / 2):>7}  centre"
                              f" {S.fmt((a + z) / 2 - (x0 + x1) / 2):>7}")
     return {"ok": True, "lines": lines}
+
+
+def asked_again(P, store, mark_id):
+    """`--again ID`: the stored question, asked of the reference as it is now,
+    under the anchor and tolerances it was first asked with, so that the same
+    picture can only place the same ends."""
+    q = span.asked(store, mark_id)
+    if not q["ok"]:
+        return q
+    name, q = f"refs/{q['ref']}", q["question"]
+    path = P.root / name
+    if not path.exists():
+        return {"ok": False, "lines": [f"FAIL measure  {mark_id}: no such reference {name}"]}
+    px = load(path)
+    _, fg = masks(px, q["bg_tol"])
+    sil = bbox(fg)
+    if sil is None:
+        return {"ok": False, "lines": [f"FAIL measure  {name} is entirely background"]}
+    row, rr = scan(px, fg, Scale(q["anchor"], sil), q["scanline"], q["of"],
+                   q["tol"], q["min_run"])
+    return span.again(store, mark_id, rr or [], row=row, height=px.shape[0])
