@@ -132,6 +132,42 @@ nothing.
 contour canvas                     # the sheet, to mark on; waits for you
 ```
 
+**A number read off a reference is a span** (ADR 0022). Drag on a reference
+instead of clicking, and the mark has two ends: *this distance, right here*.
+`contour measure --span m9` reads it in millimetres, scaled from the
+`dimensions.height` your spec states, and pins the answer beside it. A picture
+carries proportion and never scale, so with no height in the spec it refuses
+rather than guess.
+
+The agent draws spans too, and never types a pixel for an end. It names what to
+measure and code places the ends on what was found:
+
+```sh
+contour measure refs/side.jpg --silhouette --extent across "depth, front to back"
+contour measure refs/front.jpg --scanline 250 --of '#3B3F72' --runs 1,2 \
+    --between centres "the legs, centre to centre"
+contour measure --again m4         # ask a snapped span's question again
+```
+
+Only where nothing snaps — a photograph of a real object, a soft gradient —
+may it place the ends itself, with `--by-eye --from X,Y --to X,Y`. Such a span
+is dashed on the canvas and says *by eye* wherever it shows, and its answer says
+the error bar covers the arithmetic between the ends, not where they were put.
+
+An agent span is a question, and you answer it on the canvas: **adopt** (it is
+right, and yours from then on), **correct** (drag its ends where they belong; it
+is re-measured), or **reject** (with one line of why; its number is not used).
+`contour measure --standing m4` says whether a span's number may go into a
+proposal: yours, the agent's own reading for a snapped span you have not
+answered yet, or not at all — a by-eye span waits for your answer, and a
+rejected one never counts.
+
+`contour worksheet` draws every span onto its reference as one image,
+`worksheet.png`, with each span's id, number, owner, how it was placed and your
+answer. It is how the agent sees its own spans, once, before it proposes a
+number from them. No reference is ever written: an annotated photograph is not
+the photograph.
+
 **`contour-console` drives the agent behind a gate** (ADR 0019). Same page, one
 more capability: a transcript on one side, the current sheet on the other, and
 every call that means something — a build, a spec write, a commit, a push —
@@ -222,7 +258,8 @@ or the folders in `$CONTOUR_SPACES`, separated by `:`.
 | `contour canvas` | the sheet and the references in a browser, to mark on |
 | `contour mark --part <p>` | pin a finding on the sheet, for the user to see |
 | `contour resolve` | anchor marks against this build, before it changes |
-| `contour measure <ref>` | real pixel geometry from a reference image |
+| `contour measure <ref>` | real pixel geometry from a reference image; draws and reads spans |
+| `contour worksheet` | every span drawn onto its reference -> `worksheet.png` |
 | `contour run <cmd>...` | hold this space for one run, then release it |
 | `contour asks` | what this space lets through, and what asks |
 | `contour intents` | the call categories a gate can ask about |
@@ -257,7 +294,8 @@ A model space, anywhere on disk, its own git repository:
     refs/         your intent, in pictures   (the agent reads, never writes)
     build.py      the attempt                (rebuilt from an empty scene)
     sheet.png     the 4-view render you approved
-    marks.json    located comments on the sheet, from both sides (ADR 0018)
+    worksheet.png the spans drawn onto the references          (ADR 0022)
+    marks.json    located comments and spans, from both sides   (ADR 0018)
     vetoes.json   calls you refused at a gate, and why            (ADR 0019)
     NOTES.md      what is deferred, and what is undecided
     CLAUDE.md     the agent's rules          (copied from the toolkit; `contour doctor` flags drift)
@@ -314,6 +352,11 @@ blocks model content leaving via git, and `tools/guards/spec.py` — which a spa
 runs as `contour hook spec` — refuses writes to a spec or a reference image that
 git already tracks. A spec is the definition of correct, so it is not the
 agent's to adjust.
+
+When the agent argues a spec is wrong, the argument has to be a measurement,
+and a measurement off a reference has to be a span the proposal names (rule 1,
+ADR 0022). A number with no span behind it is not an argument, and a by-eye
+span argues nothing until you have answered it.
 
 ## Decisions
 
