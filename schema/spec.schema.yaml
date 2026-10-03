@@ -49,6 +49,11 @@ parts:
   - name: <part-name>
     count: 1                 # e.g. 4 for legs; verify counts instances
     # notes: prose, human-judged only
+    # parent: <part-name>    # the rig (ADR 0023): the part this one hangs from.
+    #                        # Optional; a spec with no parent anywhere has no rig.
+    #                        # With one, exactly one part has no parent (the root),
+    #                        # every parent names a part, there is no cycle, and a
+    #                        # rigged part has count 1 — one bone per part.
 
 # ---------------------------------------------------------------- topology
 # The game-asset constraints. All mechanically checkable.

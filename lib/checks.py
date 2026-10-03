@@ -178,6 +178,44 @@ def parts(spec, objects):
                    "parts " + "; ".join(problems))]
 
 
+def rig(spec):
+    """The rig tree, over the spec alone (ADR 0023).
+
+    A part names the part it hangs from with `parent:`. A spec with no
+    `parent:` anywhere has no rig and is judged on nothing, so every spec
+    written before the rig existed stays as it was. With one, the tree must be
+    a tree: one root, every parent a part, no cycle — and one bone per part,
+    so a rigged name counted more than once fails rather than guessing which
+    instance the bone is.
+    """
+    want = spec.get("parts") or []
+    if not any("parent" in p for p in want):
+        return []
+    named = {p["name"]: p for p in want}
+    problems = []
+    roots = sorted(name for name, p in named.items() if "parent" not in p)
+    if len(roots) != 1:
+        problems.append(f"{len(roots)} roots: {_named(roots)}" if roots else "no root")
+    for name, p in named.items():
+        if "parent" in p and p["parent"] not in named:
+            problems.append(f"{name}'s parent {p['parent']!r} is not a part")
+        if p.get("count", 1) != 1:
+            problems.append(f"{name} x{p['count']}: one bone per part, count must be 1")
+    looped = set()
+    for name in named:
+        seen, at = [], name
+        while at in named and "parent" in named[at] and at not in seen:
+            seen.append(at)
+            at = named[at]["parent"]
+        if at in seen:
+            looped.update(seen[seen.index(at):])
+    if looped:
+        problems.append(f"cycle: {_named(looped)}")
+    root = roots[0] if len(roots) == 1 else "?"
+    return [result("rig", not problems, f"{len(named)} parts from {root}",
+                   "rig " + "; ".join(problems))]
+
+
 def uv(spec, parts):
     """UV coverage, and the two UV rules this verifier cannot yet enforce.
 
@@ -286,9 +324,11 @@ def spec(doc, variant):
         if k in dims and not (isinstance(dims[k], dict) and {"value", "tol"} <= set(dims[k])):
             bad.append(f"dimensions.{k} needs value and tol")
     for p in doc.get("parts") or []:
-        extra = set(p) - {"name", "count", "notes"}
+        extra = set(p) - {"name", "count", "notes", "parent"}
         if "name" not in p or extra:
             bad.append(f"part entry {p!r}: needs name; unknown {sorted(extra)}")
+        elif "parent" in p and not isinstance(p["parent"], str):
+            bad.append(f"{p['name']}: parent must be a part name, got {p['parent']!r}")
     if doc.get("model") != variant:
         bad.append(f"model {doc.get('model')!r} != variant {variant!r}")
     unsupported = set(doc.get("targets") or []) - IMPLEMENTED_TARGETS
@@ -311,7 +351,7 @@ def run(doc, variant, m, only=None):
     subset, because an importer legitimately re-welds and re-triangulates and
     topology is not judged there.
     """
-    out = spec(doc, variant)
+    out = spec(doc, variant) + rig(doc)
     for check, reads in SEQUENCE:
         out += check(doc, m[reads])
     if only is not None:

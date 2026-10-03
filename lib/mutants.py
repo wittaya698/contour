@@ -92,6 +92,8 @@ MUTANTS = [
     ("extra material", _rogue_material, None, {"mat_names", "mat_slots"}),
     ("origin off", _shift_all, None, {"origin"}),
     ("tri budget", lambda: None, lambda s: s["topology"].update(tri_budget=100), {"tris"}),
+    ("rig with two roots", lambda: None,
+     lambda s: s["parts"][1].update(parent=s["parts"][0]["name"]), {"rig"}),
 ]
 
 

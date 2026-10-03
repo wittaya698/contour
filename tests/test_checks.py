@@ -23,6 +23,10 @@ rebuild (issue 23):
     extra material        a material the spec does not list
     origin off            a model shifted off base_center
     tri budget            a model over the triangle budget
+
+and the rig's (ADR 0023), written as a spec rather than a measurement:
+
+    rig with two roots    a tree whose second root is a forgotten parent
 """
 import sys
 import unittest
@@ -309,6 +313,80 @@ class SpecTest(unittest.TestCase):
         got = verdicts(checks.spec({"model": "beaky"}, "smoke"))["spec"]
         self.assertFalse(got["ok"])
         self.assertIn("!= variant 'smoke'", got["msg"])
+
+
+class RigTest(unittest.TestCase):
+    """The rig tree, judged over the spec alone (ADR 0023, issue 48).
+
+    A part names the part it hangs from with `parent:`, so part names are
+    written once and the tree cannot disagree with the part list. No geometry
+    is read: whether the tree is a tree is a question about the document.
+    """
+    TREE = [{"name": "torso"},
+            {"name": "neck", "parent": "torso"},
+            {"name": "head", "parent": "neck"},
+            {"name": "leg_L", "parent": "torso"}]
+
+    def judge(self, parts):
+        return verdicts(checks.rig({"model": "smoke", "parts": parts}))
+
+    def test_a_spec_with_no_parent_anywhere_has_no_rig_and_is_judged_on_nothing(self):
+        """Every space written before ADR 0023 stays green with no revision."""
+        self.assertEqual(checks.rig({"parts": [{"name": "plinth"}, {"name": "cap"}]}), [])
+        self.assertEqual(checks.rig({"model": "smoke"}), [])
+
+    def test_a_tree_with_one_root_passes_and_says_its_size_and_root(self):
+        got = self.judge(self.TREE)["rig"]
+        self.assertTrue(got["ok"], got["msg"])
+        self.assertEqual(got["info"], "4 parts from torso")
+
+    def test_two_parts_without_a_parent_are_two_roots(self):
+        """A forgotten parent would otherwise make a second skeleton quietly."""
+        got = self.judge(self.TREE + [{"name": "tail"}])["rig"]
+        self.assertFalse(got["ok"])
+        self.assertIn("2 roots: tail, torso", got["msg"])
+
+    def test_a_parent_that_names_no_part_is_named_back(self):
+        got = self.judge(self.TREE + [{"name": "hand_L", "parent": "arm_L"}])["rig"]
+        self.assertFalse(got["ok"])
+        self.assertIn("hand_L's parent 'arm_L' is not a part", got["msg"])
+
+    def test_a_cycle_is_named_by_the_parts_in_it(self):
+        """A cycle has no root, so the root count alone would only half say it."""
+        parts = [{"name": "torso"}, {"name": "a", "parent": "b"}, {"name": "b", "parent": "a"}]
+        got = self.judge(parts)["rig"]
+        self.assertFalse(got["ok"])
+        self.assertIn("cycle: a, b", got["msg"])
+
+    def test_a_part_that_is_its_own_parent_is_a_cycle(self):
+        got = self.judge([{"name": "torso"}, {"name": "head", "parent": "head"}])["rig"]
+        self.assertFalse(got["ok"])
+        self.assertIn("cycle: head", got["msg"])
+
+    def test_a_rigged_part_counted_more_than_once_fails_rather_than_guesses(self):
+        """One bone per part: four legs under one name have no one bone to be,
+        and a rule this verifier cannot enforce fails rather than skips."""
+        got = self.judge(self.TREE + [{"name": "toe", "count": 4, "parent": "leg_L"}])["rig"]
+        self.assertFalse(got["ok"])
+        self.assertIn("toe x4: one bone per part, count must be 1", got["msg"])
+
+    def test_the_spec_check_accepts_a_parent_on_a_part(self):
+        got = verdicts(checks.spec({"model": "smoke", "parts": self.TREE}, "smoke"))["spec"]
+        self.assertTrue(got["ok"], got["msg"])
+
+    def test_a_parent_that_is_not_a_name_is_refused_by_the_spec_check(self):
+        got = verdicts(checks.spec({"model": "smoke",
+                                    "parts": [{"name": "torso"}, {"name": "neck", "parent": 3}]},
+                                   "smoke"))["spec"]
+        self.assertFalse(got["ok"])
+        self.assertIn("neck: parent must be a part name", got["msg"])
+
+    def test_the_rig_is_judged_straight_after_the_spec(self):
+        """A tree that is not a tree makes every later rig reading beside the
+        point, as an unenforceable spec does for every reading."""
+        m = {"objects": ["torso", "neck"], "parts": [part("torso"), part("neck")]}
+        got = checks.run({"model": "smoke", "parts": self.TREE[:2]}, "smoke", m)
+        self.assertEqual([r["id"] for r in got][:3], ["spec", "rig", "parts"])
 
 
 class RunTest(unittest.TestCase):
