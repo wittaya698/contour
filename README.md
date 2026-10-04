@@ -25,8 +25,8 @@ ln -s "$PWD/contour" ~/.local/bin/   # so you can run it from a model space
 ```
 
 `selftest` builds a fixture, verifies it, renders it, exports a `.glb` and
-re-imports it, and deliberately corrupts the build in 19 ways to prove the
-checks can actually fail. If it passes, you are installed.
+re-imports it, and deliberately corrupts the build and the `.glb` in 37 ways
+to prove the checks can actually fail. If it passes, you are installed.
 
 ### The console needs an environment; `./contour` still does not
 
@@ -98,6 +98,11 @@ contour doctor                     # is the space in step with the toolkit
 contour check                      # no model name: you are standing in it
 ```
 
+`lib/kit.py` has the helpers a `build.py` uses — millimetre conversion,
+materials from hex, boxes, spheres, cylinders, and `add()` to turn a bmesh
+into a placed object. `fixtures/smoke/build.py` is a complete example in ten
+lines.
+
 `check` prints one line per failure and a two-line report when it passes:
 
 ```
@@ -112,6 +117,10 @@ contour render                     # 4-view sheet -> sheet.png
 contour export                     # .glb, re-imported and re-measured to prove it
 git add -A && git commit
 ```
+
+When an agent is doing the work, it stops before that last line. It shows you
+the `check` report and the sheet the build was drawn from, and commits only
+once you have seen both and said ship (rule 5 in `CLAUDE.md`).
 
 ## A rig, and clips that move it
 
@@ -236,11 +245,6 @@ reads it afterwards in the same units it reports a terminal session in.
 Nothing about the console is load-bearing for the pipeline: `contour selftest`
 proves a clone with none of it installed still builds, verifies, renders and
 exports.
-
-`lib/kit.py` has the helpers a `build.py` uses — millimetre conversion,
-materials from hex, boxes, spheres, cylinders, and `add()` to turn a bmesh
-into a placed object. `fixtures/smoke/build.py` is a complete example in ten
-lines.
 
 ## The lobby: every space on one page
 
