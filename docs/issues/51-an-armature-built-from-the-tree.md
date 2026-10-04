@@ -24,11 +24,37 @@ not as an undeclared part.
 
 ## Acceptance criteria
 
-- [ ] A spec with a rig builds an armature with one bone per part, parented as the tree
-- [ ] Every part is weighted wholly to its own bone
-- [ ] Every shape check reads the same at rest as without the armature
-- [ ] A bone count or parent that disagrees with the tree is red, shown by a fixture
-- [ ] The armature object is not reported as an unexpected part
+- [x] A spec with a rig builds an armature with one bone per part, parented as the tree
+- [x] Every part is weighted wholly to its own bone
+- [x] Every shape check reads the same at rest as without the armature
+- [x] A bone count or parent that disagrees with the tree is red, shown by a fixture
+- [x] The armature object is not reported as an unexpected part
+
+## What it came to
+
+`kit.rig()`, the last line of a rigged `build.py`, reads the tree from the spec
+being built — `cmd_build` hands it over — so the space declares nothing more.
+Each bone's head is on its part's origin, which `pivots` already holds to the
+seam; every bone points up +Z with no roll, so every bone's rest frame is the
+world's, which slice 52's degrees can lean on. Parts are bound by vertex group
+and armature modifier but not parented to the rig, so no origin or transform
+moves: `smoke` and `beaky` read the same on every shape check as before.
+
+The gather keeps armatures out of `objects`, which ends `parts unexpected:
+rig`, and lists them under `rigs`; each part says the bone it is `bound_to`. A
+new check, `bones`, holds one rig to the tree — a bone missing, extra or
+hanging from the wrong parent, a part not wholly on its own bone, no armature
+or two, and an armature where the spec has no rig, which `parts` can no longer
+see. Mutants: *bone off the tree*, *extra bone*, *part not weighted*.
+
+The round-trip found one more: re-importing a skinned `.glb` gives each bone a
+1 m icosphere to draw it by, measured as a part — origin a metre down, 80
+triangles more. It is the importer's and not the model's, so the re-import now
+asks for none (`disable_bone_shape`). That is all slice 54 inherits; comparing
+the rig itself across the file is still its job.
+
+`beaky` (in its own space): `bones 14/14`, every other reading unchanged, and
+its export round-trips 14/14.
 
 ## Blocked by
 

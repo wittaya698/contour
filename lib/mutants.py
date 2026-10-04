@@ -4,7 +4,7 @@ import bmesh
 import bpy
 from mathutils import Matrix
 
-from . import kit, scene
+from . import ctx_override, kit, scene
 from .cmd_build import build
 
 
@@ -96,6 +96,21 @@ def _pillar_origin_off():
     pillar.data.transform(Matrix.Translation((0.0, 0.0, -0.010)))
 
 
+def _stray_bone():
+    """A fourth bone, on no part, made the one way a bone can be (issue 47)."""
+    rig = _obj("rig")
+    bpy.context.view_layer.objects.active = rig
+    ctx_override.call("object.mode_set", mode="EDIT")
+    bone = rig.data.edit_bones.new("stray")
+    bone.head, bone.tail = (0.0, 0.0, 0.3), (0.0, 0.0, 0.31)
+    ctx_override.call("object.mode_set", mode="OBJECT")
+
+
+def _unweight_plinth():
+    plinth = _obj("plinth")
+    plinth.vertex_groups.remove(plinth.vertex_groups["plinth"])
+
+
 # name, mutate, spec edit, check ids that must fail
 MUTANTS = [
     ("height", _raise_cap, None, {"height"}),
@@ -117,6 +132,10 @@ MUTANTS = [
     ("origin off its pivot", _pillar_origin_off, None, {"pivots"}),
     ("no pivot tolerance", lambda: None,
      lambda s: s["transform"].pop("pivot_tolerance_mm"), {"pivots"}),
+    ("bone off the tree", lambda: None, lambda s: s["parts"][0].update(parent="cap"),
+     {"bones"}),
+    ("extra bone", _stray_bone, None, {"bones"}),
+    ("part not weighted", _unweight_plinth, None, {"bones"}),
 ]
 
 
@@ -159,7 +178,7 @@ GLB_MUTANTS = [
 
 def attach_roundtrip(rep, spec, P, variant):
     """Corrupt real .glb files and require file_checks (and the re-import) to object."""
-    from . import cmd_roundtrip, ctx_override, glb
+    from . import cmd_roundtrip, glb
 
     doc, blob = glb.load(P.glb)
     missed = []
@@ -179,8 +198,7 @@ def attach_roundtrip(rep, spec, P, variant):
     import verify
     path = P.out / "_mutant.glb"
     glb.write(path, glb.wrapped(doc, rotation=[0.70710678, 0.0, 0.0, 0.70710678]), blob)
-    scene.reset()
-    ctx_override.call("import_scene.gltf", filepath=str(path))
+    cmd_roundtrip.reimport(path)
     failed = {r["id"] for r in verify.run(spec, variant, only=cmd_roundtrip.RE_CHECKS)
               if not r["ok"]}
     n += 1

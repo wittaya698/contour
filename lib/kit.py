@@ -8,9 +8,15 @@ because every space's build spells them `kit.mm` (issue 26).
 """
 import bmesh
 import bpy
-from mathutils import Matrix
+from mathutils import Matrix, Vector
 
+from . import ctx_override
 from .units import MM, linear, mm, size  # noqa: F401  (MM, mm: kit's own names)
+
+# The spec being built, handed over by `lib/cmd_build.py` before `build.py`
+# runs, so that `rig()` reads the tree from where the user wrote it and a
+# space's build declares nothing the spec already says (ADR 0023).
+_spec = None
 
 
 def material(name, hex_colour, roughness=0.9):
@@ -82,4 +88,44 @@ def bake_transform(obj):
     linear = loc.inverted() @ m
     me.transform(linear)
     obj.matrix_world = loc
+    return obj
+
+
+def rig():
+    """The armature the spec's tree describes, bound rigidly (ADR 0023).
+
+    One bone per part, named after it, its head on the part's origin — the
+    pivot, which `pivots` checks — and hanging from its parent's bone. Every
+    bone points up +Z with no roll, so every bone's frame at rest is the
+    world's, and a pose in degrees reads the same way on any bone.
+
+    Each part's every vertex is weighted 1 to its own bone, and an armature
+    modifier binds it, all through the data API. Parts are not parented to the
+    rig as objects, so every origin and transform reads as it did before. Only
+    the bones need edit mode, entered and left by the whitelisted
+    `object.mode_set` (issue 47). Call it last, once every part exists.
+    """
+    tree = {p["name"]: p.get("parent") for p in (_spec or {}).get("parts") or []}
+    if not any(tree.values()):
+        raise ValueError("kit.rig(): the spec has no rig; give its parts a parent:")
+    parts = {name: bpy.data.objects[name] for name in tree}
+    arm = bpy.data.armatures.new("rig")
+    obj = bpy.data.objects.new("rig", arm)
+    bpy.context.scene.collection.objects.link(obj)
+    bpy.context.view_layer.objects.active = obj
+    ctx_override.call("object.mode_set", mode="EDIT")
+    try:
+        for name, part in parts.items():
+            bone = arm.edit_bones.new(name)
+            bone.head = part.matrix_world.translation
+            bone.tail = bone.head + Vector((0.0, 0.0, max(part.dimensions.z / 2, mm(10))))
+        for name, parent in tree.items():
+            if parent:
+                arm.edit_bones[name].parent = arm.edit_bones[parent]
+    finally:
+        ctx_override.call("object.mode_set", mode="OBJECT")
+    for name, part in parts.items():
+        group = part.vertex_groups.new(name=name)
+        group.add(range(len(part.data.vertices)), 1.0, "REPLACE")
+        part.modifiers.new("rig", "ARMATURE").object = obj
     return obj

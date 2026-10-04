@@ -3,12 +3,16 @@ import runpy
 
 import bpy
 
-from . import miniyaml, space, scene
+from . import kit, miniyaml, space, scene
 
 
 def build(P, variant):
-    """Empty scene -> build.py -> one collection. Returns the collection."""
+    """Empty scene -> build.py -> one collection. Returns the collection.
+
+    `kit` is handed the spec first, which is where `kit.rig()` reads the tree.
+    """
     scene.reset()
+    kit._spec = miniyaml.load(P.spec)
     runpy.run_path(str(P.build), run_name="__main__")
     return scene.organize(variant)
 

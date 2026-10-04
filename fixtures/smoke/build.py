@@ -15,3 +15,5 @@ kit.add("pillar", kit.box_bm((40, 40, 110)), at_mm=(0, 0, 90), mat=stone,
         pivot_mm=(0, 0, 145))
 kit.add("cap", kit.sphere_bm(30, segments=32, rings=24), at_mm=(0, 0, 170), mat=accent,
         smooth=True)
+
+kit.rig()

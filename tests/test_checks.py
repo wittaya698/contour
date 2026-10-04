@@ -31,6 +31,9 @@ and the rig's (ADR 0023): the tree written as a spec, the seams as contacts:
     tangent part          a joint whose boxes touch and nothing crosses
     origin off its pivot  an origin 137 mm from its seam's centre
     no pivot tolerance    a rig whose spec gives no pivot tolerance
+    bone off the tree     a bone hanging from another than the tree says
+    extra bone            a bone that is no part
+    part not weighted     a part on no bone
 """
 import sys
 import unittest
@@ -52,7 +55,7 @@ def part(name="plinth", **fields):
             "non_manifold_edges": 0, "loose_verts": 0, "loose_edges": 0,
             "flipped_faces": 0, "nearest_pair_mm": None, "bounds": None,
             "scale": (1.0, 1.0, 1.0), "rotation_rad": 0.0, "uv_layers": 0,
-            "materials": (), "origin": (0.0, 0.0, 0.0), **fields}
+            "materials": (), "origin": (0.0, 0.0, 0.0), "bound_to": None, **fields}
 
 
 def verdicts(results):
@@ -389,7 +392,7 @@ class RigTest(unittest.TestCase):
         """A tree that is not a tree makes every later rig reading beside the
         point, as an unenforceable spec does for every reading."""
         m = {"objects": ["torso", "neck"], "parts": [part("torso"), part("neck")],
-             "contacts": []}
+             "contacts": [], "rigs": []}
         got = checks.run({"model": "smoke", "parts": self.TREE[:2]}, "smoke", m)
         self.assertEqual([r["id"] for r in got][:3], ["spec", "rig", "parts"])
 
@@ -413,7 +416,7 @@ class SeamTest(unittest.TestCase):
         m = {"objects": ["torso", "neck"],
              "parts": [part("torso", bounds=([-.1, -.1, 0], [.1, .1, .5])),
                        part("neck", bounds=neck_box, origin=neck)],
-             "contacts": contacts}
+             "contacts": contacts, "rigs": []}
         return verdicts(checks.run(spec, "smoke", m))
 
     def crossing(self, centre=(0, 0, .5), points=12):
@@ -467,6 +470,83 @@ class SeamTest(unittest.TestCase):
         self.assertNotIn("pivots", got)
 
 
+class BoneTest(unittest.TestCase):
+    """The armature against the tree (ADR 0023, issue 51).
+
+    The gather reads each armature object as a rig: its name and its bones,
+    each with the bone it hangs from. Each part says which bone it is wholly
+    weighted to, or None.
+    """
+    SPEC = {"model": "smoke",
+            "parts": [{"name": "plinth", "parent": "pillar"},
+                      {"name": "pillar", "parent": "cap"}, {"name": "cap"}],
+            "transform": {"pivot_tolerance_mm": 1}}
+    TREE = (("plinth", "pillar"), ("pillar", "cap"), ("cap", None))
+
+    def judge(self, bones=TREE, rigs=None, bound=None, spec=SPEC):
+        """The smoke fixture's three parts, each bound to its own bone unless
+        told otherwise."""
+        bound = {"plinth": "plinth", "pillar": "pillar", "cap": "cap", **(bound or {})}
+        if rigs is None:
+            rigs = [{"name": "rig", "bones": [{"name": n, "parent": p} for n, p in bones]}]
+        m = {"objects": ["plinth", "pillar", "cap"],
+             "parts": [part(n, bound_to=b) for n, b in bound.items()],
+             "contacts": [], "rigs": rigs}
+        return verdicts(checks.run(spec, "smoke", m))
+
+    def test_bones_that_match_the_tree_pass(self):
+        got = self.judge()["bones"]
+        self.assertTrue(got["ok"], got["msg"])
+        self.assertEqual(got["info"], "3/3")
+
+    def test_a_part_with_no_bone_and_a_bone_with_no_part_are_named(self):
+        got = self.judge(bones=self.TREE[1:] + (("stray", "cap"),))["bones"]
+        self.assertFalse(got["ok"])
+        self.assertIn("no bone for plinth", got["msg"])
+        self.assertIn("bone stray is no part", got["msg"])
+
+    def test_a_bone_hanging_from_another_than_the_tree_says_is_red(self):
+        got = self.judge(bones=(("plinth", "cap"), ("pillar", "cap"), ("cap", None)))["bones"]
+        self.assertFalse(got["ok"])
+        self.assertIn("plinth's bone hangs from cap, the tree says pillar", got["msg"])
+
+    def test_a_root_bone_given_a_parent_is_red(self):
+        got = self.judge(bones=(("plinth", "pillar"), ("pillar", "cap"), ("cap", "plinth")))
+        self.assertIn("cap's bone hangs from plinth, the tree says none",
+                      got["bones"]["msg"])
+
+    def test_a_part_not_wholly_on_its_own_bone_is_red(self):
+        """None is what the gather says for a part with no weights, weights
+        under one, or weights split between bones: whatever it is, the part
+        does not move rigidly with its bone."""
+        got = self.judge(bound={"plinth": None, "pillar": "cap"})["bones"]
+        self.assertFalse(got["ok"])
+        self.assertIn("plinth is not wholly on a bone", got["msg"])
+        self.assertIn("pillar is on cap's bone, not its own", got["msg"])
+
+    def test_a_rigged_spec_with_no_armature_says_what_build_py_lacks(self):
+        got = self.judge(rigs=[])["bones"]
+        self.assertFalse(got["ok"])
+        self.assertIn("no armature; build.py needs kit.rig()", got["msg"])
+
+    def test_two_armatures_are_red_rather_than_judging_one_of_them(self):
+        one = {"name": "rig", "bones": [{"name": n, "parent": p} for n, p in self.TREE]}
+        got = self.judge(rigs=[one, {**one, "name": "rig.001"}])["bones"]
+        self.assertFalse(got["ok"])
+        self.assertIn("2 armatures: rig, rig.001; one rig per model", got["msg"])
+
+    def test_an_unrigged_spec_with_no_armature_is_judged_on_no_bones(self):
+        got = self.judge(rigs=[], spec={"model": "smoke", "parts": [{"name": "cap"}]})
+        self.assertNotIn("bones", got)
+
+    def test_an_armature_the_spec_has_no_rig_for_is_red(self):
+        """The gather keeps armatures out of `objects`, so `parts` cannot see
+        a stray one; this is where it is seen instead."""
+        got = self.judge(spec={"model": "smoke", "parts": [{"name": "cap"}]})["bones"]
+        self.assertFalse(got["ok"])
+        self.assertIn("armature rig, and the spec has no rig", got["msg"])
+
+
 class RunTest(unittest.TestCase):
     """The whole verdict list, from a measurement written by hand.
 
@@ -482,7 +562,8 @@ class RunTest(unittest.TestCase):
         return {"objects": ["plinth"],
                 "parts": [part("plinth", faces={4: 6},
                                bounds=((-0.06, -0.05, 0.0), (0.06, 0.05, 0.2)),
-                               **fields)]}
+                               **fields)],
+                "contacts": [], "rigs": []}
 
     def test_a_measurement_that_meets_its_spec_passes_every_check(self):
         got = checks.run(self.SPEC, "smoke", self.measurement())

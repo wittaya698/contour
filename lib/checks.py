@@ -290,6 +290,33 @@ def pivots(spec, m):
                    "; ".join(bad) + f" (tolerance {tol}mm)")]
 
 
+def bones(spec, m):
+    """The armature against the tree (ADR 0023): one rig, one bone per part,
+    each hanging from the bone the tree says, each part wholly on its own.
+
+    The gather says what the scene holds; the tree says what it should.
+    """
+    rigs, names = m["rigs"], _named(r["name"] for r in m["rigs"])
+    if not _joints(spec):
+        return [result("bones", False, msg=f"bones: armature {names}, and the spec has no rig")
+                ] if rigs else []
+    if len(rigs) != 1:
+        said = (f"{len(rigs)} armatures: {names}; one rig per model" if rigs
+                else "no armature; build.py needs kit.rig()")
+        return [result("bones", False, msg="bones: " + said)]
+    want = {p["name"]: p.get("parent") for p in spec["parts"]}
+    have = {b["name"]: b["parent"] for b in rigs[0]["bones"]}
+    bad = [f"no bone for {name}" for name in want if name not in have]
+    bad += [f"bone {name} is no part" for name in have if name not in want]
+    bad += [f"{name}'s bone hangs from {have[name] or 'none'}, the tree says {parent or 'none'}"
+            for name, parent in want.items() if name in have and have[name] != parent]
+    for p in m["parts"]:
+        if p["name"] in want and p["bound_to"] != p["name"]:
+            bad.append(f"{p['name']} is on {p['bound_to']}'s bone, not its own"
+                       if p["bound_to"] else f"{p['name']} is not wholly on a bone")
+    return [result("bones", not bad, f"{len(have)}/{len(want)}", "bones " + "; ".join(bad))]
+
+
 def uv(spec, parts):
     """UV coverage, and the two UV rules this verifier cannot yet enforce.
 
@@ -428,7 +455,7 @@ def run(doc, variant, m, only=None):
     out = spec(doc, variant) + rig(doc)
     for check, reads in SEQUENCE:
         out += check(doc, m[reads])
-    out += seams(doc, m) + pivots(doc, m)
+    out += seams(doc, m) + pivots(doc, m) + bones(doc, m)
     if only is not None:
         out = [r for r in out if r["id"] in only]
     return out

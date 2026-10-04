@@ -50,6 +50,6 @@ def report(variant, results):
     if "height" in info:
         stamp += f" | height {info['height'].split('.')[0]}mm"
     rest = [f"{k} {info[k]}" for k in ("width", "depth", "quads", "parts", "mat_slots", "origin",
-                                       "seams", "pivots")
+                                       "seams", "pivots", "bones")
             if k in info]
     return [f"{variant} PASS  {stamp}", "  " + " | ".join(rest)] if rest else [f"{variant} PASS  {stamp}"]

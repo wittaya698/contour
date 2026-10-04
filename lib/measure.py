@@ -28,11 +28,19 @@ The fields, per part:
     uv_layers           how many UV layers it carries
     materials           the material names in its slots, in slot order
     origin              where the object's origin stands in the world, metres
+    bound_to            the bone this part is wholly weighted to, or None: every
+                        vertex in one group at weight 1, that group a bone of
+                        the armature its modifier names (ADR 0023)
 
 The measurement `scene()` returns holds those records under `parts`, and under
-`objects` the name of every object in the scene, mesh or not. A stray empty is
-a part list that does not match, and a check reading only meshes would not see
-it — so the two are gathered together and each check says which it reads.
+`objects` the name of every object in the scene, mesh or not, but for
+armatures. A stray empty is a part list that does not match, and a check
+reading only meshes would not see it — so the two are gathered together and
+each check says which it reads. An armature is the rig and not a part; it is
+under `rigs`, one record per armature object:
+
+    name                the armature object's name
+    bones               `{"name", "parent"}` per bone, parent None at the root
 
 Under `contacts` it holds one record per pair of parts whose surfaces cross —
 a seam, wherever one exists, whether or not the spec calls it a joint (ADR
@@ -157,7 +165,33 @@ def part(obj, bm):
             "uv_layers": len(obj.data.uv_layers),
             "materials": tuple(s.material.name for s in obj.material_slots
                                if s.material),
-            "origin": tuple(obj.matrix_world.translation)}
+            "origin": tuple(obj.matrix_world.translation),
+            "bound_to": _bound_to(obj)}
+
+
+def _bound_to(obj):
+    """The one bone every vertex of `obj` is weighted wholly to, or None."""
+    rigs = [m.object for m in obj.modifiers if m.type == "ARMATURE" and m.object]
+    if len(rigs) != 1 or not obj.data.vertices:
+        return None
+    names = {g.index: g.name for g in obj.vertex_groups}
+    found = set()
+    for v in obj.data.vertices:
+        held = [g for g in v.groups if g.weight > 0]
+        if len(held) != 1 or held[0].weight < 1.0:
+            return None
+        found.add(names[held[0].group])
+    bone = found.pop() if len(found) == 1 else None
+    return bone if bone in rigs[0].data.bones else None
+
+
+def rigs(objects=None):
+    """One record per armature object: its name and its bones' tree."""
+    return [{"name": o.name,
+             "bones": [{"name": b.name, "parent": b.parent.name if b.parent else None}
+                       for b in o.data.bones]}
+            for o in (bpy.context.scene.objects if objects is None else objects)
+            if o.type == "ARMATURE"]
 
 
 def parts(objects=None):
@@ -270,15 +304,15 @@ def contacts(objects=None):
 
 def scene(objects=None):
     """The whole measurement: `{"objects": [name...], "parts": [record...],
-    "contacts": [record...]}`.
+    "contacts": [record...], "rigs": [record...]}`.
 
     What `verify.run` judges, and the only thing it judges. Nothing that has to
     be freed comes back, so there is no `release()` and no ordering obligation
     on the caller (ADR 0020, decision 2).
     """
     objs = list(bpy.context.scene.objects if objects is None else objects)
-    return {"objects": [o.name for o in objs], "parts": parts(objs),
-            "contacts": contacts(objs)}
+    return {"objects": [o.name for o in objs if o.type != "ARMATURE"],
+            "parts": parts(objs), "contacts": contacts(objs), "rigs": rigs(objs)}
 
 
 def bounds(objects=None):

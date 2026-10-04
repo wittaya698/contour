@@ -13,6 +13,17 @@ from . import checks, ctx_override, glb, measure, miniyaml, space, scene
 
 ORIGIN_TOL_MM = 1.0
 GL_AXIS = {"width": 0, "height": 1, "depth": 2}  # glTF: X right, Y up, Z toward viewer
+def reimport(path):
+    """An empty scene holding the `.glb` as Blender reads it back.
+
+    Without the shape the importer gives a bone to draw it by: that shape is a
+    1 m icosphere mesh, the importer's and not the model's, and measured as a
+    part it moves the origin a metre down (issue 51).
+    """
+    scene.reset()
+    ctx_override.call("import_scene.gltf", filepath=str(path), disable_bone_shape=True)
+
+
 RE_CHECKS = {"height", "width", "depth", "origin", "parts", "mat_names", "mat_slots"}
 
 
@@ -66,8 +77,7 @@ def run(args):
     scene.reset()
     scene.load_collections(P.blend)
     built_tris = checks.tris(measure.parts())
-    scene.reset()
-    ctx_override.call("import_scene.gltf", filepath=str(P.glb))
+    reimport(P.glb)
     results += [dict(r, id=f"re_{r['id']}") for r in verify.run(spec, variant, only=RE_CHECKS)]
     got_tris = checks.tris(measure.parts())
     results.append(_res("tris_kept", got_tris == built_tris == g["tris"], f"{got_tris:,}",
