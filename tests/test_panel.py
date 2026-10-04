@@ -30,7 +30,9 @@ CONTOUR = Path(__file__).resolve().parent.parent / "contour"
 VIEWS = [{"label": "front", "tile": [0, 0, 512, 512]}]
 
 
-class PanelTest(unittest.TestCase):
+class PanelCase(unittest.TestCase):
+    """A space with a canvas to ask, and a stubbed `contour check` to run in it."""
+
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())
         self.out = self.tmp / "out"
@@ -66,6 +68,8 @@ class PanelTest(unittest.TestCase):
         canvas.start()
         return get(canvas, "/sheet.json")[1]
 
+
+class PanelTest(PanelCase):
     def test_the_panel_names_the_build_the_sheet_was_drawn_from(self):
         self.built()
         panel = self.panel()
@@ -201,6 +205,53 @@ class PanelTest(unittest.TestCase):
             said = json.loads(r.read())
         self.assertEqual(said["build"], views.fingerprint(self.blend))
         self.assertTrue(said["current"])
+
+
+class VerdictTest(PanelCase):
+    """`last-build.json` is the last check's verdict, whole (ADR 0024, decision
+    6): `report.json` is gone by the next stage, so this is the one place what
+    that check said survives a render or a filmstrip after it (issue 58)."""
+
+    def verdict(self):
+        return json.loads((self.tmp / ".contour" / "last-build.json").read_text())
+
+    def test_a_check_leaves_its_whole_report(self):
+        self.built()
+        self.assertEqual(self.check(ok=False).returncode, 1)
+        said = self.verdict()
+        self.assertIs(said["built"], True)
+        self.assertIs(said["ok"], False)
+        self.assertEqual(said["lines"], ["stub ran build"])
+        self.assertEqual(said["results"], [{"name": "stub", "ok": False}])
+        self.assertIsInstance(said["secs"], float)
+        self.assertEqual(said["build"], views.fingerprint(self.blend))
+        self.assertRegex(said["when"], r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d")
+
+    def test_a_later_stage_leaves_the_checks_verdict_alone(self):
+        """The fact the ADR measured: after a filmstrip, `report.json` held the
+        filmstrip's lines. `check` is the one writer here."""
+        self.built()
+        self.check(ok=False)
+        before = self.verdict()
+        env = dict(os.environ, BLENDER=str(stub_blender(self.tmp)))
+        for stage in ("render", "filmstrip"):
+            r = subprocess.run([sys.executable, str(CONTOUR), stage],
+                               cwd=str(self.tmp), env=env,
+                               capture_output=True, text=True, timeout=60)
+            self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+            self.assertEqual(self.verdict(), before, f"{stage} wrote the verdict")
+
+    def test_a_build_that_died_is_not_built_and_keeps_its_lines(self):
+        """No report, so the lines are the launcher's own and the log's tail;
+        and no build named, since the `.blend` on disk is the one before."""
+        self.built()
+        self.check(crash=True)
+        said = self.verdict()
+        self.assertIs(said["built"], False)
+        self.assertIs(said["ok"], False)
+        self.assertIn("FAIL blender exit 1, no report", said["lines"][0])
+        self.assertEqual(said["results"], [])
+        self.assertIsNone(said["build"])
 
 
 if __name__ == "__main__":

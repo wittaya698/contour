@@ -10,6 +10,7 @@ and nothing for a second reader to disagree with.
 Stdlib, and Blender-free: the launcher serves this and so does the console, and
 the console may never import a `bpy`-bound module (ADR 0019, decision 32).
 """
+from datetime import datetime
 from pathlib import Path
 
 from . import marks as marks_store
@@ -28,16 +29,24 @@ the start of every stage, including the render that follows a check.
 """
 
 
-def record(path, rep):
-    """Say what this check came to, where the page can read it.
+def record(path, rep, blend):
+    """Say what this check came to, where the page can read it — the whole
+    report, because nothing else keeps it past the next stage (ADR 0024,
+    decision 6).
 
     `results` is a verify verdict, and a report that carries one got as far as
     being judged — which is as far as being saved. A report without one is a
-    stage that died, and the build on disk is whatever was there before it ran.
+    stage that died, and the build on disk is whatever was there before it ran,
+    so it is named only when this check made it.
     """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    store.save(path, {"built": "results" in rep})
+    built = "results" in rep
+    store.save(path, {"built": built, "ok": rep["ok"], "lines": rep["lines"],
+                      "results": rep.get("results", []),
+                      "secs": rep.get("secs"),
+                      "build": sheet_views.fingerprint(blend) if built else None,
+                      "when": datetime.now().astimezone().isoformat(timespec="seconds")})
 
 
 def state(views=None, blend=None, verdict=None, marks=None):

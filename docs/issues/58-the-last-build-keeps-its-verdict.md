@@ -16,12 +16,21 @@ writer, as today. A stage that died is still recorded as not built.
 
 ## Acceptance criteria
 
-- [ ] After `contour check`, `last-build.json` holds pass or fail, the lines, the results, the seconds, the fingerprint and the time
-- [ ] After a later `contour filmstrip` or `contour render`, it still holds that check's verdict unchanged
-- [ ] A build that died before verify is recorded as not built, with its lines
-- [ ] `check` is still its only writer
-- [ ] The console's panel still reads it, and still labels a failed build as before
+- [x] After `contour check`, `last-build.json` holds pass or fail, the lines, the results, the seconds, the fingerprint and the time
+- [x] After a later `contour filmstrip` or `contour render`, it still holds that check's verdict unchanged
+- [x] A build that died before verify is recorded as not built, with its lines
+- [x] `check` is still its only writer
+- [x] The console's panel still reads it, and still labels a failed build as before
 
 ## Blocked by
 
 None - can start immediately
+
+## What it came to
+
+Done, 2026-10-04. `panel.record` saves `built`, `ok`, `lines`, `results`, `secs`,
+`build` and `when`, and the panel still reads only `built`. A build that died
+names no build (`build` is null), because the `.blend` on disk is the one from
+before it, and naming it would repeat the mistake `built` was written to prevent.
+The verdict is written before the sheet is drawn, so a failed render's `warn` lines
+are the report's and not the verdict's.

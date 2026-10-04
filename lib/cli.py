@@ -228,7 +228,7 @@ def on_build(cmd, rest, held):
     if cmd == "check":
         rep = stage(["build"])
         from lib import panel
-        panel.record(OUT / panel.NAME, rep)
+        panel.record(OUT / panel.NAME, rep, HERE.blend)
         return say_marks(emit(draw(rep)))
     if cmd != "export":
         return emit(stage([cmd]))

@@ -405,7 +405,7 @@ class ServesTest(ConsoleCase):
         blend.write_bytes(b"a blend")
         views.record(out / "views.json", [1024, 1024],
                       [{"label": "front", "tile": [0, 0, 512, 512]}], blend)
-        panel.record(space / ".contour" / panel.NAME, {"ok": False, "lines": []})
+        panel.record(space / ".contour" / panel.NAME, {"ok": False, "lines": []}, blend)
         _, said = self.ask(self.launch(space)[1], "/sheet.json")
         self.assertEqual(said["build"], views.fingerprint(blend))
         self.assertFalse(said["current"])
