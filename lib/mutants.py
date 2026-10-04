@@ -4,7 +4,7 @@ import bmesh
 import bpy
 from mathutils import Matrix
 
-from . import ctx_override, kit, scene
+from . import ctx_override, kit, pose, scene
 from .cmd_build import build
 
 
@@ -125,6 +125,25 @@ def _open_sway():
             fc.update()
 
 
+def _sink_cap():
+    """The cap 125 mm down, into the plinth, which is not its child."""
+    _obj("cap").location.z -= 0.125
+
+
+def _sweep_plinth():
+    """A key at frame 5, which no spec key names, turning the plinth 90
+    degrees about Y on its pivot: through the pillar it hangs from."""
+    rig, act = _obj("rig"), bpy.data.actions["sway"]
+    pb = rig.pose.bones["plinth"]
+    pose.turn(pb, (0, 90, 0))
+    turned = tuple(pb.rotation_euler)
+    pose.turn(pb, (0, 0, 0))
+    bag = act.layers[0].strips[0].channelbag(act.slots[0])
+    for fc in bag.fcurves:
+        if fc.data_path == 'pose.bones["plinth"].rotation_euler':
+            fc.keyframe_points.insert(5, turned[fc.array_index])
+
+
 def _key(frame, bone, angles):
     return lambda s: s["clips"]["sway"]["keys"][frame].update({bone: angles})
 
@@ -157,6 +176,8 @@ MUTANTS = [
     ("clip too short", _shorten_sway, None, {"clips"}),
     ("loop left open", _open_sway, None, {"clips"}),
     ("key on the wrong axis", lambda: None, _key(0, "plinth", [8, 0, 0]), {"clips"}),
+    ("part enters another", _sink_cap, None, {"clips"}),
+    ("seam swept through its parent", _sweep_plinth, None, {"clips"}),
 ]
 
 

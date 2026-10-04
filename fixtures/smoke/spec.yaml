@@ -55,3 +55,6 @@ clips:
       0:  { pillar: [10, 0, 0], plinth: [0, 8, 0] }
       10: { pillar: [-10, 0, 15] }
     tol_deg: 1
+    # The sphere is faceted, so the pillar's seam with the cap widens 2.8 mm
+    # as the pillar sways on a pivot that is right (issue 53).
+    seam_growth_mm: 3

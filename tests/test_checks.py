@@ -40,6 +40,12 @@ and the clips' (issue 52), the clip as the gather reads it back:
     clip too short        a clip of the wrong length
     loop left open        a loop whose last frame is not its first
     key on the wrong axis a key pose off tolerance
+
+and the motion's (issue 53), each frame's crossings as the gather reads them:
+
+    part enters another   a part crossing one that is not its parent, off a key
+    seam swept through its parent
+                          a seam wider than at rest by more than the clip allows
 """
 import sys
 import unittest
@@ -561,34 +567,72 @@ class ClipTest(unittest.TestCase):
     X, Y and Z, in the parent's frame, from rest.
     """
     WALK = {"feel": "toy-like", "frames": 4, "fps": 30, "loop": True, "tol_deg": 2,
+            "seam_growth_mm": 3,
             "keys": {0: {"leg": [25, 0, 0]}, 2: {"leg": [-25, 0, 0]}}}
     SPEC = {"model": "smoke",
-            "parts": [{"name": "torso"}, {"name": "leg", "parent": "torso"}],
+            "parts": [{"name": "torso"}, {"name": "leg", "parent": "torso"},
+                      {"name": "arm", "parent": "torso"}],
             "transform": {"pivot_tolerance_mm": 1}, "clips": {"walk": WALK}}
     SWING = {0: 25, 1: 0, 2: -25, 3: 0, 4: 25}
+    # The two seams as the rest pose has them: where each limb meets the torso,
+    # reaching 20 mm from its centre at the furthest.
+    SEAMS = [{"parts": ("leg", "torso"), "centre": (0.0, 0.0, 0.1), "points": 8,
+              "reach": 0.020},
+             {"parts": ("arm", "torso"), "centre": (0.0, 0.0, 0.3), "points": 8,
+              "reach": 0.020}]
 
-    def clip(self, name="walk", fps=30, frames=4, leg=SWING, torso=None):
+    def clip(self, name="walk", fps=30, frames=4, leg=SWING, torso=None, contacts=None):
         """What the gather reads off a walk keyed as the spec says, unless
-        told otherwise: the leg swinging about X, the torso still."""
-        torso = torso or {}
+        told otherwise: the leg swinging about X, the torso and arm still,
+        and at every frame the two seams no bigger than at rest."""
+        torso, contacts = torso or {}, contacts or {}
         return {"name": name, "fps": fps, "frames": frames,
                 "poses": {f: {"torso": tuple(torso.get(f, (0.0, 0.0, 0.0))),
-                              "leg": (float(x), 0.0, 0.0)}
-                          for f, x in leg.items()}}
+                              "leg": (float(x), 0.0, 0.0), "arm": (0.0, 0.0, 0.0)}
+                          for f in leg for x in [leg[f]]},
+                "contacts": {f: contacts.get(f, self.SEAMS) for f in leg}}
 
     def judge(self, clips=None, spec=SPEC):
         clips = [self.clip()] if clips is None else clips
-        bones = [{"name": "torso", "parent": None}, {"name": "leg", "parent": "torso"}]
-        m = {"objects": ["torso", "leg"],
-             "parts": [part("torso", bound_to="torso"), part("leg", bound_to="leg")],
-             "contacts": [], "rigs": [{"name": "rig", "bones": bones, "clips": clips}]}
+        bones = [{"name": "torso", "parent": None}, {"name": "leg", "parent": "torso"},
+                 {"name": "arm", "parent": "torso"}]
+        m = {"objects": ["torso", "leg", "arm"],
+             "parts": [part(n, bound_to=n) for n in ("torso", "leg", "arm")],
+             "contacts": self.SEAMS,
+             "rigs": [{"name": "rig", "bones": bones, "clips": clips}]}
         return verdicts(checks.run(spec, "smoke", m))
+
+    def test_a_part_entering_another_between_keys_names_the_clip_frame_and_both(self):
+        """Mid-swing, off any key, is where a limb passes closest: every
+        frame is judged, not only the keyed ones."""
+        hit = {"parts": ("arm", "leg"), "centre": (0.0, 0.0, 0.2), "points": 4,
+               "reach": 0.005}
+        got = self.judge([self.clip(contacts={1: self.SEAMS + [hit]})])["clips"]
+        self.assertFalse(got["ok"])
+        self.assertIn("walk f1: arm enters leg", got["msg"])
 
     def test_a_clip_keyed_as_the_spec_says_passes(self):
         got = self.judge()
         self.assertTrue(got["spec"]["ok"], got["spec"]["msg"])
         self.assertTrue(got["clips"]["ok"], got["clips"]["msg"])
         self.assertEqual(got["clips"]["info"], "walk 4f")
+
+    def grown(self, reach):
+        """The leg's seam, as wide as `reach` metres from its centre."""
+        return [{**self.SEAMS[0], "reach": reach}, self.SEAMS[1]]
+
+    def test_a_seam_grown_past_its_tolerance_names_the_joint_and_its_worst_frame(self):
+        """A part swinging through its own parent is not an entry the rig
+        allows: its seam grows, and that is what is caught."""
+        got = self.judge([self.clip(contacts={1: self.grown(0.0235),
+                                              2: self.grown(0.0262)})])["clips"]
+        self.assertFalse(got["ok"])
+        self.assertIn("walk f2: leg's seam with torso grows 6.2mm, past 3mm", got["msg"])
+        self.assertNotIn("f1", got["msg"])
+
+    def test_a_seam_grown_within_its_tolerance_passes(self):
+        got = self.judge([self.clip(contacts={2: self.grown(0.0229)})])["clips"]
+        self.assertTrue(got["ok"], got["msg"])
 
     def test_a_key_pose_off_tolerance_names_the_clip_frame_and_bone(self):
         got = self.judge([self.clip(leg={**self.SWING, 2: -20.5})])["clips"]
@@ -648,6 +692,12 @@ class ClipTest(unittest.TestCase):
         self.assertFalse(got["spec"]["ok"])
         self.assertIn("clips.walk needs tol_deg", got["spec"]["msg"])
         self.assertFalse(got["clips"]["ok"])
+
+    def test_a_clip_without_its_seam_tolerance_is_a_spec_the_verifier_cannot_judge(self):
+        """How far a seam may grow is the user's, clip by clip (issue 53)."""
+        walk = {k: v for k, v in self.WALK.items() if k != "seam_growth_mm"}
+        got = self.judge(spec={**self.SPEC, "clips": {"walk": walk}})
+        self.assertIn("clips.walk needs seam_growth_mm", got["spec"]["msg"])
 
     def test_a_key_outside_the_clip_or_on_no_bone_is_a_spec_error(self):
         """A looping clip's closing frame is implied, never written: its keys

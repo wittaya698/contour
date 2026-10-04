@@ -42,8 +42,10 @@ under `rigs`, one record per armature object:
     name                the armature object's name
     bones               `{"name", "parent"}` per bone, parent None at the root
     clips               per NLA track: `name`, `fps` (from its action), `frames`
-                        it spans, and `poses` — frame from 0 -> bone -> the
-                        `[x, y, z]` degrees it reads, as the spec writes them
+                        it spans, `poses` — frame from 0 -> bone -> the
+                        `[x, y, z]` degrees it reads, as the spec writes them —
+                        and `contacts`: frame from 0 -> the contact records of
+                        the parts as that frame poses them
 
 Under `contacts` it holds one record per pair of parts whose surfaces cross —
 a seam, wherever one exists, whether or not the spec calls it a joint (ADR
@@ -53,6 +55,11 @@ checks pick those out. Each record is
     parts               the two part names, sorted
     centre              the mean of the crossing points, metres: the pivot
     points              how many crossing points there were
+    reach               how far from the centre the overlap goes, metres: the
+                        furthest of the crossing points and of either part's
+                        vertices inside the other. A part turning about its
+                        pivot keeps it; one swinging through its parent grows
+                        it (issue 53)
 
 A crossing point is where an edge of one part passes from strictly inside the
 other to strictly outside. A vertex within `ON_SURFACE` of the other surface
@@ -195,13 +202,14 @@ def rigs(objects=None):
     return [{"name": o.name,
              "bones": [{"name": b.name, "parent": b.parent.name if b.parent else None}
                        for b in o.data.bones],
-             "clips": clips(o)}
+             "clips": clips(o, objects)}
             for o in (bpy.context.scene.objects if objects is None else objects)
             if o.type == "ARMATURE"]
 
 
-def clips(rig):
-    """Every clip on `rig`'s NLA tracks, posed frame by frame and read back.
+def clips(rig, objects=None):
+    """Every clip on `rig`'s NLA tracks, posed frame by frame and read back:
+    each bone's angles, and where the parts among `objects` cross.
 
     The rig is posed for this and only this — each track alone, the others
     muted — and left at rest, on the frame it was on, as it was found.
@@ -219,12 +227,13 @@ def clips(rig):
                 t.mute = t is not track
             act = track.strips[0].action
             start, end = round(act.frame_range[0]), round(act.frame_range[1])
-            poses = {}
+            poses, crossed = {}, {}
             for f in range(start, end + 1):
                 sc.frame_set(f)
                 poses[f - start] = {pb.name: pose.read(pb) for pb in rig.pose.bones}
+                crossed[f - start] = contacts(objects)
             out.append({"name": track.name, "fps": act.get("fps"),
-                        "frames": end - start, "poses": poses})
+                        "frames": end - start, "poses": poses, "contacts": crossed})
     finally:
         rig.data.pose_position, frame, mutes = held
         for t, m in zip(tracks, mutes):
@@ -271,8 +280,10 @@ def _side(tree, co):
 
 
 def _crossings(bm, tree):
-    """Where the edges of `bm` pass from inside `tree`'s surface to outside."""
+    """Where the edges of `bm` pass from inside `tree`'s surface to outside,
+    and where `bm`'s vertices strictly inside it are."""
     side = {v: _side(tree, v.co) for v in bm.verts}
+    inside = [v.co.copy() for v, s in side.items() if s > 0]
     out = []
     for e in bm.edges:
         a, b = e.verts
@@ -284,7 +295,7 @@ def _crossings(bm, tree):
         hit = tree.ray_cast(a.co, step, step.length)[0]
         if hit is not None:
             out.append(hit)
-    return out
+    return out, inside
 
 
 def _world(obj, dg):
@@ -330,11 +341,14 @@ def contacts(objects=None):
                 (bm_a, tree_a, box_a), (bm_b, tree_b, box_b) = worlds[a], worlds[b]
                 if box_a is None or box_b is None or _apart(box_a, box_b):
                     continue
-                points = _crossings(bm_a, tree_b) + _crossings(bm_b, tree_a)
+                (cross_a, in_a), (cross_b, in_b) = _crossings(bm_a, tree_b), \
+                    _crossings(bm_b, tree_a)
+                points = cross_a + cross_b
                 if points:
                     centre = sum(points, Vector()) / len(points)
+                    reach = max((p - centre).length for p in points + in_a + in_b)
                     out.append({"parts": (a, b), "centre": tuple(centre),
-                                "points": len(points)})
+                                "points": len(points), "reach": reach})
     finally:
         for bm, _, _ in worlds.values():
             bm.free()

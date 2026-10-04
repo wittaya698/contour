@@ -21,8 +21,8 @@ SECTIONS = {
                   "pivot_tolerance_mm"},
     "render": {"grid_metres", "sheet_resolution"},
 }
-CLIP = {"feel", "frames", "fps", "loop", "keys", "tol_deg"}
-CLIP_NEEDS = ("frames", "fps", "keys", "tol_deg")
+CLIP = {"feel", "frames", "fps", "loop", "keys", "tol_deg", "seam_growth_mm"}
+CLIP_NEEDS = ("frames", "fps", "keys", "tol_deg", "seam_growth_mm")
 DIMS = ("height", "width", "depth")
 IMPLEMENTED_TARGETS = {"web"}
 ORIGIN_TOL_MM = 1.0
@@ -378,6 +378,37 @@ def _clip(name, clip, got):
     return bad
 
 
+def _motion(name, clip, got, joints, rest):
+    """Every frame's crossings (ADR 0023). A part may cross only its parent,
+    at their seam, and that seam may grow no more than the clip allows past
+    the size it has at rest: a part swinging through its parent grows it.
+
+    A part entering another is named once, at the first frame it does; a
+    seam that grows, once, at its worst frame. A joint with no seam at rest
+    has nothing to grow from, and `seams` has said why.
+    """
+    child = {frozenset(j): j for j in joints}
+    tol = clip["seam_growth_mm"]
+    bad, said, worst = [], set(), {}
+    for frame, crossed in sorted(got["contacts"].items()):
+        for c in crossed:
+            pair = frozenset(c["parts"])
+            if pair not in child:
+                if pair not in said:
+                    said.add(pair)
+                    bad.append(f"{name} f{frame}: {c['parts'][0]} enters {c['parts'][1]}")
+            elif pair in rest:
+                grew = _mm(c["reach"] - rest[pair])
+                if grew > worst.get(pair, (0.0,))[0]:
+                    worst[pair] = (grew, frame)
+    for pair, (grew, frame) in worst.items():
+        if grew > tol:
+            part, parent = child[pair]
+            bad.append(f"{name} f{frame}: {part}'s seam with {parent} grows "
+                       f"{grew:.1f}mm, past {tol}mm")
+    return bad
+
+
 def clips(spec, m):
     """Each clip as keyed against the spec's keys (ADR 0023)."""
     want = spec.get("clips")
@@ -388,6 +419,7 @@ def clips(spec, m):
     if len(m["rigs"]) != 1:
         return []  # `bones` has said why there is no one rig to read
     have = {c["name"]: c for c in m["rigs"][0]["clips"]}
+    rest = {frozenset(c["parts"]): c["reach"] for c in m["contacts"]}
     bad = [f"{name} is keyed and not in the spec" for name in have if name not in want]
     parts_ = {p["name"] for p in spec.get("parts") or []}
     for name, clip in want.items():
@@ -398,6 +430,7 @@ def clips(spec, m):
             bad.append(f"{name} is not keyed")
             continue
         bad += _clip(name, clip, have[name])
+        bad += _motion(name, clip, have[name], _joints(spec), rest)
     info = ", ".join(f"{name} {have[name]['frames']}f" for name in want if name in have)
     return [result("clips", not bad, info, "clips " + "; ".join(bad))]
 

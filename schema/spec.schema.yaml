@@ -109,6 +109,11 @@ transform:
 #     tol_deg: 2             # required: how far a keyed bone may read off its
 #                            # key, and a loop's last frame off its first. The
 #                            # user's number.
+#     seam_growth_mm: 3      # required: how much wider than at rest a seam may
+#                            # get at any frame. A part turning about its pivot
+#                            # keeps its seam; one swinging through its parent
+#                            # grows it. And at every frame no part may cross
+#                            # any but its parent. The user's number.
 
 # ---------------------------------------------------------------- render
 # Checkpoint sheet settings. Defaults live in lib/ — override only if the
