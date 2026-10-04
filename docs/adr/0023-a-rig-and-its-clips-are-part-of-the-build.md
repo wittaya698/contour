@@ -1,6 +1,6 @@
 # 0023 — A rig and its clips are part of the build
 
-**Status:** Proposed · 2026-10-03
+**Status:** Accepted · 2026-10-04 (proposed 2026-10-03)
 
 > **Accept on a probe, then a tracer bullet.** First: on Blender 5.2.1, an armature's
 > bones can be created through `Armature.edit_bones.new` with no `bpy.ops` beyond one
@@ -24,6 +24,34 @@ approved by the user on 2026-10-03. Node animation is not needed.
 The probe also found that verify counts every object as a part — `parts unexpected:
 rig` — so the armature object must be recognised as the rig rather than an
 undeclared part. That falls to slice 51.
+
+## Evidence: the tracer bullet, 2026-10-04 (issue 56)
+
+`beaky`, revision 2: an on-the-spot `walk`, the agent's numbers confirmed by the
+user before they were written — legs ±25° about X in opposite phase, each arm
+±20° opposite its own leg, 30 frames at 30 fps, looping; `tol_deg: 1`,
+`seam_growth_mm: 3`, `roundtrip_mm: 0.1`.
+
+| stage | result |
+|---|---|
+| `contour check` | PASS 22/22 on the first build, `clips walk 30f`: every key within 1°, no seam grown past 3 mm, no part entering another at any frame — `build.py` unchanged, the clip keyed from the spec alone |
+| `contour export` | PASS 16/16: 14 bones and `walk 30f` read back, every part within 0.1 mm of the build at every frame |
+| `contour filmstrip` | build `a90eb28584e3`, frames 0, 5 … 25: the side row is a stiff-legged toy walk, legs scissoring and arms opposite; the user also played the `.glb` in Blender and approved it |
+
+What it shows, and what it does not:
+
+- **The whole path holds for a cycle.** Tree to armature to keyed clip to `.glb`
+  and back, with no hand work after the spec. Eight numbers a key, two keys, was
+  light to write; whether degrees per bone stay light beyond a cycle is not yet
+  shown, and `idle` and `wave` (Deferred) are where it will be.
+- **Ground contact is unchecked.** A kneeless leg turning at the hip lifts its
+  foot by leg × (1 − cos θ), roughly 4–5 cm at 25° (estimated from the geometry,
+  not measured), so at full stride `beaky` hovers slightly. For a toy it reads as
+  a bounce. A check would need a ground the spec does not yet name; knees would
+  need parts `beaky` does not have.
+- **The filmstrip's front row says little about a walk** whose every turn is
+  about X. It is kept: it is where lateral sway, and a limb turning on the wrong
+  axis, would show.
 
 ## Context
 

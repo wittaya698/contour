@@ -22,10 +22,10 @@ Things this may turn up, which would amend rather than withdraw:
 
 ## Acceptance criteria
 
-- [ ] The user confirmed `revision: 2` and its tolerances before it was written
-- [ ] `contour check` and `contour export` are green on `beaky`
-- [ ] The user has seen the filmstrip of that build
-- [ ] ADR 0023's status says accepted, amended or withdrawn, with the evidence
+- [x] The user confirmed `revision: 2` and its tolerances before it was written
+- [x] `contour check` and `contour export` are green on `beaky`
+- [x] The user has seen the filmstrip of that build
+- [x] ADR 0023's status says accepted, amended or withdrawn, with the evidence
 
 ## Blocked by
 
@@ -33,3 +33,10 @@ Things this may turn up, which would amend rather than withdraw:
 - [53](53-no-part-enters-another.md)
 - [54](54-the-round-trip-carries-the-rig.md)
 - [55](55-the-filmstrip.md)
+
+## What it came to
+
+Accepted, 2026-10-04. The user confirmed revision 2 as proposed; the first build
+was green, export and round-trip green, and the user approved the filmstrip and
+the `.glb` played in Blender. Evidence and the two limitations it found (ground
+contact unchecked; the front row says little of a walk) are in ADR 0023.
