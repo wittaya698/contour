@@ -222,6 +222,41 @@ as 43 was on ADR 0022.
 
 **Every new check ships with a fixture that makes it fail** (ADR 0009).
 
+## Batch 6 — the connector
+
+From [ADR 0024](../adr/0024-the-connector-desktop-reads-and-opens.md), proposed
+2026-10-04. Claude Desktop reads a space's results and opens the pages where the
+user acts, through `contour mcp`, and makes a new space from reference files on
+disk; inside a space that exists it never builds, writes or holds. The lobby's
+create takes dropped references the same way. One HITL slice and eight AFK.
+
+| # | Slice | Type | Blocked by |
+|---|---|---|---|
+| [57](57-the-connector-answers-spaces.md) | The connector answers `spaces` | AFK | — |
+| [58](58-the-last-build-keeps-its-verdict.md) | The last build keeps its verdict | AFK | — |
+| [59](59-status-and-log.md) | `status` and `log` | AFK | 57, 58 |
+| [60](60-picture.md) | `picture` | AFK | 57 |
+| [61](61-spec-and-spend.md) | `spec` and `spend` | AFK | 57 |
+| [62](62-open.md) | `open` | AFK | 57 |
+| [64](64-create.md) | `create` | AFK | 57 |
+| [65](65-references-dropped-on-create.md) | References dropped on the lobby's create | AFK | — |
+| [63](63-desktop-reads-beaky.md) | Desktop reads `beaky`, and ADR 0024 is accepted | HITL | 59, 60, 61, 62, 64 |
+
+### Shape of the graph
+
+**57 and 58 are both unblocked.** 58 is a toolkit fix the connector found and does
+not need: no file held the last check's verdict once a later stage ran, which the
+console's panel can use whether or not the connector lands.
+
+**57 fans out.** Every tool after it needs the protocol and nothing from the others.
+60 is apart from 61 because an image is the one result shape new to the connector.
+64 and 65 were added after the rest were sliced, which is why they are numbered
+after 63. 65 needs nothing from the connector: it is the lobby's half of the same
+rule, that a reference is the original file.
+
+**63 is the only slice that needs Desktop, or the user.** Everything before it is
+tested without Desktop installed; 63 is the verdict on ADR 0024, as 56 was on 0023.
+
 ## Found in flight
 
 Not from either review — a defect the work turned up, filed where the rest of the
