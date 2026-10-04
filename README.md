@@ -113,6 +113,46 @@ contour export                     # .glb, re-imported and re-measured to prove 
 git add -A && git commit
 ```
 
+## A rig, and clips that move it
+
+A model that moves carries its rig and its animation in the same spec and the
+same build (ADR 0023). Give parts a `parent:` and the spec has a tree; give it
+`clips:` and the tree moves. Every number is yours, in the spec, and nothing is
+posed by hand:
+
+```yaml
+parts:
+  - { name: torso, count: 1 }
+  - { name: leg_L, count: 1, parent: torso }
+transform:
+  pivot_tolerance_mm: 1        # how far a part's origin may sit from its seam
+clips:
+  walk:
+    frames: 30
+    fps: 30
+    loop: true
+    keys:                      # degrees about X, Y, Z, in the parent's frame
+      0:  { leg_L: [25, 0, 0] }
+      15: { leg_L: [-25, 0, 0] }
+    tol_deg: 1
+    seam_growth_mm: 3
+    roundtrip_mm: 0.1
+```
+
+`build.py` ends with `kit.rig()`, which builds one bone per part from the tree,
+binds each part rigidly to its bone and keys every clip from the spec. `check`
+then holds the rig to it: every pivot on the centre of its seam, every key read
+back within `tol_deg`, no seam growing past `seam_growth_mm` and no part entering
+another at any frame. `export` carries bones and clips into the `.glb` and
+re-imports them, every part within `roundtrip_mm` of the build at every frame.
+
+What numbers cannot say — whether it reads as a walk — is a picture, drawn at a
+checkpoint and never on a build:
+
+```sh
+contour filmstrip                  # six side and six front frames -> out/filmstrip.png
+```
+
 ## Marking, and driving a run from the browser
 
 Everything above is you and a terminal. There are two more surfaces, and both
@@ -245,7 +285,7 @@ or the folders in `$CONTOUR_SPACES`, separated by `:`.
 | `contour render` | 4-view orthographic sheet with a 1 m grid and rulers |
 | `contour export` | `.glb`, re-imported into a clean Blender and re-measured |
 | `contour api <symbol>` | the real signature from the installed Blender |
-| `contour selftest` | the fixture through every stage, plus 19 mutants |
+| `contour selftest` | the fixture through every stage, plus 37 mutants |
 | `contour init <name> [--to <dir>]` | create a model space here, or in `<dir>` |
 | `contour doctor` | is this space still in step with the toolkit |
 | `contour spaces [name]` | list model spaces, or print one's path |
@@ -302,7 +342,7 @@ A model space, anywhere on disk, its own git repository:
     CLAUDE.md     the agent's rules          (copied from the toolkit; `contour doctor` flags drift)
     .claude/      the spec guard's settings, and the build and release skills
     .contour/     the marker, plus logs               (git-ignored)
-    out/          generated .blend and scratch        (git-ignored)
+    out/          generated .blend, filmstrip, scratch (git-ignored)
     exports/      generated .glb                      (git-ignored)
     release/v<N>/ archived .blend + .glb + sheet      (tracked, at a tag)
     work/scene.blend  YOUR file — materials, lights, camera (git-ignored)
