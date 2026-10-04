@@ -17,10 +17,29 @@ in says so.
 
 ## Acceptance criteria
 
-- [ ] `spec` returns the spec unchanged, followed by the pointer line
-- [ ] `spend` returns per-run cost in the same units `tools/tokens.py` uses
-- [ ] `spend` on a space with no console runs says so
-- [ ] Neither tool writes anything
+- [x] `spec` returns the spec unchanged, followed by the pointer line
+- [x] `spend` returns per-run cost in the same units `tools/tokens.py` uses
+- [x] `spend` on a space with no console runs says so
+- [x] Neither tool writes anything
+
+## What it came to
+
+`spec` returns the file's text as one plain text block, not a JSON string,
+followed by a blank line and the instructions' second line, read from
+`connector.INSTRUCTIONS` so the two cannot drift apart. `contour init` writes no
+spec, so a space without one says *no spec.yaml yet* above the same pointer.
+
+`spend` needed the reading half of the accounting below the console, which the
+launcher may never import. That half (`NAME`, the figures and multipliers,
+`counts`, `thinking`, `load`, `weigh`) moved to `lib/spend.py`, together with
+`runs`, the per-run grouping that used to live in `tools/tokens.py`'s
+`console_runs`. `console/spend.py` keeps the one write (`record`) and `total`,
+and imports the rest. `tools/tokens.py` reads through `lib/spend.py`, so a run's
+row in a chat is its row in `tokens.py --json`, figure for figure; the test
+compares the two. A space with no runs says *no console has run here*.
+
+That neither tool writes is tested by every file's bytes and mtime before and
+after, and the test was checked by planting a write.
 
 ## Blocked by
 

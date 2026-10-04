@@ -45,6 +45,14 @@ TOOLS = (
                      "properties": {"space": {"type": "string"},
                                     "picture": {"enum": ["sheet", "filmstrip",
                                                          "worksheet"]}}}},
+    {"name": "spec",
+     "description": "A space's spec.yaml, as text.",
+     "inputSchema": {"type": "object", "required": ["space"],
+                     "properties": {"space": {"type": "string"}}}},
+    {"name": "spend",
+     "description": "What each console run in a space cost, in tools/tokens.py's units.",
+     "inputSchema": {"type": "object", "required": ["space"],
+                     "properties": {"space": {"type": "string"}}}},
 )
 """Every tool's definition, coarse on purpose: each one sits in Desktop's
 context on every turn (ADR 0024, decision 3)."""
@@ -53,6 +61,11 @@ context on every turn (ADR 0024, decision 3)."""
 class Content(list):
     """A tool's answer as MCP content blocks, handed over as they are. Any other
     answer is a reading, and goes to Desktop as its JSON text."""
+
+
+def text(said):
+    """Text Desktop reads as it is, rather than as a JSON string of it."""
+    return Content([{"type": "text", "text": said}])
 
 
 def image(png, reading):

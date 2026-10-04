@@ -19,6 +19,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from console import spend
+from lib import spend as reading
 
 TOKENS = ROOT / "tools" / "tokens.py"
 
@@ -233,6 +234,24 @@ class TerminalOnlyTest(TokensCase):
             env={"HOME": str(self.home), "PATH": os.environ.get("PATH", "")})
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertIn("weighted", done.stdout)
+
+
+class OnePriceTest(TokensCase):
+    """`lib/spend.py` is the reading the page, this tool and the connector share
+    (ADR 0024, decision 3): one run, one price, wherever it is read."""
+
+    def test_a_space_no_console_ran_in_has_no_runs(self):
+        self.assertEqual(reading.runs(self.space()), [])
+
+    def test_the_pages_running_total_is_the_runs_row(self):
+        space = self.space()
+        self.spent(space, "r1", {"input_tokens": 900, "output_tokens": 40},
+                   {"cache_read_input_tokens": 30000, "gates": 1})
+        self.spent(space, "r2", {"input_tokens": 7})
+        row = reading.runs(space)[0]
+        total = spend.total(space, "r1")
+        for k in ("turns", *reading.FIGURES, "weighted"):
+            self.assertEqual(row[k], total[k], k)
 
 
 if __name__ == "__main__":

@@ -374,7 +374,9 @@ def on_mcp(cmd, rest, held):
         "spaces": lambda args: listing(),
         "status": lambda args: status(named(args.get("space"))),
         "log": lambda args: log(named(args.get("space")), args.get("lines", 40)),
-        "picture": lambda args: picture(named(args.get("space")), args.get("picture"))})
+        "picture": lambda args: picture(named(args.get("space")), args.get("picture")),
+        "spec": lambda args: spec(named(args.get("space"))),
+        "spend": lambda args: spent(named(args.get("space")))})
     return 0
 
 
@@ -859,6 +861,26 @@ def picture(root, which):
     if not path.is_file():
         return {"picture": which, "said": "not drawn yet"}
     return connector.image(path.read_bytes(), reading())
+
+
+def spec(root):
+    """The spec as it is on disk, and the one line that says where it changes:
+    the instructions' own, so a chat arguing a tolerance is sent to draw a span
+    rather than handed a file it could propose to (ADR 0024, decision 4)."""
+    path = space.layout(root).spec
+    said = (path.read_text() if path.is_file()
+            else "no spec.yaml yet: a spec is drafted in the space's console\n")
+    return connector.text(said + ("" if said.endswith("\n") else "\n")
+                          + "\n" + connector.INSTRUCTIONS.splitlines()[1] + "\n")
+
+
+def spent(root):
+    """What the console's runs here cost, as `tools/tokens.py` reports them."""
+    from lib import spend
+    runs = spend.runs(root)
+    return {"runs": runs,
+            "said": [] if runs else ["no console has run here: a terminal "
+                                     "session's cost is tools/tokens.py's to read"]}
 
 
 def out_of_step(root):

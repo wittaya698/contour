@@ -12,95 +12,15 @@ one line per turn, in the vocabulary `tools/tokens.py` already counts in — so 
 reader translates nothing and a console run and a terminal iteration can be read
 off one table.
 
-Above `lib/` for the veto store's reason: a run is the console's own knowledge.
-No `contour` subcommand has a turn to account for.
+The write is above `lib/` for the veto store's reason: a run is the console's
+own knowledge, and no `contour` subcommand has a turn to account for. Reading it
+is not, so that half is `lib/spend.py`'s, where the connector can ask it.
 """
 import json
 from datetime import datetime, timezone
 
-from lib import space as space_lib
-
-NAME = "spend.jsonl"
-"""One line per turn, appended, in the space's own `.contour/`.
-
-Appended rather than rewritten so a run that dies mid-turn still accounts for the
-turns it had already spent — the figure exists to be trusted, and a total that
-loses whatever came before a crash is the one that flatters.
-"""
-
-
-def counts(usage):
-    """One turn's usage, in the words `tools/tokens.py` counts in.
-
-    The SDK's own keys are the API's, and the accounting's are shorter. Named
-    here, once, so the reader never has to know two spellings for one number.
-    """
-    usage = usage or {}
-    return {"input": usage.get("input_tokens", 0) or 0,
-            "cache_read": usage.get("cache_read_input_tokens", 0) or 0,
-            "cache_write": usage.get("cache_creation_input_tokens", 0) or 0,
-            "output": usage.get("output_tokens", 0) or 0}
-
-
-def thinking(usage):
-    """How much of one turn's output was thought rather than said.
-
-    Not one of `FIGURES` — the console does not record it, because the page
-    weighs what a turn cost and thinking is already inside `output`. It is named
-    here for the other reason `counts` exists: this is where the SDK's own
-    spelling is kept, and the accounting must not hold a second copy of it. The
-    details block is absent on a turn that did none, so *no thinking* and *no
-    such key* are the same answer, which is zero and never a crash.
-    """
-    details = (usage or {}).get("output_tokens_details") or {}
-    return details.get("thinking_tokens", 0) or 0
-
-
-def path(space):
-    """The layout says where a space's `.contour` is; the name is this
-    module's own (slice 17)."""
-    return space_lib.layout(space).dot / NAME
-
-
-def load(space, run=None):
-    """Every recorded turn, oldest first; one run's, if a run is named."""
-    where = path(space)
-    if not where.exists():
-        return []
-    lines = []
-    for line in where.read_text().splitlines():
-        if not line.strip():
-            continue
-        try:
-            turn = json.loads(line)
-        except json.JSONDecodeError:
-            continue           # a line half-written when something died
-        if run is None or turn.get("run") == run:
-            lines.append(turn)
-    return lines
-
-
-FIGURES = ("input", "cache_read", "cache_write", "output")
-
-# Anthropic's cache pricing, relative to a fresh input token, and output's
-# premium over one. Here rather than in `tools/tokens.py`, which imports them:
-# the page and the accounting must not each hold an opinion about what a turn
-# cost, or a run would be two prices depending on where it was read.
-CACHE_READ_MULT = 0.10
-CACHE_WRITE_MULT = 1.25
-OUTPUT_MULT = 5.0
-
-
-def weigh(figures):
-    """The four figures as one comparable number — relative units, never dollars.
-
-    A gated run is mostly cache reads, and four columns is not something a person
-    watching a run can add up in their head; this is the column they can.
-    """
-    return round(figures.get("input", 0)
-                 + figures.get("cache_read", 0) * CACHE_READ_MULT
-                 + figures.get("cache_write", 0) * CACHE_WRITE_MULT
-                 + figures.get("output", 0) * OUTPUT_MULT)
+from lib.spend import (CACHE_READ_MULT, CACHE_WRITE_MULT, FIGURES, NAME,  # noqa: F401
+                       OUTPUT_MULT, counts, load, path, thinking, weigh)
 
 
 def total(space, run):

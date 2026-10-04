@@ -16,7 +16,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from console import spend
+from lib import spend
 from lib.space import transcripts as transcript_dir
 
 # Wrappers the CLI injects around a prompt; none of them are what the user typed.
@@ -26,7 +26,7 @@ NOISE = re.compile(
     r"(</\1>|$)", re.S)
 
 # What a turn cost, and what the SDK's usage keys are called, both come from
-# `console/spend.py` — the module the console weighs a turn with for the page.
+# `lib/spend.py` — the module the console weighs a turn with for the page.
 # Nothing here re-expresses either. One definition, because a run read here and
 # watched there must not come out as two prices, and a key the SDK renames must
 # not break one reader while silently miscounting the other (ADR 0019,
@@ -114,27 +114,9 @@ def console_runs(project: Path):
     one set of units, and the second stated priority is served by one number
     (ADR 0019, decision 37).
     """
-    out = {}
-    for turn in spend.load(project):
-        it = out.setdefault(turn.get("run", "?"), {
-            "prompt": (turn.get("prompt") or turn.get("run", "?"))[:58],
-            "images": 0,
-            "time": turn.get("at", ""), "branch": "console", "turns": 0,
-            **{k: 0 for k in spend.FIGURES}, "thinking": 0, "tools": 0,
-            # How many gates the run stopped at, and what the turns after one
-            # cost. A gate buys a turn of re-explanation, and this is the figure
-            # that makes tuning the ask-list a decision rather than a mood.
-            "gates": 0, "after_gates": 0,
-        })
-        it["turns"] += 1
-        for k in spend.FIGURES:
-            it[k] += turn.get(k, 0)
-        it["gates"] = max(it["gates"], turn.get("gates", 0))
-        if turn.get("gates", 0):
-            it["after_gates"] += spend.weigh(turn)
-    for it in out.values():
-        it["weighted"] = spend.weigh(it)
-    return list(out.values())
+    return [{**run, "prompt": run["prompt"][:58], "images": 0,
+             "time": run["at"], "branch": "console", "thinking": 0, "tools": 0}
+            for run in spend.runs(project)]
 
 
 def human(n):

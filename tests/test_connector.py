@@ -162,7 +162,9 @@ class LauncherTest(SpacesCase):
             call(3, "tools/call", name="spaces", arguments={}))))
         self.assertEqual(r.returncode, 0, r.stderr)
         _, listed, called = [json.loads(l) for l in r.stdout.splitlines()]
-        self.assertEqual([t["name"] for t in listed["result"]["tools"]], ["spaces", "status", "log", "picture"])
+        self.assertEqual([t["name"] for t in listed["result"]["tools"]],
+                         [t["name"] for t in connector.TOOLS],
+                         "every tool defined is served")
         said = json.loads(called["result"]["content"][0]["text"])
         self.assertEqual(said, json.loads(self.contour("spaces", "--json").stdout))
         self.assertEqual([s["name"] for s in said["spaces"]], ["alpha", "beta"])
@@ -441,6 +443,92 @@ class PictureTest(InSpaceCase):
             [text] = content
             self.assertEqual(json.loads(text["text"])["said"], "not drawn yet")
         self.assertFalse((self.tmp / "stages").exists(), "Blender was started")
+
+
+
+class SpecSpendTest(InSpaceCase):
+    """`spec` and `spend` (issue 61): two readings, and nothing written."""
+
+    def text(self, name):
+        """The one text block a call returns, as it came, and whether it failed."""
+        r = self.contour("mcp", stdin=json.dumps(call(
+            1, "tools/call", name=name, arguments={"space": "alpha"})) + "\n")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        got = json.loads(r.stdout)["result"]
+        [block] = got["content"]
+        return block["text"], got["isError"]
+
+    def test_spec_is_the_file_unchanged_and_then_the_pointer(self):
+        """The pointer is what sends a chat arguing a tolerance to the canvas
+        (ADR 0024, decision 4), and it is the instructions' own line."""
+        spec = "revision: 3\nname: alpha\nheight: 600 ±20  # mm\n"
+        (self.space / "spec.yaml").write_text(spec)
+        said, failed = self.text("spec")
+        self.assertFalse(failed, said)
+        self.assertTrue(said.startswith(spec), "the spec, byte for byte")
+        self.assertEqual(said[len(spec):].strip(),
+                         connector.INSTRUCTIONS.splitlines()[1])
+
+    def test_a_space_with_no_spec_yet_says_so(self):
+        """`contour init` writes none: the spec is drafted in the console."""
+        said, failed = self.text("spec")
+        self.assertFalse(failed, said)
+        self.assertTrue(said.startswith("no spec.yaml yet"), said)
+        self.assertIn(connector.INSTRUCTIONS.splitlines()[1], said)
+
+
+    def spent(self, run, prompt, *turns):
+        """Turns recorded the way the console records them."""
+        from console import spend
+        for gates, usage in turns:
+            spend.record(self.space, run, usage, gates, prompt)
+
+    def test_spend_is_per_run_in_the_units_tokens_reports(self):
+        """One accounting: what a chat is told a run cost is what `tools/tokens.py`
+        prints for it, figure for figure (ADR 0019, decision 37)."""
+        self.spent("r1", "why is the neck 269",
+                   (0, {"input_tokens": 900, "cache_read_input_tokens": 20000,
+                        "cache_creation_input_tokens": 3000, "output_tokens": 400}),
+                   (1, {"input_tokens": 50, "cache_read_input_tokens": 24000,
+                        "output_tokens": 120}))
+        self.spent("r2", "widen the base",
+                   (0, {"input_tokens": 10, "output_tokens": 5}))
+        said, failed = self.text("spend")
+        self.assertFalse(failed, said)
+        runs = json.loads(said)["runs"]
+        tokens = subprocess.run(
+            [sys.executable, str(ROOT / "tools" / "tokens.py"), "--project",
+             str(self.space), "--json"], capture_output=True, text=True,
+            env=dict(self.env, HOME=str(self.home)))
+        reported = json.loads(tokens.stdout)["console"]
+        self.assertEqual(len(runs), 2)
+        for run, row in zip(runs, reported):
+            for k in ("prompt", "turns", "input", "cache_read", "cache_write",
+                      "output", "gates", "after_gates", "weighted"):
+                self.assertEqual(run[k], row[k], k)
+        self.assertEqual(runs[0]["turns"], 2)
+        self.assertEqual(json.loads(said)["said"], [])
+
+    def test_neither_reading_writes_anything_in_the_space(self):
+        """Every file, its bytes and its time, before and after: the connector
+        changes nothing in a space that exists (ADR 0024, decision 2)."""
+        (self.space / "spec.yaml").write_text("revision: 1\n")
+        self.spent("r1", "p", (0, {"input_tokens": 1}))
+
+        def tree():
+            return {p: (p.read_bytes(), p.stat().st_mtime_ns)
+                    for p in self.space.rglob("*") if p.is_file()}
+        before = tree()
+        for name in ("spec", "spend"):
+            self.assertFalse(self.text(name)[1])
+        self.assertEqual(tree(), before)
+
+    def test_spend_where_no_console_has_run_says_so(self):
+        said, failed = self.text("spend")
+        self.assertFalse(failed, said)
+        said = json.loads(said)
+        self.assertEqual(said["runs"], [])
+        self.assertIn("no console has run", " ".join(said["said"]))
 
 
 if __name__ == "__main__":
