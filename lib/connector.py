@@ -15,9 +15,12 @@ import json
 LATEST = "2025-06-18"
 
 INSTRUCTIONS = "\n".join((
-    "This connector reads Contour's model spaces and opens their pages; it changes nothing in a space.",
+    "This connector reads Contour's model spaces, opens their pages and makes new ones; "
+    "it changes nothing in a space.",
     "A spec changes only inside its space, argued from a span the user can see on the canvas.",
     "To change a model, open its console.",
+    "A picture pasted into the chat is not a reference: you hold what you saw, not the file, "
+    "so ask for the file's path.",
 ))
 """Facts about the connector, not a copy of the rules (ADR 0024, decision 4): what it
 cannot do needs no rule here, and what it can say is steered to a span."""
@@ -59,6 +62,14 @@ TOOLS = (
      "inputSchema": {"type": "object", "required": ["page"],
                      "properties": {"page": {"enum": ["console", "lobby", "canvas"]},
                                     "space": {"type": "string"}}}},
+    {"name": "create",
+     "description": "Make a new model space from reference pictures on disk, "
+                    "and open its console to draft the spec. Takes their paths, "
+                    "never a picture pasted into the chat.",
+     "inputSchema": {"type": "object", "required": ["name", "references"],
+                     "properties": {"name": {"type": "string"},
+                                    "references": {"type": "array",
+                                                   "items": {"type": "string"}}}}},
 )
 """Every tool's definition, coarse on purpose: each one sits in Desktop's
 context on every turn (ADR 0024, decision 3)."""

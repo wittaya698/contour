@@ -377,7 +377,8 @@ def on_mcp(cmd, rest, held):
         "picture": lambda args: picture(named(args.get("space")), args.get("picture")),
         "spec": lambda args: spec(named(args.get("space"))),
         "spend": lambda args: spent(named(args.get("space"))),
-        "open": lambda args: opened(args.get("page"), args.get("space"))})
+        "open": lambda args: opened(args.get("page"), args.get("space")),
+        "create": lambda args: created(args.get("name"), args.get("references") or [])})
     return 0
 
 
@@ -906,6 +907,31 @@ def opened(page, name):
         enter.page(root, "canvas")
         refused = None
     return {"page": page, "space": root.name, "refused": refused}
+
+
+def created(name, paths):
+    """The lobby's create, where the lobby would make it, plus references
+    already on disk (ADR 0024, decision 10). Every path is read before
+    anything is made, so a bad one leaves no half a space."""
+    from lib import lobby
+    read = []
+    for p in map(Path, paths):
+        try:
+            data = p.read_bytes()
+        except OSError as e:
+            return refused_create(f"{p} cannot be read: {e.strerror}")
+        if not lobby.image(p.name, data):
+            return refused_create(f"{p} is not a reference: a .png, .jpg or .webp "
+                                  f"image whose name and bytes agree")
+        if any(p.name == n for n, _ in read):
+            return refused_create(f"two references are called {p.name}, and "
+                                  f"one would overwrite the other in refs/")
+        read.append((p.name, data))
+    return lobby.made(str(name or ""), lobby.location(space.roots(ROOT)), pictures=read)
+
+
+def refused_create(why):
+    return {"path": None, "next": None, "refused": why}
 
 
 def out_of_step(root):

@@ -77,11 +77,12 @@ context on every turn, and token usage is the second stated priority.
 A space is named in every call but `spaces` and `open lobby`, resolved as
 `contour spaces <name>` resolves it: a chat stands in no directory.
 
-**4. Its instructions describe the connector, not the rules.** Three lines in
+**4. Its instructions describe the connector, not the rules.** Four lines in
 `initialize`'s `instructions`: it reads and opens and changes nothing; a spec
 changes only inside a space, argued from a span the user can see on the canvas;
-to change the model, open its console. `spec`'s result ends with the second of
-those. This states facts about the connector, which cannot drift from
+to change the model, open its console; a picture pasted into the chat is not a
+reference, so ask for its file's path (decision 10). `spec`'s result ends with
+the second of those. This states facts about the connector, which cannot drift from
 `CLAUDE.md` because they are not a copy of it — and it turns *Desktop argues
 for a wider tolerance* into *Desktop sends you to draw a span*, which is where
 rule 1 needs the argument to be had.

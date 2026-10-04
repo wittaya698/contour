@@ -15,7 +15,7 @@ import sys
 import webbrowser
 from pathlib import Path
 
-from lib import enter
+from lib import enter, refs
 from lib.page import Page
 
 PAGE = Path(__file__).resolve().parent / "lobby.html"
@@ -62,14 +62,7 @@ class Lobby(Page):
                 ("POST", "/reveal"): self.reveal}
 
     def location(self):
-        """Where the page offers to make a space: the toolkit's `project/`,
-        which this repo ignores and the push guard blocks (ADR 0021, decision
-        4), when this lobby looks there; otherwise the first place it looks."""
-        roots = [Path(r) for r in self.listing()["roots"]]
-        project = CONTOUR.parent / "project"
-        if any(project.resolve().is_relative_to(r.resolve()) for r in roots):
-            return project
-        return roots[0]
+        return location(self.listing()["roots"])
 
     def create(self, asked):
         """`contour init` in the location the page named, its answer as it gave
@@ -93,19 +86,7 @@ class Lobby(Page):
             return {"path": None, "next": None,
                     "refused": f"{of} is not a space this lobby lists, so there is "
                                f"nothing to make a variation of"}
-        flow = "variation" if of else "new-space"
-        said = contour(CONTOUR.parent, "init", str(asked.get("name") or ""), "--to", str(location),
-                       "--new", "--json")
-        if said["refused"]:
-            return dict(said, next=None)
-        missing = enter.environment()
-        if missing:
-            return dict(said, next=f"no console environment to open it in; make one, "
-                                   f"from {enter.ROOT}: {missing}, then: cd {said['path']} "
-                                   f"&& {enter.CONSOLE} --begin {flow}"
-                                   + (f" --of {of}" if of else ""))
-        enter.console(said["path"], begin=flow, of=of)
-        return dict(said, next=None)
+        return made(str(asked.get("name") or ""), location, of=of)
 
     def rename(self, asked):
         """`contour rename` in the space the page named, its answer as it
@@ -184,6 +165,54 @@ class Lobby(Page):
         if "reveal" not in self.can:
             return {"path": asked["path"], "refused": "no Finder on this machine to open it in"}
         return {"path": asked["path"], "refused": enter.reveal(asked["path"])}
+
+
+def location(roots):
+    """Where to make a space: the toolkit's `project/`, which this repo ignores
+    and the push guard blocks (ADR 0021, decision 4), when `roots` take it in;
+    otherwise the first of them."""
+    roots = [Path(r) for r in roots]
+    project = CONTOUR.parent / "project"
+    if any(project.resolve().is_relative_to(r.resolve()) for r in roots):
+        return project
+    return roots[0]
+
+
+def image(name, data):
+    """Whether `data`, called `name`, is a reference the canvas can show: its
+    first bytes say it is a PNG, a JPEG or a WebP, and its name says the same,
+    since the name is what the canvas serves it as."""
+    head = bytes(data[:12])
+    said = ("image/png" if head.startswith(b"\x89PNG\r\n\x1a\n") else
+            "image/jpeg" if head.startswith(b"\xff\xd8\xff") else
+            "image/webp" if head[:4] == b"RIFF" and head[8:12] == b"WEBP" else None)
+    return said is not None and refs.KINDS.get(Path(name).suffix.lower()) == said
+
+
+def made(name, location, of=None, pictures=()):
+    """`contour init --new` in `location`, its answer as it gave it; then
+    `pictures`, `(filename, bytes)` pairs checked before this was called, written
+    into the new space's `refs/` as they came; then its console on the
+    new-space flow, or the variation flow `of` a space. The lobby and the
+    connector both make a space here, so neither drafts anything (ADR 0024,
+    decision 10). With no console environment the space is still made, and
+    `next` says how to go on from a terminal."""
+    flow = "variation" if of else "new-space"
+    said = contour(CONTOUR.parent, "init", name, "--to", str(location), "--new", "--json")
+    if said["refused"]:
+        return dict(said, next=None)
+    for filename, data in pictures:
+        # Not rule 1's write: nothing in a space this new is tracked yet, and a
+        # reference is guarded from when git first tracks it (ADR 0024, decision 10).
+        (Path(said["path"]) / "refs" / filename).write_bytes(data)
+    missing = enter.environment()
+    if missing:
+        return dict(said, next=f"no console environment to open it in; make one, "
+                               f"from {enter.ROOT}: {missing}, then: cd {said['path']} "
+                               f"&& {enter.CONSOLE} --begin {flow}"
+                               + (f" --of {of}" if of else ""))
+    enter.console(said["path"], begin=flow, of=of)
+    return dict(said, next=None)
 
 
 def contour(space, *args):

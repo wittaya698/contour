@@ -293,7 +293,7 @@ servers already there, and restart Desktop. The block names the `contour` link
 from Install, not the checkout, so moving the toolkit is still only a relink. If
 there is no link on `PATH`, the command says so and exits 1.
 
-Today the connector answers seven tools. `spaces` is the same reading as
+Today the connector answers eight tools. `spaces` is the same reading as
 `contour spaces --json`. `status` takes a space and gives its last check's
 verdict, open marks, uncommitted vetoes and toolkit drift. `log` gives the tail
 of a space's last Blender log and says which stage wrote it. `picture` shows a
@@ -303,6 +303,12 @@ each console run there cost, in the units `tools/tokens.py` prints. `open`
 starts a space's console or canvas, or the lobby, and says only whether it
 did: never the page's address, which carries its secret. It refuses a second
 console as the lobby does, and a canvas on a space a console already serves.
+`create` is the lobby's create, plus reference pictures: give it a name and the
+paths of images on disk, and it makes the space where the lobby would, copies
+them into `refs/` byte for byte, and opens its console on the new-space flow.
+It refuses any path that is not a `.png`, `.jpg` or `.webp` image before
+anything is made, and drafts no spec. A picture pasted into the chat is not a
+reference, so it asks for the file's path instead.
 Inside a space it never builds, writes, marks or holds anything: to change a
 model, open its console. Every space it finds is visible to the chat,
 so what you ask about goes to the model provider. Installing the connector is

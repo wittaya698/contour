@@ -51,17 +51,21 @@ class ProtocolTest(unittest.TestCase):
         self.assertEqual(got["result"]["capabilities"], {"tools": {}})
         self.assertEqual(got["result"]["protocolVersion"], "2025-06-18")
 
-    def test_the_instructions_describe_the_connector_in_three_lines(self):
+    def test_the_instructions_describe_the_connector_in_four_lines(self):
         """ADR 0024, decision 4: it reads and opens and changes nothing; a spec changes
         inside its space, from a span on the canvas; the console is where the
-        model changes."""
+        model changes; and a pasted picture is answered with a request for its
+        path (ADR 0024, decision 10)."""
         [got] = talk(call(1, "initialize", protocolVersion=connector.LATEST))
         said = got["result"]["instructions"].splitlines()
-        self.assertEqual(len(said), 3)
+        self.assertEqual(len(said), 4)
         self.assertIn("changes nothing", said[0])
         self.assertIn("span", said[1])
         self.assertIn("canvas", said[1])
         self.assertIn("console", said[2])
+        self.assertIn("pasted", said[3])
+        self.assertIn("ask for", said[3])
+        self.assertIn("path", said[3])
 
     def test_the_instructions_restate_none_of_the_rules(self):
         """Facts about the connector cannot drift from `CLAUDE.md`, because they
@@ -534,11 +538,10 @@ class SpecSpendTest(InSpaceCase):
         self.assertIn("no console has run", " ".join(said["said"]))
 
 
-class OpenTest(InSpaceCase):
-    """`open` (issue 62): the page where the user acts, started and left to
-    them. `$BROWSER` writes down the URL each page tried to open, and the pid
-    that tried, so no tab opens and the test can see the page it would have
-    shown."""
+class PagesCase(InSpaceCase):
+    """Pages a call starts and leaves to the user. `$BROWSER` writes down the
+    URL each page tried to open, and the pid that tried, so no tab opens and
+    the test can see the page it would have shown."""
 
     def setUp(self):
         super().setUp()
@@ -560,16 +563,6 @@ class OpenTest(InSpaceCase):
             except ProcessLookupError:
                 pass
 
-    def open(self, page, **more):
-        """One `open` call, as raw text and as a reading."""
-        r = self.contour("mcp", stdin=json.dumps(call(
-            1, "tools/call", name="open", arguments={"page": page, **more})) + "\n")
-        self.assertEqual(r.returncode, 0, r.stderr)
-        got = json.loads(r.stdout)["result"]
-        [block] = got["content"]
-        self.assertFalse(got["isError"], block["text"])
-        return block["text"], json.loads(block["text"])
-
     def urls(self):
         """Each page's URL, once its browser has been asked to show it."""
         deadline = time.monotonic() + 30
@@ -589,6 +582,22 @@ class OpenTest(InSpaceCase):
         origin, token = url.split("/?")[0], url.split("t=")[1]
         for leak in ("http", origin, origin.rsplit(":", 1)[1], token):
             self.assertNotIn(leak, text)
+
+
+
+class OpenTest(PagesCase):
+    """`open` (issue 62): the page where the user acts, started and left to
+    them."""
+
+    def open(self, page, **more):
+        """One `open` call, as raw text and as a reading."""
+        r = self.contour("mcp", stdin=json.dumps(call(
+            1, "tools/call", name="open", arguments={"page": page, **more})) + "\n")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        got = json.loads(r.stdout)["result"]
+        [block] = got["content"]
+        self.assertFalse(got["isError"], block["text"])
+        return block["text"], json.loads(block["text"])
 
     def test_open_console_starts_a_console_that_outlives_the_connector(self):
         text, said = self.open("console", space="alpha")
@@ -651,6 +660,126 @@ class OpenTest(InSpaceCase):
         req = urllib.request.Request(origin + "/spaces", headers={TOKEN_HEADER: token})
         with urllib.request.urlopen(req, timeout=30) as r:
             return [s["name"] for s in json.loads(r.read())["spaces"]]
+
+
+class CreateTest(PagesCase):
+    """`create` (issue 64): the lobby's create, plus references already on disk.
+    The console it starts is the real one, with the scripted stand-in for an
+    agent, which writes down the prompt it was begun on."""
+
+    JPEG = b"\xff\xd8\xff\xe0 a photo of the front"
+
+    def setUp(self):
+        super().setUp()
+        self.prompt = self.tmp / "prompt"
+        self.env.update(
+            CONTOUR_CONSOLE_AGENT=str(ROOT / "tests" / "agent_stand_in.py") + ":drive",
+            CONTOUR_AGENT_SCRIPT=json.dumps([{"keep_prompt": str(self.prompt)}]))
+        self.pictures = Path(tempfile.mkdtemp()).resolve()
+        self.front = self.pictures / "front.jpg"
+        self.front.write_bytes(self.JPEG)
+        self.side = self.pictures / "side.png"
+        self.side.write_bytes(PictureTest.PNG)
+        self.space = self.tmp / "beta"      # whose pages `close_pages` closes
+        self.coming = False                 # whether a console is starting on it
+
+    def create(self, name, *paths):
+        r = self.contour("mcp", stdin=json.dumps(call(
+            1, "tools/call", name="create",
+            arguments={"name": name, "references": [str(p) for p in paths]})) + "\n")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        got = json.loads(r.stdout)["result"]
+        [block] = got["content"]
+        self.assertFalse(got["isError"], block["text"])
+        said = json.loads(block["text"])
+        self.coming = self.coming or not (said["refused"] or said["next"])
+        return block["text"], said
+
+    def close_pages(self):
+        """A console a create started, once it is up: one that came up after
+        the test ended would outlive it."""
+        from lib import presence
+        if getattr(self, "coming", False):
+            deadline = time.monotonic() + 30
+            while not presence.live(self.space) and time.monotonic() < deadline:
+                time.sleep(0.1)
+        super().close_pages()
+
+    def begun_on(self):
+        deadline = time.monotonic() + 30
+        while not self.prompt.exists() and time.monotonic() < deadline:
+            time.sleep(0.1)
+        return self.prompt.read_text()
+
+    def test_create_copies_the_references_and_opens_the_new_space_flow(self):
+        text, said = self.create("beta", self.front, self.side)
+        self.assertIsNone(said["refused"], said)
+        self.assertEqual(said["path"], str(self.space))
+        refs = self.space / "refs"
+        self.assertEqual(sorted(p.name for p in refs.iterdir()), ["front.jpg", "side.png"])
+        self.assertEqual((refs / "front.jpg").read_bytes(), self.JPEG)
+        self.assertEqual((refs / "side.png").read_bytes(), PictureTest.PNG)
+        self.assertIn("new-space flow", self.begun_on())
+        [url] = self.urls()
+        self.assertSecretless(text, url)
+
+    def test_a_path_that_is_no_readable_image_is_refused_and_nothing_is_made(self):
+        """Missing, unreadable, or not an image by its bytes or its name: each
+        is refused by name, before `contour init` runs."""
+        notes = self.pictures / "notes.png"
+        notes.write_text("not a picture at all")
+        locked = self.pictures / "locked.jpg"
+        locked.write_bytes(self.JPEG)
+        locked.chmod(0)
+        self.addCleanup(locked.chmod, 0o644)
+        text_file = self.pictures / "front.txt"
+        text_file.write_bytes(self.JPEG)
+        for bad in (self.pictures / "gone.jpg", notes, locked, text_file):
+            _, said = self.create("beta", self.front, bad)
+            self.assertIn(str(bad), said["refused"])
+            self.assertIsNone(said["path"])
+            self.assertFalse(self.space.exists(), bad)
+        time.sleep(1)
+        self.assertFalse(self.opened.exists(), "a console was opened anyway")
+
+    def test_two_references_of_one_name_are_refused(self):
+        """In `refs/` one would overwrite the other."""
+        other = Path(tempfile.mkdtemp()).resolve() / "front.jpg"
+        other.write_bytes(self.JPEG + b" again")
+        _, said = self.create("beta", self.front, other)
+        self.assertIn("front.jpg", said["refused"])
+        self.assertFalse(self.space.exists())
+
+    def test_a_name_init_refuses_is_refused_in_its_words(self):
+        said_by_init = json.loads(self.contour(
+            "init", "alpha", "--new", "--json").stdout)["refused"]
+        _, said = self.create("alpha", self.front)
+        self.assertEqual(said["refused"], said_by_init)
+        self.assertEqual(list((self.tmp / "alpha" / "refs").iterdir()), [])
+
+    def test_nothing_but_inits_files_and_the_references_is_written(self):
+        by_hand = Path(tempfile.mkdtemp()).resolve()
+        r = subprocess.run([sys.executable, str(CONTOUR), "init", "beta"],
+                           cwd=str(by_hand), env=self.env, capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.create("beta", self.front)
+        self.begun_on()                     # the console is up, and has written its own
+
+        def files(root):
+            return {str(p.relative_to(root)) for p in root.rglob("*") if p.is_file()
+                    and not p.relative_to(root).parts[0] in (".git", ".contour")}
+        self.assertEqual(files(self.space), files(by_hand / "beta") | {"refs/front.jpg"})
+
+    def test_with_no_console_environment_the_space_is_made_and_says_how_to_go_on(self):
+        self.env["CONTOUR_CONSOLE_PYTHON"] = str(self.tmp / "no-python")
+        _, said = self.create("beta", self.front)
+        self.assertIsNone(said["refused"])
+        self.assertEqual((self.space / "refs" / "front.jpg").read_bytes(), self.JPEG)
+        self.assertIn("python3 -m venv .venv", said["next"])
+        self.assertIn(f"cd {self.space}", said["next"])
+        self.assertIn("contour-console --begin new-space", said["next"])
+        time.sleep(1)
+        self.assertFalse(self.opened.exists(), "a console was opened anyway")
 
 
 if __name__ == "__main__":
