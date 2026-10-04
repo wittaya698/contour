@@ -25,7 +25,7 @@ import sys
 import time
 from pathlib import Path
 
-from lib import commands, delete, git, presence, rename, restore, revision, space     # stdlib-only by test (ADR 0019, 29)
+from lib import commands, connector, delete, git, presence, rename, restore, revision, space     # stdlib-only by test (ADR 0019, 29)
 
 ROOT = Path(__file__).resolve().parent.parent
 BLENDER = os.environ.get("BLENDER", "/Applications/Blender.app/Contents/MacOS/Blender")
@@ -342,6 +342,29 @@ def on_doctor(cmd, rest, held):
 
 def on_migrate_marks(cmd, rest, held):
     return emit(migrate_marks())
+
+
+def on_mcp(cmd, rest, held):
+    """The connector (ADR 0024): Desktop on the other end of stdin and stdout,
+    handed the readings it may call and nothing that writes.
+
+    `--config` prints Desktop's block and writes nothing: that file is the
+    user's, and lists servers that are not Contour's.
+    """
+    if rest == ["--config"]:
+        found = shutil.which("contour")
+        linked = found and Path(found).resolve() == (ROOT / "contour").resolve()
+        link = Path(found) if linked else Path.home() / ".local" / "bin" / "contour"
+        print(json.dumps(connector.config(link), indent=2))
+        if not linked:
+            print(f"no `contour` link on PATH; make the one this block names:\n"
+                  f"    ln -s {ROOT / 'contour'} ~/.local/bin/", file=sys.stderr)
+        return 0 if linked else 1
+    if rest:
+        print(usage(), file=sys.stderr)
+        return 2
+    connector.serve(sys.stdin, sys.stdout, {"spaces": lambda args: listing()})
+    return 0
 
 
 def on_spaces(cmd, rest, held):

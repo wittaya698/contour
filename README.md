@@ -281,6 +281,24 @@ makes it.
 The lobby looks where `contour spaces` does: the directory holding the toolkit,
 or the folders in `$CONTOUR_SPACES`, separated by `:`.
 
+## Asking from Claude Desktop
+
+```sh
+contour mcp --config               # prints the block; writes nothing
+```
+
+The connector lets a Claude Desktop chat read your spaces (ADR 0024). Paste the
+block it prints into `claude_desktop_config.json` under `mcpServers`, beside any
+servers already there, and restart Desktop. The block names the `contour` link
+from Install, not the checkout, so moving the toolkit is still only a relink. If
+there is no link on `PATH`, the command says so and exits 1.
+
+Today the connector answers `spaces`, the same reading as `contour spaces
+--json`. Inside a space it never builds, writes, marks or holds anything: to
+change a model, open its console. Every space it finds is visible to the chat,
+so what you ask about goes to the model provider. Installing the connector is
+the choice to allow that, and Desktop asks before each call.
+
 ## Commands
 
 | Command | Does |
@@ -294,6 +312,7 @@ or the folders in `$CONTOUR_SPACES`, separated by `:`.
 | `contour doctor` | is this space still in step with the toolkit |
 | `contour spaces [name]` | list model spaces, or print one's path |
 | `contour lobby` | every space on this machine, on one page |
+| `contour mcp` | the connector, for Claude Desktop; `--config` prints its block |
 | `contour rename <name>` | propose renaming this space; `--yes` does it |
 | `contour delete <name>` | propose deleting this space; `--yes` does it, leaving a bundle |
 | `contour restore <id>` | clone a deleted space back from its bundle |

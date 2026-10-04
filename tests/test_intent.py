@@ -229,6 +229,8 @@ INTENTLESS = {
     "spaces": "lists spaces on this machine",
     "lobby": "serves that list on a page and writes nothing; rename and delete "
              "arrive as commands of their own, classified there (ADR 0021)",
+    "mcp": "is the connector, which a chat drives and an agent under a console "
+           "has no use for; it builds, writes and holds nothing (ADR 0024)",
     "restore": "creates a space from its bundle, as init creates one, and "
                "refuses any path or name already taken, so it overwrites nothing",
     "intents": "prints this very vocabulary",
