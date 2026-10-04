@@ -293,10 +293,12 @@ servers already there, and restart Desktop. The block names the `contour` link
 from Install, not the checkout, so moving the toolkit is still only a relink. If
 there is no link on `PATH`, the command says so and exits 1.
 
-Today the connector answers three tools. `spaces` is the same reading as
+Today the connector answers four tools. `spaces` is the same reading as
 `contour spaces --json`. `status` takes a space and gives its last check's
 verdict, open marks, uncommitted vetoes and toolkit drift. `log` gives the tail
-of a space's last Blender log and says which stage wrote it. Inside a space it never builds, writes, marks or holds anything: to
+of a space's last Blender log and says which stage wrote it. `picture` shows a
+space's sheet, filmstrip or worksheet and says whether it is still current; it
+never renders one. Inside a space it never builds, writes, marks or holds anything: to
 change a model, open its console. Every space it finds is visible to the chat,
 so what you ask about goes to the model provider. Installing the connector is
 the choice to allow that, and Desktop asks before each call.

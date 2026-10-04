@@ -244,7 +244,11 @@ def on_filmstrip(cmd, rest, held):
     """A clip as one picture, for a checkpoint (ADR 0023). Never drawn by a
     build: `contour check` renders the sheet for the page and nothing else, and
     this says where the picture is rather than putting it in the report."""
-    return emit(stage(["filmstrip", *[f"--clip={c}" for c in rest]]))
+    rep = stage(["filmstrip", *[f"--clip={c}" for c in rest]])
+    if rep["ok"]:
+        from lib import filmstrip
+        filmstrip.record(HERE.out, HERE.blend)
+    return emit(rep)
 
 
 def on_api(cmd, rest, held):
@@ -268,7 +272,10 @@ def on_worksheet(cmd, rest, held):
     if not worksheet.spans(marks.load(HERE.marks)):
         return emit({"ok": True, "lines": [
             "ok   worksheet  no spans on file: nothing to draw, nothing written"]})
-    return emit(stage(["worksheet"]))
+    rep = stage(["worksheet"])
+    if rep["ok"]:
+        worksheet.record(HERE.dot, HERE.marks)
+    return emit(rep)
 
 
 def on_canvas(cmd, rest, held):
@@ -366,7 +373,8 @@ def on_mcp(cmd, rest, held):
     connector.serve(sys.stdin, sys.stdout, {
         "spaces": lambda args: listing(),
         "status": lambda args: status(named(args.get("space"))),
-        "log": lambda args: log(named(args.get("space")), args.get("lines", 40))})
+        "log": lambda args: log(named(args.get("space")), args.get("lines", 40)),
+        "picture": lambda args: picture(named(args.get("space")), args.get("picture"))})
     return 0
 
 
@@ -826,6 +834,31 @@ def log(root, lines=40):
     return {"stage": stage, "lines": said[len(said) - max(0, int(lines)):],
             "said": [] if stage == "check"
             else [f"this log is from {stage}, not the last check"]}
+
+
+def picture(root, which):
+    """One of the space's pictures and what it is of (ADR 0024, decision 3).
+    Read off disk only: nothing is rendered to answer.
+
+    The sheet and the filmstrip are of a build, and say so through the panel's
+    own comparison, so a chat and the console never disagree about one. The
+    worksheet is of the spans on the references, and is behind when they move.
+    """
+    from lib import filmstrip, panel, worksheet
+    here = space.layout(root)
+    of_build = lambda record: lambda: panel.state(
+        views=record, blend=here.blend, verdict=here.dot / panel.NAME)
+    path, reading = {
+        "sheet": (here.sheet, of_build(here.views)),
+        "filmstrip": (here.filmstrip, of_build(here.out / filmstrip.RECORD)),
+        "worksheet": (root / worksheet.NAME,
+                      lambda: worksheet.state(here.dot, here.marks)),
+    }.get(which, (None, None))
+    if path is None:
+        raise LookupError(f"no picture {which!r}: sheet, filmstrip or worksheet")
+    if not path.is_file():
+        return {"picture": which, "said": "not drawn yet"}
+    return connector.image(path.read_bytes(), reading())
 
 
 def out_of_step(root):

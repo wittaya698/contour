@@ -5,6 +5,7 @@ a test writes the lines Desktop would write and reads what comes back. Most of
 these drive `connector.serve` over in-memory pipes; the ones that matter end to
 end run `contour mcp` as Desktop runs it.
 """
+import base64
 import io
 import json
 import os
@@ -19,6 +20,7 @@ CONTOUR = ROOT / "contour"
 sys.path.insert(0, str(ROOT))
 
 from lib import connector  # noqa: E402
+from lib import marks, views  # noqa: E402
 from test_launcher import stub_blender  # noqa: E402
 
 
@@ -160,7 +162,7 @@ class LauncherTest(SpacesCase):
             call(3, "tools/call", name="spaces", arguments={}))))
         self.assertEqual(r.returncode, 0, r.stderr)
         _, listed, called = [json.loads(l) for l in r.stdout.splitlines()]
-        self.assertEqual([t["name"] for t in listed["result"]["tools"]], ["spaces", "status", "log"])
+        self.assertEqual([t["name"] for t in listed["result"]["tools"]], ["spaces", "status", "log", "picture"])
         said = json.loads(called["result"]["content"][0]["text"])
         self.assertEqual(said, json.loads(self.contour("spaces", "--json").stdout))
         self.assertEqual([s["name"] for s in said["spaces"]], ["alpha", "beta"])
@@ -194,9 +196,9 @@ class LauncherTest(SpacesCase):
         self.assertIn("ln -s", r.stderr)
 
 
-class ReadingTest(SpacesCase):
-    """`status` and `log`, over a space a stubbed Blender has built in (issue 59).
-    A chat stands in no directory, so every call names its space."""
+class InSpaceCase(SpacesCase):
+    """One space, `alpha`, that a stubbed Blender can build in. A chat stands
+    in no directory, so every call names its space."""
 
     def setUp(self):
         super().setUp()
@@ -220,6 +222,10 @@ class ReadingTest(SpacesCase):
         got = json.loads(r.stdout)["result"]
         text = got["content"][0]["text"]
         return (text if got["isError"] else json.loads(text)), got["isError"]
+
+
+class ReadingTest(InSpaceCase):
+    """`status` and `log` (issue 59)."""
 
     def test_status_is_the_last_checks_verdict_after_a_later_stage(self):
         """The filmstrip ran last and its log says so; the verdict is the check's."""
@@ -340,6 +346,101 @@ class ReadingTest(SpacesCase):
         self.assertFalse(failed, said)
         self.assertIsNone(said["verdict"])
         self.assertIn("never checked", " ".join(said["said"]))
+
+
+
+class PictureTest(InSpaceCase):
+    """`picture` (issue 60): an image Desktop shows, and which build it is of —
+    the panel's comparison, so a chat and the console agree about it."""
+
+    PNG = b"\x89PNG\r\n\x1a\nsome pixels"
+
+    def picture(self, which):
+        """The content blocks a `picture` call returns, and whether it failed."""
+        r = self.contour("mcp", stdin=json.dumps(call(
+            1, "tools/call", name="picture",
+            arguments={"space": "alpha", "picture": which})) + "\n")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        got = json.loads(r.stdout)["result"]
+        return got["content"], got["isError"]
+
+    def drawn(self):
+        """A build on disk and the sheet `render` drew of it."""
+        here = self.space / "out"
+        here.mkdir(exist_ok=True)
+        (here / "alpha.blend").write_bytes(b"a blend")
+        (self.space / "sheet.png").write_bytes(self.PNG)
+        views.record(here / "views.json", [64, 64], [], here / "alpha.blend")
+
+    def test_the_sheet_is_an_image_with_the_build_it_is_of(self):
+        self.drawn()
+        content, failed = self.picture("sheet")
+        self.assertFalse(failed, content)
+        image, text = content
+        self.assertEqual(image["type"], "image")
+        self.assertEqual(image["mimeType"], "image/png")
+        self.assertEqual(base64.b64decode(image["data"]), self.PNG)
+        said = json.loads(text["text"])
+        self.assertEqual(said["build"], views.fingerprint(self.space / "out" / "alpha.blend"))
+        self.assertIs(said["current"], True)
+
+    def test_a_sheet_the_build_moved_past_says_it_is_not_current(self):
+        self.drawn()
+        drawn = views.fingerprint(self.space / "out" / "alpha.blend")
+        (self.space / "out" / "alpha.blend").write_bytes(b"a later blend")
+        content, _ = self.picture("sheet")
+        said = json.loads(content[1]["text"])
+        self.assertEqual(said["build"], drawn, "the build it is a picture of")
+        self.assertIs(said["current"], False)
+        self.assertIn("moved on", said["why"])
+
+    def test_the_filmstrip_is_of_the_build_it_was_drawn_from(self):
+        """Its build is in its pixels, which no reader below Blender can read,
+        so the launcher writes it down as the filmstrip succeeds. The stub
+        draws nothing; the PNG is laid down where Blender would have put it."""
+        blend = self.space / "out" / "alpha.blend"
+        blend.parent.mkdir()
+        blend.write_bytes(b"a blend")
+        self.assertEqual(self.run_in("filmstrip").returncode, 0)
+        (self.space / "out" / "filmstrip.png").write_bytes(self.PNG)
+        content, failed = self.picture("filmstrip")
+        self.assertFalse(failed, content)
+        self.assertEqual(base64.b64decode(content[0]["data"]), self.PNG)
+        said = json.loads(content[1]["text"])
+        self.assertEqual(said["build"], views.fingerprint(blend))
+        self.assertIs(said["current"], True, said)
+        blend.write_bytes(b"a later blend")
+        said = json.loads(self.picture("filmstrip")[0][1]["text"])
+        self.assertIs(said["current"], False)
+        self.assertIn("moved on", said["why"])
+
+    def test_the_worksheet_is_of_its_spans_and_says_when_they_moved(self):
+        """Drawn from the references and the spans on them, not from a build:
+        so no build is named, and what it can fall behind is the spans."""
+        spans = self.space / "marks.json"
+        marks.on_reference(spans, "front.png", [10, 20], "height", to=[10, 200])
+        self.assertEqual(self.run_in("worksheet").returncode, 0)
+        (self.space / "worksheet.png").write_bytes(self.PNG)
+        content, failed = self.picture("worksheet")
+        self.assertFalse(failed, content)
+        self.assertEqual(base64.b64decode(content[0]["data"]), self.PNG)
+        said = json.loads(content[1]["text"])
+        self.assertIsNone(said["build"])
+        self.assertIs(said["current"], True, said)
+        marks.on_reference(spans, "front.png", [30, 20], "width", to=[90, 20])
+        said = json.loads(self.picture("worksheet")[0][1]["text"])
+        self.assertIs(said["current"], False)
+        self.assertIn("contour worksheet", said["why"])
+
+    def test_a_picture_never_drawn_says_so_and_nothing_renders(self):
+        """The stub Blender writes down every stage it is asked for; no line
+        there means nothing was started to answer."""
+        for which in ("sheet", "filmstrip", "worksheet"):
+            content, failed = self.picture(which)
+            self.assertFalse(failed, content)
+            [text] = content
+            self.assertEqual(json.loads(text["text"])["said"], "not drawn yet")
+        self.assertFalse((self.tmp / "stages").exists(), "Blender was started")
 
 
 if __name__ == "__main__":

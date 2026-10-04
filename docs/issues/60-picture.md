@@ -15,10 +15,29 @@ it is a slice of its own.
 
 ## Acceptance criteria
 
-- [ ] `picture` returns each of the three as an image Desktop shows
-- [ ] Each comes with its build, and says when that build is no longer current
-- [ ] A picture never drawn says *not drawn yet*, and nothing renders
-- [ ] Nothing about `picture` starts Blender
+- [x] `picture` returns each of the three as an image Desktop shows
+- [x] Each comes with its build, and says when that build is no longer current
+- [x] A picture never drawn says *not drawn yet*, and nothing renders
+- [x] Nothing about `picture` starts Blender
+
+## What it came to
+
+A tool may now hand the connector MCP content blocks (`connector.image`)
+instead of a reading. `picture` returns the PNG as an image block, then a text
+block with the reading. A picture not on disk returns only
+`{"said": "not drawn yet"}`, and the stub Blender's trace proves nothing started.
+
+- **sheet**: `panel.state` over `views.json`, so `build`, `current` and `why`
+  are the panel's own, including *last build failed*.
+- **filmstrip**: its build was only in its pixels. The launcher now writes
+  `out/filmstrip.json` (`{"build": …}`, the `views.json` shape) when a
+  filmstrip succeeds, and `panel.state` reads that instead. A build already
+  deletes `filmstrip.png`, and the record sits beside it.
+- **worksheet**: of no build, so `build` is null. The launcher writes a
+  fingerprint of the spans it drew to `.contour/worksheet.json`, and the
+  reading says *the spans changed since it was drawn: run contour worksheet*
+  when they move, or that it is not known, for a worksheet with no record
+  (a fresh clone, or one drawn before this).
 
 ## Blocked by
 

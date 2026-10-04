@@ -10,13 +10,21 @@ launcher can tell there is nothing to draw without starting Blender. Where it
 goes and how it is drawn is `worksheet_draw`'s; reading the photographs and
 saving the image are `cmd_worksheet`'s.
 """
+import hashlib
+import json
 import re
 
-from . import marks
+from . import marks, store
 
 NAME = "worksheet.png"
 """Where it is written, in the space beside `sheet.png`, and tracked as that is:
 ADR 0017 made the worksheet a picture to share."""
+
+RECORD = "worksheet.json"
+"""Which spans the worksheet was drawn from, in the space's `.contour/`. It is
+of no build, so a build fingerprint would say nothing about it; what it can
+fall behind is the spans (ADR 0024, decision 3). Not beside the PNG, which is
+tracked: this is the launcher's note, not a picture to share."""
 
 NUMBER = re.compile(r"(\d+) (mm|px) ±(\d+)")
 
@@ -62,3 +70,23 @@ def number(mark, all_marks):
     got = NUMBER.search(marks.text(found)) if found else None
     return f"{got[1]} {got[2]} ±{got[3]}" if got else "not measured"
 
+
+def fingerprint(all_marks):
+    """Which spans these are, as twelve hex characters — what the worksheet
+    draws, so a change it would draw differently is a change here."""
+    said = json.dumps(spans(all_marks), sort_keys=True).encode()
+    return hashlib.sha256(said).hexdigest()[:12]
+
+
+def record(dot, marks_path):
+    """Say which spans the worksheet just drawn is of."""
+    store.save(dot / RECORD, {"spans": fingerprint(marks.load(marks_path))})
+
+
+def state(dot, marks_path):
+    """What a reader is told about the worksheet on disk, in the panel's shape."""
+    drawn = (store.load(dot / RECORD, None) or {}).get("spans")
+    why = (None if drawn == fingerprint(marks.load(marks_path))
+           else "the spans changed since it was drawn: run contour worksheet"
+           if drawn else "not known which spans it was drawn from: run contour worksheet")
+    return {"build": None, "current": not why, "why": why}

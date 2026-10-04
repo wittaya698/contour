@@ -9,6 +9,7 @@ This module is the protocol and the tools' definitions. What a tool does is
 handed to `serve` by `lib/cli.py`, which owns the readings, so the connector
 imports nothing of the launcher's and cannot reach a write the launcher has.
 """
+import base64
 import json
 
 LATEST = "2025-06-18"
@@ -37,9 +38,28 @@ TOOLS = (
      "inputSchema": {"type": "object", "required": ["space"],
                      "properties": {"space": {"type": "string"},
                                     "lines": {"type": "integer", "default": 40}}}},
+    {"name": "picture",
+     "description": "One of a space's pictures as an image, with the build it "
+                    "was drawn from and whether that is still current.",
+     "inputSchema": {"type": "object", "required": ["space", "picture"],
+                     "properties": {"space": {"type": "string"},
+                                    "picture": {"enum": ["sheet", "filmstrip",
+                                                         "worksheet"]}}}},
 )
 """Every tool's definition, coarse on purpose: each one sits in Desktop's
 context on every turn (ADR 0024, decision 3)."""
+
+
+class Content(list):
+    """A tool's answer as MCP content blocks, handed over as they are. Any other
+    answer is a reading, and goes to Desktop as its JSON text."""
+
+
+def image(png, reading):
+    """A picture Desktop shows, and the reading that says what it is of."""
+    return Content([{"type": "image", "mimeType": "image/png",
+                     "data": base64.b64encode(png).decode("ascii")},
+                    {"type": "text", "text": json.dumps(reading)}])
 
 
 def config(link):
@@ -80,11 +100,13 @@ def answer(message, tools):
         if run is None:
             return error(n, -32602, f"no tool {params.get('name')!r}")
         try:
-            said, failed = json.dumps(run(params.get("arguments") or {})), False
+            said, failed = run(params.get("arguments") or {}), False
         except Exception as e:      # a finding for the chat, never a dead pipe
             said, failed = f"{params['name']} failed: {e}", True
-        return result(n, {"content": [{"type": "text", "text": said}],
-                          "isError": failed})
+        if not isinstance(said, Content):
+            said = [{"type": "text",
+                     "text": said if failed else json.dumps(said)}]
+        return result(n, {"content": list(said), "isError": failed})
     return error(n, -32601, f"no method {method!r}: the connector speaks "
                             f"initialize, tools/list and tools/call")
 

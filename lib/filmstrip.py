@@ -10,7 +10,20 @@ Rendered at a checkpoint and never on a build (ADR 0005): the clip's numbers
 are checked every build, and the filmstrip is for what numbers miss.
 """
 
-from . import views
+from . import store, views
+
+RECORD = "filmstrip.json"
+"""Which build the filmstrip in `out/` is of, beside it. The build is drawn into
+the picture's own pixels, which nothing below Blender can read, so the launcher
+writes it down as a filmstrip succeeds (ADR 0024, decision 3)."""
+
+
+def record(out, blend):
+    """Say which build the filmstrip just drawn is of, in the shape `views.json`
+    says it, so the panel's one comparison answers for both pictures."""
+    out.mkdir(parents=True, exist_ok=True)
+    store.save(out / RECORD, {"build": views.fingerprint(blend)})
+
 
 COLUMNS = 6
 TILE = (1024 // COLUMNS, 512)
