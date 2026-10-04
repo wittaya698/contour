@@ -27,6 +27,16 @@ TOOLS = (
      "description": "Every Contour model space on this machine and its health: "
                     "toolkit drift, scaffold, remotes, who is in it, and the trash.",
      "inputSchema": {"type": "object", "properties": {}}},
+    {"name": "status",
+     "description": "Is a space green, and if not why: its last check's verdict, "
+                    "open marks, uncommitted vetoes, and toolkit drift.",
+     "inputSchema": {"type": "object", "required": ["space"],
+                     "properties": {"space": {"type": "string"}}}},
+    {"name": "log",
+     "description": "The tail of a space's last Blender log, and which stage wrote it.",
+     "inputSchema": {"type": "object", "required": ["space"],
+                     "properties": {"space": {"type": "string"},
+                                    "lines": {"type": "integer", "default": 40}}}},
 )
 """Every tool's definition, coarse on purpose: each one sits in Desktop's
 context on every turn (ADR 0024, decision 3)."""

@@ -14,12 +14,12 @@ moment, already true when it happened — so pruning one would delete the only
 record that something was prevented. Two opposite rules in one file means the
 pruner has to tell them apart, and the first bug is that it does not.
 """
-import json
 from pathlib import Path
 
-from lib import agent, git, marks, space as space_lib, store, views
+from lib import agent, marks, space as space_lib, store, views
+from lib import vetoes as reading
 
-NAME = "vetoes.json"
+NAME = reading.NAME
 """Beside `marks.json` at the space's root, and tracked for the same reason.
 
 Not in `.contour/`, which a space gitignores whole but for its marker: a veto
@@ -107,22 +107,8 @@ def promote(space, veto_id, part):
     return mark
 
 
-def committed(space):
-    """The veto ids `HEAD` already holds.
-
-    Asked of git rather than stamped on the veto as it is written: a stamp would
-    be a claim about a commit that had not happened, and the thing that makes it
-    true or false afterwards is `git checkout`, which does not come past here.
-    """
-    # A space that is not a repository yet, or a machine with no git, is not an
-    # error to raise at the page — it is a space where no veto is committed,
-    # which is what the count then says. `lib/git.py` says so once, for every
-    # caller that used to decide it alone (slice 21).
-    blob = git.show(space, "HEAD", NAME)
-    try:
-        return {v.get("id") for v in json.loads(blob)} if blob and blob.strip() else set()
-    except json.JSONDecodeError:
-        return set()
+committed = reading.committed
+"""The ids `HEAD` holds, asked in `lib/` so the connector's count is this one."""
 
 
 def exposure(space):
@@ -135,7 +121,4 @@ def exposure(space):
     the model got here. *I stopped you widening that tolerance* belongs in the
     commit where the tolerance did not get widened.
     """
-    kept = load(space)
-    held = committed(space)
-    return {"vetoes": kept,
-            "uncommitted": sum(1 for v in kept if v.get("id") not in held)}
+    return {"vetoes": load(space), "uncommitted": reading.uncommitted(space)}

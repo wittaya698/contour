@@ -363,7 +363,10 @@ def on_mcp(cmd, rest, held):
     if rest:
         print(usage(), file=sys.stderr)
         return 2
-    connector.serve(sys.stdin, sys.stdout, {"spaces": lambda args: listing()})
+    connector.serve(sys.stdin, sys.stdout, {
+        "spaces": lambda args: listing(),
+        "status": lambda args: status(named(args.get("space"))),
+        "log": lambda args: log(named(args.get("space")), args.get("lines", 40))})
     return 0
 
 
@@ -776,6 +779,60 @@ def listing():
     return {"roots": [str(r) for r in space.roots(ROOT)],
             "spaces": [reading(s, now) for s in space.spaces(space.roots(ROOT))],
             "deleted": restore.deleted()}
+
+
+def named(name):
+    """The space a call names, resolved as `contour spaces <name>` resolves it:
+    a chat stands in no directory (ADR 0024, decision 3)."""
+    if not name:
+        raise LookupError("name a space: a chat stands in none")
+    said = spaces(name)
+    if not said["ok"]:
+        raise LookupError(said["lines"][0])
+    return Path(said["lines"][0])
+
+
+def status(root):
+    """Is it green, and if not why (ADR 0024, decisions 3 and 6)."""
+    from lib import lock, marks, panel, store, vetoes
+    here = space.layout(root)
+    verdict = store.load(here.dot / panel.NAME, None)
+    said = [] if verdict else ["never checked: no verdict here is not a green one"]
+    rec = lock.holder(root)
+    held = held_by(rec) if rec and lock.alive(rec) else None
+    if held and verdict:
+        said.append(f"a run is live ({held}); this verdict is from before it")
+    return {"verdict": verdict, "held": held, "said": said,
+            "marks": sum(1 for m in marks.load(here.marks) if marks.is_open(m)),
+            "vetoes": vetoes.uncommitted(root),
+            "doctor": out_of_step(root)}
+
+
+def log(root, lines=40):
+    """The tail of `last-build.log`, and the stage its first line says wrote it.
+
+    Every stage rewrites the log, so after a check and a filmstrip it is the
+    filmstrip's; naming the writer is what keeps it from being read as the
+    cause of a red check it never saw (ADR 0024, decision 6).
+    """
+    try:
+        said = (space.layout(root).dot / LOG.name).read_text().splitlines()
+    except FileNotFoundError:
+        said = []
+    if not said:
+        return {"stage": None, "lines": [], "said": ["no log: nothing has run here"]}
+    first = said[0].removeprefix("$ ").split()
+    stage = "check" if first[:1] == ["build"] else first[0]
+    return {"stage": stage, "lines": said[len(said) - max(0, int(lines)):],
+            "said": [] if stage == "check"
+            else [f"this log is from {stage}, not the last check"]}
+
+
+def out_of_step(root):
+    """What `doctor` would find behind the toolkit here: `reading`'s half of
+    it, so a chat, `spaces` and `doctor` name the same drifted files."""
+    said = reading(root, toolkit_commit())
+    return {"toolkit": said["toolkit"]["state"], **said["scaffold"]}
 
 
 def spaces(name=None, as_json=False):
