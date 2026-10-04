@@ -72,10 +72,11 @@ class LayoutTest(unittest.TestCase):
         self.assertEqual(here.mask, Path("/spaces/beaky/out/mask.png"))
         self.assertEqual(here.parts, Path("/spaces/beaky/out/parts.json"))
         self.assertEqual(here.views, Path("/spaces/beaky/out/views.json"))
+        self.assertEqual(here.filmstrip, Path("/spaces/beaky/out/filmstrip.png"))
         self.assertEqual(here.release, Path("/spaces/beaky/release"))
         smoke = space.fixture("smoke", Path("/toolkit"))
         for field in ("spec", "build", "refs", "dot", "mask", "parts", "views",
-                      "release"):
+                      "filmstrip", "release"):
             rel = getattr(here, field).relative_to(here.root)
             self.assertEqual(getattr(smoke, field), smoke.root / rel, field)
 

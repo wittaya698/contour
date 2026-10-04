@@ -42,6 +42,16 @@ FONT = {
     "5": "#####|#....|####.|....#|....#|#...#|.###.", "6": "..##.|.#...|#....|####.|#...#|#...#|.###.",
     "7": "#####|....#|...#.|..#..|.#...|.#...|.#...", "8": ".###.|#...#|#...#|.###.|#...#|#...#|.###.",
     "9": ".###.|#...#|#...#|.####|....#|...#.|.##..",
+    # A filmstrip prints a clip's name and a build's hex, so the rest of the
+    # alphabet is here too (issue 55)
+    "a": ".....|.....|.###.|....#|.####|#...#|.####", "b": "#....|#....|####.|#...#|#...#|#...#|####.",
+    "c": ".....|.....|.###.|#....|#....|#...#|.###.", "j": "...#.|.....|..##.|...#.|...#.|#..#.|.##..",
+    "k": "#....|#....|#..#.|#.#..|##...|#.#..|#..#.", "l": ".##..|..#..|..#..|..#..|..#..|..#..|.###.",
+    "q": ".....|.....|.####|#...#|.####|....#|....#", "u": ".....|.....|#...#|#...#|#...#|#..##|.##.#",
+    "v": ".....|.....|#...#|#...#|#...#|.#.#.|..#..", "w": ".....|.....|#...#|#...#|#.#.#|#.#.#|.#.#.",
+    "x": ".....|.....|#...#|.#.#.|..#..|.#.#.|#...#", "y": ".....|.....|#...#|#...#|.####|....#|.###.",
+    "z": ".....|.....|#####|...#.|..#..|.#...|#####", "_": ".....|.....|.....|.....|.....|.....|#####",
+    ".": ".....|.....|.....|.....|.....|.##..|.##..", "-": ".....|.....|.....|.###.|.....|.....|.....",
 }
 
 BADGE = 2          # glyph scale: 14 px tall on a 512 tile, and readable
@@ -89,8 +99,8 @@ def paint(tile, bgmask, p0, p1, colour, width):
 
 def text(tile, x, y, s, scale=2, colour=INK):
     """Paint `s` with its bottom-left at pixel (x, y)."""
-    for ch in s:
-        for r, row in enumerate(FONT[ch].split("|")):
+    for ch in s.lower():
+        for r, row in enumerate(FONT.get(ch, FONT[" "]).split("|")):
             for c, v in enumerate(row):
                 if v == "#":
                     y0, x0 = y + (6 - r) * scale, x + c * scale
@@ -307,7 +317,7 @@ def run(args):
 
     ext = [h - l for l, h in zip(lo, hi)]
     ctr = Vector([(l + h) / 2 for l, h in zip(lo, hi)])
-    scale = max(1.12 * max(ext) + 0.6, 1.5)  # the 1 m ruler must fit the frame
+    scale = sheet_views.sheet_scale(lo, hi)
     d = 1.2 * (math.sqrt(sum(e * e for e in ext)) / 2) / math.sin(math.atan(18 / 50))
     far = 20.0
     views = [  # sheet order: top-left, top-right, bottom-left, bottom-right

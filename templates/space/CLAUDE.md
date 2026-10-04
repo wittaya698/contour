@@ -16,6 +16,7 @@ Run `contour doctor` to find out whether that copy has gone stale.
 | `contour api <symbol>` | real signature from the installed Blender | ~15 tok |
 | `contour render` | 4-view sheet → `sheet.png` | ~1400 tok |
 | `contour export` | `.glb` + round-trip re-measure | ~80 tok |
+| `contour filmstrip [clip]` | a clip as six side and six front frames → `out/filmstrip.png`, at a checkpoint | ~1400 tok |
 | `contour canvas` | the sheet in a browser, to mark on; waits for you | ~20 tok |
 | `contour measure` | pixel geometry off a reference; draws and reads spans | ~60 tok |
 | `contour worksheet` | every span drawn onto its reference → `worksheet.png` | ~1400 tok |

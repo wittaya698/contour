@@ -27,6 +27,9 @@ def run(args):
             return {"ok": False,
                     "lines": [f"FAIL {variant}: missing {P.display(needed)}"]}
     spec = miniyaml.load(P.spec)
+    # A filmstrip is a picture of one build, so the next one takes it away
+    # rather than leave a walk beside it that it never did (issue 55).
+    P.filmstrip.unlink(missing_ok=True)
     coll = build(P, variant)
     scene.save_collection(coll, P.blend)
     results = verify.run(spec, variant)

@@ -78,6 +78,22 @@ read wrong against the 1 m grid.
 
 Then show the user the verify report and the sheet, and say what changed.
 
+When the spec has `clips:` and they are green, the sheet shows the rest pose
+and nothing of the motion. At that checkpoint, and not before:
+
+```
+contour filmstrip [clip]
+```
+
+Six frames from the side and six from the front, evenly through the clip, on
+the sheet's grid at one scale, labelled with the clip and the build. Look for
+what the clip's numbers cannot catch: whether it reads as what `feel:` says —
+a walk that shuffles, a limb swinging the wrong way, a part that should move
+and does not. Show it to the user with the sheet. Never render one inside the
+fix loop: the clip's angles, seams and crossings are checked by every build,
+and a red check is fixed from its report, not from a picture. The next build
+deletes the filmstrip, so one on disk is always of the build beside it.
+
 Under a console the sheet is already on the page beside the transcript, redrawn
 by every build and labelled with the build it came from (ADR 0019). Rendering
 again there buys nothing and costs ~1400 tokens of your own context: say what

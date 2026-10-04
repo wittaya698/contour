@@ -31,7 +31,7 @@ class HoldTest(unittest.TestCase):
         casts rays into the build another terminal may be replacing. `run` is
         the unit the hold is scoped to, so it takes it too."""
         self.assertEqual(names(holds=True),
-                         ["check", "render", "export", "resolve", "run"])
+                         ["check", "render", "export", "filmstrip", "resolve", "run"])
 
     def test_the_canvas_and_the_agents_mark_deliberately_take_nothing(self):
         """Both only append to `marks.json`, and a canvas session is a person
@@ -52,7 +52,8 @@ class SpaceTest(unittest.TestCase):
         about one has nowhere else to find it — and falling back to the
         toolkit's own directory would build something nobody asked for."""
         self.assertEqual(names(space=True),
-                         ["check", "render", "export", "measure", "worksheet", "canvas",
+                         ["check", "render", "export", "filmstrip", "measure",
+                          "worksheet", "canvas",
                           "resolve", "mark", "run", "doctor", "migrate-marks",
                           "rename", "delete"])
 

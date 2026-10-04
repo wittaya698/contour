@@ -38,6 +38,9 @@ TABLE = (
             (("render", "4-view sheet -> sheet.png, + mask, + mark badges"),), "on_build"),
     Command("export", NONE, True, True, "build",
             (("export", ".glb + round-trip re-measure"),), "on_build"),
+    Command("filmstrip", (0, 1), True, True, None,
+            (("filmstrip [clip]", "a clip as six side and six front frames -> "
+                                  "out/filmstrip.png"),), "on_filmstrip"),
     Command("api", ANY, False, False, None,
             (("api <symbol>...", "real signature from the installed Blender"),), "on_api"),
     Command("measure", ANY, True, False, None,

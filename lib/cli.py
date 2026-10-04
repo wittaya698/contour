@@ -240,6 +240,13 @@ def on_build(cmd, rest, held):
     return emit(rt)
 
 
+def on_filmstrip(cmd, rest, held):
+    """A clip as one picture, for a checkpoint (ADR 0023). Never drawn by a
+    build: `contour check` renders the sheet for the page and nothing else, and
+    this says where the picture is rather than putting it in the report."""
+    return emit(stage(["filmstrip", *[f"--clip={c}" for c in rest]]))
+
+
 def on_api(cmd, rest, held):
     return emit(stage(["api", *rest]))
 
@@ -812,7 +819,7 @@ def unit_tests():
 
 def fixture_tests():
     """`tests/test_fixture.py`'s claims against the fixture's render — the
-    mask, the views, anchoring and an agent's badge — run here so that one
+    mask, the views, anchoring, an agent's badge and the filmstrip — run here so that one
     command still proves them (ADR 0009, issue 25). A skip is a failure: the
     point of running them here is that they cannot be left out.
     """
@@ -820,7 +827,7 @@ def fixture_tests():
     os.environ["BLENDER"] = BLENDER          # before loading: the skip is decided there
     found = unittest.defaultTestLoader.discover(str(ROOT / "tests"), pattern="test_fixture.py")
     cases = unittest.TestSuite(t for s in found for c in s for t in c
-                               if type(t).__name__ == "FixtureTest")
+                               if type(t).__name__ in ("FixtureTest", "FilmstripTest"))
     result = unittest.TestResult()
     cases.run(result)
     wrong = [f"{getattr(t, '_testMethodName', t)}: {err.strip().splitlines()[-1]}"

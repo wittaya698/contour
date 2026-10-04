@@ -76,6 +76,8 @@ of duplicates is a count at some tolerance, and the tolerance is in the spec,
 which a gather does not read. The distance answers the same question for any
 tolerance and says how close rather than how many (issue 22).
 """
+import contextlib
+
 import bmesh
 import bpy
 from mathutils import Vector, kdtree
@@ -208,45 +210,55 @@ def rigs(objects=None):
             if o.type == "ARMATURE"]
 
 
+@contextlib.contextmanager
+def playing(rig, track):
+    """`rig` posed by `track` alone, the others muted: yields the frames its
+    clip runs over, `(start, end)`, and leaves the rig at rest, on the frame it
+    was on, as it was found.
+
+    As long as its action, from where its strip plays it: the importer lays a
+    strip at frame 1 over an action keyed from 0.
+    """
+    ad, sc = rig.animation_data, bpy.context.scene
+    tracks = [t for t in ad.nla_tracks if t.strips]
+    held = rig.data.pose_position, sc.frame_current, [t.mute for t in tracks], ad.action
+    try:
+        rig.data.pose_position = "POSE"
+        ad.action = None  # the importer leaves one clip active, over every track
+        for t in tracks:  # by pointer: each lookup makes a new Python wrapper
+            t.mute = t.as_pointer() != track.as_pointer()
+        strip = track.strips[0]
+        act = strip.action
+        start = round(strip.frame_start)
+        yield start, start + round(act.frame_range[1] - act.frame_range[0])
+    finally:
+        rig.data.pose_position, frame, mutes, ad.action = held
+        for t, m in zip(tracks, mutes):
+            t.mute = m
+        sc.frame_set(frame)
+
+
 def clips(rig, objects=None):
     """Every clip on `rig`'s NLA tracks, posed frame by frame and read back:
     each bone's angles, and where the parts among `objects` cross.
 
-    The rig is posed for this and only this — each track alone, the others
-    muted — and left at rest, on the frame it was on, as it was found.
+    The rig is posed for this and only this, one track at a time (`playing`).
     """
     ad, sc = rig.animation_data, bpy.context.scene
     if ad is None:
         return []
-    tracks = [t for t in ad.nla_tracks if t.strips]
-    held = rig.data.pose_position, sc.frame_current, [t.mute for t in tracks], ad.action
     out = []
-    try:
-        rig.data.pose_position = "POSE"
-        ad.action = None  # the importer leaves one clip active, over every track
-        for track in tracks:
-            for t in tracks:
-                t.mute = t is not track
-            strip = track.strips[0]
-            act = strip.action
-            # As long as its action, from where its strip plays it: the
-            # importer lays a strip at frame 1 over an action keyed from 0.
-            start = round(strip.frame_start)
-            end = start + round(act.frame_range[1] - act.frame_range[0])
+    for track in [t for t in ad.nla_tracks if t.strips]:
+        with playing(rig, track) as (start, end):
             poses, crossed, placed = {}, {}, {}
             for f in range(start, end + 1):
                 sc.frame_set(f)
                 poses[f - start] = {pb.name: pose.read(pb) for pb in rig.pose.bones}
                 crossed[f - start] = contacts(objects)
                 placed[f - start] = boxes(objects)
-            out.append({"name": track.name, "fps": act.get("fps"),
+            out.append({"name": track.name, "fps": track.strips[0].action.get("fps"),
                         "frames": end - start, "poses": poses, "contacts": crossed,
                         "boxes": placed})
-    finally:
-        rig.data.pose_position, frame, mutes, ad.action = held
-        for t, m in zip(tracks, mutes):
-            t.mute = m
-        sc.frame_set(frame)
     return out
 
 

@@ -36,6 +36,16 @@ def aim(sheet, pixel):
     return None
 
 
+def sheet_scale(lo, hi):
+    """How many metres a sheet tile spans, given the corners it frames: the
+    model with a margin, and never less than the 1 m ruler needs to fit.
+
+    The filmstrip draws at this scale too, so a part reads the same size on
+    both (ADR 0023).
+    """
+    return max(1.12 * max(h - l for l, h in zip(lo, hi)) + 0.6, 1.5)
+
+
 def fingerprint(blend):
     """Which build this is, as twelve hex characters — `""` when there is no
     build at all. The `.blend` is regenerated from zero on every `contour

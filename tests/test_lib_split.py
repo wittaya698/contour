@@ -35,7 +35,7 @@ print(" ".join(sorted({n.split(".")[0] for n in set(sys.modules) - before}
 # Runs outside Blender: the launcher, the canvas, the stores. Standard library
 # only, because `./contour` has to work on a clone with nothing installed.
 FREE = ("agent", "badges", "canvas", "checks", "cli", "commands", "delete", "enter",
-        "git", "glb", "intent", "lobby", "lock", "marks", "mask", "miniyaml",
+        "filmstrip", "git", "glb", "intent", "lobby", "lock", "marks", "mask", "miniyaml",
         "ops_whitelist", "page", "panel", "policy", "presence", "refs",
         "rename", "restore", "revision", "signals", "space", "span", "store",
         "units", "views", "worksheet")
@@ -44,7 +44,8 @@ FREE = ("agent", "badges", "canvas", "checks", "cli", "commands", "delete", "ent
 # Two of these are here by role rather than by their imports: `entry` is
 # stdlib-only but is the module Blender runs, and `cmd_api` imports only
 # `importlib` and `inspect` yet exists to resolve `bpy.*` symbols.
-BLENDER = ("cmd_api", "cmd_build", "cmd_export", "cmd_measure", "cmd_render",
+BLENDER = ("cmd_api", "cmd_build", "cmd_export", "cmd_filmstrip",
+           "cmd_measure", "cmd_render",
            "cmd_resolve", "cmd_roundtrip", "cmd_worksheet", "ctx_override",
            "entry", "kit", "measure", "mutants", "pose", "scene", "worksheet_draw")
 

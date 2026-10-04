@@ -260,6 +260,7 @@ or the folders in `$CONTOUR_SPACES`, separated by `:`.
 | `contour resolve` | anchor marks against this build, before it changes |
 | `contour measure <ref>` | real pixel geometry from a reference image; draws and reads spans |
 | `contour worksheet` | every span drawn onto its reference -> `worksheet.png` |
+| `contour filmstrip [clip]` | a clip as six side and six front frames -> `out/filmstrip.png` |
 | `contour run <cmd>...` | hold this space for one run, then release it |
 | `contour asks` | what this space lets through, and what asks |
 | `contour intents` | the call categories a gate can ask about |

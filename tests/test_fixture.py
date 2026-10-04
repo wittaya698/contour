@@ -209,3 +209,44 @@ class FixtureTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def png_size(path):
+    """`(width, height)` from a PNG's header, which is all a stdlib test can
+    say of a colour picture without decoding one."""
+    import struct
+    blob = Path(path).read_bytes()
+    return struct.unpack(">II", blob[16:24])
+
+
+@unittest.skipUnless(BLENDER, "needs $BLENDER: the filmstrip is rendered by Blender")
+class FilmstripTest(unittest.TestCase):
+    """The fixture's sway as one picture (ADR 0023, issue 55), and a build
+    taking the last one away."""
+
+    @classmethod
+    def setUpClass(cls):
+        from lib import cli, space, views
+        F = cls.F = space.fixture("smoke", ROOT)
+        FixtureTest.must(cli.stage(["build", "smoke", "--fixture"], first=False))
+        cls.fingerprint = views.fingerprint(F.blend)
+        cls.said = " | ".join(FixtureTest.must(
+            cli.stage(["filmstrip", "smoke", "--fixture"], first=False))["lines"])
+        cls.size = png_size(F.filmstrip)
+        FixtureTest.must(cli.stage(["build", "smoke", "--fixture"], first=False))
+        cls.left = F.filmstrip.exists()
+
+    def test_a_clip_is_one_picture_the_size_of_a_sheet(self):
+        self.assertEqual(self.size, (1024, 1024))
+
+    def test_the_filmstrip_says_which_build_it_was_drawn_from(self):
+        self.assertIn(f"build {self.fingerprint}", self.said)
+
+    def test_the_frames_drawn_are_six_evenly_through_the_clip(self):
+        self.assertIn("sway f0 f3 f7 f10 f13 f17", self.said)
+
+    def test_a_build_takes_the_last_filmstrip_away(self):
+        """A filmstrip is a picture of one build. Left beside the next, it would
+        be a walk that build never did, and nothing on the page says otherwise
+        but twelve hex characters."""
+        self.assertFalse(self.left)

@@ -11,6 +11,7 @@ truth; `.blend` files are disposable output, rebuilt from an empty scene.
 | `contour api <symbol>` | real signature from the installed Blender | ~15 tok |
 | `contour render` | 4-view sheet → `sheet.png` | ~1400 tok |
 | `contour export` | `.glb` + round-trip re-measure | ~80 tok |
+| `contour filmstrip [clip]` | a clip as six side and six front frames → `out/filmstrip.png`, at a checkpoint | ~1400 tok |
 | `contour canvas` | the sheet in a browser, to mark on; waits for you | ~20 tok |
 | `contour worksheet` | every span drawn onto its reference → `worksheet.png` | ~1400 tok |
 | `contour run <cmd>...` | hold this space for one run, then release it | ~0 tok |
