@@ -114,6 +114,11 @@ transform:
 #                            # keeps its seam; one swinging through its parent
 #                            # grows it. And at every frame no part may cross
 #                            # any but its parent. The user's number.
+#     roundtrip_mm: 0.1      # required: how far any part may stand, at any
+#                            # frame, from where the build put it once the
+#                            # .glb is exported and read back. Positions, not
+#                            # angles: an importer may re-orient a bone. Every
+#                            # clip in one file shares one fps. The user's number.
 
 # ---------------------------------------------------------------- render
 # Checkpoint sheet settings. Defaults live in lib/ — override only if the

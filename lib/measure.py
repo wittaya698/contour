@@ -45,7 +45,8 @@ under `rigs`, one record per armature object:
                         it spans, `poses` — frame from 0 -> bone -> the
                         `[x, y, z]` degrees it reads, as the spec writes them —
                         and `contacts`: frame from 0 -> the contact records of
-                        the parts as that frame poses them
+                        the parts as that frame poses them; and `boxes`:
+                        frame from 0 -> part -> its world box, `(lo, hi)`
 
 Under `contacts` it holds one record per pair of parts whose surfaces cross —
 a seam, wherever one exists, whether or not the spec calls it a joint (ADR
@@ -218,24 +219,31 @@ def clips(rig, objects=None):
     if ad is None:
         return []
     tracks = [t for t in ad.nla_tracks if t.strips]
-    held = rig.data.pose_position, sc.frame_current, [t.mute for t in tracks]
+    held = rig.data.pose_position, sc.frame_current, [t.mute for t in tracks], ad.action
     out = []
     try:
         rig.data.pose_position = "POSE"
+        ad.action = None  # the importer leaves one clip active, over every track
         for track in tracks:
             for t in tracks:
                 t.mute = t is not track
-            act = track.strips[0].action
-            start, end = round(act.frame_range[0]), round(act.frame_range[1])
-            poses, crossed = {}, {}
+            strip = track.strips[0]
+            act = strip.action
+            # As long as its action, from where its strip plays it: the
+            # importer lays a strip at frame 1 over an action keyed from 0.
+            start = round(strip.frame_start)
+            end = start + round(act.frame_range[1] - act.frame_range[0])
+            poses, crossed, placed = {}, {}, {}
             for f in range(start, end + 1):
                 sc.frame_set(f)
                 poses[f - start] = {pb.name: pose.read(pb) for pb in rig.pose.bones}
                 crossed[f - start] = contacts(objects)
+                placed[f - start] = boxes(objects)
             out.append({"name": track.name, "fps": act.get("fps"),
-                        "frames": end - start, "poses": poses, "contacts": crossed})
+                        "frames": end - start, "poses": poses, "contacts": crossed,
+                        "boxes": placed})
     finally:
-        rig.data.pose_position, frame, mutes = held
+        rig.data.pose_position, frame, mutes, ad.action = held
         for t, m in zip(tracks, mutes):
             t.mute = m
         sc.frame_set(frame)
@@ -368,29 +376,41 @@ def scene(objects=None):
             "parts": parts(objs), "contacts": contacts(objs), "rigs": rigs(objs)}
 
 
-def bounds(objects=None):
-    """The world box the scene occupies, as `(lo, hi)` — `(None, None)` when
-    there is no mesh to measure.
+def boxes(objects=None):
+    """Each mesh part's world box, `{name: (lo, hi)}` in metres, as the scene
+    is evaluated now — posed, if the rig is. A part with no vertices has none.
 
-    Its own call, and a cheap one: the sheet wants two corners to frame on and
-    used to pay a `bmesh` of every mesh to get them (ADR 0020, decision 5).
-    This walks the evaluated vertices and builds nothing.
+    Walks the evaluated vertices and builds nothing, so a clip can afford it
+    at every frame: it is what the round-trip compares a re-import by
+    (issue 54).
     """
     bpy.context.view_layer.update()
     dg = bpy.context.evaluated_depsgraph_get()
-    lo, hi = None, None
+    out = {}
     for obj in (bpy.context.scene.objects if objects is None else objects):
         if obj.type != "MESH":
             continue
         ev = obj.evaluated_get(dg)
         me = ev.to_mesh()
         mw = obj.matrix_world
-        for v in me.vertices:
-            w = mw @ v.co
-            if lo is None:
-                lo, hi = list(w), list(w)
-            else:
-                for i in range(3):
-                    lo[i], hi[i] = min(lo[i], w[i]), max(hi[i], w[i])
+        pts = [mw @ v.co for v in me.vertices]
         ev.to_mesh_clear()
-    return lo, hi
+        if pts:
+            out[obj.name] = ([min(p[i] for p in pts) for i in range(3)],
+                             [max(p[i] for p in pts) for i in range(3)])
+    return out
+
+
+def bounds(objects=None):
+    """The world box the scene occupies, as `(lo, hi)` — `(None, None)` when
+    there is no mesh to measure.
+
+    Its own call, and a cheap one: the sheet wants two corners to frame on and
+    used to pay a `bmesh` of every mesh to get them (ADR 0020, decision 5).
+    The union of `boxes`, which builds nothing.
+    """
+    each = list(boxes(objects).values())
+    if not each:
+        return None, None
+    return ([min(b[0][i] for b in each) for i in range(3)],
+            [max(b[1][i] for b in each) for i in range(3)])

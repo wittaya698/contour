@@ -58,3 +58,7 @@ clips:
     # The sphere is faceted, so the pillar's seam with the cap widens 2.8 mm
     # as the pillar sways on a pivot that is right (issue 53).
     seam_growth_mm: 3
+    # Exported and read back, every part stands within 0.00003 mm of where
+    # the build put it at every frame; this is room for float noise, not for
+    # a clip that moved (issue 54).
+    roundtrip_mm: 0.1

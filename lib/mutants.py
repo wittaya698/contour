@@ -218,8 +218,56 @@ GLB_MUTANTS = [
 ]
 
 
-def attach_roundtrip(rep, spec, P, variant):
-    """Corrupt real .glb files and require file_checks (and the re-import) to object."""
+# name, how the build is exported wrong, check ids that must fail (issue 54)
+RIG_EXPORTS = [
+    ("exported at rest", {"posed": False}, {"re_motion"}),
+    ("exported at another rate", {"fps": 30}, {"gl_rig"}),
+]
+# name, wrap transform on the real export, read back: every part moved
+RIG_WRAPS = [
+    ("mirrored x, read back", {"scale": [-1.0, 1.0, 1.0]}),
+    ("millimetre units, read back", {"scale": [1000.0, 1000.0, 1000.0]}),
+]
+
+
+def _carried(spec, built, path, heuristic="BLENDER"):
+    """The rig checks' failures on the file at `path`, read back."""
+    from . import checks, cmd_roundtrip, glb, measure
+
+    cmd_roundtrip.reimport(path, cmd_roundtrip.rate(built), heuristic)
+    return {r["id"] for r in checks.carried(spec, built, measure.rigs(), glb.measure(path))
+            if not r["ok"]}
+
+
+def _rig_mutants(spec, P, built, doc, blob):
+    """-> (how many, what was missed). A rig exported wrong, or a file that
+    moved every part, is red; the real file read back with its bones
+    re-oriented is not — position, not angle, is what is compared."""
+    from . import cmd_export, glb
+
+    missed, path = [], P.out / "_mutant.glb"
+    for name, how, expect in RIG_EXPORTS:
+        scene.reset()
+        scene.load_collections(P.blend)
+        why = cmd_export.write(path, **how)
+        failed = {why} if why else _carried(spec, built, path)
+        if not expect <= failed:
+            missed.append(f"{name} (wanted {sorted(expect)}, got {sorted(failed)})")
+    for name, trs in RIG_WRAPS:
+        glb.write(path, glb.wrapped(doc, **trs), blob)
+        failed = _carried(spec, built, path)
+        if "re_motion" not in failed:
+            missed.append(f"{name} (wanted ['re_motion'], got {sorted(failed)})")
+    failed = _carried(spec, built, P.glb, heuristic="TEMPERANCE")
+    if failed:
+        missed.append(f"bones re-oriented on import (wanted none, got {sorted(failed)})")
+    path.unlink(missing_ok=True)
+    return len(RIG_EXPORTS) + len(RIG_WRAPS) + 1, missed
+
+
+def attach_roundtrip(rep, spec, P, variant, built=None):
+    """Corrupt real .glb files and require file_checks (and the re-import) to object.
+    With a rig, `built` is the build's, which the rig mutants are read against."""
     from . import cmd_roundtrip, glb
 
     doc, blob = glb.load(P.glb)
@@ -247,6 +295,9 @@ def attach_roundtrip(rep, spec, P, variant):
     if not ({"height", "depth", "width"} & failed):
         missed.append(f"re-import of z-up file (got {sorted(failed)})")
     path.unlink(missing_ok=True)
+    if built:
+        k, lost = _rig_mutants(spec, P, built, doc, blob)
+        n, missed = n + k, missed + lost
     rep["lines"].append(f"mutants {n - len(missed)}/{n} caught")
     for m in missed:
         rep["lines"].append(f"  FAIL not caught: {m}")

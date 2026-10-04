@@ -6,22 +6,39 @@ Two independent readings of the same .glb:
      wound outward), part names.
   2. A clean Blender scene imports it back: dimensions and origin in Blender
      space, part names, materials, and an unchanged triangle count.
+A rig is checked across both (ADR 0023, issue 54): its bones, clips and each
+clip's length off the file, and where every part stands at every frame of
+every clip off the re-import, against the build.
 Topology checks (manifold, doubles, quad %) are NOT re-run: glTF is triangles-only
 and splits vertices at hard edges, so an importer legitimately changes both.
 """
+import bpy
+
 from . import checks, ctx_override, glb, measure, miniyaml, space, scene
 
 ORIGIN_TOL_MM = 1.0
 GL_AXIS = {"width": 0, "height": 1, "depth": 2}  # glTF: X right, Y up, Z toward viewer
-def reimport(path):
+def reimport(path, fps=None, heuristic="BLENDER"):
     """An empty scene holding the `.glb` as Blender reads it back.
 
     Without the shape the importer gives a bone to draw it by: that shape is a
     1 m icosphere mesh, the importer's and not the model's, and measured as a
     part it moves the origin a metre down (issue 51).
+
+    The importer turns the file's seconds into frames at the scene's rate, so
+    a rig is read back at `fps`, its build's. `heuristic` is how the importer
+    orients bones; a correct file reads back the same whichever it picks.
     """
     scene.reset()
-    ctx_override.call("import_scene.gltf", filepath=str(path), disable_bone_shape=True)
+    if fps:
+        bpy.context.scene.render.fps, bpy.context.scene.render.fps_base = fps, 1.0
+    ctx_override.call("import_scene.gltf", filepath=str(path), disable_bone_shape=True,
+                      bone_heuristic=heuristic)
+    # At rest, as the build holds its rig, so the shape is measured as shaped;
+    # the gather poses it only to read the clips (issue 52).
+    for o in bpy.context.scene.objects:
+        if o.type == "ARMATURE":
+            o.data.pose_position = "REST"
 
 
 RE_CHECKS = {"height", "width", "depth", "origin", "parts", "mat_names", "mat_slots"}
@@ -62,6 +79,11 @@ def file_checks(spec, g):
     return out
 
 
+def rate(rigs):
+    """The one rate a measurement's clips were keyed at, or None."""
+    return checks.one_rate({c["name"]: c["fps"] for r in rigs for c in r["clips"]})[0]
+
+
 def run(args):
     import verify
 
@@ -77,9 +99,15 @@ def run(args):
     scene.reset()
     scene.load_collections(P.blend)
     built_tris = checks.tris(measure.parts())
-    reimport(P.glb)
+    built = measure.rigs()
+    fps = rate(built)
+    reimport(P.glb, fps)
     results += [dict(r, id=f"re_{r['id']}") for r in verify.run(spec, variant, only=RE_CHECKS)]
     got_tris = checks.tris(measure.parts())
+    rig = []
+    if built or g["joints"] or g["clips"]:
+        rig = checks.carried(spec, built, measure.rigs(), g)
+        results += rig
     results.append(_res("tris_kept", got_tris == built_tris == g["tris"], f"{got_tris:,}",
                         f"triangles: built {built_tris:,}, file {g['tris']:,}, "
                         f"re-imported {got_tris:,}"))
@@ -88,12 +116,13 @@ def run(args):
     d = [(g["hi"][a] - g["lo"][a]) * 1000 for a in (1, 0, 2)]
     if ok == n:
         lines = [f"{variant} roundtrip PASS {ok}/{n} | file h{d[0]:.1f} w{d[1]:.1f} d{d[2]:.1f}mm"
-                 f" Y-up right-handed | tris {got_tris:,} kept"]
+                 f" Y-up right-handed | tris {got_tris:,} kept"
+                 + "".join(f" | rig {r['info']} kept" for r in rig if r["id"] == "gl_rig")]
     else:
         lines = [f"{variant} roundtrip FAIL {ok}/{n}"] + [
             f"  FAIL {r['id']:<10} {r['msg']}" for r in results if not r["ok"]]
     rep = {"ok": ok == n, "lines": lines, "results": results}
     if P.fixture:
         from . import mutants
-        rep = mutants.attach_roundtrip(rep, spec, P, variant)
+        rep = mutants.attach_roundtrip(rep, spec, P, variant, built)
     return rep

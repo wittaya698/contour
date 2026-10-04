@@ -567,7 +567,7 @@ class ClipTest(unittest.TestCase):
     X, Y and Z, in the parent's frame, from rest.
     """
     WALK = {"feel": "toy-like", "frames": 4, "fps": 30, "loop": True, "tol_deg": 2,
-            "seam_growth_mm": 3,
+            "seam_growth_mm": 3, "roundtrip_mm": 0.1,
             "keys": {0: {"leg": [25, 0, 0]}, 2: {"leg": [-25, 0, 0]}}}
     SPEC = {"model": "smoke",
             "parts": [{"name": "torso"}, {"name": "leg", "parent": "torso"},
@@ -699,6 +699,12 @@ class ClipTest(unittest.TestCase):
         got = self.judge(spec={**self.SPEC, "clips": {"walk": walk}})
         self.assertIn("clips.walk needs seam_growth_mm", got["spec"]["msg"])
 
+    def test_a_clip_without_its_round_trip_tolerance_is_a_spec_the_verifier_cannot_judge(self):
+        """How far the export may move a part is the user's, clip by clip (issue 54)."""
+        walk = {k: v for k, v in self.WALK.items() if k != "roundtrip_mm"}
+        got = self.judge(spec={**self.SPEC, "clips": {"walk": walk}})
+        self.assertIn("clips.walk needs roundtrip_mm", got["spec"]["msg"])
+
     def test_a_key_outside_the_clip_or_on_no_bone_is_a_spec_error(self):
         """A looping clip's closing frame is implied, never written: its keys
         run from 0 to one short of `frames`."""
@@ -720,6 +726,100 @@ class ClipTest(unittest.TestCase):
     def test_a_spec_with_no_clips_is_judged_on_none(self):
         spec = {k: v for k, v in self.SPEC.items() if k != "clips"}
         self.assertNotIn("clips", self.judge(clips=[], spec=spec))
+
+
+class CarriedTest(unittest.TestCase):
+    """The rig through the export round-trip (ADR 0023, issue 54).
+
+    Not angles: the glTF importer may re-orient a bone, and a correct file
+    would read back different numbers on it. Where every part ends up is the
+    same whichever way its bone points, so that is what is compared — each
+    part's world box at every frame of every clip, the build's against the
+    re-import's.
+    """
+    SWAY = {"frames": 2, "fps": 24, "loop": True, "tol_deg": 1, "seam_growth_mm": 3,
+            "roundtrip_mm": 0.1, "keys": {0: {"arm": [10, 0, 0]}}}
+    SPEC = {"model": "smoke",
+            "parts": [{"name": "torso"}, {"name": "arm", "parent": "torso"}],
+            "clips": {"sway": SWAY}}
+    TORSO = ([-0.05, -0.05, 0.0], [0.05, 0.05, 0.2])
+    ARM = ([0.05, -0.01, 0.1], [0.15, 0.01, 0.12])
+
+    def rig(self, arm=None, frames=2):
+        """A rig as the gather reads it: two bones, one clip, and at every
+        frame each part's world box — the arm's moved by `arm[frame]`, in
+        metres along X."""
+        arm = arm or {}
+        def box(f):
+            dx = arm.get(f, 0.0)
+            return ([self.ARM[0][0] + dx, *self.ARM[0][1:]],
+                    [self.ARM[1][0] + dx, *self.ARM[1][1:]])
+        return [{"name": "rig",
+                 "bones": [{"name": "torso", "parent": None},
+                           {"name": "arm", "parent": "torso"}],
+                 "clips": [{"name": "sway", "fps": 24, "frames": frames,
+                            "boxes": {f: {"torso": self.TORSO, "arm": box(f)}
+                                      for f in range(frames + 1)}}]}]
+
+    # What `glb.measure` reads off the file itself: its joints, and how long
+    # each animation runs, in seconds — a glTF file has no frames and no fps.
+    FILE = {"joints": 2, "clips": {"sway": 2 / 24}}
+
+    def judge(self, got=None, file=FILE):
+        return {r["id"]: r for r in checks.carried(self.SPEC, self.rig(),
+                                                   self.rig() if got is None else got,
+                                                   file)}
+
+    def test_a_rig_carried_whole_reports_its_counts_against_the_build(self):
+        got = self.judge()
+        self.assertTrue(got["gl_rig"]["ok"], got["gl_rig"]["msg"])
+        self.assertTrue(got["re_motion"]["ok"], got["re_motion"]["msg"])
+        self.assertEqual(got["gl_rig"]["info"], "2 bones, sway 2f")
+
+    def test_a_clip_played_at_the_wrong_rate_is_red_on_its_length(self):
+        """A file carries seconds. Read at the build's fps, a clip exported
+        at another rate is the wrong number of frames long (issue 52)."""
+        got = self.judge(file={"joints": 2, "clips": {"sway": 2 / 30}})["gl_rig"]
+        self.assertFalse(got["ok"])
+        self.assertIn("sway runs 1.6f at 24fps in the file, built 2f", got["msg"])
+
+    def test_a_clip_or_part_the_re_import_lacks_is_red(self):
+        lost = self.rig()
+        lost[0]["clips"] = []
+        got = self.judge(lost)["re_motion"]
+        self.assertFalse(got["ok"])
+        self.assertIn("sway is not in the re-import", got["msg"])
+        short = self.rig()
+        del short[0]["clips"][0]["boxes"][1]["arm"]
+        self.assertIn("sway f1: arm is not in the re-import", self.judge(short)["re_motion"]["msg"])
+
+    def test_a_clip_with_no_round_trip_tolerance_is_red_and_not_a_crash(self):
+        sway = {k: v for k, v in self.SWAY.items() if k != "roundtrip_mm"}
+        got = checks.carried({**self.SPEC, "clips": {"sway": sway}}, self.rig(), self.rig(),
+                             self.FILE)
+        motion = {r["id"]: r for r in got}["re_motion"]
+        self.assertFalse(motion["ok"])
+        self.assertIn("sway cannot be judged: the spec check says why", motion["msg"])
+
+    def test_a_file_plays_at_one_rate_so_clips_at_two_cannot_share_one(self):
+        """The exporter turns frames into seconds at the scene's one rate."""
+        self.assertEqual(checks.one_rate({"walk": 30, "idle": 30}), (30, ""))
+        self.assertEqual(checks.one_rate({}), (None, ""))
+        fps, why = checks.one_rate({"walk": 30, "idle": 24})
+        self.assertIsNone(fps)
+        self.assertIn("idle 24fps, walk 30fps", why)
+
+    def test_bones_or_clips_the_file_lost_are_red(self):
+        got = self.judge(file={"joints": 1, "clips": {}})["gl_rig"]
+        self.assertFalse(got["ok"])
+        self.assertIn("1 bones in the file, built 2", got["msg"])
+        self.assertIn("sway is not in the file", got["msg"])
+
+    def test_a_part_landing_elsewhere_names_the_clip_frame_part_and_distance(self):
+        got = self.judge(self.rig(arm={1: 0.0004, 2: 0.0012}))["re_motion"]
+        self.assertFalse(got["ok"])
+        self.assertIn("sway f2: arm 1.2mm from the build, past 0.1mm", got["msg"])
+        self.assertNotIn("f1", got["msg"])
 
 
 class RunTest(unittest.TestCase):

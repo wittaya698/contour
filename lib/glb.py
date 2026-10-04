@@ -102,7 +102,12 @@ def _det3(m):
 
 
 def measure(path):
-    """-> dict(lo, hi, meshes={node name: signed volume m^3}, det_min, tris, materials)."""
+    """-> dict(lo, hi, meshes={node name: signed volume m^3}, det_min, tris, materials,
+    joints, clips={animation name: seconds}).
+
+    A rig is counted, not posed: how many joints the skins name, and how long
+    each animation runs — its latest sample time. The file holds seconds and no
+    frame rate; the round-trip reads them at the build's (issue 54)."""
     doc, blob = load(path)
     lo, hi = [1e30] * 3, [-1e30] * 3
     meshes, dets, tris, mats = {}, [], 0, set()
@@ -138,8 +143,13 @@ def measure(path):
     ident = [1.0 if r == c else 0.0 for c in range(4) for r in range(4)]
     for root in doc["scenes"][doc.get("scene", 0)]["nodes"]:
         visit(root, ident)
+    joints = {j for skin in doc.get("skins", []) for j in skin["joints"]}
+    clips = {a.get("name", f"animation{i}"):
+             max((t[0] for s in a["samplers"] for t in accessor(doc, blob, s["input"])),
+                 default=0.0)
+             for i, a in enumerate(doc.get("animations", []))}
     return {"lo": lo, "hi": hi, "meshes": meshes, "det_min": min(dets) if dets else 1.0,
-            "tris": tris, "materials": mats}
+            "tris": tris, "materials": mats, "joints": len(joints), "clips": clips}
 
 
 def base_name(node_name):

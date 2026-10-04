@@ -21,8 +21,9 @@ SECTIONS = {
                   "pivot_tolerance_mm"},
     "render": {"grid_metres", "sheet_resolution"},
 }
-CLIP = {"feel", "frames", "fps", "loop", "keys", "tol_deg", "seam_growth_mm"}
-CLIP_NEEDS = ("frames", "fps", "keys", "tol_deg", "seam_growth_mm")
+CLIP = {"feel", "frames", "fps", "loop", "keys", "tol_deg", "seam_growth_mm",
+        "roundtrip_mm"}
+CLIP_NEEDS = ("frames", "fps", "keys", "tol_deg", "seam_growth_mm", "roundtrip_mm")
 DIMS = ("height", "width", "depth")
 IMPLEMENTED_TARGETS = {"web"}
 ORIGIN_TOL_MM = 1.0
@@ -433,6 +434,83 @@ def clips(spec, m):
         bad += _motion(name, clip, have[name], _joints(spec), rest)
     info = ", ".join(f"{name} {have[name]['frames']}f" for name in want if name in have)
     return [result("clips", not bad, info, "clips " + "; ".join(bad))]
+
+
+def _corners_off(a, b):
+    """How far apart the furthest pair of matching corners of two world boxes
+    stand, in metres: on each axis the worse of the two faces, then across."""
+    return sum(max(abs(a[0][i] - b[0][i]), abs(a[1][i] - b[1][i])) ** 2
+               for i in range(3)) ** 0.5
+
+
+def _counts(built, file):
+    """Bones, clips and each clip's frames, as the file itself has them. A
+    file carries seconds and no rate, so a clip's length is read at the fps
+    its build keyed it at: one exported at another rate is the wrong number
+    of frames long (issue 52)."""
+    bones = len(built[0]["bones"]) if built else 0
+    clips_ = built[0]["clips"] if built else []
+    bad = [] if file["joints"] == bones else [f"{file['joints']} bones in the file, built {bones}"]
+    for clip in clips_:
+        secs = file["clips"].get(clip["name"])
+        if secs is None:
+            bad.append(f"{clip['name']} is not in the file")
+        elif abs(secs * clip["fps"] - clip["frames"]) > UNIT_TOL:
+            bad.append(f"{clip['name']} runs {secs * clip['fps']:.1f}f at {clip['fps']}fps "
+                       f"in the file, built {clip['frames']}f")
+    bad += [f"{name} is in the file and not the build"
+            for name in file["clips"] if name not in {c["name"] for c in clips_}]
+    info = ", ".join([f"{bones} bones"] + [f"{c['name']} {c['frames']}f" for c in clips_])
+    return result("gl_rig", not bad, info, "; ".join(bad))
+
+
+def one_rate(rates):
+    """`{clip: fps}` -> `(fps, "")`, or `(None, why)` when the clips do not
+    share one. A `.glb` holds seconds, and the exporter turns frames into them
+    at the scene's one rate, so clips at two rates cannot go in one file."""
+    if len(set(rates.values())) > 1:
+        each = ", ".join(f"{n} {f}fps" for n, f in sorted(rates.items()))
+        return None, f"clips at more than one rate ({each}): a .glb plays at one"
+    return next(iter(rates.values()), None), ""
+
+
+def carried(spec, built, got, file):
+    """The rig as the export carried it, against the build (ADR 0023).
+
+    `built` and `got` are the `rigs` of two measurements, the `.blend`'s and
+    the re-imported `.glb`'s, and `file` what `glb.measure` read off the file
+    itself; `_counts` says what is counted. Every part's world box at every frame of every
+    clip is compared, and a part off by more than the clip's `roundtrip_mm`
+    is named once, at its worst frame. Not angles: the importer may re-orient
+    a bone, and where the part ends up does not care which way it points.
+    """
+    want = spec.get("clips") or {}
+    have = {c["name"]: c for r in got for c in r["clips"]}
+    bad = []
+    for clip in built[0]["clips"] if built else []:
+        name = clip["name"]
+        tol = (want.get(name) or {}).get("roundtrip_mm")
+        if not isinstance(tol, (int, float)):
+            bad.append(f"{name} cannot be judged: the spec check says why")
+            continue
+        if name not in have:
+            bad.append(f"{name} is not in the re-import")
+            continue
+        worst, lost = {}, set()
+        for frame, boxes in sorted(clip["boxes"].items()):
+            back = have[name]["boxes"].get(frame, {})
+            for part, box in boxes.items():
+                if part not in back:
+                    if part not in lost:
+                        lost.add(part)
+                        bad.append(f"{name} f{frame}: {part} is not in the re-import")
+                    continue
+                off = _mm(_corners_off(box, back[part]))
+                if off > worst.get(part, (0.0,))[0]:
+                    worst[part] = (off, frame)
+        bad += [f"{name} f{frame}: {part} {off:.1f}mm from the build, past {tol}mm"
+                for part, (off, frame) in sorted(worst.items()) if off > tol]
+    return [_counts(built, file), result("re_motion", not bad, msg="; ".join(bad))]
 
 
 def uv(spec, parts):

@@ -177,6 +177,34 @@ class PaddingTest(GlbTest):
         self.assertEqual(glb.load(path)[0], doc)
 
 
+class RigTest(GlbTest):
+    """A rig as the file holds it (ADR 0023, issue 54): its joints, and each
+    animation's length in seconds — the file has no frames and no rate."""
+
+    def test_joints_and_how_long_each_animation_runs(self):
+        times = struct.pack("<3f", 0.0, 0.5, 0.8333)
+        doc = dict(TRIANGLE,
+                   nodes=TRIANGLE["nodes"] + [{"name": "a"}, {"name": "b"}],
+                   skins=[{"joints": [1, 2]}],
+                   accessors=TRIANGLE["accessors"] + [
+                       {"bufferView": 1, "componentType": 5126, "type": "SCALAR", "count": 3}],
+                   bufferViews=TRIANGLE["bufferViews"] + [
+                       {"buffer": 0, "byteOffset": 36, "byteLength": 12}],
+                   buffers=[{"byteLength": 48}],
+                   animations=[{"name": "sway", "samplers": [{"input": 1, "output": 1}],
+                                "channels": [{"sampler": 0,
+                                              "target": {"node": 1, "path": "rotation"}}]}])
+        got = glb.measure(self.write(container(chunk(JSON, doc_bytes(doc)),
+                                               chunk(BIN, POINTS + times))))
+        self.assertEqual(got["joints"], 2)
+        self.assertEqual(list(got["clips"]), ["sway"])
+        self.assertAlmostEqual(got["clips"]["sway"], 0.8333, places=6)
+
+    def test_a_file_with_no_rig_has_no_joints_and_no_clips(self):
+        got = glb.measure(self.write(self.good()))
+        self.assertEqual((got["joints"], got["clips"]), (0, {}))
+
+
 class BlenderWroteThisTest(unittest.TestCase):
     """`tests/data/smoke.glb` is `contour export` of `fixtures/smoke/`, committed
     so the parser is shown a file it did not write. The fixture is the toolkit's
