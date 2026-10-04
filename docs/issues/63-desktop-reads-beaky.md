@@ -20,14 +20,23 @@ console on the new-space flow, its `refs/` holding those files byte for byte.
 
 ## Acceptance criteria
 
-- [ ] Desktop is registered from the printed block, and Contour wrote nothing to its config
-- [ ] `status` gives the check's verdict after a filmstrip has run
-- [ ] `log` names its stage
-- [ ] Both refusals are seen, worded as decided
-- [ ] No console URL appears anywhere in the Desktop conversation
-- [ ] A pasted picture is answered with a request for a path, and never saved
-- [ ] `create` from paths gives a space whose references match the originals byte for byte
-- [ ] ADR 0024's status says accepted, amended or withdrawn, with the evidence
+- [x] Desktop is registered from the printed block, and Contour wrote nothing to its config
+- [x] `status` gives the check's verdict after a filmstrip has run
+- [x] `log` names its stage
+- [x] Both refusals are seen, worded as decided
+- [x] No console URL appears anywhere in the Desktop conversation
+- [x] A pasted picture is answered with a request for a path, and never saved
+- [x] `create` from paths gives a space whose references match the originals byte for byte
+- [x] ADR 0024's status says accepted, amended or withdrawn, with the evidence
+
+## What it came to
+
+Run by hand on 2026-10-04, and every check passed as decided. ADR 0024 is
+accepted, with the run as its evidence section. The one surprise was where the
+sheet appears: Desktop puts a tool's image in the call's expanded row, not in
+the chat, so `picture` looked empty until the row was opened. The README says
+so now. The `create` copies were hashed against a replay of the same call,
+since the Desktop-made `beaky-63` had been committed and deleted by then.
 
 ## Blocked by
 

@@ -298,7 +298,8 @@ Today the connector answers eight tools. `spaces` is the same reading as
 verdict, open marks, uncommitted vetoes and toolkit drift. `log` gives the tail
 of a space's last Blender log and says which stage wrote it. `picture` shows a
 space's sheet, filmstrip or worksheet and says whether it is still current; it
-never renders one. `spec` gives a space's `spec.yaml` as text, and `spend` what
+never renders one. Desktop shows the picture inside the tool call's row, so
+expand it to see it. `spec` gives a space's `spec.yaml` as text, and `spend` what
 each console run there cost, in the units `tools/tokens.py` prints. `open`
 starts a space's console or canvas, or the lobby, and says only whether it
 did: never the page's address, which carries its secret. It refuses a second

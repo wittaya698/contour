@@ -1,17 +1,34 @@
 # 0024 — The connector: Desktop reads and opens, never drives
 
-**Status:** Proposed · 2026-10-04 · **amends [ADR 0019](0019-console-a-driven-agent-behind-a-gate.md) (its rejection of *a socket and any agent behind it*) and [ADR 0021](0021-the-lobby.md) (create carries references)**
+**Status:** Accepted · 2026-10-04 · **amends [ADR 0019](0019-console-a-driven-agent-behind-a-gate.md) (its rejection of *a socket and any agent behind it*) and [ADR 0021](0021-the-lobby.md) (create carries references)**
 
-> **Accept on a tracer bullet.** Claude Desktop, registered from the block
-> `contour mcp --config` prints, asks for `beaky`'s `status` after a
-> `contour filmstrip` has run since its last `check` — and gets that check's
-> verdict lines, not the filmstrip's. `log` on the same space says its log is
-> from `filmstrip`. `open console` on a space a console already serves refuses
-> in the lobby's words, and `open canvas` on it refuses in the connector's own.
-> No console URL appears anywhere in the Desktop conversation. Asked to start a
-> model from pictures on disk, Desktop makes a space whose `refs/` holds those
-> files byte for byte and opens its console on the new-space flow; handed a
-> picture pasted into the chat instead, it asks for a path.
+> **Drafted Proposed, accepted the same day on the tracer bullet's result**
+> (issue 63). Claude Desktop, registered by hand from the block `contour mcp
+> --config` printed, read `beaky`, refused as decided, and made a space from
+> pictures on disk, and no console URL reached the conversation.
+
+## Evidence: the tracer bullet, 2026-10-04
+
+`beaky`, checked and then filmstripped, so its last log was the filmstrip's:
+
+| | asked in Desktop | what came back |
+|---|---|---|
+| registration | the printed block, pasted by hand | Desktop's config differed only by the paste |
+| `status` | *beaky's status?* | the check's verdict, PASS 22/22, 4 marks open |
+| `log` | *beaky's last log?* | its tail, written by `filmstrip` |
+| `picture` | *beaky's sheet?* | the sheet, current, inside the tool call's expanded row |
+| `open console` | twice | opened, then *already open in a console (pid …); its tab is the way in* |
+| `open canvas` | with that console up | *already open in a console; its page can mark* |
+| a tolerance | *change the width tolerance* | sent to the console; nothing changed |
+| a pasted picture | *make a space from this* | asked for the file's path; no `create` |
+| `create` | `beaky-63`, from `refs/front.jpg` and `refs/side.jpg` | the space, its console on the new-space flow |
+
+The copies matched their originals byte for byte (`front.jpg` `10a4d64…`,
+`side.jpg` `0206126…`, replayed through the same call once `beaky-63` had been
+deleted). Two things the run showed that the decisions did not say: Desktop
+shows a tool's image in the call's expanded row, not inline in the chat, which
+the README now says; and the instructions grew a fourth line for pasted
+pictures while issue 64 was built, which decision 4 already records.
 
 ## Context
 
