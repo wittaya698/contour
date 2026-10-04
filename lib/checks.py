@@ -11,7 +11,7 @@ acquires a Blender import is a red selftest rather than a discovery.
 import re
 
 TOP = {"model", "revision", "description", "targets", "dimensions", "parts",
-       "topology", "uv", "materials", "transform", "render", "notes"}
+       "topology", "uv", "materials", "transform", "render", "notes", "clips"}
 SECTIONS = {
     "topology": {"tri_budget", "quads_min_pct", "ngons_allowed", "manifold",
                  "loose_geometry", "normals", "doubles_tolerance_mm"},
@@ -21,6 +21,8 @@ SECTIONS = {
                   "pivot_tolerance_mm"},
     "render": {"grid_metres", "sheet_resolution"},
 }
+CLIP = {"feel", "frames", "fps", "loop", "keys", "tol_deg"}
+CLIP_NEEDS = ("frames", "fps", "keys", "tol_deg")
 DIMS = ("height", "width", "depth")
 IMPLEMENTED_TARGETS = {"web"}
 ORIGIN_TOL_MM = 1.0
@@ -317,6 +319,89 @@ def bones(spec, m):
     return [result("bones", not bad, f"{len(have)}/{len(want)}", "bones " + "; ".join(bad))]
 
 
+def _clip_problems(name, clip, parts):
+    """What is wrong with how the spec writes one clip, before any keying.
+
+    `feel` is the user's word for how it should look and is judged at the
+    checkpoint, by eye (ADR 0023); it is known here and checked nowhere.
+    """
+    if not isinstance(clip, dict):
+        return [f"clips.{name} is not a mapping"]
+    bad = [f"unknown field clips.{name}.{k}" for k in clip if k not in CLIP]
+    missing = [k for k in CLIP_NEEDS if k not in clip]
+    if missing:
+        return bad + [f"clips.{name} needs {', '.join(missing)}"]
+    last = clip["frames"] - 1 if clip.get("loop") else clip["frames"]
+    for frame, pose in clip["keys"].items():
+        if not (isinstance(frame, int) and 0 <= frame <= last):
+            bad.append(f"clips.{name} key {frame} is outside 0..{last}")
+        for bone, angles in (pose or {}).items():
+            if bone not in parts:
+                bad.append(f"clips.{name} key {frame} names {bone}, which is no part")
+            elif not (isinstance(angles, list) and len(angles) == 3):
+                bad.append(f"clips.{name} key {frame} {bone}: want [x, y, z] degrees")
+    return bad
+
+
+def _angles(xyz):
+    return ", ".join(f"{a:.1f}" for a in xyz)
+
+
+def _off(reads, want):
+    """The largest difference between two sets of angles, in degrees, each
+    taken the short way round: 335 and -25 are the same angle."""
+    return max(abs((r - w + 180) % 360 - 180) for r, w in zip(reads, want))
+
+
+def _clip(name, clip, got):
+    """One clip as read back against the spec's: length, fps, the loop
+    closing, and every bone at every key."""
+    tol, poses = clip["tol_deg"], got["poses"]
+    bad = []
+    if got["frames"] != clip["frames"]:
+        bad.append(f"{name}: {got['frames']} frames, want {clip['frames']}")
+    if got["fps"] != clip["fps"]:
+        bad.append(f"{name}: {got['fps']} fps, want {clip['fps']}")
+    end, first = got["frames"], poses[0]
+    if clip.get("loop") and end in poses:
+        for bone, reads in poses[end].items():
+            if _off(reads, first[bone]) > tol:
+                bad.append(f"{name} f{end} {bone}: reads ({_angles(reads)}), "
+                           f"f0 ({_angles(first[bone])}); the loop does not close")
+    for frame, pose in clip["keys"].items():
+        # a key past the clip's end is the length's failure, already said
+        for bone, reads in poses.get(frame, {}).items():
+            angles = (pose or {}).get(bone, [0, 0, 0])
+            if _off(reads, angles) > tol:
+                bad.append(f"{name} f{frame} {bone}: reads ({_angles(reads)}), "
+                           f"want ({', '.join(str(a) for a in angles)}) ±{tol}°")
+    return bad
+
+
+def clips(spec, m):
+    """Each clip as keyed against the spec's keys (ADR 0023)."""
+    want = spec.get("clips")
+    if not want or not isinstance(want, dict):
+        return []
+    if not _joints(spec):
+        return [result("clips", False, msg="clips need a rig: give the parts a parent:")]
+    if len(m["rigs"]) != 1:
+        return []  # `bones` has said why there is no one rig to read
+    have = {c["name"]: c for c in m["rigs"][0]["clips"]}
+    bad = [f"{name} is keyed and not in the spec" for name in have if name not in want]
+    parts_ = {p["name"] for p in spec.get("parts") or []}
+    for name, clip in want.items():
+        if _clip_problems(name, clip, parts_):
+            bad.append(f"{name} cannot be judged: the spec check says why")
+            continue
+        if name not in have:
+            bad.append(f"{name} is not keyed")
+            continue
+        bad += _clip(name, clip, have[name])
+    info = ", ".join(f"{name} {have[name]['frames']}f" for name in want if name in have)
+    return [result("clips", not bad, info, "clips " + "; ".join(bad))]
+
+
 def uv(spec, parts):
     """UV coverage, and the two UV rules this verifier cannot yet enforce.
 
@@ -430,6 +515,13 @@ def spec(doc, variant):
             bad.append(f"part entry {p!r}: needs name; unknown {sorted(extra)}")
         elif "parent" in p and not isinstance(p["parent"], str):
             bad.append(f"{p['name']}: parent must be a part name, got {p['parent']!r}")
+    names = {p.get("name") for p in doc.get("parts") or []}
+    clips_ = doc.get("clips") or {}
+    if not isinstance(clips_, dict):
+        bad.append("clips is not a mapping of clip names")
+        clips_ = {}
+    for name, clip in clips_.items():
+        bad += _clip_problems(name, clip, names)
     if doc.get("model") != variant:
         bad.append(f"model {doc.get('model')!r} != variant {variant!r}")
     unsupported = set(doc.get("targets") or []) - IMPLEMENTED_TARGETS
@@ -455,7 +547,7 @@ def run(doc, variant, m, only=None):
     out = spec(doc, variant) + rig(doc)
     for check, reads in SEQUENCE:
         out += check(doc, m[reads])
-    out += seams(doc, m) + pivots(doc, m) + bones(doc, m)
+    out += seams(doc, m) + pivots(doc, m) + bones(doc, m) + clips(doc, m)
     if only is not None:
         out = [r for r in out if r["id"] in only]
     return out

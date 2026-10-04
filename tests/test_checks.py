@@ -34,6 +34,12 @@ and the rig's (ADR 0023): the tree written as a spec, the seams as contacts:
     bone off the tree     a bone hanging from another than the tree says
     extra bone            a bone that is no part
     part not weighted     a part on no bone
+
+and the clips' (issue 52), the clip as the gather reads it back:
+
+    clip too short        a clip of the wrong length
+    loop left open        a loop whose last frame is not its first
+    key on the wrong axis a key pose off tolerance
 """
 import sys
 import unittest
@@ -545,6 +551,125 @@ class BoneTest(unittest.TestCase):
         got = self.judge(spec={"model": "smoke", "parts": [{"name": "cap"}]})["bones"]
         self.assertFalse(got["ok"])
         self.assertIn("armature rig, and the spec has no rig", got["msg"])
+
+
+class ClipTest(unittest.TestCase):
+    """Each clip against the spec's keys (ADR 0023, issue 52).
+
+    The gather reads every clip off the armature: its fps, how many frames it
+    spans, and every bone's angles at every frame — degrees about the model's
+    X, Y and Z, in the parent's frame, from rest.
+    """
+    WALK = {"feel": "toy-like", "frames": 4, "fps": 30, "loop": True, "tol_deg": 2,
+            "keys": {0: {"leg": [25, 0, 0]}, 2: {"leg": [-25, 0, 0]}}}
+    SPEC = {"model": "smoke",
+            "parts": [{"name": "torso"}, {"name": "leg", "parent": "torso"}],
+            "transform": {"pivot_tolerance_mm": 1}, "clips": {"walk": WALK}}
+    SWING = {0: 25, 1: 0, 2: -25, 3: 0, 4: 25}
+
+    def clip(self, name="walk", fps=30, frames=4, leg=SWING, torso=None):
+        """What the gather reads off a walk keyed as the spec says, unless
+        told otherwise: the leg swinging about X, the torso still."""
+        torso = torso or {}
+        return {"name": name, "fps": fps, "frames": frames,
+                "poses": {f: {"torso": tuple(torso.get(f, (0.0, 0.0, 0.0))),
+                              "leg": (float(x), 0.0, 0.0)}
+                          for f, x in leg.items()}}
+
+    def judge(self, clips=None, spec=SPEC):
+        clips = [self.clip()] if clips is None else clips
+        bones = [{"name": "torso", "parent": None}, {"name": "leg", "parent": "torso"}]
+        m = {"objects": ["torso", "leg"],
+             "parts": [part("torso", bound_to="torso"), part("leg", bound_to="leg")],
+             "contacts": [], "rigs": [{"name": "rig", "bones": bones, "clips": clips}]}
+        return verdicts(checks.run(spec, "smoke", m))
+
+    def test_a_clip_keyed_as_the_spec_says_passes(self):
+        got = self.judge()
+        self.assertTrue(got["spec"]["ok"], got["spec"]["msg"])
+        self.assertTrue(got["clips"]["ok"], got["clips"]["msg"])
+        self.assertEqual(got["clips"]["info"], "walk 4f")
+
+    def test_a_key_pose_off_tolerance_names_the_clip_frame_and_bone(self):
+        got = self.judge([self.clip(leg={**self.SWING, 2: -20.5})])["clips"]
+        self.assertFalse(got["ok"])
+        self.assertIn("walk f2 leg: reads (-20.5, 0.0, 0.0), want (-25, 0, 0) ±2°", got["msg"])
+
+    def test_a_key_pose_within_tolerance_passes(self):
+        got = self.judge([self.clip(leg={**self.SWING, 2: -23.5})])["clips"]
+        self.assertTrue(got["ok"], got["msg"])
+
+    def test_an_angle_read_the_other_way_round_the_circle_is_the_same_angle(self):
+        got = self.judge([self.clip(leg={**self.SWING, 2: 335})])["clips"]
+        self.assertTrue(got["ok"], got["msg"])
+
+    def test_a_bone_a_key_does_not_name_is_at_rest_in_that_key(self):
+        """A key pose is the whole pose: what it leaves out stays as shaped."""
+        got = self.judge([self.clip(torso={0: (0.0, 0.0, 10.0)})])["clips"]
+        self.assertFalse(got["ok"])
+        self.assertIn("walk f0 torso: reads (0.0, 0.0, 10.0), want (0, 0, 0) ±2°", got["msg"])
+
+    def test_a_clip_of_the_wrong_length_is_red(self):
+        got = self.judge([self.clip(frames=3, leg={0: 25, 1: 0, 2: -25, 3: 25})])["clips"]
+        self.assertFalse(got["ok"])
+        self.assertIn("walk: 3 frames, want 4", got["msg"])
+
+    def test_a_clip_keyed_shorter_than_its_last_key_says_so_rather_than_crash(self):
+        got = self.judge([self.clip(frames=1, leg={0: 25, 1: 25})])["clips"]
+        self.assertFalse(got["ok"])
+        self.assertIn("walk: 1 frames, want 4", got["msg"])
+
+    def test_a_clip_at_the_wrong_fps_is_red(self):
+        got = self.judge([self.clip(fps=24)])["clips"]
+        self.assertFalse(got["ok"])
+        self.assertIn("walk: 24 fps, want 30", got["msg"])
+
+    def test_a_loop_whose_last_frame_is_not_its_first_does_not_close(self):
+        got = self.judge([self.clip(leg={**self.SWING, 4: 20})])["clips"]
+        self.assertFalse(got["ok"])
+        self.assertIn("walk f4 leg: reads (20.0, 0.0, 0.0), f0 (25.0, 0.0, 0.0); "
+                      "the loop does not close", got["msg"])
+
+    def test_a_clip_that_does_not_loop_need_not_close(self):
+        spec = {**self.SPEC, "clips": {"walk": {**self.WALK, "loop": False}}}
+        got = self.judge([self.clip(leg={**self.SWING, 4: 20})], spec=spec)["clips"]
+        self.assertTrue(got["ok"], got["msg"])
+
+    def test_a_clip_not_keyed_and_a_clip_not_in_the_spec_are_named(self):
+        got = self.judge([self.clip(name="run")])["clips"]
+        self.assertFalse(got["ok"])
+        self.assertIn("walk is not keyed", got["msg"])
+        self.assertIn("run is keyed and not in the spec", got["msg"])
+
+    def test_a_clip_without_its_tolerance_is_a_spec_the_verifier_cannot_judge(self):
+        """The tolerance is the user's (ADR 0023), as the pivot's is."""
+        walk = {k: v for k, v in self.WALK.items() if k != "tol_deg"}
+        got = self.judge(spec={**self.SPEC, "clips": {"walk": walk}})
+        self.assertFalse(got["spec"]["ok"])
+        self.assertIn("clips.walk needs tol_deg", got["spec"]["msg"])
+        self.assertFalse(got["clips"]["ok"])
+
+    def test_a_key_outside_the_clip_or_on_no_bone_is_a_spec_error(self):
+        """A looping clip's closing frame is implied, never written: its keys
+        run from 0 to one short of `frames`."""
+        keys = {0: {"leg": [25, 0, 0]}, 4: {"leg": [25, 0, 0]}, 2: {"tail": [5, 0, 0]}}
+        got = self.judge(spec={**self.SPEC, "clips": {"walk": {**self.WALK, "keys": keys}}})
+        self.assertIn("clips.walk key 4 is outside 0..3", got["spec"]["msg"])
+        self.assertIn("clips.walk key 2 names tail, which is no part", got["spec"]["msg"])
+
+    def test_the_spec_check_knows_a_clips_fields_and_no_others(self):
+        got = self.judge(spec={**self.SPEC, "clips": {"walk": {**self.WALK, "speed": 2}}})
+        self.assertIn("unknown field clips.walk.speed", got["spec"]["msg"])
+
+    def test_clips_with_no_rig_to_key_them_on_are_red(self):
+        spec = {**self.SPEC, "parts": [{"name": "torso"}, {"name": "leg"}]}
+        got = self.judge(spec=spec)["clips"]
+        self.assertFalse(got["ok"])
+        self.assertIn("clips need a rig: give the parts a parent:", got["msg"])
+
+    def test_a_spec_with_no_clips_is_judged_on_none(self):
+        spec = {k: v for k, v in self.SPEC.items() if k != "clips"}
+        self.assertNotIn("clips", self.judge(clips=[], spec=spec))
 
 
 class RunTest(unittest.TestCase):

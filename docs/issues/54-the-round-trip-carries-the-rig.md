@@ -17,6 +17,17 @@ with different numbers on a differently-oriented bone; comparing angles would be
 red on a correct export. Angles check intent against the spec; positions check
 fidelity against the build.
 
+## Found by 52
+
+A probe exported a keyed clip and read the `.glb` back. Two things to fix here:
+
+- **The swing is lost.** The build saves the armature at `pose_position:
+  REST`, and the exporter samples the pose it sees: a 30°/−30°/30° swing
+  came out as two samples of a still pose. Export must pose the armature.
+- **The fps is lost.** A saved build is one collection and no scene, so
+  export runs at Blender's 24 fps: a 30-frame clip came out 1.25 s long. Each
+  clip's fps is on its action as `fps`, which `kit` writes and `clips` checks.
+
 ## Acceptance criteria
 
 - [ ] A rigged export reports bone, clip and frame counts against the build

@@ -46,7 +46,7 @@ FREE = ("agent", "badges", "canvas", "checks", "cli", "commands", "delete", "ent
 # `importlib` and `inspect` yet exists to resolve `bpy.*` symbols.
 BLENDER = ("cmd_api", "cmd_build", "cmd_export", "cmd_measure", "cmd_render",
            "cmd_resolve", "cmd_roundtrip", "cmd_worksheet", "ctx_override",
-           "entry", "kit", "measure", "mutants", "scene", "worksheet_draw")
+           "entry", "kit", "measure", "mutants", "pose", "scene", "worksheet_draw")
 
 
 def declared(path):

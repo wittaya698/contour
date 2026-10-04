@@ -35,8 +35,9 @@ not as an undeclared part.
 `kit.rig()`, the last line of a rigged `build.py`, reads the tree from the spec
 being built — `cmd_build` hands it over — so the space declares nothing more.
 Each bone's head is on its part's origin, which `pivots` already holds to the
-seam; every bone points up +Z with no roll, so every bone's rest frame is the
-world's, which slice 52's degrees can lean on. Parts are bound by vertex group
+seam; every bone points up +Z with no roll, so every bone has the same rest
+frame. (Not the world's, as this first said: a bone's Y is the model's Z.
+Slice 52 converts, in `lib/pose.py`.) Parts are bound by vertex group
 and armature modifier but not parented to the rig, so no origin or transform
 moves: `smoke` and `beaky` read the same on every shape check as before.
 

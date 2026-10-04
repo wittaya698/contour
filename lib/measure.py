@@ -41,6 +41,9 @@ under `rigs`, one record per armature object:
 
     name                the armature object's name
     bones               `{"name", "parent"}` per bone, parent None at the root
+    clips               per NLA track: `name`, `fps` (from its action), `frames`
+                        it spans, and `poses` — frame from 0 -> bone -> the
+                        `[x, y, z]` degrees it reads, as the spec writes them
 
 Under `contacts` it holds one record per pair of parts whose surfaces cross —
 a seam, wherever one exists, whether or not the spec calls it a joint (ADR
@@ -69,6 +72,8 @@ import bmesh
 import bpy
 from mathutils import Vector, kdtree
 from mathutils.bvhtree import BVHTree
+
+from . import pose
 
 # Metres. Closer than this to a surface is on it: neither inside nor out.
 ON_SURFACE = 1e-6
@@ -186,12 +191,46 @@ def _bound_to(obj):
 
 
 def rigs(objects=None):
-    """One record per armature object: its name and its bones' tree."""
+    """One record per armature object: its name, its bones' tree, its clips."""
     return [{"name": o.name,
              "bones": [{"name": b.name, "parent": b.parent.name if b.parent else None}
-                       for b in o.data.bones]}
+                       for b in o.data.bones],
+             "clips": clips(o)}
             for o in (bpy.context.scene.objects if objects is None else objects)
             if o.type == "ARMATURE"]
+
+
+def clips(rig):
+    """Every clip on `rig`'s NLA tracks, posed frame by frame and read back.
+
+    The rig is posed for this and only this — each track alone, the others
+    muted — and left at rest, on the frame it was on, as it was found.
+    """
+    ad, sc = rig.animation_data, bpy.context.scene
+    if ad is None:
+        return []
+    tracks = [t for t in ad.nla_tracks if t.strips]
+    held = rig.data.pose_position, sc.frame_current, [t.mute for t in tracks]
+    out = []
+    try:
+        rig.data.pose_position = "POSE"
+        for track in tracks:
+            for t in tracks:
+                t.mute = t is not track
+            act = track.strips[0].action
+            start, end = round(act.frame_range[0]), round(act.frame_range[1])
+            poses = {}
+            for f in range(start, end + 1):
+                sc.frame_set(f)
+                poses[f - start] = {pb.name: pose.read(pb) for pb in rig.pose.bones}
+            out.append({"name": track.name, "fps": act.get("fps"),
+                        "frames": end - start, "poses": poses})
+    finally:
+        rig.data.pose_position, frame, mutes = held
+        for t, m in zip(tracks, mutes):
+            t.mute = m
+        sc.frame_set(frame)
+    return out
 
 
 def parts(objects=None):

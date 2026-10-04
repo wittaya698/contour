@@ -8,7 +8,8 @@ def reset():
     for o in list(bpy.data.objects):
         bpy.data.objects.remove(o, do_unlink=True)
     for coll in (bpy.data.meshes, bpy.data.materials, bpy.data.lights, bpy.data.cameras,
-                 bpy.data.curves, bpy.data.images, bpy.data.collections, bpy.data.armatures):
+                 bpy.data.curves, bpy.data.images, bpy.data.collections, bpy.data.armatures,
+                 bpy.data.actions):
         for block in list(coll):
             coll.remove(block)
     for c in list(bpy.context.scene.collection.children):

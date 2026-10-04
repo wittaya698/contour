@@ -111,6 +111,24 @@ def _unweight_plinth():
     plinth.vertex_groups.remove(plinth.vertex_groups["plinth"])
 
 
+def _shorten_sway():
+    bpy.data.actions["sway"].frame_end = 16
+
+
+def _open_sway():
+    """The pillar's closing key, at frame 20, turned 10 degrees off frame 0."""
+    act = bpy.data.actions["sway"]
+    bag = act.layers[0].strips[0].channelbag(act.slots[0])
+    for fc in bag.fcurves:
+        if fc.data_path == 'pose.bones["pillar"].rotation_euler' and fc.array_index == 0:
+            fc.keyframe_points[-1].co.y += 0.1745
+            fc.update()
+
+
+def _key(frame, bone, angles):
+    return lambda s: s["clips"]["sway"]["keys"][frame].update({bone: angles})
+
+
 # name, mutate, spec edit, check ids that must fail
 MUTANTS = [
     ("height", _raise_cap, None, {"height"}),
@@ -136,6 +154,9 @@ MUTANTS = [
      {"bones"}),
     ("extra bone", _stray_bone, None, {"bones"}),
     ("part not weighted", _unweight_plinth, None, {"bones"}),
+    ("clip too short", _shorten_sway, None, {"clips"}),
+    ("loop left open", _open_sway, None, {"clips"}),
+    ("key on the wrong axis", lambda: None, _key(0, "plinth", [8, 0, 0]), {"clips"}),
 ]
 
 

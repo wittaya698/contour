@@ -88,6 +88,28 @@ transform:
   #                          # part's origin may sit from the centre of its seam
   #                          # with its parent (ADR 0023). The user's number.
 
+# ---------------------------------------------------------------- clips
+# Animation, keyed onto the rig by kit.rig() from these numbers alone (ADR
+# 0023). Needs a rig: parts with parent:. Optional; a spec with none has none.
+# clips:
+#   walk:                    # the clip's name, which the .glb carries
+#     feel: "toy-like, on the spot"   # the user's word; judged by eye at the
+#                            # checkpoint, checked by nothing
+#     frames: 30             # how many frames the clip spans
+#     fps: 30
+#     loop: true             # the frame at `frames` is key 0 again — implied,
+#                            # never written; keys run 0..frames-1
+#     keys:                  # key poses, by frame from 0
+#       0:  { leg_L: [25, 0, 0], leg_R: [-25, 0, 0] }
+#       15: { leg_L: [-25, 0, 0], leg_R: [25, 0, 0] }
+#                            # [x, y, z] degrees about the model's X, Y, Z, in
+#                            # the parent's frame, from rest, applied X then Y
+#                            # then Z. A key pose is the whole pose: a part it
+#                            # does not name is at rest in it.
+#     tol_deg: 2             # required: how far a keyed bone may read off its
+#                            # key, and a loop's last frame off its first. The
+#                            # user's number.
+
 # ---------------------------------------------------------------- render
 # Checkpoint sheet settings. Defaults live in lib/ — override only if the
 # subject needs it (e.g. a very tall object needs a different framing).

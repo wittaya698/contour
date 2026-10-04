@@ -42,3 +42,16 @@ transform:
   rotation_applied: true
   up_axis: Z
   pivot_tolerance_mm: 1
+
+# A sway that turns on all three axes, so a key read back on the wrong one
+# is red: the pillar about X then Z, the plinth about Y (ADR 0023).
+clips:
+  sway:
+    feel: "a slow nod, fixture only"
+    frames: 20
+    fps: 24
+    loop: true
+    keys:
+      0:  { pillar: [10, 0, 0], plinth: [0, 8, 0] }
+      10: { pillar: [-10, 0, 15] }
+    tol_deg: 1

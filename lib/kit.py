@@ -10,7 +10,7 @@ import bmesh
 import bpy
 from mathutils import Matrix, Vector
 
-from . import ctx_override
+from . import ctx_override, pose
 from .units import MM, linear, mm, size  # noqa: F401  (MM, mm: kit's own names)
 
 # The spec being built, handed over by `lib/cmd_build.py` before `build.py`
@@ -96,8 +96,12 @@ def rig():
 
     One bone per part, named after it, its head on the part's origin — the
     pivot, which `pivots` checks — and hanging from its parent's bone. Every
-    bone points up +Z with no roll, so every bone's frame at rest is the
-    world's, and a pose in degrees reads the same way on any bone.
+    bone stands up +Z with no roll, so every bone has the same rest frame —
+    not the model's, since a bone's Y is the model's Z; `lib/pose.py` turns
+    the spec's degrees into it and back.
+
+    Each clip in the spec is keyed onto an action and NLA track of its own,
+    and the armature is left at rest (issue 52).
 
     Each part's every vertex is weighted 1 to its own bone, and an armature
     modifier binds it, all through the data API. Parts are not parented to the
@@ -128,4 +132,37 @@ def rig():
         group = part.vertex_groups.new(name=name)
         group.add(range(len(part.data.vertices)), 1.0, "REPLACE")
         part.modifiers.new("rig", "ARMATURE").object = obj
+    for name, clip in (_spec.get("clips") or {}).items():
+        _key(obj, name, clip)
+    # Held at rest, so every shape check, the sheet and the round-trip see the
+    # model as shaped; the gather poses it only to read the clips (issue 52).
+    arm.pose_position = "REST"
     return obj
+
+
+def _key(obj, name, clip):
+    """One clip, keyed from the spec onto its own action and NLA track.
+
+    A key pose is the whole pose: a bone it does not name is keyed at rest.
+    A looping clip's closing frame is key 0 again, at `frames`. The clip's
+    fps rides on its action, since a saved build carries no scene to hold it.
+    """
+    ad = obj.animation_data or obj.animation_data_create()
+    act = bpy.data.actions.new(name)
+    ad.action = act
+    keys = dict(clip["keys"])
+    if clip.get("loop"):
+        keys[clip["frames"]] = keys[0]
+    for frame, poses in sorted(keys.items()):
+        for pb in obj.pose.bones:
+            pose.turn(pb, (poses or {}).get(pb.name, (0, 0, 0)))
+            pb.keyframe_insert("rotation_euler", frame=frame)
+    act.use_frame_range = True
+    act.frame_start, act.frame_end = 0, clip["frames"]
+    act["fps"] = clip["fps"]
+    track = ad.nla_tracks.new()
+    track.name = name
+    track.strips.new(name, 0, act)
+    ad.action = None
+    for pb in obj.pose.bones:
+        pose.turn(pb, (0, 0, 0))
