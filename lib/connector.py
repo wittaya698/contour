@@ -53,6 +53,12 @@ TOOLS = (
      "description": "What each console run in a space cost, in tools/tokens.py's units.",
      "inputSchema": {"type": "object", "required": ["space"],
                      "properties": {"space": {"type": "string"}}}},
+    {"name": "open",
+     "description": "Open the page where the user acts: a space's console or "
+                    "canvas, or the lobby. Says whether it opened, never where.",
+     "inputSchema": {"type": "object", "required": ["page"],
+                     "properties": {"page": {"enum": ["console", "lobby", "canvas"]},
+                                    "space": {"type": "string"}}}},
 )
 """Every tool's definition, coarse on purpose: each one sits in Desktop's
 context on every turn (ADR 0024, decision 3)."""

@@ -9,10 +9,13 @@ import base64
 import io
 import json
 import os
+import signal
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
+import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -529,6 +532,125 @@ class SpecSpendTest(InSpaceCase):
         said = json.loads(said)
         self.assertEqual(said["runs"], [])
         self.assertIn("no console has run", " ".join(said["said"]))
+
+
+class OpenTest(InSpaceCase):
+    """`open` (issue 62): the page where the user acts, started and left to
+    them. `$BROWSER` writes down the URL each page tried to open, and the pid
+    that tried, so no tab opens and the test can see the page it would have
+    shown."""
+
+    def setUp(self):
+        super().setUp()
+        self.opened = self.tmp / "opened"
+        browser = self.tmp / "browser"
+        browser.write_text(f'#!/bin/sh\necho "$PPID $1" >> "{self.opened}"\n')
+        browser.chmod(0o755)
+        self.env.update(BROWSER=str(browser), CONTOUR_CONSOLE_PYTHON=sys.executable)
+        self.addCleanup(self.close_pages)
+
+    def close_pages(self):
+        from lib import presence
+        pids = {p["pid"] for p in presence.live(self.space)}
+        if self.opened.exists():
+            pids |= {int(l.split()[0]) for l in self.opened.read_text().splitlines()}
+        for pid in pids:
+            try:
+                os.kill(pid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+
+    def open(self, page, **more):
+        """One `open` call, as raw text and as a reading."""
+        r = self.contour("mcp", stdin=json.dumps(call(
+            1, "tools/call", name="open", arguments={"page": page, **more})) + "\n")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        got = json.loads(r.stdout)["result"]
+        [block] = got["content"]
+        self.assertFalse(got["isError"], block["text"])
+        return block["text"], json.loads(block["text"])
+
+    def urls(self):
+        """Each page's URL, once its browser has been asked to show it."""
+        deadline = time.monotonic() + 30
+        while time.monotonic() < deadline:
+            if self.opened.exists() and self.opened.read_text().strip():
+                return [l.split()[1] for l in self.opened.read_text().splitlines()]
+            time.sleep(0.1)
+        self.fail("no page asked for a browser")
+
+    def serving(self, url):
+        """The page answers at its URL, so the process behind it is alive."""
+        with urllib.request.urlopen(url, timeout=30) as r:
+            self.assertEqual(r.status, 200)
+
+    def assertSecretless(self, text, url):
+        """No URL, no port, no token: nothing that reaches the page."""
+        origin, token = url.split("/?")[0], url.split("t=")[1]
+        for leak in ("http", origin, origin.rsplit(":", 1)[1], token):
+            self.assertNotIn(leak, text)
+
+    def test_open_console_starts_a_console_that_outlives_the_connector(self):
+        text, said = self.open("console", space="alpha")
+        self.assertIsNone(said["refused"], said)
+        [url] = self.urls()
+        self.serving(url)
+        self.assertSecretless(text, url)
+
+    def test_open_console_refuses_as_the_lobby_does(self):
+        """The same two refusals, word for word as `test_lobby_enter` reads
+        them: a console already here (this process stands for it), and no
+        environment to start one in."""
+        from lib import presence
+        with presence.present(self.space, "console"):
+            _, said = self.open("console", space="alpha")
+        self.assertIn("already open in a console", said["refused"])
+        self.assertIn(str(os.getpid()), said["refused"])
+        self.env["CONTOUR_CONSOLE_PYTHON"] = str(self.tmp / "no-python")
+        _, said = self.open("console", space="alpha")
+        self.assertIn("no console environment; make one", said["refused"])
+        time.sleep(1)
+        self.assertFalse(self.opened.exists(), "a page was opened anyway")
+
+    def test_open_canvas_returns_and_the_canvas_outlives_the_connector(self):
+        """Done is the user's, on the page: the call is answered while the
+        canvas still waits for it."""
+        (self.space / "sheet.png").write_bytes(PictureTest.PNG)
+        text, said = self.open("canvas", space="alpha")
+        self.assertIsNone(said["refused"], said)
+        [url] = self.urls()
+        self.serving(url)
+        from lib import presence
+        self.assertEqual([p["kind"] for p in presence.live(self.space)], ["canvas"])
+        self.assertSecretless(text, url)
+
+    def test_open_canvas_on_a_space_a_console_serves_is_refused(self):
+        """A second page would be a second writer to `marks.json`, and the
+        console's page can mark already."""
+        from lib import presence
+        (self.space / "sheet.png").write_bytes(PictureTest.PNG)
+        with presence.present(self.space, "console"):
+            _, said = self.open("canvas", space="alpha")
+        self.assertEqual(said["refused"], "already open in a console; its page can mark")
+        time.sleep(1)
+        self.assertFalse(self.opened.exists(), "a canvas was opened anyway")
+
+    def test_open_lobby_needs_no_space_and_outlives_the_connector(self):
+        """Every space on one page: there is none to name."""
+        text, said = self.open("lobby")
+        self.assertIsNone(said["refused"], said)
+        [url] = self.urls()
+        self.serving(url)
+        self.assertSecretless(text, url)
+        self.assertEqual(self.lobby_listing(url), ["alpha"])
+
+    def lobby_listing(self, url):
+        """The names the lobby lists, asked as its page asks."""
+        from lib.page import TOKEN_HEADER
+        origin, token = url.split("/?")[0], url.split("t=")[1]
+        req = urllib.request.Request(origin + "/spaces", headers={TOKEN_HEADER: token})
+        with urllib.request.urlopen(req, timeout=30) as r:
+            return [s["name"] for s in json.loads(r.read())["spaces"]]
 
 
 if __name__ == "__main__":

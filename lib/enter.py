@@ -7,10 +7,12 @@ the console cannot disagree about whether there is one.
 """
 import os
 import subprocess
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 CONSOLE = ROOT / "contour-console"
+CONTOUR = ROOT / "contour"
 VENV = ROOT / ".venv"
 MAKE_IT = ("python3 -m venv .venv && "
            ".venv/bin/pip install -r console/requirements.txt")
@@ -31,6 +33,23 @@ def environment():
     return None if interpreter().exists() else MAKE_IT
 
 
+def into(space, presence):
+    """Start a console on `space`, or the refusal that says why not, in the
+    words the lobby and the connector both say (ADR 0024, decision 5).
+    `presence` is the space's, as `contour spaces --json` lists it. A space a
+    console already serves gets no second one: neither caller sees a console's
+    URL, which carries its secret, so neither can send anybody there."""
+    consoles = [p for p in presence if p["kind"] == "console"]
+    if consoles:
+        return ("already open in a console (pid "
+                + ", ".join(str(p["pid"]) for p in consoles) + "); its tab is the way in")
+    missing = environment()
+    if missing:
+        return f"no console environment; make one, from {ROOT}: {missing}"
+    console(space)
+    return None
+
+
 def console(space, begin=None, of=None):
     """Start `contour-console` in `space`, and return without waiting for it.
 
@@ -39,9 +58,19 @@ def console(space, begin=None, of=None):
     varies. In a session of its own, so nothing that ends the lobby — a closed
     tab, a Ctrl-C, a closed terminal — reaches it: the console has its own
     lifetime, its own port and its own tab."""
-    subprocess.Popen([str(CONSOLE), *(("--begin", begin) if begin else ()),
-                      *(("--of", str(of)) if of else ())],
-                     cwd=str(space), start_new_session=True,
+    detached(space, str(CONSOLE), *(("--begin", begin) if begin else ()),
+             *(("--of", str(of)) if of else ()))
+
+
+def page(where, command):
+    """Start `contour <command>` in `where`, and return without waiting for it:
+    a page whose Done is the user's, on the page (ADR 0024, decision 5)."""
+    detached(where, sys.executable, str(CONTOUR), command)
+
+
+def detached(where, *argv):
+    """In a session of its own, with nothing to say to its starter."""
+    subprocess.Popen(argv, cwd=str(where), start_new_session=True,
                      stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                      stderr=subprocess.DEVNULL)
 

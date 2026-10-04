@@ -167,26 +167,14 @@ class Lobby(Page):
         return contour(CONTOUR.parent, "purge", asked["id"], "--yes", "--json")
 
     def enter(self, asked):
-        """Start a console on a space the listing holds. Nothing is passed to
-        it but where to stand. A space whose presence says a console is
-        already serving it gets no second one: the lobby never sees a console's
-        URL, which carries its secret, so it cannot send the page there.
-        A path the listing does not hold is None: not found."""
+        """Start a console on a space the listing holds, refused as
+        `enter.into` refuses. Nothing is passed to it but where to stand. A
+        path the listing does not hold is None: not found."""
         listed = {s["path"]: s for s in self.listing()["spaces"]}
         if asked.get("path") not in listed:
             return None
-        consoles = [p for p in listed[asked["path"]]["presence"] if p["kind"] == "console"]
-        if consoles:
-            return {"path": asked["path"],
-                    "refused": "already open in a console (pid "
-                               + ", ".join(str(p["pid"]) for p in consoles)
-                               + "); its tab is the way in"}
-        missing = enter.environment()
-        if missing:
-            return {"path": asked["path"],
-                    "refused": f"no console environment; make one, from {enter.ROOT}: {missing}"}
-        enter.console(asked["path"])
-        return {"path": asked["path"], "refused": None}
+        return {"path": asked["path"],
+                "refused": enter.into(asked["path"], listed[asked["path"]]["presence"])}
 
     def reveal(self, asked):
         """Open a space the listing holds in Finder. A path the listing does

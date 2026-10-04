@@ -376,7 +376,8 @@ def on_mcp(cmd, rest, held):
         "log": lambda args: log(named(args.get("space")), args.get("lines", 40)),
         "picture": lambda args: picture(named(args.get("space")), args.get("picture")),
         "spec": lambda args: spec(named(args.get("space"))),
-        "spend": lambda args: spent(named(args.get("space")))})
+        "spend": lambda args: spent(named(args.get("space"))),
+        "open": lambda args: opened(args.get("page"), args.get("space"))})
     return 0
 
 
@@ -881,6 +882,30 @@ def spent(root):
     return {"runs": runs,
             "said": [] if runs else ["no console has run here: a terminal "
                                      "session's cost is tools/tokens.py's to read"]}
+
+
+def opened(page, name):
+    """Start the page where the user acts, and say only whether it started
+    (ADR 0024, decision 5). Never its URL: that carries the secret behind
+    every gate, and a chat is no place for it."""
+    from lib import enter
+    if page == "lobby":
+        enter.page(Path.home(), "lobby")    # every space's page stands in none
+        return {"page": page, "space": None, "refused": None}
+    if page not in ("console", "canvas"):
+        raise LookupError(f"no page {page!r}: console, lobby or canvas")
+    root = named(name)
+    here = presence.live(root)
+    if page == "console":
+        refused = enter.into(root, here)
+    elif any(p["kind"] == "console" for p in here):
+        # The connector's own: a second page would be a second writer to
+        # `marks.json`, and the console's page can mark already.
+        refused = "already open in a console; its page can mark"
+    else:
+        enter.page(root, "canvas")
+        refused = None
+    return {"page": page, "space": root.name, "refused": refused}
 
 
 def out_of_step(root):
