@@ -183,3 +183,20 @@ lives somewhere else. The candidate fixes are `contour init` writing a space-lev
 `CLAUDE.md` that points at the toolkit's, or `contour doctor` reporting when a
 space cannot see the rules.
 
+
+## 14. Getting in without a terminal
+
+The pages are written for someone who never opens a terminal (CONTEXT.md, *On
+the page*, decided 2026-10-05). Getting to the first page still takes one:
+clone, `install-hooks`, `selftest`, a symlink, a venv and `pip install` for the
+console, and a JSON block pasted by hand into Claude Desktop's config
+(`contour mcp --config`). The console's agent also needs Claude credentials on
+the machine, and what that asks of a person has not been checked.
+
+The candidate shape is an installer that does all of it once, and a Desktop
+extension in place of the pasted block — neither researched.
+
+**Blocks:** a real first-time user who is not a developer. The page work does
+not wait on it: it starts at the first page and assumes someone has installed.
+**If nobody decides:** a person who has never used a terminal is installed by
+someone who has.

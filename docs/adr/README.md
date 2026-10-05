@@ -30,3 +30,5 @@ works — the alternative you are about to suggest is probably here with a reaso
 | [0022](0022-the-agent-reads-the-references-in-spans.md) | The agent reads the references in spans — *Accepted*; amends [0017](0017-scaffold-measured-from-references.md), [0018](0018-marks-a-canvas-over-the-sheet.md) |
 | [0023](0023-a-rig-and-its-clips-are-part-of-the-build.md) | A rig and its clips are part of the build — *Accepted* |
 | [0024](0024-the-connector-desktop-reads-and-opens.md) | The connector: Desktop reads and opens, never drives — *Accepted*; amends [0019](0019-console-a-driven-agent-behind-a-gate.md), [0021](0021-the-lobby.md) |
+| [0025](0025-pages-for-someone-who-never-opened-a-terminal.md) | Pages for someone who has never opened a terminal — *Proposed*; amends [0019](0019-console-a-driven-agent-behind-a-gate.md), [0021](0021-the-lobby.md), [0024](0024-the-connector-desktop-reads-and-opens.md) |
+| [0026](0026-update-brings-a-space-in-step.md) | Update: a space's copies brought in step, where nobody edited them — *Proposed*; extends [0015](0015-model-spaces.md), [0021](0021-the-lobby.md) |
