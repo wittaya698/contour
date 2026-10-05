@@ -257,6 +257,41 @@ rule, that a reference is the original file.
 **63 is the only slice that needs Desktop, or the user.** Everything before it is
 tested without Desktop installed; 63 is the verdict on ADR 0024, as 56 was on 0023.
 
+## Batch 7 — pages for someone who has never opened a terminal
+
+From [ADR 0025](../adr/0025-pages-for-someone-who-never-opened-a-terminal.md) and
+[ADR 0026](../adr/0026-update-brings-a-space-in-step.md), both Proposed. Three
+HITL slices and fourteen AFK.
+
+| # | Slice | Type | Blocked by |
+|---|---|---|---|
+| [66](66-the-verdict-in-plain-words.md) | The verdict, in plain words, on the console's page | AFK | — |
+| [67](67-a-lobby-row-is-a-picture-and-a-verdict.md) | A lobby row is a picture and a verdict | AFK | 66 |
+| [68](68-a-gate-says-the-act.md) | A gate says the act and what changes | AFK | — |
+| [69](69-always-for-this-model.md) | Build gates can be allowed for good, and undone | AFK | 68 |
+| [70](70-accept-adr-0025.md) | A plain lobby and a plain gate, and ADR 0025 is accepted | HITL | 67, 69 |
+| [71](71-export-from-the-console.md) | Export from the console, and the file handed over | AFK | 66 |
+| [72](72-the-transcript-shows-activity.md) | The transcript shows activity, not calls | AFK | — |
+| [73](73-spend-is-a-quiet-line.md) | Spend is a quiet line | AFK | 69 |
+| [74](74-you-said-no-to.md) | The vetoes panel says *You said no to* | AFK | 68 |
+| [75](75-span-questions-one-at-a-time.md) | Claude's span questions, one at a time | AFK | — |
+| [76](76-one-look-and-a-way-back.md) | One look, and a way back to the lobby | AFK | 66 |
+| [77](77-shown-terms-are-taught.md) | Shown terms are taught where they first appear | AFK | 76 |
+| [78](78-claude-speaks-plain-words.md) | Claude speaks in plain words | HITL | — |
+| [79](79-the-connector-speaks-plain-words.md) | The connector speaks plain words, and a pasted picture opens the drop form | AFK | 66 |
+| [80](80-contour-update.md) | `contour update` replaces only what nobody edited | AFK | — |
+| [81](81-update-from-the-lobby.md) | Update from the lobby | AFK | 67, 80 |
+| [82](82-accept-adr-0026.md) | `beaky` is updated, and ADR 0026 is accepted | HITL | 78, 81 |
+
+**66 is the root.** Its wording table, one sentence per check id, is what the
+lobby row, the export card, the header and the connector all say, so it lands
+first. 68, 72, 75, 78 and 80 are unblocked beside it.
+
+**78 is HITL because its wording is the decision.** It is the agent's voice, so
+the user reads it before it lands. 70 and 82 are the verdicts on the two ADRs,
+as 63 was on 0024; 70 needs only a plain lobby and a plain gate, and the other
+page slices can land on either side of it.
+
 ## Found in flight
 
 Not from either review — a defect the work turned up, filed where the rest of the
