@@ -41,6 +41,10 @@
   #create, #first { margin-top: 16px; }
   #create .actions, #first .actions { display: flex; gap: 8px; flex-wrap: wrap; }
   #create input, #first input { min-width: 0; flex: 1 1 160px; }
+  .drop { margin-top: 8px; padding: 10px; border: 1px dashed var(--line);
+          border-radius: 6px; color: var(--muted); }
+  .drop.over { border-color: var(--fg); color: var(--fg); }
+  .drop input { display: none; }
 </style>
 </head>
 <body>
@@ -233,18 +237,42 @@ function creating(room, of) {
     ask('/location').then(r => r.json()).then(({ default: where }) => { location.value = where; });
   }
   const said = para('', 'warn');
-  const b = button(of ? 'Create variation' : 'Create', () => {
+  // Reference pictures, dropped or chosen, to start the space with in refs/
+  // (ADR 0024, decision 11). Only here: a space that exists takes none.
+  let dropped = [];
+  const drop = document.createElement('label');
+  drop.className = 'drop';
+  const chooser = document.createElement('input');
+  chooser.type = 'file';
+  chooser.multiple = true;
+  chooser.accept = '.png,.jpg,.jpeg,.webp';
+  const named = () => {
+    drop.firstChild.textContent = dropped.length
+      ? 'References: ' + dropped.map(f => f.name).join(', ') + ' (drop again to replace)'
+      : 'Drop reference pictures here, or click to choose them';
+  };
+  drop.append(document.createTextNode(''), chooser);
+  named();
+  const take = files => { dropped = [...files]; named(); };
+  chooser.onchange = () => take(chooser.files);
+  drop.ondragover = e => { e.preventDefault(); drop.classList.add('over'); };
+  drop.ondragleave = () => drop.classList.remove('over');
+  drop.ondrop = e => { e.preventDefault(); drop.classList.remove('over'); take(e.dataTransfer.files); };
+  const b = button(of ? 'Create variation' : 'Create', async () => {
     b.disabled = true;
-    ask('/create', { name: name.value, location: location.value,
-                     of: of && of.path }).then(r => r.json()).then(done => {
-      b.disabled = false;
-      if (done.refused) { said.className = 'warn'; said.textContent = 'Not created: ' + done.refused; return; }
-      name.value = '';
-      said.className = 'muted';
-      said.textContent = done.next ? 'Made ' + done.path + '; ' + done.next
-                       : 'Made ' + done.path + '; its console is opening in a new tab.';
-      setTimeout(load, 2000);
-    });
+    const r = await ask('/create', { name: name.value, location: location.value,
+                                     of: of && of.path, references: await sent(dropped) });
+    const done = r.status === 413
+      ? { refused: 'those pictures together are more than one create takes' }
+      : await r.json();
+    b.disabled = false;
+    if (done.refused) { said.className = 'warn'; said.textContent = 'Not created: ' + done.refused; return; }
+    name.value = '';
+    take([]);
+    said.className = 'muted';
+    said.textContent = done.next ? 'Made ' + done.path + '; ' + done.next
+                     : 'Made ' + done.path + '; its console is opening in a new tab.';
+    setTimeout(load, 2000);
   });
   b.className = 'go';
   const editable = () => { b.disabled = name.value === stem; };
@@ -254,7 +282,20 @@ function creating(room, of) {
   const row = document.createElement('div');
   row.className = 'actions';
   row.append(name, location, b);
-  room.replaceChildren(row, said);
+  room.replaceChildren(row, drop, said);
+}
+
+// Each file as the lobby takes it: its name, and its bytes read raw and sent
+// base64. Never drawn or resized first, since either would re-encode it and
+// refs/ would hold a copy that is not the user's file.
+async function sent(files) {
+  return Promise.all(files.map(async f => {
+    const bytes = new Uint8Array(await f.arrayBuffer());
+    let raw = '';
+    for (let i = 0; i < bytes.length; i += 0x8000)
+      raw += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    return { name: f.name, data: btoa(raw) };
+  }));
 }
 
 function button(text, onclick, cls) {

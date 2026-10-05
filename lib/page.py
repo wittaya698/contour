@@ -2,10 +2,10 @@
 
 What the canvas, the console and the lobby have in common, and the only place
 issue 01's protections are written: a per-session secret, a bind to the
-loopback address, an origin check, JSON-only POSTs, and a heartbeat. It knows
-nothing about sheets, marks or spaces. A host is a `Page` that serves more —
-its own `routes()` — and a second copy of these checks for a new host is the
-drift ADR 0019 served the canvas's own server to avoid.
+loopback address, an origin check, JSON-only POSTs under a size cap, and a
+heartbeat. It knows nothing about sheets, marks or spaces. A host is a `Page`
+that serves more — its own `routes()` — and a second copy of these checks for
+a new host is the drift ADR 0019 served the canvas's own server to avoid.
 
 The endpoints every page has, and which no host may replace:
 
@@ -103,6 +103,10 @@ class _Handler(BaseHTTPRequestHandler):
         if self.path != "/beat":
             page.touched()                    # a beat is not somebody being here
         n = int(self.headers.get("Content-Length") or 0)
+        if n > page.max_body:
+            # Asked of the length alone, so a body too large is never read.
+            self.close_connection = True
+            return self.send_error(413)
         body = json.loads(self.rfile.read(n) or b"{}")
         if self.path == "/beat":
             return self._json(page.beat(hidden=bool(body.get("hidden"))))
@@ -155,6 +159,10 @@ class Page:
     that said it is hidden, whose timers the browser may slow or stop
     (issue 39).
     """
+
+    max_body = 4 * 2**20
+    """The largest POST body a page reads; a host whose page sends files says
+    how much more it takes."""
 
     def __init__(self, html, can=(), routes=None, grace=None, hidden_grace=None):
         self.html = html

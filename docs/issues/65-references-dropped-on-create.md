@@ -21,14 +21,39 @@ is a `ref-write`, and belongs in its console where that is gated.
 
 ## Acceptance criteria
 
-- [ ] Images dropped or chosen on create land in the new space's `refs/`, matching the originals byte for byte
-- [ ] The same works for **variation of this**
-- [ ] A file that is not an image, will not decode, or is over the cap is refused, named, and no space is made
-- [ ] The upload is JSON, through the same token and origin checks as every other POST
-- [ ] A request body over the cap is refused before it is read into memory
-- [ ] No drop zone appears on a space that already exists
-- [ ] Checked by hand once: drag two photos onto create, and compare their hashes with the copies in `refs/`
+- [x] Images dropped or chosen on create land in the new space's `refs/`, matching the originals byte for byte
+- [x] The same works for **variation of this**
+- [x] A file that is not an image, will not decode, or is over the cap is refused, named, and no space is made
+- [x] The upload is JSON, through the same token and origin checks as every other POST
+- [x] A request body over the cap is refused before it is read into memory
+- [x] No drop zone appears on a space that already exists
+- [x] Checked by hand once: drag two photos onto create, and compare their hashes with the copies in `refs/`
 
 ## Blocked by
 
 None - can start immediately
+
+## What it came to
+
+The create form, and so **variation of this**, which is the same form, has a
+drop zone that is also a file chooser. The page reads each file with
+`arrayBuffer()` and sends it base64 under `references` in the create request,
+and nowhere draws a picture. The lobby's `dropped` checks every file before
+`lobby.made` runs: that its name is a plain filename (`../x.png` would write
+outside `refs/`), that its base64 decodes, that it is no more than
+`REFERENCE_CAP` (20 MB), and then `lobby.unfit`, which is the image and
+duplicate-name check the connector's `create` now shares, worded the same.
+
+The body cap is in `Page`, beside the other POST checks. A body whose
+`Content-Length` is over `max_body` gets a 413 without being read: 4 MB for
+every page, 128 MB for the lobby, which is the one page that sends files. The
+form turns a 413 into a refusal it can show.
+
+Nothing in `row` or `render` takes a drop, so a space that exists has no way to
+take a reference from the lobby.
+
+Checked by hand on 2026-10-05: two photos were dropped onto create as
+`beaky-test-drop-ref`, and the copies landed in `refs/` with the same SHA-1 as
+beaky's `side.jpg` (`0206126…`) and `front.jpg` (`10a4d64…`). Those are the
+same two photos as the connector's tracer bullet (ADR 0024, Evidence).
+

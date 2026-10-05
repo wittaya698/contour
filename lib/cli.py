@@ -920,12 +920,9 @@ def created(name, paths):
             data = p.read_bytes()
         except OSError as e:
             return refused_create(f"{p} cannot be read: {e.strerror}")
-        if not lobby.image(p.name, data):
-            return refused_create(f"{p} is not a reference: a .png, .jpg or .webp "
-                                  f"image whose name and bytes agree")
-        if any(p.name == n for n, _ in read):
-            return refused_create(f"two references are called {p.name}, and "
-                                  f"one would overwrite the other in refs/")
+        why = lobby.unfit(p.name, data, read, called=p)
+        if why:
+            return refused_create(why)
         read.append((p.name, data))
     return lobby.made(str(name or ""), lobby.location(space.roots(ROOT)), pictures=read)
 

@@ -9,6 +9,7 @@ about which spaces exist (ADR 0021, decision 3).
 Its lifetime is the tab. There is no Done button: a list has nothing to finish,
 so a page that stopped beating is the only ending there is.
 """
+import base64
 import json
 import subprocess
 import sys
@@ -23,6 +24,9 @@ CONTOUR = PAGE.parent.parent / "contour"
 GRACE_S = 10          # beats are seconds apart; this is several missed ones
 HIDDEN_GRACE_S = 60 * 60   # a background tab's timers may stop; a quit browser
                            # is caught here, and a lingering lobby costs a port
+
+REFERENCE_CAP = 20 * 2**20
+"""How large one dropped reference may be: a photo, not a video."""
 
 CAN = ("create", "rename", "delete", "restore", "purge")
 """What the lobby can do beyond listing, for the page to ask about. Each action
@@ -43,6 +47,8 @@ def granted():
 class Lobby(Page):
     """One lobby session. `listing` is called on every request for the list,
     because the list is derived and never stored."""
+
+    max_body = 128 * 2**20       # several references, base64 inside the JSON
 
     def __init__(self, listing, can=None, grace=GRACE_S, hidden_grace=HIDDEN_GRACE_S):
         super().__init__(PAGE, can=granted() if can is None else can, grace=grace,
@@ -86,7 +92,10 @@ class Lobby(Page):
             return {"path": None, "next": None,
                     "refused": f"{of} is not a space this lobby lists, so there is "
                                f"nothing to make a variation of"}
-        return made(str(asked.get("name") or ""), location, of=of)
+        pictures, refused = dropped(asked.get("references") or [])
+        if refused:
+            return {"path": None, "next": None, "refused": refused}
+        return made(str(asked.get("name") or ""), location, of=of, pictures=pictures)
 
     def rename(self, asked):
         """`contour rename` in the space the page named, its answer as it
@@ -187,6 +196,42 @@ def image(name, data):
             "image/jpeg" if head.startswith(b"\xff\xd8\xff") else
             "image/webp" if head[:4] == b"RIFF" and head[8:12] == b"WEBP" else None)
     return said is not None and refs.KINDS.get(Path(name).suffix.lower()) == said
+
+
+def unfit(name, data, pictures, called=None):
+    """Why `data`, called `name`, cannot join `pictures` in a new space's refs/,
+    or None if it can. `called` is what the refusal names it, where that is
+    more than its filename."""
+    if not image(name, data):
+        return (f"{called or name} is not a reference: a .png, .jpg or .webp "
+                f"image whose name and bytes agree")
+    if name in {n for n, _ in pictures}:
+        return (f"two references are called {name}, and one would overwrite "
+                f"the other in refs/")
+    return None
+
+
+def dropped(references):
+    """The files dropped on create, as `(filename, bytes)` pairs, and why they
+    are refused, if they are: all of them are checked before anything is made,
+    so a bad drop never leaves half a space (ADR 0024, decision 11)."""
+    pictures = []
+    for r in references:
+        name = str(r.get("name") or "")
+        if Path(name).name != name or "\\" in name or name.startswith("."):
+            return [], f"{name} is not a file's name, so it has no place in refs/"
+        try:
+            data = base64.b64decode(str(r.get("data") or ""), validate=True)
+        except ValueError:
+            return [], f"{name} did not arrive whole; drop it again"
+        if len(data) > REFERENCE_CAP:
+            return [], (f"{name} is over the {REFERENCE_CAP // 2**20} MB a reference "
+                        f"may be")
+        why = unfit(name, data, pictures)
+        if why:
+            return [], why
+        pictures.append((name, data))
+    return pictures, None
 
 
 def made(name, location, of=None, pictures=()):

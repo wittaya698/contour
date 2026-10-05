@@ -258,11 +258,16 @@ to them what you would otherwise do in a terminal:
 
 - **create** runs `contour init`, defaulting to `project/` under the toolkit,
   then opens the new space's console with the new-space flow as its first
-  prompt. The lobby never drafts a spec itself: that happens in the console,
+  prompt. Reference pictures dropped onto its form, or chosen with its file
+  picker, start the space in `refs/`, copied byte for byte; a picture that is
+  not a PNG, JPEG or WebP, or is over 20 MB, is refused before anything is
+  made. The lobby never drafts a spec itself: that happens in the console,
   behind its gates.
 - **variation of this** is create, with a first prompt that points at the
   source's `spec.yaml` and `build.py` for reference. Nothing is copied, so the
-  variation's spec is agreed as its own.
+  variation's spec is agreed as its own. It takes dropped references as create
+  does; a space that already exists takes none, since adding a reference is a
+  change its console gates.
 - **enter** opens a space's console in a tab of its own. Closing the lobby
   ends none of them.
 - **rename** shows everything it will change before it changes anything, and

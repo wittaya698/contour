@@ -243,6 +243,34 @@ class LobbyPageTest(unittest.TestCase):
         self.assertIn("b.disabled = name.value === stem", creating)
         self.assertIn("name.oninput", creating)
 
+    def test_create_takes_references_dropped_or_chosen(self):
+        """Dropped onto its form, or picked with a file chooser for anyone who
+        does not drag (ADR 0024, decision 11; issue 65)."""
+        creating = self.function("creating")
+        self.assertIn("ondrop", creating)
+        self.assertIn("ondragover", creating)
+        self.assertIn("type = 'file'", creating)
+        self.assertIn("multiple = true", creating)
+        self.assertIn("references: await sent(dropped)", creating)
+
+    def test_references_are_sent_as_read_never_drawn(self):
+        """Drawing or resizing a picture re-encodes it, and refs/ would hold a
+        copy that is not the user's file."""
+        sent = self.function("sent")
+        self.assertIn("arrayBuffer()", sent)
+        self.assertIn("btoa(", sent)
+        for redraws in ("drawImage", "toDataURL", "toBlob", "createElement('canvas')",
+                        "new Image"):
+            self.assertNotIn(redraws, self.page)
+
+    def test_a_space_that_exists_takes_no_drop(self):
+        """Adding a reference to a space is a `ref-write`, gated in its console
+        (ADR 0024, decision 11)."""
+        for name in ("row", "gone", "render"):
+            with self.subTest(function=name):
+                self.assertNotIn("drop", self.function(name))
+                self.assertNotIn("'file'", self.function(name))
+
     def test_it_asks_the_host_what_it_can_do(self):
         self.assertIn("ask('/can')", self.page)
 
@@ -488,6 +516,22 @@ class LobbyProtectionTest(unittest.TestCase):
                      **{"Content-Type": "text/plain;charset=UTF-8"})
         self.refused(403, "/create", self.CREATE, Origin="https://example.com")
         self.refused(403, "/create", self.CREATE, **{"Sec-Fetch-Site": "cross-site"})
+        self.assertEqual(self.asked, 0)
+
+    def test_a_create_over_the_cap_is_refused_before_its_body_is_read(self):
+        """Its length is all that is asked: a body that never arrives cannot
+        hold the answer up, and one that is too large is never in memory."""
+        import http.client
+        from urllib.parse import urlparse
+        url = urlparse(self.lobby.origin)
+        conn = http.client.HTTPConnection(url.hostname, url.port, timeout=5)
+        self.addCleanup(conn.close)
+        conn.putrequest("POST", "/create")
+        conn.putheader(TOKEN_HEADER, self.lobby.token)
+        conn.putheader("Content-Type", "application/json")
+        conn.putheader("Content-Length", str(self.lobby.max_body + 1))
+        conn.endheaders()
+        self.assertEqual(conn.getresponse().status, 413)
         self.assertEqual(self.asked, 0)
 
     def test_without_the_token_or_from_another_origin_no_tab_hides_or_goes(self):
