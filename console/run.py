@@ -13,7 +13,7 @@ import threading
 from pathlib import Path
 
 from console import launcher, seed, spend, vetoes
-from lib import intent, lock, marks, policy
+from lib import gate as gate_words, intent, lock, marks, policy
 
 
 class Stopped(Exception):
@@ -233,13 +233,21 @@ class Run:
         # would be a route from a verdict back into the call, which is the one
         # thing a gate must not be able to do.
         self.say("gate", id=waiting["id"], category=category, tool=tool,
-                 call=dict(payload))
+                 call=dict(payload), said=gate_words.say(category, self.space, tool, payload,
+                                     self.proposal()))
         waiting["answered"].wait()
         # Counted here and not at an ask-list allow: what costs a turn is the
         # stopping and the asking. A call the user allowed in advance cost the
         # agent nothing to have made.
         self.gates += 1
         return self.approved(waiting["allow"], waiting["reason"], category)
+
+    def proposal(self):
+        """What the agent last said, which before a spec write is the case
+        for it (rule 1): the gate names the span it measured on."""
+        with self._lock:
+            return next((e["text"] for e in reversed(self.events)
+                         if e["kind"] == "text"), "")
 
     def approved(self, allow, reason, category):
         """The one way out of the gate for a call that is about to happen.

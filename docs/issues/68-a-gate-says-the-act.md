@@ -17,11 +17,11 @@ Not yet. A category the table does not know shows its own name.
 
 ## Acceptance criteria
 
-- [ ] Every category `contour intents` prints has a plain sentence, and a test fails when a new one has none
-- [ ] A spec-write gate lists each field that changes, old → new, and the span it names
-- [ ] The raw call is reachable from the gate and not shown by default
-- [ ] The call still cannot be edited from the gate
-- [ ] A commit gate reads *Save this version?*
+- [x] Every category `contour intents` prints has a plain sentence, and a test fails when a new one has none
+- [x] A spec-write gate lists each field that changes, old → new, and the span it names
+- [x] The raw call is reachable from the gate and not shown by default
+- [x] The call still cannot be edited from the gate
+- [x] A commit gate reads *Save this version?*
 
 ## Blocked by
 

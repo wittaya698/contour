@@ -138,9 +138,12 @@
      uses, because it is the one line of the transcript that is waiting for you. */
   #turns .gate { border: 1px solid var(--pin); border-radius: 6px; padding: 8px;
                  display: flex; flex-direction: column; gap: 6px; }
-  #turns .category { font-weight: 700; text-transform: uppercase;
-                     letter-spacing: .06em; font-size: 11px; color: var(--pin); }
-  #turns .call { font-family: ui-monospace, SFMono-Regular, monospace;
+  #turns .act { font-weight: 700; color: var(--pin); }
+  #turns .changes { margin: 0; padding-left: 18px; }
+  #turns .changes:empty, #turns .spans:empty { display: none; }
+  #turns .raw summary { cursor: pointer; opacity: .6; font-size: 11px; }
+  #turns .call { display: block; margin-top: 4px;
+                 font-family: ui-monospace, SFMono-Regular, monospace;
                  font-size: 11px; word-break: break-all; }
   .why { opacity: .6; font-size: 11px; }
   /* Until the host has answered, nothing that depends on the answer is on
@@ -202,12 +205,19 @@
          the gate is not the one place it gets laundered. The user says a
          sentence; the agent writes the code (ADR 0019, decision 13).
 
+         It reads as the act, and what would change: the category is a term,
+         and the raw call is kept one click away rather than in front
+         (ADR 0025, decision 6).
+
          Markup and not built in script, so that what the dialog contains can be
          read here rather than inferred from the code that assembles it. -->
     <template id="gate">
       <li class="gate">
-        <span class="category"></span>
-        <span class="call"></span>
+        <span class="act"></span>
+        <ul class="changes"></ul>
+        <span class="spans"></span>
+        <details class="raw"><summary>the exact call</summary>
+          <span class="call"></span></details>
         <input class="because" placeholder="why not (a sentence)" autocomplete="off">
         <div class="pair">
           <button class="allow">Allow</button>
@@ -418,8 +428,20 @@ function turn(event) {
 // paragraph after the fact.
 function gate(event) {
   const li = document.getElementById('gate').content.firstElementChild.cloneNode(true);
-  li.querySelector('.category').textContent = event.category;
+  const said = event.said;
+  li.querySelector('.act').textContent = said.act;
+  for (const change of said.changes) {
+    const item = document.createElement('li');
+    item.textContent = change;
+    li.querySelector('.changes').append(item);
+  }
+  if (said.spans.length) {
+    li.querySelector('.spans').textContent = 'measured on '
+      + (said.spans.length === 1 ? 'span ' : 'spans ') + said.spans.join(', ');
+  }
   li.querySelector('.call').textContent = called(event);
+  li.querySelector('.allow').textContent = said.allow;
+  li.querySelector('.deny').textContent = said.deny;
   const because = li.querySelector('.because');
   const answer = async allow => {
     for (const b of li.querySelectorAll('button')) b.disabled = true;
