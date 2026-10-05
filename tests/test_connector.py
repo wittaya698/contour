@@ -244,7 +244,7 @@ class ReadingTest(InSpaceCase):
         self.assertFalse(failed, said)
         self.assertIs(said["verdict"]["ok"], False)
         self.assertEqual(said["verdict"]["lines"], ["stub ran build"])
-        self.assertEqual(said["verdict"]["results"], [{"name": "stub", "ok": False}])
+        self.assertEqual(said["verdict"]["results"], [{"id": "height", "ok": False, "info": "1640.0", "msg": "height 1640.0mm, want 1700±5"}])
 
     def test_status_on_a_held_space_says_the_verdict_is_from_before_the_run(self):
         """Asked from inside `contour run`, so the hold is a real one and alive:

@@ -38,7 +38,7 @@ FREE = ("agent", "badges", "canvas", "checks", "cli", "commands", "connector", "
         "filmstrip", "git", "glb", "intent", "lobby", "lock", "marks", "mask", "miniyaml",
         "ops_whitelist", "page", "panel", "policy", "presence", "refs",
         "rename", "restore", "revision", "signals", "space", "span", "spend", "store",
-        "units", "vetoes", "views", "worksheet")
+        "units", "verdict", "vetoes", "views", "worksheet")
 
 # Runs inside Blender, and may import anything in FREE — the ban is one way.
 # Two of these are here by role rather than by their imports: `entry` is

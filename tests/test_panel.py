@@ -143,22 +143,43 @@ class PanelTest(PanelCase):
         self.assertFalse(panel["current"], "the build still failed")
         self.assertIsNone(panel["marks"])
 
-    def test_the_panel_is_told_the_build_failed_and_never_what_failed(self):
-        """No failing check is overlaid on the picture, and the page could not
-        overlay one if it tried: it is never told which check failed.
-
-        Refused because a check knows a number, not a location — so overlays
-        would appear for some failures and not others, and teach the reader to
-        distrust their absence. The report is the launcher's answer and the
-        transcript is where it lands; the sheet stays a picture (ADR 0019, 27).
-        """
+    def test_the_panel_says_what_failed_in_plain_words(self):
+        """Whether the model is right, on the page beside which build the sheet
+        is of (ADR 0025, decision 4) — read from the verdict `check` keeps, in
+        the words the lobby and the connector will say too."""
         self.built()
-        red = self.check(ok=False)
-        self.assertEqual(red.returncode, 1)
-        self.assertIn("stub ran build", red.stdout, "the report still says it")
-        said = " ".join(str(v) for v in self.panel().values())
-        for leak in ("stub", "FAIL", "verify"):
-            self.assertNotIn(leak, said, f"the panel was handed {leak!r}")
+        self.assertEqual(self.check(ok=False).returncode, 1)
+        said = self.panel()["verdict"]
+        self.assertIs(said["ok"], False)
+        self.assertEqual(said["line"], "1 thing doesn't match the spec")
+        self.assertEqual(said["failing"],
+                         ["Height is 1640 mm; the spec wants 1700, give or take 5."])
+
+    def test_a_green_build_is_one_quiet_line(self):
+        self.built()
+        self.assertEqual(self.check().returncode, 0)
+        said = self.panel()["verdict"]
+        self.assertEqual((said["ok"], said["line"], said["failing"]),
+                         (True, "matches the spec", []))
+        self.assertEqual(said["passing"], ["height 1640.0"])
+
+    def test_a_space_that_has_never_been_checked_has_no_verdict(self):
+        self.built()
+        self.assertIsNone(self.panel()["verdict"])
+
+    def test_the_verdict_is_words_and_never_a_place_on_the_sheet(self):
+        """ADR 0019 decision 13's refusal stands: no failing check is overlaid
+        on the picture. A check knows a number, not a location — so overlays
+        would appear for some failures and not others, and teach the reader to
+        distrust their absence. The page is handed sentences and a yes or no,
+        and nothing it could draw with."""
+        self.built()
+        self.check(ok=False)
+        said = self.panel()["verdict"]
+        self.assertEqual(set(said), {"ok", "line", "failing", "passing"})
+        for value in said.values():
+            self.assertTrue(isinstance(value, (bool, str)) or
+                            all(isinstance(v, str) for v in value), value)
 
     def stop(self, proc):
         """End a canvas this test launched, and wait for it.
@@ -222,7 +243,7 @@ class VerdictTest(PanelCase):
         self.assertIs(said["built"], True)
         self.assertIs(said["ok"], False)
         self.assertEqual(said["lines"], ["stub ran build"])
-        self.assertEqual(said["results"], [{"name": "stub", "ok": False}])
+        self.assertEqual(said["results"], [{"id": "height", "ok": False, "info": "1640.0", "msg": "height 1640.0mm, want 1700±5"}])
         self.assertIsInstance(said["secs"], float)
         self.assertEqual(said["build"], views.fingerprint(self.blend))
         self.assertRegex(said["when"], r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d")

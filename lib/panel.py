@@ -15,6 +15,7 @@ from pathlib import Path
 
 from . import marks as marks_store
 from . import store
+from . import verdict as words
 from . import views as sheet_views
 """Aliased because `state` takes a `views` argument — the path to the file —
 and the module that reads it would be shadowed by its own subject."""
@@ -53,15 +54,18 @@ def state(views=None, blend=None, verdict=None, marks=None):
     """What the panel shows, as one dict the page renders and does not reason
     about. `build` is None when nothing has ever been drawn, which is a space
     at the start and not a broken page."""
+    said = store.load(verdict, None) if verdict else None
+    # Whether the model is right, in plain words, beside which build the sheet
+    # is of and never on it (ADR 0025, decision 4). None until a first check.
+    told = words.say(said) if said else None
     sheet = store.load(views, None) if views else None
     if sheet is None:
-        return {"build": None, "current": False}
-    said = store.load(verdict, None) if verdict else None
+        return {"build": None, "current": False, "verdict": told}
     failed = bool(said) and not said["built"]
     why = ("last build failed" if failed
            else sheet_views.stale(sheet, blend) and "the build moved on")
     return {"build": sheet["build"] or None, "current": not why, "why": why,
-            "marks": pending(marks) if failed else None}
+            "marks": pending(marks) if failed else None, "verdict": told}
 
 
 def pending(path):

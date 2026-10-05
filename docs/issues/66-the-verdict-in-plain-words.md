@@ -24,12 +24,12 @@ decision 13).
 
 ## Acceptance criteria
 
-- [ ] Green shows one line, *matches the spec*, with the passing checks behind it
-- [ ] Red names each failing check as one plain sentence: what, measured, wanted
-- [ ] A build that died before verify says so in its own words
-- [ ] Every check id `verify` can report has a sentence, and a test fails when a new id has none
-- [ ] An id the table does not know is shown as its report line, never hidden
-- [ ] Nothing about the verdict is drawn on the sheet
+- [x] Green shows one line, *matches the spec*, with the passing checks behind it
+- [x] Red names each failing check as one plain sentence: what, measured, wanted
+- [x] A build that died before verify says so in its own words
+- [x] Every check id `verify` can report has a sentence, and a test fails when a new id has none
+- [x] An id the table does not know is shown as its report line, never hidden
+- [x] Nothing about the verdict is drawn on the sheet
 
 ## Blocked by
 

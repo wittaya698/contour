@@ -52,8 +52,11 @@ def stub_blender(dirpath, ok=True, crash=False):
         lines.append("exit 1")                # no report: Blender died mid-stage
     else:
         lines += [
+            # One result in a real check's shape (`lib/checks.py`), so what a
+            # page says about a verdict can be read off a launcher run.
             'printf \'{"ok": %s, "lines": ["stub ran %s"], '
-            '"results": [{"name": "stub", "ok": %s}]}\' '
+            '"results": [{"id": "height", "ok": %s, "info": "1640.0", '
+            '"msg": "height 1640.0mm, want 1700±5"}]}\' '
             '"$ok" "$last" "$ok" > "$CONTOUR_REPORT"',
             "exit $code",
         ]

@@ -30,6 +30,13 @@
   #build { margin: 8px 0 0; font-size: 12px; opacity: .6;
            font-family: ui-monospace, SFMono-Regular, monospace; }
   #build.old { opacity: 1; color: var(--pin); }
+  /* Whether the model is right (ADR 0025, decision 4): green is one quiet line
+     and red is loud, each failure one sentence; what passed stays folded. */
+  #verdict { margin: 4px 0 0; font-size: 13px; }
+  #verdict .line { margin: 0; opacity: .6; }
+  #verdict.red .line { opacity: 1; color: var(--pin); font-weight: 600; }
+  #verdict ul { margin: 4px 0 0; padding-left: 18px; }
+  #verdict details { font-size: 12px; opacity: .6; margin-top: 4px; }
   .pin { position: absolute; width: 20px; height: 20px; margin: -10px 0 0 -10px;
          border-radius: 50%; background: var(--pin); color: #fff; font-size: 11px;
          font-weight: 700; display: grid; place-items: center; pointer-events: none; }
@@ -149,7 +156,12 @@
        about what you are looking at and is read while looking at it. A sheet is
        only ever of a finished build, so an unlabelled one is authoritative about
        whichever build happens to be on disk (ADR 0019, decision 13). -->
-  <p id="build"></p></div>
+  <p id="build"></p>
+  <!-- Whether the model is right, under the label and never on the sheet: a
+       check knows a number, not a place, so it is said in words beside the
+       picture (ADR 0019, decision 13; ADR 0025, decision 4). -->
+  <div id="verdict" hidden><p class="line"></p><ul class="failing"></ul>
+    <details><summary>what matched</summary><ul class="passing"></ul></details></div></div>
 <aside>
   <h1>Marks</h1>
   <ol id="list"></ol>
@@ -473,6 +485,7 @@ async function labelled() {
                        said.build && !said.current ? 'not current: ' + said.why : '',
                        said.marks || ''].filter(Boolean).join('  —  ');
   label.classList.toggle('old', Boolean(said.build) && !said.current);
+  verdict(said.verdict);
   // A new build means a new sheet. Redrawn here rather than on a timer, so the
   // picture changes when the thing it is a picture of does and at no other time.
   if (said.build !== drawn) {
@@ -480,6 +493,22 @@ async function labelled() {
     drawn = said.build;
     if (!first && !showing) show(null);
   }
+}
+
+// The sentences come whole from the server's one table (`lib/verdict.py`); the
+// page lays them out and words none of its own.
+const told = document.getElementById('verdict');
+function verdict(said) {
+  told.hidden = !said;
+  if (!said) return;
+  told.classList.toggle('red', !said.ok);
+  told.querySelector('.line').textContent = said.line;
+  const list = (cls, items) => told.querySelector(cls).replaceChildren(
+    ...items.map(text => { const li = document.createElement('li');
+                           li.textContent = text; return li; }));
+  list('.failing', said.failing);
+  list('.passing', said.passing);
+  told.querySelector('details').hidden = !said.passing.length;
 }
 
 const img = new Image();

@@ -1,6 +1,6 @@
 # 0025 — Pages for someone who has never opened a terminal
 
-**Status:** Proposed · 2026-10-05 · **amends [ADR 0019](0019-console-a-driven-agent-behind-a-gate.md) (decision 33's count, and decision 36 is tuned from the page), [ADR 0021](0021-the-lobby.md) (what a row shows) and [ADR 0024](0024-the-connector-desktop-reads-and-opens.md) (decisions 4 and 10)**
+**Status:** Proposed · 2026-10-05 · **amends [ADR 0019](0019-console-a-driven-agent-behind-a-gate.md) (ADR 0019 decision 33's count, and ADR 0019 decision 36 is tuned from the page), [ADR 0021](0021-the-lobby.md) (what a row shows) and [ADR 0024](0024-the-connector-desktop-reads-and-opens.md) (decisions 4 and 10)**
 
 ## Context
 
@@ -21,14 +21,14 @@ grilling session over every page.
 Five facts, measured that day, shape it:
 
 - **No page says whether the model is right.** The console's panel labels
-  which build the sheet is of (decision 13) and nothing else. The verdict sits
+  which build the sheet is of (ADR 0019, decision 13) and nothing else. The verdict sits
   per check in `.contour/last-build.json` (issue 58), read by the connector
   and by the agent's transcript only.
 - **No page can produce or hand over a `.glb`.** Export — the one sanctioned
   way a model leaves (rule 8) — is reachable only by asking the agent, and lands
   in `exports/`, a directory this person has never seen.
 - **A model made from the lobby gates every build.** The ask-list has no
-  presets and a space it does not name lets nothing through (decision 36), so
+  presets and a space it does not name lets nothing through (ADR 0019, decision 36), so
   every `contour check` the agent runs is an *Allow* click until somebody edits
   `~/.contour/ask-list.yaml` by hand.
 - **There is a door in and none back.** The lobby enters a console; nothing on
@@ -58,7 +58,7 @@ The glossary stays exact everywhere else: code, ADRs, commit messages.
 **2. The agent speaks to the user by the same tiers, everywhere.** In a console
 run and in a terminal session alike — *Save this version?*, not *commit?* — so
 the page and the agent are one voice and there is no second vocabulary to keep
-in step. It reaches the agent where decision 19 says everything does: the
+in step. It reaches the agent where ADR 0019 decision 19 says everything does: the
 space's own `CLAUDE.md` and skills, discovered and never declared by the
 console. Existing spaces receive it through **update** (ADR 0026). The commit
 message the agent then writes stays exact.
@@ -74,7 +74,7 @@ exists and a second way in would be a second thing to keep in step.
 **4. The verdict is on the console's page, beside the build label, and never
 on the sheet.** Green is one quiet line, *matches the spec*. Red names each
 failing check as one plain sentence — what, measured, wanted — from a wording
-table keyed by check id; passing checks stay collapsed. Decision 13's refusal
+table keyed by check id; passing checks stay collapsed. ADR 0019 decision 13's refusal
 to overlay a failure on the sheet stands: a check knows a number, not a place.
 
 **5. Export has two ways in and one result.** A button on the console runs
@@ -95,19 +95,19 @@ global one whole, so what is written is the resolved list plus `build`, never
 `build` alone. Spec writes, reference writes and saving a version always ask;
 push is never offered. Every *Always* is listed on the page with an undo.
 
-This is decision 36 kept, not reversed. The list is still an allow-list with no
+This is ADR 0019 decision 36 kept, not reversed. The list is still an allow-list with no
 presets and silence still means ask; the user still decides each category. What
-changes is where they decide it: decision 36 accepted that *the first session is
+changes is where they decide it: ADR 0019 decision 36 accepted that *the first session is
 spent writing the file*, and for a person who cannot edit YAML that session
 would never end. Builds unwatched by default was rejected because it is a
 preset.
 
-**7. The vetoes count leaves the page.** Decision 33's visible *n vetoes
+**7. The vetoes count leaves the page.** ADR 0019 decision 33's visible *n vetoes
 uncommitted* is a sentence about commits, and commit is hidden. A veto still
 rides the commit carrying the change it prevented, and the next *Save this
 version* carries it as before; nothing counts it on the page. The panel becomes
 *You said no to*, each line the gate's plain act and the user's reason, and
-*promote to a mark* becomes *Pin this to a part*. The residual risk decision 33
+*promote to a mark* becomes *Pin this to a part*. The residual risk ADR 0019 decision 33
 stated — `git checkout .` loses uncommitted vetoes — is unchanged, and now not
 signposted.
 
@@ -119,8 +119,8 @@ rejected: work visible between the agent's messages is what makes the console a
 control surface rather than a progress bar.
 
 **9. Spend is a quiet line.** *12 turns*, and, when gates cost turns, *3 stops
-cost 4 extra turns* — linking to decision 6's list, which is decision 37's
-*informed act* made one click long. Tokens sit behind it. Still a measurement
+cost 4 extra turns* — linking to decision 6's list of *Always*, which is
+ADR 0019 decision 37's *informed act* made one click long. Tokens sit behind it. Still a measurement
 and never a limit. A money estimate was rejected: it is wrong for a
 subscription and would replace the accounting's own units.
 
@@ -166,4 +166,4 @@ verdict — and *Models* returns to the lobby, starting one if none is running.
   machinery to someone who never needs to operate it.
 - **A console-only voice, by hook or by prompt.** A `SessionStart` hook keyed
   on `$CONTOUR_RUN` would keep two voices in step; a console system prompt
-  reverses decision 19.
+  reverses ADR 0019 decision 19.
