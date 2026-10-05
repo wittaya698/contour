@@ -118,6 +118,15 @@ class DiedTest(unittest.TestCase):
                          "the build stopped before it could be checked")
         self.assertEqual(said["failing"], [])
 
+    def test_a_verdict_kept_before_checks_were_kept_says_it_cannot_tell(self):
+        """Before issue 58 a check kept only whether it built. That is not a
+        green build, and not a red one: neither is known, and it says so."""
+        said = verdict.say({"built": True})
+        self.assertIsNone(said["ok"])
+        self.assertEqual(said["line"],
+                         "built before its checks were kept — build it again to see")
+        self.assertEqual((said["failing"], said["passing"]), ([], []))
+
 
 if __name__ == "__main__":
     unittest.main()

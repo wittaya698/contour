@@ -16,8 +16,8 @@ import sys
 import webbrowser
 from pathlib import Path
 
-from lib import enter, refs
-from lib.page import Page
+from lib import enter, refs, space
+from lib.page import Blob, Page
 
 PAGE = Path(__file__).resolve().parent / "lobby.html"
 CONTOUR = PAGE.parent.parent / "contour"
@@ -65,10 +65,25 @@ class Lobby(Page):
                 ("POST", "/purge"): self.purge,
                 ("GET", "/environment"): lambda q: {"console": enter.environment()},
                 ("POST", "/enter"): self.enter,
-                ("POST", "/reveal"): self.reveal}
+                ("POST", "/reveal"): self.reveal,
+                ("GET", "/picture"): self.picture}
 
     def location(self):
         return location(self.listing()["roots"])
+
+    def picture(self, asked):
+        """A row's picture: the space's last sheet, or its first reference
+        before there is one (ADR 0025, decision 10). Read, never drawn or
+        resized, and only for a space the listing holds. Anything else, or a
+        space with neither, is None: not found."""
+        listed = {s["path"]: s["picture"] for s in self.listing()["spaces"]}
+        if not listed.get(asked.get("path")):
+            return None
+        here = space.layout(asked["path"])
+        if listed[asked["path"]] == "sheet" and here.sheet.is_file():
+            return Blob((here.sheet.read_bytes(), "image/png"))
+        named = refs.listing(here.refs)
+        return Blob(refs.blob(here.refs, named[0])) if named else None
 
     def create(self, asked):
         """`contour init` in the location the page named, its answer as it gave

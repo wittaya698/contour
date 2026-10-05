@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Contour lobby</title>
+<title>Models</title>
 <style>
   :root { --bg: #fafaf8; --fg: #1d1d1b; --muted: #6b6b66; --line: #e2e2dc;
           --warn: #a3470d; --ok: #2f6b3a; }
@@ -45,16 +45,31 @@
           border-radius: 6px; color: var(--muted); }
   .drop.over { border-color: var(--fg); color: var(--fg); }
   .drop input { display: none; }
+  td.thumb { width: 96px; padding-right: 0; }
+  td.thumb img, td.thumb div { display: block; width: 96px; height: 72px; object-fit: contain;
+                               border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+  td.thumb div { background: transparent; border-style: dashed; }
+  td p { margin: 2px 0; }
+  p.verdict { font-weight: 600; }
+  ul.failing { margin: 2px 0 4px; padding-left: 18px; color: var(--warn); font-size: 14px; }
+  td.actions { white-space: nowrap; text-align: right; }
+  details.menu { display: inline-block; position: relative; margin-left: 6px; }
+  details.menu summary { list-style: none; cursor: pointer; padding: 4px 10px;
+                         border: 1px solid var(--line); border-radius: 6px; }
+  details.menu summary::-webkit-details-marker { display: none; }
+  details.menu > div { position: absolute; right: 0; z-index: 1; margin-top: 4px;
+                       display: flex; flex-direction: column; gap: 4px; padding: 6px;
+                       background: var(--bg); border: 1px solid var(--line); border-radius: 6px; }
+  details.menu > div button { text-align: left; border: 0; }
 </style>
 </head>
 <body>
 <main>
-  <h1>Model spaces</h1>
+  <h1>Models</h1>
   <p class="muted" id="roots"></p>
   <div id="create" hidden></div>
   <div class="wrap" id="list" hidden>
     <table>
-      <thead><tr><th>Space</th><th>Toolkit</th><th class="num">Commits</th><th>Health</th><th></th></tr></thead>
       <tbody id="rows"></tbody>
     </table>
   </div>
@@ -70,15 +85,12 @@
     </div>
   </section>
   <section id="onboarding" hidden>
-    <p>There are no model spaces here yet.</p>
-    <p>A <strong>model space</strong> is one model: its own directory and its own
-      git repository, holding <code>spec.yaml</code>, the reference images in
-      <code>refs/</code>, and the <code>build.py</code> that makes it. It is
-      never pushed anywhere.</p>
+    <p>There are no models here yet.</p>
+    <p>A <strong>model</strong> is one thing you are making: what it should be, the
+      reference pictures it is made from, and what Claude writes to build it.
+      It stays on this computer.</p>
     <p><strong>Name your first model.</strong></p>
     <div id="first"></div>
-    <p class="muted">Or, from a terminal, run <code>contour init &lt;name&gt;</code> inside
-      <span id="where">the directory spaces live in</span>, then reload this page.</p>
   </section>
 </main>
 <script>
@@ -105,109 +117,149 @@ function cell(text, cls) {
   return td;
 }
 
-// What a row says about health: the drift `contour doctor` would report, and
-// any remote, which a model space must never have (rule 8).
+// What a row says about health: nothing, when nothing is wrong, and the
+// outcome when something is (ADR 0025, decision 10). A remote is a warning,
+// since a model is never pushed (rule 8); what `contour doctor` would call
+// drift, a missing copy or rules the agent cannot see is one thing an update
+// puts right (ADR 0026).
 function health(s) {
   const said = [];
-  for (const r of s.remotes) said.push(['warn', 'has a remote (' + r + ') — never pushed']);
-  if (!s.rules) said.push(['warn', 'cannot see the rules']);
-  if (s.scaffold.missing.length) said.push(['warn', 'missing ' + s.scaffold.missing.join(', ')]);
-  if (s.scaffold.drift.length) said.push(['', 'differs from the template: ' + s.scaffold.drift.join(', ')]);
-  if (!said.length) said.push(['ok', 'in step']);
-  const td = document.createElement('td');
-  for (const [cls, text] of said) {
-    const line = document.createElement('div');
-    line.className = cls;
-    line.textContent = text;
-    td.append(line);
+  if (s.remotes.length) said.push(para('has a remote — a model is never pushed', 'warn'));
+  if (s.scaffold.missing.length || s.scaffold.drift.length || !s.rules)
+    said.push(para('needs an update', 'muted'));
+  return said;
+}
+
+// What a row says about whether the model is right: issue 66's words, which
+// the console says too (ADR 0025, decisions 4 and 10). Each failing check is
+// one plain sentence; the passing ones are the console's to show.
+function verdict(v) {
+  const box = document.createElement('div');
+  if (!v) {
+    box.append(para('not built yet', 'muted verdict'));
+    return box;
+  }
+  // `ok` is null for a verdict that cannot tell: neither green nor red.
+  box.append(para(v.line, (v.ok ? 'ok' : v.ok === false ? 'warn' : 'muted') + ' verdict'));
+  if (v.failing.length) {
+    const ul = document.createElement('ul');
+    ul.className = 'failing';
+    for (const text of v.failing) {
+      const li = document.createElement('li');
+      li.textContent = text;
+      ul.append(li);
+    }
+    box.append(ul);
+  }
+  return box;
+}
+
+// When it was last worked on, as a person says it rather than as a timestamp.
+function ago(iso) {
+  if (!iso) return '';
+  const then = new Date(iso);
+  const minutes = Math.round((Date.now() - then) / 60000);
+  if (minutes < 1) return 'worked on just now';
+  if (minutes < 60) return 'worked on ' + minutes + (minutes === 1 ? ' minute' : ' minutes') + ' ago';
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return 'worked on ' + hours + (hours === 1 ? ' hour' : ' hours') + ' ago';
+  const days = Math.round(hours / 24);
+  if (days === 1) return 'worked on yesterday';
+  if (days < 14) return 'worked on ' + days + ' days ago';
+  return 'worked on ' + then.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+// The row's picture: the last sheet, or before the first build one of the
+// references it is to be built from, served by the lobby. An `<img>` cannot
+// send a header, so the token rides in its query, as the canvas's do.
+function thumbnail(s) {
+  const td = cell('', 'thumb');
+  if (s.picture) {
+    const img = document.createElement('img');
+    img.src = '/picture?path=' + encodeURIComponent(s.path) + '&t=' + TOKEN;
+    img.alt = s.picture === 'sheet' ? 'the last sheet of ' + s.name : 'a reference for ' + s.name;
+    img.loading = 'lazy';
+    td.append(img);
+  } else {
+    td.append(document.createElement('div'));    // nothing to show yet, and a frame says so
   }
   return td;
 }
 
-// One space's row, and under it the room a rename or a delete lays itself out in.
-// `environment` is the host's answer to whether a console can run here.
+// One model's row — a picture and a verdict (ADR 0025, decision 10) — and
+// under it the room a rename or a delete lays itself out in. `environment` is
+// the host's answer to whether a console can run here.
 function row(s, can, environment) {
   const tr = document.createElement('tr');
   const name = cell('');
   const strong = document.createElement('strong');
   strong.textContent = s.name;
-  const path = document.createElement('div');
-  path.className = 'muted';
-  path.textContent = s.path;
-  name.append(strong, path);
+  strong.title = s.path;
+  name.append(strong, verdict(s.verdict), para(ago(s.worked), 'muted'));
   // Until a commit in the space carries the rename, which the lobby never
   // makes (rule 5): the listing reads this from git each time.
-  if (s.renamed) {
-    const note = document.createElement('div');
-    note.className = 'warn';
-    note.textContent = 'renamed from ' + s.renamed.from + ', uncommitted';
-    name.append(note);
-  }
+  if (s.renamed) name.append(para('renamed from ' + s.renamed.from + ', not saved yet', 'warn'));
+  name.append(...health(s));
   // A console already serving the space, from its presence. Entering again
   // would start a second one, and the lobby never sees the first one's URL.
   const open = s.presence.some(p => p.kind === 'console');
   if (open) name.append(para('open in a console — its tab is the way in', 'ok'));
   const said = para('', 'warn');
   name.append(said);
-  const actions = cell('');
+  const actions = cell('', 'actions');
   const under = document.createElement('tr');
   under.hidden = true;
   const room = document.createElement('td');
-  room.colSpan = 5;
+  room.colSpan = 3;
   room.className = 'panel';
   under.append(room);
-  if (can.has('rename')) {
-    const b = document.createElement('button');
-    b.textContent = 'Rename…';
-    b.onclick = () => { under.hidden = false; askName(s, room); };
-    actions.append(b);
-  }
-  // A variation is a new space, never a copy (ADR 0015): create, with this
-  // space named as what its console's first prompt points at (issue 38).
-  if (can.has('create')) {
-    const b = document.createElement('button');
-    b.textContent = 'Variation of this…';
-    b.onclick = () => { under.hidden = false; room.replaceChildren(); creating(room, s); };
-    actions.append(b);
-  }
-  if (can.has('delete')) {
-    const b = document.createElement('button');
-    b.textContent = 'Delete…';
-    b.onclick = () => { under.hidden = false; deleting(s, room); };
-    actions.append(b);
-  }
-  // Entering needs the console's environment; where there is none, the line
-  // that makes one, as `contour-console` prints it, stands where the button would.
+  // Open is the row's one button. The rest sit behind one control, and each
+  // lays itself out in the room under the row (ADR 0025, decision 10).
   if (can.has('enter') && !open) {
     actions.append(entering(s, said));
   } else if (!can.has('enter') && environment.console) {
-    const how = para('to enter, make the console environment: ', 'muted');
+    // Opening needs the console's environment; where there is none, the line
+    // that makes one, as `contour-console` prints it, stands where Open would.
+    const how = para('to open, make the console environment: ', 'muted');
     const code = document.createElement('code');
     code.textContent = environment.console;
     how.append(code);
     actions.append(how);
   }
+  const menu = document.createElement('details');
+  menu.className = 'menu';
+  const more = document.createElement('summary');
+  more.textContent = '⋯';
+  more.setAttribute('aria-label', 'More for ' + s.name);
+  const items = document.createElement('div');
+  menu.append(more, items);
+  const item = (text, act) => items.append(button(text, () => { menu.open = false; act(); }));
+  if (can.has('rename')) item('Rename…', () => { under.hidden = false; askName(s, room); });
+  // A new model from this one is a new space, never a copy (ADR 0015):
+  // create, with this space named as what its console's first prompt points
+  // at (issue 38).
+  if (can.has('create'))
+    item('New model from this one…', () => { under.hidden = false; room.replaceChildren(); creating(room, s); });
   if (can.has('reveal')) {
-    actions.append(button('Open in Finder', () => {
+    item('Show in Finder', () => {
       ask('/reveal', { path: s.path }).then(r => r.json()).then(done => {
-        said.textContent = done.refused ? 'Not opened: ' + done.refused : '';
+        said.textContent = done.refused ? 'Not shown: ' + done.refused : '';
       });
-    }));
+    });
   }
-  tr.append(name,
-            cell((s.toolkit.commit || '?') + ' (' + s.toolkit.state + ')'),
-            cell(String(s.commits), 'num'),
-            health(s), actions);
+  if (can.has('delete')) item('Delete…', () => { under.hidden = false; deleting(s, room); });
+  if (items.childElementCount) actions.append(menu);
+  tr.append(thumbnail(s), name, actions);
   return [tr, under];
 }
 
-// Enter: `contour-console` started in the space, which opens its own tab. The
+// Open: `contour-console` started in the space, which opens its own tab. The
 // list is asked again once it has had time to say it is there.
 function entering(s, said) {
-  const b = button('Enter', () => {
+  const b = button('Open', () => {
     b.disabled = true;
     ask('/enter', { path: s.path }).then(r => r.json()).then(done => {
-      if (done.refused) { b.disabled = false; said.textContent = 'Not entered: ' + done.refused; return; }
+      if (done.refused) { b.disabled = false; said.textContent = 'Not opened: ' + done.refused; return; }
       said.textContent = '';
       setTimeout(load, 2000);
     });
@@ -224,7 +276,7 @@ function creating(room, of) {
   if (room.childElementCount) return;
   const name = document.createElement('input');
   name.placeholder = 'name, like oak-chair';
-  name.setAttribute('aria-label', of ? 'Name of the variation of ' + of.name : 'Name of the new model');
+  name.setAttribute('aria-label', of ? 'Name of the new model from ' + of.name : 'Name of the new model');
   const location = document.createElement('input');
   location.size = 40;
   location.setAttribute('aria-label', 'Folder to make it in');
@@ -258,7 +310,7 @@ function creating(room, of) {
   drop.ondragover = e => { e.preventDefault(); drop.classList.add('over'); };
   drop.ondragleave = () => drop.classList.remove('over');
   drop.ondrop = e => { e.preventDefault(); drop.classList.remove('over'); take(e.dataTransfer.files); };
-  const b = button(of ? 'Create variation' : 'Create', async () => {
+  const b = button('Create', async () => {
     b.disabled = true;
     const r = await ask('/create', { name: name.value, location: location.value,
                                      of: of && of.path, references: await sent(dropped) });
@@ -500,7 +552,6 @@ function purging(d, room, p) {
 // so a deleted space never reads as a live one.
 function render({ roots, spaces, deleted }, can, environment) {
   document.getElementById('roots').textContent = 'Looking in ' + roots.join(', ');
-  document.getElementById('where').textContent = roots.join(' or ');
   const may = can.has('create');
   document.getElementById('create').hidden = !may || spaces.length === 0;
   if (may) {

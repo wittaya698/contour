@@ -198,19 +198,18 @@ class LobbyPageTest(unittest.TestCase):
 
     def test_no_spaces_is_onboarding_and_not_an_empty_table(self):
         """The table and the onboarding copy are shown for exactly opposite
-        answers, and the copy says what a space is and how one is made."""
+        answers, and the copy says what a model is (ADR 0025, decision 1: a
+        space is a *model* on the page)."""
         self.assertIn("getElementById('list').hidden = spaces.length === 0", self.page)
         self.assertIn("getElementById('onboarding').hidden = spaces.length !== 0", self.page)
         onboarding = self.page.split('id="onboarding"')[1].split("</section>")[0]
-        self.assertIn("model space", onboarding)
-        self.assertIn("contour init", onboarding)
+        self.assertIn("A <strong>model</strong> is", onboarding)
 
     def test_with_no_spaces_create_is_the_primary_action(self):
-        """*Name your first model* (ADR 0021, decision 4): a form, before the
-        terminal's way, which stays beneath it."""
+        """*Name your first model* (ADR 0021, decision 4): a form, and since
+        ADR 0025 the only way the page offers (issue 67)."""
         onboarding = self.page.split('id="onboarding"')[1].split("</section>")[0]
         self.assertIn('id="first"', onboarding)
-        self.assertLess(onboarding.index('id="first"'), onboarding.index("contour init"))
         self.assertIn("creating(document.getElementById('first'))", self.function("render"))
 
     def test_with_spaces_create_sits_above_the_table(self):
@@ -228,10 +227,12 @@ class LobbyPageTest(unittest.TestCase):
 
     def test_each_row_offers_a_variation_where_create_is_granted(self):
         """A variation is a new space, never a copy (ADR 0015): create, with the
-        source named, so its console's first prompt can point at it (issue 38)."""
+        source named, so its console's first prompt can point at it (issue 38).
+        On the page it is *a new model from this one* (ADR 0025, decision 10)."""
         row = self.function("row")
-        self.assertIn("'Variation of this…'", row)
-        self.assertIn("can.has('create')", row.split("'Variation of this…'")[0].rsplit("if (", 1)[1])
+        self.assertIn("'New model from this one…'", row)
+        self.assertIn("can.has('create')",
+                      row.split("'New model from this one…'")[0].rsplit("if (", 1)[1])
         self.assertIn("creating(room, s)", row)
         self.assertIn("of: of && of.path", self.function("creating"))
 
@@ -303,9 +304,10 @@ class LobbyPageTest(unittest.TestCase):
         self.assertLess(refused, shown.index("'Confirm rename'"))
 
     def test_a_renamed_space_says_so_until_it_is_committed(self):
+        """*Not saved yet*: commit is a hidden term (ADR 0025, decision 1)."""
         row = self.function("row")
         self.assertIn("s.renamed", row)
-        self.assertIn("uncommitted", row)
+        self.assertIn("not saved yet", row)
 
     def test_delete_is_offered_only_where_the_host_can_do_it(self):
         self.assertIn("can.has('delete')", self.function("row"))
@@ -394,12 +396,12 @@ class LobbyPageTest(unittest.TestCase):
         self.assertIn("!open", row)
 
     def test_an_enter_refusal_is_shown_as_the_host_worded_it(self):
-        self.assertIn("'Not entered: ' + done.refused", self.function("entering"))
+        self.assertIn("'Not opened: ' + done.refused", self.function("entering"))
 
     def test_open_in_finder_is_offered_only_where_the_host_can_do_it(self):
         row = self.function("row")
         self.assertIn("can.has('reveal')", row)
-        self.assertIn("Open in Finder", row)
+        self.assertIn("Show in Finder", row)
         self.assertIn("ask('/reveal'", self.page)
 
 

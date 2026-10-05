@@ -93,10 +93,15 @@ def say(kept):
     does not reason about.
 
     A build that never got as far as being judged has no failures because
-    nothing judged it, and says that rather than a count of none.
+    nothing judged it, and says that rather than a count of none. One kept
+    before checks were (issue 58) knows only that it built: `ok` is None,
+    neither green nor red, because neither is known.
     """
     if not kept["built"]:
         return {"ok": False, "line": "the build stopped before it could be checked",
+                "failing": [], "passing": []}
+    if "results" not in kept:
+        return {"ok": None, "line": "built before its checks were kept — build it again to see",
                 "failing": [], "passing": []}
     results = kept["results"]
     failing = [sentence(r) for r in results if not r["ok"]]

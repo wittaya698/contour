@@ -17,12 +17,12 @@ issue 81 gives it one. The empty state's terminal hint goes.
 
 ## Acceptance criteria
 
-- [ ] A row shows thumbnail, name, plain verdict, last worked on, and Open
-- [ ] A never-built model shows a reference as its picture and says *not built yet*
-- [ ] Rename, new model from this one, and Delete sit in a menu and behave as before
-- [ ] No row shows a toolkit commit or a commit count
-- [ ] A healthy model shows no health text; a remote is a warning; drift reads *needs an update*
-- [ ] The empty state no longer suggests a terminal command
+- [x] A row shows thumbnail, name, plain verdict, last worked on, and Open
+- [x] A never-built model shows a reference as its picture and says *not built yet*
+- [x] Rename, new model from this one, and Delete sit in a menu and behave as before
+- [x] No row shows a toolkit commit or a commit count
+- [x] A healthy model shows no health text; a remote is a warning; drift reads *needs an update*
+- [x] The empty state no longer suggests a terminal command
 
 ## Blocked by
 

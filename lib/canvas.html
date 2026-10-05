@@ -501,7 +501,7 @@ const told = document.getElementById('verdict');
 function verdict(said) {
   told.hidden = !said;
   if (!said) return;
-  told.classList.toggle('red', !said.ok);
+  told.classList.toggle('red', said.ok === false);   // null: not known either way
   told.querySelector('.line').textContent = said.line;
   const list = (cls, items) => told.querySelector(cls).replaceChildren(
     ...items.map(text => { const li = document.createElement('li');

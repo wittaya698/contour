@@ -772,7 +772,16 @@ def reading(root, now):
     was = next((l.split(":", 1)[1].strip() for l in marker.splitlines()
                 if l.startswith("toolkit:")), None)
     found = scaffold(root)
+    from lib import panel, refs, store, verdict
+    here = space.layout(root)
+    kept = store.load(here.dot / panel.NAME, None)
     return {"name": root.name, "path": str(root),
+            "verdict": verdict.say(kept) if kept else None,
+            # What a lobby row shows of it: the last sheet, or before there is
+            # one, what it is to be built from (ADR 0025, decision 10).
+            "picture": ("sheet" if here.sheet.is_file()
+                        else "reference" if refs.listing(here.refs) else None),
+            "worked": worked(here),
             "toolkit": {"commit": was,
                         "state": "unknown" if was is None
                         else "current" if was == now else "behind"},
@@ -782,6 +791,21 @@ def reading(root, now):
             "rules": sees_rules(root),
             "presence": presence.live(root),
             "renamed": rename.uncommitted(root)}
+
+
+def worked(here):
+    """When a space was last worked on, as ISO 8601: the newest of the files
+    the work touches — the spec, the build, the marks, the references, the
+    last check, and the marker `init` wrote, so a model nobody has touched
+    since it was made says when it was made. Not the last commit: most work
+    sits unsaved until the user says save (rule 5)."""
+    from datetime import datetime
+    from lib import panel
+    touched = [here.spec, here.build, here.marks, here.sheet, here.dot / panel.NAME,
+               here.root / MARKER, *(here.refs.iterdir() if here.refs.is_dir() else ())]
+    times = [p.stat().st_mtime for p in touched if p.is_file()]
+    return (datetime.fromtimestamp(max(times)).astimezone().isoformat(timespec="seconds")
+            if times else None)
 
 
 def listing():
