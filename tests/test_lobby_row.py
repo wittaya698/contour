@@ -83,6 +83,26 @@ class RowTest(unittest.TestCase):
         self.assertIsNone(row["verdict"])
         self.assertEqual(row["picture"], "reference")
 
+    def test_a_built_model_is_shown_by_its_perspective_view(self):
+        """One view and not four: at row size the four-view sheet is four
+        thumbnails of a thumbnail, and the one that reads as the model is the
+        perspective (ADR 0025, decision 10, as amended by issue 70). Where on
+        the sheet it sits is read off the views the sheet was drawn with."""
+        chair = self.init("chair")
+        (chair / "sheet.png").write_bytes(PNG)
+        (chair / "out").mkdir(exist_ok=True)
+        (chair / "out" / "views.json").write_text(json.dumps({"resolution": 1024, "views": [
+            {"label": "front", "tile": [0, 0, 512, 512], "type": "ORTHO"},
+            {"label": "persp", "tile": [512, 512, 512, 512], "type": "PERSP"}]}))
+        self.assertEqual(self.row("chair")["view"],
+                         {"tile": [512, 512, 512, 512], "size": 1024})
+
+    def test_a_sheet_with_no_views_beside_it_is_shown_whole(self):
+        chair = self.init("chair")
+        (chair / "sheet.png").write_bytes(PNG)
+        self.assertEqual(self.row("chair")["picture"], "sheet")
+        self.assertIsNone(self.row("chair")["view"])
+
     def test_last_worked_on_is_the_newest_of_what_the_work_touches(self):
         """An edit to the build counts though nothing was built or saved since,
         and a fresh model was worked on when it was made."""
@@ -159,6 +179,9 @@ class RowPageTest(unittest.TestCase):
         self.assertIn("s.verdict", row)
         self.assertIn("s.worked", row)
         self.assertIn("'Open'", self.function("entering"))
+
+    def test_a_sheet_is_cut_to_the_view_the_row_names(self):
+        self.assertIn("s.view", self.function("thumbnail"))
 
     def test_a_model_never_built_says_so(self):
         self.assertIn("'not built yet'", self.function("verdict"))

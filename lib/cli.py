@@ -801,6 +801,7 @@ def reading(root, now):
             # one, what it is to be built from (ADR 0025, decision 10).
             "picture": ("sheet" if here.sheet.is_file()
                         else "reference" if refs.listing(here.refs) else None),
+            "view": viewed(here) if here.sheet.is_file() else None,
             "worked": worked(here),
             "toolkit": {"commit": was,
                         "state": "unknown" if was is None
@@ -811,6 +812,23 @@ def reading(root, now):
             "rules": sees_rules(root),
             "presence": presence.live(root),
             "renamed": rename.uncommitted(root)}
+
+
+def viewed(here):
+    """Where on the sheet its perspective view sits, as `{tile, size}`, or None.
+
+    One view and not four is what a row shows: at row size the four-view sheet
+    is four thumbnails of a thumbnail, and the perspective is the one that
+    reads as the model (ADR 0025, decision 10, as amended by issue 70). Read off
+    the views the sheet was drawn with; with none to read, the row shows the
+    whole sheet, which is still the model and only harder to see."""
+    try:
+        drawn = json.loads(here.views.read_text(encoding="utf-8"))
+        view = next(v for v in drawn["views"]
+                    if v.get("label") == "persp" or v.get("type") == "PERSP")
+        return {"tile": [int(n) for n in view["tile"]], "size": int(drawn["resolution"])}
+    except (OSError, ValueError, KeyError, TypeError, StopIteration):
+        return None
 
 
 def worked(here):

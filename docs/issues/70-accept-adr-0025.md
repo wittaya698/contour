@@ -15,10 +15,10 @@ listed, undo it, and see the gate come back.
 
 ## Acceptance criteria
 
-- [ ] The lobby is read without a glossary word from the hidden tier
-- [ ] The first build gate is plain, and Always stops the next one
-- [ ] Undo brings the gate back
-- [ ] ADR 0025's status says accepted, amended or withdrawn, with the evidence
+- [x] The lobby is read without a glossary word from the hidden tier
+- [x] The first build gate is plain, and Always stops the next one
+- [x] Undo brings the gate back
+- [x] ADR 0025's status says accepted, amended or withdrawn, with the evidence
 
 ## Blocked by
 

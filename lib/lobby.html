@@ -45,10 +45,14 @@
           border-radius: 6px; color: var(--muted); }
   .drop.over { border-color: var(--fg); color: var(--fg); }
   .drop input { display: none; }
-  td.thumb { width: 96px; padding-right: 0; }
-  td.thumb img, td.thumb div { display: block; width: 96px; height: 72px; object-fit: contain;
+  /* Square, because the perspective view is, and large, because the picture is
+     how a model is found (ADR 0025, decision 10, as amended by issue 70). The
+     size is THUMB in the script too. */
+  td.thumb { width: 160px; padding-right: 0; }
+  td.thumb img, td.thumb div { display: block; width: 160px; height: 160px; object-fit: contain;
                                border: 1px solid var(--line); border-radius: 6px; background: #fff; }
   td.thumb div { background: transparent; border-style: dashed; }
+  td.thumb div.cut { border-style: solid; background-color: #fff; background-repeat: no-repeat; }
   td p { margin: 2px 0; }
   p.verdict { font-weight: 600; }
   ul.failing { margin: 2px 0 4px; padding-left: 18px; color: var(--warn); font-size: 14px; }
@@ -172,11 +176,28 @@ function ago(iso) {
 // The row's picture: the last sheet, or before the first build one of the
 // references it is to be built from, served by the lobby. An `<img>` cannot
 // send a header, so the token rides in its query, as the canvas's do.
+const THUMB = 160;                         // the frame's side, in px, as the stylesheet has it
 function thumbnail(s) {
   const td = cell('', 'thumb');
-  if (s.picture) {
+  const src = '/picture?path=' + encodeURIComponent(s.path) + '&t=' + TOKEN;
+  if (s.picture === 'sheet' && s.view) {
+    // One view of the four, the perspective: the sheet as served, scaled so
+    // that view covers the frame and centred in it, so no edge of a
+    // neighbouring view shows (ADR 0025, decision 10, as amended by issue 70).
+    const [x, y, w, h] = s.view.tile;
+    const k = Math.max(THUMB / w, THUMB / h);
+    const cut = document.createElement('div');
+    cut.className = 'cut';
+    cut.setAttribute('role', 'img');
+    cut.setAttribute('aria-label', 'the last build of ' + s.name);
+    cut.style.backgroundImage = 'url("' + src + '")';
+    cut.style.backgroundSize = (s.view.size * k) + 'px';
+    cut.style.backgroundPosition = ((THUMB - w * k) / 2 - x * k) + 'px '
+      + ((THUMB - h * k) / 2 - y * k) + 'px';
+    td.append(cut);
+  } else if (s.picture) {
     const img = document.createElement('img');
-    img.src = '/picture?path=' + encodeURIComponent(s.path) + '&t=' + TOKEN;
+    img.src = src;
     img.alt = s.picture === 'sheet' ? 'the last sheet of ' + s.name : 'a reference for ' + s.name;
     img.loading = 'lazy';
     td.append(img);

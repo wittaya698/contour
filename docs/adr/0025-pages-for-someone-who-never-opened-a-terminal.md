@@ -1,6 +1,36 @@
 # 0025 — Pages for someone who has never opened a terminal
 
-**Status:** Proposed · 2026-10-05 · **amends [ADR 0019](0019-console-a-driven-agent-behind-a-gate.md) (ADR 0019 decision 33's count, and ADR 0019 decision 36 is tuned from the page), [ADR 0021](0021-the-lobby.md) (what a row shows) and [ADR 0024](0024-the-connector-desktop-reads-and-opens.md) (decisions 4 and 10)**
+**Status:** Accepted, amended · 2026-10-06 (proposed 2026-10-05) · **amends [ADR 0019](0019-console-a-driven-agent-behind-a-gate.md) (ADR 0019 decision 33's count, and ADR 0019 decision 36 is tuned from the page), [ADR 0021](0021-the-lobby.md) (what a row shows) and [ADR 0024](0024-the-connector-desktop-reads-and-opens.md) (decisions 4 and 10)**
+
+> **Accepted on its tracer bullet, with decision 10 amended** (issue 70).
+> Used by hand on 2026-10-06, in the lobby over this machine's spaces and in
+> the console of a throwaway space, `gate-trial`. The space had its own copy
+> of beaky's spec, build and side reference, and had never been built.
+>
+> - **The gate:** the first build gate read *Claude wants to build the model
+>   to check its work*, with Allow, *Always for this model* and Deny. The
+>   user's verdict was "gate is good".
+> - **Always and Undo:** both ran. The ask-list, which did not exist before
+>   the run, was left holding `gate-trial` with an empty list. Always creates
+>   that entry, and only Undo empties it.
+> - **The lobby:** no row said toolkit or commits. `beaky` read *matches the
+>   spec*, and a model with no sheet showed its reference and *not built yet*.
+>
+> **The amendment.** A row's thumbnail was the whole four-view sheet, and at
+> row size it did not read as the model: *"I can't see what is the model in
+> 4 panel."* Decision 10's thumbnail is now the sheet's perspective view
+> alone, cut from the sheet where the sheet's own views place it, in a
+> square frame of 160 px — larger, at the user's asking, because the
+> picture is how a model is found, and a taller row is its price. A sheet
+> with no views recorded beside it is still shown whole. The side view was
+> considered and passed over: it loses whatever only the front shows.
+> A reference was passed over too, because the verdict beside the thumbnail
+> is about the build.
+>
+> **What the run showed that no decision covers.** A space with a sheet but
+> no check kept since issue 66 reads *not built yet*, beside a picture of a
+> build (`beaky-lite`, `beaky-solo`). That is decision 4's wording for a
+> missing verdict, and it is wrong when a sheet exists. Left as a finding.
 
 ## Context
 
@@ -124,7 +154,8 @@ ADR 0019 decision 37's *informed act* made one click long. Tokens sit behind it.
 and never a limit. A money estimate was rejected: it is wrong for a
 subscription and would replace the accounting's own units.
 
-**10. A lobby row is a picture and a verdict.** The last sheet as a thumbnail,
+**10. A lobby row is a picture and a verdict.** The last sheet as a thumbnail
+— its perspective view alone, 160 px square, as amended by issue 70 —
 or a reference before the first build; the name; the verdict in decision 4's
 words; when it was last worked on; Open. Rename, *a new model from this one*
 and delete move to a menu. Toolkit and commits are hidden. Health appears only
