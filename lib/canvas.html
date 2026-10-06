@@ -93,6 +93,9 @@
   #denied .call { font-family: ui-monospace, SFMono-Regular, monospace;
                   font-size: 11px; opacity: .7; word-break: break-all; }
   #exposure { font-size: 12px; color: var(--pin); }
+  #unwatched { border-top: 1px solid var(--line); padding-top: 12px; }
+  #unasked { padding-left: 0; list-style: none; margin: 4px 0 0; }
+  #unasked li { font-size: 12px; margin-bottom: 4px; }
   /* The run, when the host is one that owns a build. Above the ending, because
      the ending is what you reach for last. */
   #run { border-top: 1px solid var(--line); padding-top: 12px; display: flex;
@@ -221,6 +224,7 @@
         <input class="because" placeholder="why not (a sentence)" autocomplete="off">
         <div class="pair">
           <button class="allow">Allow</button>
+          <button class="always" hidden>Always for this model</button>
           <button class="deny">Deny</button>
         </div>
       </li>
@@ -233,6 +237,15 @@
        to getting one into git — it does not commit, and it does not offer to:
        a veto-only commit describes no model state, and this one belongs in the
        commit where the tolerance did not get widened (ADR 0019, decision 33). -->
+  <!-- What runs without asking for this model, each with Undo. Written only
+       by the user's own act — *Always* on a build gate, or by hand — and listed
+       so that every one of them can be taken back where it was given
+       (ADR 0025, decision 6). Silence still means ask, so an empty list shows
+       nothing. -->
+  <section id="unwatched" data-needs="drive" hidden>
+    <h1>Runs without asking</h1>
+    <ul id="unasked"></ul>
+  </section>
   <section id="vetoes" data-needs="drive" hidden>
     <h1>Vetoes</h1>
     <p id="exposure"></p>
@@ -332,6 +345,7 @@ function drive() {
   // route that host does not have.
   refreshVetoes();
   setInterval(refreshVetoes, 2000);
+  refreshUnwatched();
 
   // Polled from a cursor, so a reloaded tab gets the whole run back rather than
   // whatever happened after it reconnected.
@@ -369,6 +383,36 @@ async function refreshVetoes() {
   const list = document.getElementById('denied');
   list.replaceChildren();
   for (const veto of said.vetoes) list.append(vetoed(veto));
+}
+
+// What runs without asking for this model. Asked again after an *Always* and
+// after an Undo, which are the only two ways the page changes it.
+async function refreshUnwatched() {
+  const said = await ask('/asks').then(r => r.json()).catch(() => null);
+  if (said) unwatched(said.unwatched);
+}
+
+function unwatched(rows) {
+  const section = document.getElementById('unwatched');
+  if (!section) return;                     // a host with no gates removed it
+  section.hidden = !rows.length;
+  const list = document.getElementById('unasked');
+  list.replaceChildren();
+  for (const row of rows) {
+    const li = document.createElement('li');
+    li.textContent = row.says;
+    const undo = document.createElement('button');
+    undo.className = 'shut';
+    undo.textContent = 'Undo';
+    undo.addEventListener('click', async () => {
+      undo.disabled = true;
+      const said = await ask('/undo', { category: row.category })
+        .then(r => r.json()).catch(() => null);
+      if (said) unwatched(said.unwatched);
+    });
+    li.append(undo);
+    list.append(li);
+  }
 }
 
 // One veto, and the one thing that can be done with it. Promotion is what turns
@@ -443,11 +487,17 @@ function gate(event) {
   li.querySelector('.allow').textContent = said.allow;
   li.querySelector('.deny').textContent = said.deny;
   const because = li.querySelector('.because');
-  const answer = async allow => {
+  const answer = async (allow, always) => {
     for (const b of li.querySelectorAll('button')) b.disabled = true;
-    await ask('/verdict', { id: event.id, allow: allow, reason: because.value.trim() });
+    await ask('/verdict', { id: event.id, allow: allow, reason: because.value.trim(),
+                            always: always });
+    if (always) refreshUnwatched();
   };
-  li.querySelector('.allow').addEventListener('click', () => answer(true));
+  li.querySelector('.allow').addEventListener('click', () => answer(true, false));
+  // A third answer on a build only: this call, and every build in this space
+  // after it, until Undo (ADR 0025, decision 6).
+  li.querySelector('.always').hidden = !said.always;
+  li.querySelector('.always').addEventListener('click', () => answer(true, true));
   li.querySelector('.deny').addEventListener('click', () => answer(false));
   return li;
 }

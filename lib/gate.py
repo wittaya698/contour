@@ -14,7 +14,7 @@ Stdlib, and Blender-free: the console imports this to draw a gate.
 import re
 from pathlib import Path
 
-from . import marks, miniyaml
+from . import marks, miniyaml, policy
 
 WORDS = {
     "spec-write": ("Claude wants to change the spec", "Allow", "Deny"),
@@ -26,6 +26,23 @@ WORDS = {
 """Category -> the act, and the two answers to it. Every category `contour
 intents` prints is here (`tests/test_gate.py`)."""
 
+UNWATCHED = {
+    "spec-write": "Changing the spec",
+    "ref-write": "Changing your reference pictures",
+    "build": "Building the model to check its work",
+    "commit": "Saving a version",
+    "push": "Sending this model off this computer",
+}
+"""Category -> what runs without asking, as the page lists it beside Undo. All
+five, though *Always* writes only a build: a hand-written list can say any."""
+
+
+def unwatched(space):
+    """What this space lets through without asking, as the page lists it. A
+    category the table lacks shows its own name, as `say` does."""
+    return [{"category": c, "says": UNWATCHED.get(c, c)}
+            for c in policy.allowed(space)]
+
 
 def say(category, space, tool, call, proposal=""):
     """What a page says about one gate, as one dict it renders and does not
@@ -35,9 +52,13 @@ def say(category, space, tool, call, proposal=""):
 
     `proposal` is what the agent last said before the call. For a spec write
     it is the argument rule 1 asks for, and the span it names is named here.
+
+    `always` is whether the gate offers a third answer, *Always for this
+    model*: on a build only, from the table `lib/policy.py` writes against.
     """
     act, allow, deny = WORDS.get(category, (category, "Allow", "Deny"))
-    said = {"act": act, "allow": allow, "deny": deny, "changes": [], "spans": []}
+    said = {"act": act, "allow": allow, "deny": deny, "changes": [], "spans": [],
+            "always": category in policy.ALWAYS}
     if category == "spec-write":
         said["changes"] = changes(Path(space) / "spec.yaml", tool, call)
         said["spans"] = spans(Path(space) / marks.NAME, proposal)

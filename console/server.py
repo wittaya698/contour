@@ -15,9 +15,11 @@ from pathlib import Path
 
 from console import run as run_lib
 from console import vetoes as veto_store
+from console import launcher
 from lib import canvas as canvas_lib
+from lib import gate as gate_words
 from lib import panel as panel_state
-from lib import presence, signals
+from lib import policy, presence, signals
 from lib import space as space_lib
 
 
@@ -136,6 +138,8 @@ class Console:
                     ("POST", "/verdict"): self.verdict,
                     ("GET", "/vetoes"): self.vetoes,
                     ("POST", "/promote"): self.promoted,
+                    ("GET", "/asks"): self.asks,
+                    ("POST", "/undo"): self.undone,
                     ("POST", "/end"): self.ending})
 
     def started(self, body):
@@ -166,9 +170,10 @@ class Console:
     def verdict(self, body):
         """`POST /verdict`: allow, or deny with a reason. Nothing else is read
         off the body — a gate has two answers and a sentence, and the call is
-        not among them."""
+        not among them. *Always* is an allow that also writes this space's
+        ask-list entry (ADR 0025, decision 6)."""
         return self.run.answer(body.get("id"), body.get("allow"),
-                               body.get("reason"))
+                               body.get("reason"), always=bool(body.get("always")))
 
     def vetoes(self, query):
         """`GET /vetoes`: every veto in this space, and how many git does not
@@ -184,6 +189,21 @@ class Console:
         no gates, so it has no vetoes to promote and must not learn about them.
         """
         return veto_store.promote(self.space, body.get("id"), body.get("part"))
+
+    def asks(self, query):
+        """`GET /asks`: what runs without asking for this model, each in words.
+        Read by importing `lib/`; written only by the launcher, below."""
+        try:
+            return {"unwatched": gate_words.unwatched(self.space)}
+        except policy.PolicyError as e:      # an ask-list nobody can read
+            return {"unwatched": [], "refused": str(e)}
+
+    def undone(self, body):
+        """`POST /undo`: ask about this category again in this space. By the
+        command that writes the list, of which the page is the one client
+        (ADR 0021, decision 3); answered with the list as it now stands."""
+        launcher.run(self.space, "asks", "--undo", str(body.get("category")), "--json")
+        return self.asks({})
 
     def start(self):
         url = self.canvas.start()

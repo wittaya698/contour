@@ -209,6 +209,14 @@ class Run:
         """
         if self.stopped:
             raise Stopped()
+        if policy.rewrites(tool, payload):
+            # Not a gate: one the user allowed by reflex would be the agent
+            # granting itself builds by the user's hand. The list is written
+            # from the page, by the user (ADR 0025, decision 6).
+            why = ("the ask-list is the user's to change, from the page's "
+                   "Always and Undo; ask them instead")
+            self.say("refused", text=why)
+            return False, why
         category = intent.classify(tool, payload)
         if category is None:
             return True, None
@@ -288,7 +296,7 @@ class Run:
         for line in lines:
             self.say("resolved", text=line)
 
-    def answer(self, at, allow, reason=None):
+    def answer(self, at, allow, reason=None, always=False):
         """The user's verdict on the gate that is waiting, or None if none is.
 
         On the transcript, because the decision is as much a part of the run as
@@ -303,6 +311,11 @@ class Run:
             return None
         waiting["allow"], waiting["reason"] = bool(allow), reason
         self.pending = None
+        if allow and always and waiting["category"] in policy.ALWAYS:
+            # The user's own act, by the page's door to the command that writes
+            # the list: the next build in this space runs without asking. Done
+            # before the call is let go, so it is in force for the next one.
+            launcher.run(self.space, "asks", "--always", waiting["category"], "--json")
         if not allow:
             # The transcript dies with the tab; this does not. A denial is why
             # two builds differ, so it is kept in the space and reaches git with

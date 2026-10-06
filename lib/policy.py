@@ -8,7 +8,9 @@ than as a word like `normal` whose meaning moved underneath the user.
 Blender-free by construction: the console consults this to decide whether to
 ask, and the console must never pull Blender into its own process.
 """
+import json
 import os
+import re
 from pathlib import Path
 
 from lib import intent, miniyaml
@@ -139,3 +141,91 @@ def report(space, file=None):
               for c in intent.categories()]
     return lines + [f"unknown category {c!r} in {file} — not a category the "
                     f"toolkit knows, so it allows nothing" for c in strangers]
+
+
+ALWAYS = ("build",)
+"""The categories a gate may offer *Always for this model* on (ADR 0025,
+decision 6). A build is the one whose stopping costs a turn and protects
+nothing a later look cannot catch: a spec write, a reference write and saving a
+version always ask, and a push is never offered at all."""
+
+
+def always(space, category, file=None):
+    """Let `category` through for this space without asking, from now on.
+
+    The space's own list replaces the global one whole, so what is written is
+    the list as it resolves for this space now, plus `category` — never the
+    category alone, which would quietly retire whatever the global list let
+    through. Returns what this space now allows.
+    """
+    if category not in ALWAYS:
+        raise PolicyError(f"{category} always asks; only "
+                          f"{', '.join(ALWAYS)} can be allowed for good")
+    return own(space, (*named(space, file), category), file)
+
+
+def undo(space, category, file=None):
+    """Ask about `category` again in this space: the resolved list, without
+    it, written as the space's own. Narrowing needs no table — any category
+    may go back to asking."""
+    return own(space, tuple(c for c in named(space, file) if c != category), file)
+
+
+def own(space, lets, file=None):
+    """Write `lets` as this space's own list, keeping the global list and
+    every other space as they were, and return what the space now allows.
+
+    The file is rewritten whole, so a comment in it does not survive: the
+    write is the user's own act from the page, and the list is what is kept.
+    """
+    if space is None:
+        raise PolicyError("not in a model space: an ask-list entry is per space")
+    file = Path(file or ask_list())
+    whole = (miniyaml.load(file) or {}) if file.exists() else {}
+    spaces = {k: v for k, v in (whole.get("spaces") or {}).items()
+              if here(k) != here(space)}
+    # In the toolkit's order, and a name it does not know kept where `report`
+    # will still say it: dropped here, it would retire silently.
+    known, strangers = split(tuple(dict.fromkeys(lets)))
+    spaces[here(space)] = {"allow": [*known, *strangers]}
+    whole["spaces"] = spaces
+    file.parent.mkdir(parents=True, exist_ok=True)
+    file.write_text(dumps(whole), encoding="utf-8")
+    return allowed(space, file)
+
+
+def dumps(doc, indent=0):
+    """An ask-list as YAML `lib/miniyaml.py` reads back: mappings in blocks,
+    lists in flow, every string quoted so a path is one key whatever it holds."""
+    out = []
+    for key, value in doc.items():
+        lead = " " * indent + json.dumps(str(key)) + ":"
+        if isinstance(value, dict):
+            out.append(lead)
+            out.append(dumps(value, indent + 2).rstrip("\n"))
+        elif isinstance(value, (list, tuple)):
+            out.append(lead + " [" + ", ".join(json.dumps(str(v)) for v in value) + "]")
+        elif value is None:
+            out.append(lead)
+        else:
+            out.append(lead + " " + json.dumps(value))
+    return "\n".join(line for line in out if line) + "\n"
+
+
+# A call that would rewrite the list, read off its text as `lib/intent.py` reads
+# a spec write: blunt on purpose, since a false positive costs an agent one
+# refused call and a false negative is an agent granting itself permissions.
+WRITER = re.compile(r"\bcontour\b.*\basks\b.*--(always|undo)\b", re.S)
+
+
+def rewrites(tool, payload):
+    """Whether this call would change the ask-list, by the command that writes
+    it or by touching the file. The console refuses such a call from its agent
+    outright: the list is the user's, written from the page (ADR 0025,
+    decision 6), and an agent widening its own permissions is what it exists to
+    prevent."""
+    if tool in ("Write", "Edit", "MultiEdit", "NotebookEdit"):
+        named = payload.get("file_path") or payload.get("notebook_path") or ""
+        return Path(named).name == ask_list().name
+    text = payload.get("command") or ""
+    return ask_list().name in text or bool(WRITER.search(text))

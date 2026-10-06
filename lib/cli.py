@@ -496,12 +496,32 @@ def on_intents(cmd, rest, held):
 
 
 def on_asks(cmd, rest, held):
+    """The resolved policy, or with `--always <c>` / `--undo <c>` this space's
+    entry rewritten (ADR 0025, decision 6). The page is the writer's one client
+    (ADR 0021, decision 3); the console refuses the agent's call to it, since an
+    agent widening its own permissions is what the ask-list exists to prevent."""
     from lib import policy
+    acts = {"--always": policy.always, "--undo": policy.undo}
+    act = next((w for w in rest if w in acts), None)
+    named = [w for w in rest if w not in (*acts, "--json")]
+    if act is None and not named:
+        try:
+            print("\n".join(policy.report(PROJECT)))
+        except policy.PolicyError as e:
+            return emit({"ok": False, "lines": [f"FAIL {e}"]})
+        return 0
+    if act is None or len(named) != 1:
+        print(usage(), file=sys.stderr)
+        return 2
     try:
-        print("\n".join(policy.report(PROJECT)))
+        said = {"refused": None, "allowed": list(acts[act](PROJECT, named[0]))}
     except policy.PolicyError as e:
-        return emit({"ok": False, "lines": [f"FAIL {e}"]})
-    return 0
+        said = {"refused": str(e), "allowed": None}
+    if "--json" in rest:
+        return emit({"ok": not said["refused"], "lines": [json.dumps(said, indent=2)]})
+    if said["refused"]:
+        return emit({"ok": False, "lines": [f"FAIL asks  {said['refused']}"]})
+    return emit({"ok": True, "lines": policy.report(PROJECT)})
 
 
 def on_hook(cmd, rest, held):

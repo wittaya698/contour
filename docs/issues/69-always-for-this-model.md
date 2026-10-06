@@ -21,11 +21,11 @@ writes the list back without it. Silence still means ask (ADR 0019, decision 36)
 
 ## Acceptance criteria
 
-- [ ] A build gate offers Allow, Always for this model, and Deny; no other category offers Always
-- [ ] Always writes the resolved list plus `build` for this space, and `contour asks` shows it
-- [ ] A global entry survives a per-space Always
-- [ ] The page lists what runs unwatched for this model, and Undo removes one
-- [ ] The command that writes the list is not callable by the console's agent
+- [x] A build gate offers Allow, Always for this model, and Deny; no other category offers Always
+- [x] Always writes the resolved list plus `build` for this space, and `contour asks` shows it
+- [x] A global entry survives a per-space Always
+- [x] The page lists what runs unwatched for this model, and Undo removes one
+- [x] The command that writes the list is not callable by the console's agent
 
 ## Blocked by
 

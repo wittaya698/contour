@@ -105,8 +105,12 @@ TABLE = (
                             "it for good, --json says it for a client"),), "on_purge"),
     Command("intents", NONE, False, False, None,
             (("intents", "the call categories a gate can ask about"),), "on_intents"),
-    Command("asks", NONE, False, False, None,
-            (("asks", "what this space lets through, and what asks"),), "on_asks"),
+    Command("asks", (0, 3), False, False, None,
+            (("asks", "what this space lets through, and what asks"),
+             ("asks --always build", "let builds through in this space without asking; "
+                                     "for the page, not the agent"),
+             ("asks --undo <category>", "ask about it again in this space; --json says "
+                                        "it for a client")), "on_asks"),
     Command("hook", ANY, False, False, None,
             (("hook <name>", "run a guard; for hooks to call, not you"),), "on_hook"),
 )

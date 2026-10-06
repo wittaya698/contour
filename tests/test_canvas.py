@@ -314,8 +314,10 @@ class CanvasTest(unittest.TestCase):
         script = page.split("<script>", 1)[1]
         body = re.search(r"ask\('/verdict', \{([^}]*)\}", script)
         self.assertIsNotNone(script and body, "the page never answers a gate")
+        # `always` is an answer and not a piece of the call: a build gate's third
+        # one, allow-and-write-the-ask-list (ADR 0025, decision 6).
         self.assertEqual(set(re.findall(r"(\w+):", body.group(1))),
-                         {"id", "allow", "reason"})
+                         {"id", "allow", "reason", "always"})
 
     def test_one_rule_applies_every_declaration(self):
         """The page asks its host once and enforces the answer in one place.
