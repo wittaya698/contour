@@ -130,7 +130,7 @@ class Console:
         self.run = run_lib.Run(self.space)
         self.canvas = canvas_lib.Canvas(
             sheet=here.sheet, marks=here.marks,
-            mask=here.mask, parts=here.parts, can=CAN,
+            mask=here.mask, parts=here.parts, refs=here.refs, can=CAN,
             # `views.json` beside the build says which build the cameras drew,
             # so the panel can be labelled rather than quietly authoritative
             # (ADR 0019, decision 13).

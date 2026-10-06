@@ -236,6 +236,19 @@ class ServesTest(ConsoleCase):
         self.assertEqual(asked - granted, set(),
                          "the page keys an affordance on a name no host answers")
 
+    def test_the_console_shows_the_references_the_canvas_shows(self):
+        """The strip, a span's own picture and the card that asks about one
+        all read `/refs.json` and `/ref` — so a console that served no
+        references could neither show a span nor take *Let me move it*."""
+        space = self.space()
+        (space / "refs").mkdir()
+        (space / "refs" / "side.png").write_bytes(b"\x89PNG\r\n\x1a\na side view")
+        _, url = self.launch(space)
+        self.assertEqual(self.ask(url, "/refs.json")[1], ["side.png"])
+        origin, token = url.split("/?")[0], url.split("t=")[1]
+        with urllib.request.urlopen(f"{origin}/ref?name=side.png&t={token}", timeout=10) as r:
+            self.assertEqual(r.read(), b"\x89PNG\r\n\x1a\na side view")
+
     def test_the_console_serves_the_page_it_shares_with_the_canvas(self):
         """`lib/canvas.html`, not a copy: two copies of the page would drift,
         and the one that drifts is the one nobody is looking at."""
