@@ -15,11 +15,11 @@ The marks list stays as the overview, and answering there still works.
 
 ## Acceptance criteria
 
-- [ ] Unanswered agent spans are offered one at a time, zoomed
-- [ ] Each answer records adopt, correct or reject exactly as the list does
-- [ ] Skip leaves the span unanswered and moves on
-- [ ] A by-eye span is flagged as decided
-- [ ] The list still shows every span and still answers
+- [x] Unanswered agent spans are offered one at a time, zoomed
+- [x] Each answer records adopt, correct or reject exactly as the list does
+- [x] Skip leaves the span unanswered and moves on
+- [x] A by-eye span is flagged as decided
+- [x] The list still shows every span and still answers
 
 ## Blocked by
 

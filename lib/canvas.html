@@ -77,6 +77,20 @@
      dashed and asks; answered, it says which answer it got. A rejected one is
      closed already, and says why beside its struck-through number. */
   li.unanswered { border-left: 2px dashed var(--agent); padding-left: 6px; }
+  /* The same questions, asked one at a time (issue 75): the agent's colour,
+     because the agent is asking. */
+  #questions { display: flex; flex-direction: column; gap: 6px;
+               border-bottom: 1px solid var(--line); padding-bottom: 12px; }
+  #questions[hidden] { display: none; }
+  #questions .zoom { width: 100%; cursor: default; border-radius: 4px;
+                     border: 1px solid var(--line); }
+  #questions p { margin: 0; }
+  #questions .number { font-family: ui-monospace, SFMono-Regular, monospace;
+                       font-size: 12px; color: var(--agent); }
+  #questions .asks { font-weight: 700; }
+  #questions .eyed { font-size: 12px; font-style: italic; color: var(--agent); }
+  #questions .answers { display: flex; flex-wrap: wrap; gap: 6px; }
+  #questions .skip { align-self: flex-start; }
   li.adopted .verdict, li.corrected .verdict { color: var(--pin); }
   li.rejected .why { display: block; font-size: 12px; text-decoration: none; }
   /* By eye: the agent placed the ends itself, where nothing would snap (ADR
@@ -190,6 +204,23 @@
   <div id="verdict" hidden><p class="line"></p><ul class="failing"></ul>
     <details><summary>what matched</summary><ul class="passing"></ul></details></div></div>
 <aside>
+  <!-- Claude's questions about the references, one at a time: each unanswered
+       agent span, zoomed, with its number and the three answers in words
+       (ADR 0022, decision 5; ADR 0025, decision 1). The list below stays the
+       overview and still answers; this is the same three answers, asked. -->
+  <section id="questions" hidden>
+    <h1 class="count"></h1>
+    <canvas class="zoom" width="536" height="320"></canvas>
+    <p class="number"></p>
+    <p class="asks"></p>
+    <p class="eyed" hidden>Claude placed these ends by eye — check them closely.</p>
+    <div class="answers">
+      <button type="button" class="yes">Yes, that&rsquo;s it</button>
+      <button type="button" class="move">Let me move it</button>
+      <button type="button" class="wrong">Wrong thing&hellip;</button>
+    </div>
+    <button type="button" class="skip shut">skip for now</button>
+  </section>
   <h1>Marks</h1>
   <ol id="list"></ol>
   <p id="hint">Click the sheet, then type one line.</p>
@@ -903,6 +934,7 @@ function draw() {
     }
     list.appendChild(li);
   });
+  questions();
 }
 
 // What this run has cost so far: its turns, and — only when gates have cost
@@ -966,6 +998,85 @@ function spanState(mark) {
   if (mark.answer) return mark.answer;
   return mark.author === 'agent' && mark.ref && mark.to ? 'unanswered' : null;
 }
+
+// Claude's questions, asked one at a time (issue 75). The ids put off with
+// *skip for now*, for this tab only: skipping answers nothing, so nothing is
+// written and a reload asks them again.
+const skipped = new Set();
+let asked = null;                            // the span the card is asking about
+
+function questions() {
+  const card = document.getElementById('questions');
+  const open = marks.filter(m => spanState(m) === 'unanswered' && m.status !== 'closed');
+  const mark = open.find(m => !skipped.has(m.id)) || null;
+  card.hidden = !mark;
+  asked = mark;
+  if (!mark) return;
+  card.querySelector('.count').textContent = 'Claude has ' + open.length
+    + (open.length === 1 ? ' question' : ' questions') + ' about your pictures';
+  // The number the span gave, from the reading it is linked to: *span m4: 640
+  // mm ±3 mm  (213 px at …)* is shown as *640 mm ±3 mm*. A span drawn before
+  // readings were linked has none to show, and the question still stands.
+  const reading = marks.find(m => m.id === mark.reading);
+  card.querySelector('.number').textContent = reading
+    ? reading.text.replace(/^span \S+: /, '').split('  ')[0] : '';
+  card.querySelector('.asks').textContent = 'Is this ' + mark.text + '?';
+  card.querySelector('.eyed').hidden = mark.placed !== 'by eye';
+  zoom(mark);
+}
+
+// The reference, cropped to the span with room either side, and the span drawn
+// on it as the big canvas draws one. One picture per reference, kept: the card
+// redraws with the list, every time it changes.
+const zoomed = {};
+function zoom(mark) {
+  const cv = document.querySelector('#questions .zoom');
+  const pic = zoomed[mark.ref] || (zoomed[mark.ref] = new Image());
+  if (!pic.src) pic.src = asset('/ref?name=' + encodeURIComponent(mark.ref));
+  if (!pic.complete || !pic.naturalWidth) {
+    pic.onload = () => { if (asked === mark) zoom(mark); };
+    return;
+  }
+  const [a, b] = [mark.pixel, mark.to];
+  const pad = Math.max(Math.hypot(b[0] - a[0], b[1] - a[1]) * 0.35, 40);
+  // The span's box, padded, then widened to the card's shape so nothing is
+  // stretched, and held inside the picture.
+  let w = Math.abs(b[0] - a[0]) + 2 * pad, h = Math.abs(b[1] - a[1]) + 2 * pad;
+  const shape = cv.width / cv.height;
+  if (w / h < shape) w = h * shape; else h = w / shape;
+  w = Math.min(w, pic.naturalWidth); h = Math.min(h, pic.naturalHeight);
+  const x = Math.min(Math.max((a[0] + b[0]) / 2 - w / 2, 0), pic.naturalWidth - w);
+  const y = Math.min(Math.max((a[1] + b[1]) / 2 - h / 2, 0), pic.naturalHeight - h);
+  const c = cv.getContext('2d');
+  const k = Math.min(cv.width / w, cv.height / h);
+  c.clearRect(0, 0, cv.width, cv.height);
+  c.drawImage(pic, x, y, w, h, 0, 0, w * k, h * k);
+  c.save();
+  c.strokeStyle = '#2f6fd8';
+  c.lineWidth = 3;
+  c.lineCap = 'round';
+  if (mark.placed === 'by eye') c.setLineDash([9, 9]);
+  c.beginPath();
+  c.moveTo((a[0] - x) * k, (a[1] - y) * k);
+  c.lineTo((b[0] - x) * k, (b[1] - y) * k);
+  c.stroke();
+  c.restore();
+}
+
+// The card's answers are the list's: adopt, correct and reject, by the same
+// functions, so an answer given here is recorded exactly as one given there.
+// Skip writes nothing and asks the next.
+function askedAnswers() {
+  const card = document.getElementById('questions');
+  const on = (cls, act) => card.querySelector(cls).addEventListener('click', () => {
+    if (asked) act();
+  });
+  on('.yes', () => adoptSpan(asked));
+  on('.move', () => correctSpan(asked));
+  on('.wrong', () => rejectSpan(asked));
+  on('.skip', () => { skipped.add(asked.id); questions(); });
+}
+askedAnswers();
 
 // The user's three answers. Each goes to the server and the list is read back
 // whole: an answer can close a reading or add one, which is more than the one
