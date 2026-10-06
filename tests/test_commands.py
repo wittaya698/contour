@@ -54,7 +54,7 @@ class SpaceTest(unittest.TestCase):
         self.assertEqual(names(space=True),
                          ["check", "render", "export", "filmstrip", "measure",
                           "worksheet", "canvas",
-                          "resolve", "mark", "run", "doctor", "migrate-marks",
+                          "resolve", "mark", "run", "doctor", "update", "migrate-marks",
                           "rename", "delete"])
 
 

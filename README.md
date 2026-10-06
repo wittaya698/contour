@@ -331,6 +331,7 @@ the choice to allow that, and Desktop asks before each call.
 | `contour selftest` | the fixture through every stage, plus 37 mutants |
 | `contour init <name> [--to <dir>]` | create a model space here, or in `<dir>` |
 | `contour doctor` | is this space still in step with the toolkit |
+| `contour update [--dry-run]` | bring this space's rules in step, where nobody edited them |
 | `contour spaces [name]` | list model spaces, or print one's path |
 | `contour lobby` | every space on this machine, on one page |
 | `contour mcp` | the connector, for Claude Desktop; `--config` prints its block |
@@ -383,7 +384,7 @@ A model space, anywhere on disk, its own git repository:
     marks.json    located comments and spans, from both sides   (ADR 0018)
     vetoes.json   calls you refused at a gate, and why            (ADR 0019)
     NOTES.md      what is deferred, and what is undecided
-    CLAUDE.md     the agent's rules          (copied from the toolkit; `contour doctor` flags drift)
+    CLAUDE.md     the agent's rules          (copied from the toolkit; `contour doctor` flags drift, `contour update` mends it)
     .claude/      the spec guard's settings, and the build and release skills
     .contour/     the marker, plus logs               (git-ignored)
     out/          generated .blend, filmstrip, scratch (git-ignored)

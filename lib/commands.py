@@ -78,6 +78,10 @@ TABLE = (
                                           "it for a client"),), "on_init"),
     Command("doctor", NONE, True, False, None,
             (("doctor", "is this space in step with the toolkit"),), "on_doctor"),
+    Command("update", (0, 2), True, False, None,
+            (("update", "bring this space's rules in step with the toolkit, where "
+                        "nobody edited them; --dry-run says what it would do, --json "
+                        "says it for a client"),), "on_update"),
     Command("migrate-marks", NONE, True, False, None,
             (("migrate-marks", "rewrite this space's marks into one spelling"),),
             "on_migrate_marks"),

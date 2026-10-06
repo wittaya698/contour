@@ -17,12 +17,12 @@ is left uncommitted. Machine-readable output, for the lobby.
 
 ## Acceptance criteria
 
-- [ ] An untouched file is replaced and an edited one is named and left
-- [ ] A renamed space's untouched files count as untouched
-- [ ] A recorded commit missing from history overwrites nothing
-- [ ] It refuses during a run and while a page is open, worded as rename words it
-- [ ] `--dry-run` changes nothing
-- [ ] `contour doctor` reports the space in step afterwards, except for files left alone
+- [x] An untouched file is replaced and an edited one is named and left
+- [x] A renamed space's untouched files count as untouched
+- [x] A recorded commit missing from history overwrites nothing
+- [x] It refuses during a run and while a page is open, worded as rename words it
+- [x] `--dry-run` changes nothing
+- [x] `contour doctor` reports the space in step afterwards, except for files left alone
 
 ## Blocked by
 

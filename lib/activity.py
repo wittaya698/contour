@@ -31,6 +31,7 @@ CONTOUR = {
     "install-hooks": "Installed the safety checks",
     "init": "Made a new model",
     "doctor": "Checked this model is in step with Contour",
+    "update": "Brought this model's rules up to date with Contour",
     "migrate-marks": "Rewrote the marks in the current spelling",
     "spaces": "Listed the models",
     "mcp": "Started the Claude Desktop connection",

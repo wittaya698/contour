@@ -25,7 +25,7 @@ import sys
 import time
 from pathlib import Path
 
-from lib import commands, connector, delete, git, presence, rename, restore, revision, space     # stdlib-only by test (ADR 0019, 29)
+from lib import commands, connector, delete, git, presence, rename, restore, revision, space, update     # stdlib-only by test (ADR 0019, 29)
 
 ROOT = Path(__file__).resolve().parent.parent
 BLENDER = os.environ.get("BLENDER", "/Applications/Blender.app/Contents/MacOS/Blender")
@@ -351,6 +351,24 @@ def on_init(cmd, rest, held):
 
 def on_doctor(cmd, rest, held):
     return emit(doctor())
+
+
+def on_update(cmd, rest, held):
+    """Updates, or with `--dry-run` says what it would (ADR 0026).
+
+    `holds` is False in the table and the hold is taken in `update.perform`,
+    as rename's is: a run already holding the space is a refusal worded the
+    way rename words it, not the launcher's own."""
+    if not set(rest) <= {"--dry-run", "--json"}:
+        print(usage(), file=sys.stderr)
+        return 2
+    done = "--dry-run" not in rest
+    said = (update.perform if done else update.propose)(PROJECT, ROOT)
+    if "--json" in rest:
+        return emit({"ok": not said["refused"], "lines": [json.dumps(said, indent=2)]})
+    if said["refused"]:
+        return emit({"ok": False, "lines": [f"FAIL update  {said['refused']}"]})
+    return emit({"ok": True, "lines": update.lines(said, done)})
 
 
 def on_migrate_marks(cmd, rest, held):
@@ -684,7 +702,7 @@ def doctor():
     lines, ok = [], True
     for rel, state in scaffold(PROJECT).items():
         if state == "missing":
-            lines.append(f"MISS {rel} — run contour init in a fresh dir to see it")
+            lines.append(f"MISS {rel} — run contour update to write it")
             ok = False
         elif state == "drift":
             lines.append(f"DRIFT {rel} — differs from the toolkit's template")
@@ -697,6 +715,9 @@ def doctor():
     now = toolkit_commit()
     lines.append(f"{'ok  ' if was == now else 'NOTE'} toolkit {was}"
                  + ("" if was == now else f" -> {now} since this space was created"))
+    if not ok or was != now:
+        lines.append("     run contour update: it replaces what nobody edited, "
+                     "and names what it leaves")
     remotes = git.remotes(PROJECT)
     if remotes:
         lines.append(f"WARN this space has a remote ({', '.join(remotes)}); it is never pushed")

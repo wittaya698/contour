@@ -223,6 +223,9 @@ INTENTLESS = {
     "install-hooks": "installs the push guard; refusing it protects nothing",
     "init": "creates a space, and there is no space yet to have policy about",
     "doctor": "compares a space against the toolkit and writes nothing",
+    "update": "rewrites only a space's copies of the toolkit's rules, never a spec, "
+              "a reference or the build, and refuses while a page is open or a run "
+              "holds the space, so no agent under a console can reach it (ADR 0026)",
     "migrate-marks": "rewrites the user\'s own marks into one spelling, and only "
                      "when they ask for it by name; the diff it makes is theirs "
                      "to read and reaches a remote only past the commit gate",
