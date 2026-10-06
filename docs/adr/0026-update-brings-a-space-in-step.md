@@ -1,6 +1,30 @@
 # 0026 — Update: a space's copies brought in step, where nobody edited them
 
-**Status:** Proposed · 2026-10-05 · **extends [ADR 0015](0015-model-spaces.md) (its copies gain a way back into step) and [ADR 0021](0021-the-lobby.md) (the lobby gains an action)**
+**Status:** Accepted, amended · 2026-10-07 (proposed 2026-10-05) · **extends [ADR 0015](0015-model-spaces.md) (its copies gain a way back into step) and [ADR 0021](0021-the-lobby.md) (the lobby gains an action)**
+
+> **Accepted on its tracer bullet, with decision 1 amended** (issue 82).
+> Used by hand on 2026-10-07 over this machine's six spaces, every one of
+> them behind, `beaky` on the rules of `72876fe`.
+>
+> - **The update:** `contour update` brought all six from their recorded
+>   commits to `b20494a`, and left nothing alone.
+> - **The lobby:** `beaky` was then put back on `72876fe`'s copies and
+>   updated from its row. The preview was read first, it named the four copies
+>   that had moved on, and the confirm replaced them. The row then said
+>   *updated, not saved yet*, and the marker said `45faa31`, which only the
+>   lobby's run could have written.
+> - **The agent:** a run in `beaky`'s console afterwards spoke ADR 0025's
+>   plain words. The user's verdict: "everything looks good".
+> - **The model:** the row still said *matches the spec*, and `beaky`'s check
+>   stayed green. Update changes rules, never the model (decision 5).
+>
+> **The amendment.** Decision 1 compared a copy against the template written
+> for the space's *current* name. A space renamed before its template moved
+> on breaks that: `rename` rewrites only what it must, so its untouched skill
+> files still say the old name, and under the current name they read as
+> edited. A copy is now unedited when it equals the old template written for
+> **one name, used throughout**, whichever name that is. Two names in one file
+> is still an edit.
 
 ## Context
 
@@ -26,10 +50,10 @@ toolkit's own git history holds the template as it was at that commit.
 
 **1. `contour update`, run inside a space, replaces only what nobody edited.**
 A scaffold file is replaced when it still equals the template *as it was at the
-toolkit commit the space records*, written for the space's current name as
+toolkit commit the space records*, written for one name used throughout, as
 `space.template` writes it today — read from the toolkit's git history, so
-nothing new is stored, and a renamed space is compared under the name `rename`
-already rewrote it to. A file that differs from that was edited, and is named
+nothing new is stored. *(Amended: this said the space's current name; see the
+status note.)* A file that differs from that was edited, and is named
 and left alone. A missing file is written. The recorded toolkit commit moves to
 the current one.
 

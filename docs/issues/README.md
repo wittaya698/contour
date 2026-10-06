@@ -260,8 +260,8 @@ tested without Desktop installed; 63 is the verdict on ADR 0024, as 56 was on 00
 ## Batch 7 — pages for someone who has never opened a terminal
 
 From [ADR 0025](../adr/0025-pages-for-someone-who-never-opened-a-terminal.md) and
-[ADR 0026](../adr/0026-update-brings-a-space-in-step.md), both Proposed. Three
-HITL slices and fourteen AFK.
+[ADR 0026](../adr/0026-update-brings-a-space-in-step.md), both since accepted,
+amended (issues 70 and 82). Three HITL slices and fourteen AFK.
 
 | # | Slice | Type | Blocked by |
 |---|---|---|---|

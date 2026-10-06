@@ -13,10 +13,10 @@ the agent speak issue 78's plain words. `contour check` is still green.
 
 ## Acceptance criteria
 
-- [ ] `beaky` is updated from the lobby, the preview having been read first
-- [ ] Its agent speaks in plain words afterwards
-- [ ] `contour check` is green afterwards
-- [ ] ADR 0026's status says accepted, amended or withdrawn, with the evidence
+- [x] `beaky` is updated from the lobby, the preview having been read first
+- [x] Its agent speaks in plain words afterwards
+- [x] `contour check` is green afterwards
+- [x] ADR 0026's status says accepted, amended or withdrawn, with the evidence
 
 ## Blocked by
 
