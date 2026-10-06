@@ -51,21 +51,24 @@ class ProtocolTest(unittest.TestCase):
         self.assertEqual(got["result"]["capabilities"], {"tools": {}})
         self.assertEqual(got["result"]["protocolVersion"], "2025-06-18")
 
-    def test_the_instructions_describe_the_connector_in_four_lines(self):
+    def test_the_instructions_describe_the_connector_in_five_lines(self):
         """ADR 0024, decision 4: it reads and opens and changes nothing; a spec changes
         inside its space, from a span on the canvas; the console is where the
-        model changes; and a pasted picture is answered with a request for its
-        path (ADR 0024, decision 10)."""
+        model changes. ADR 0025, decision 11: a pasted picture is answered with
+        the lobby's create form, where the file can be dropped, and never by
+        asking for a path; and what the connector says is read as a page reads."""
         [got] = talk(call(1, "initialize", protocolVersion=connector.LATEST))
         said = got["result"]["instructions"].splitlines()
-        self.assertEqual(len(said), 4)
+        self.assertEqual(len(said), 5)
         self.assertIn("changes nothing", said[0])
         self.assertIn("span", said[1])
         self.assertIn("canvas", said[1])
         self.assertIn("console", said[2])
         self.assertIn("pasted", said[3])
-        self.assertIn("ask for", said[3])
-        self.assertIn("path", said[3])
+        self.assertIn("create form", said[3])
+        self.assertNotIn("ask for the file's path", said[3])
+        self.assertIn("plain words", said[4])
+        self.assertIn("status", said[4])
 
     def test_the_instructions_restate_none_of_the_rules(self):
         """Facts about the connector cannot drift from `CLAUDE.md`, because they
@@ -245,6 +248,16 @@ class ReadingTest(InSpaceCase):
         self.assertIs(said["verdict"]["ok"], False)
         self.assertEqual(said["verdict"]["lines"], ["stub ran build"])
         self.assertEqual(said["verdict"]["results"], [{"id": "height", "ok": False, "info": "1640.0", "msg": "height 1640.0mm, want 1700±5"}])
+
+    def test_status_says_the_verdict_in_the_words_the_pages_use(self):
+        """Beside the report lines, never instead of them: issue 66's sentences,
+        from the one table the console's panel reads (ADR 0025, decision 11)."""
+        self.run_in("check", ok=False)
+        said, _ = self.tool("status", space="alpha")
+        self.assertEqual(said["plain"]["line"], "1 thing doesn't match the spec")
+        self.assertEqual(said["plain"]["failing"],
+                         ["Height is 1640 mm; the spec wants 1700, give or take 5."])
+        self.assertIn("results", said["verdict"])
 
     def test_status_on_a_held_space_says_the_verdict_is_from_before_the_run(self):
         """Asked from inside `contour run`, so the hold is a real one and alive:
@@ -652,6 +665,30 @@ class OpenTest(PagesCase):
         self.serving(url)
         self.assertSecretless(text, url)
         self.assertEqual(self.lobby_listing(url), ["alpha"])
+
+    def test_open_lobby_on_its_create_form_with_the_name_filled_in(self):
+        """Where a pasted picture is answered: the form it can be dropped on
+        (ADR 0025, decision 11). The name rides in the fragment, which the page
+        reads and the server never sees."""
+        text, said = self.open("lobby", create=True, name="oak-chair")
+        self.assertIsNone(said["refused"], said)
+        [url] = self.urls()
+        self.assertTrue(url.endswith("#create=oak-chair"), url)
+        self.serving(url.split("#")[0])
+        self.assertSecretless(text, url.split("#")[0])
+
+    def test_a_running_lobby_is_shown_again_on_its_create_form(self):
+        """One lobby lists every space, so the second ask is the same tab
+        shown again — on the form this time."""
+        self.open("lobby")
+        [first] = self.urls()
+        self.open("lobby", create=True)
+        deadline = time.monotonic() + 30
+        while len(self.opened.read_text().splitlines()) < 2:
+            self.assertLess(time.monotonic(), deadline, "the lobby was not shown again")
+            time.sleep(0.1)
+        again = self.opened.read_text().splitlines()[1].split()[1]
+        self.assertEqual(again, first + "#create")
 
     def lobby_listing(self, url):
         """The names the lobby lists, asked as its page asks."""

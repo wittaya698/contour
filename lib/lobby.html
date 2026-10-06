@@ -557,6 +557,25 @@ function purging(d, room, p) {
   typed.focus();
 }
 
+// Opened on its create form: `#create`, and the name to fill in after `=`.
+// The connector sends a picture pasted into a chat here, to be dropped on the
+// form (ADR 0025, decision 11). Read at the top, where `location` is still the
+// address and not the form's folder field.
+let asked = location.hash.startsWith('#create')
+  ? decodeURIComponent(location.hash.slice('#create='.length)) : null;
+
+// Once, on whichever form is showing, and then off the address, so a reload is
+// the list as it is.
+function ready(room) {
+  if (asked === null || !room.childElementCount) return;
+  const name = room.querySelector('input');
+  if (asked) name.value = asked;
+  asked = null;
+  history.replaceState(null, '', location.pathname + location.search);
+  room.scrollIntoView({ block: 'center' });
+  name.focus();
+}
+
 // Empty is onboarding, not an empty table: someone with no spaces is standing
 // where someone with ten is (ADR 0021, decision 1). The trash is its own list,
 // so a deleted space never reads as a live one.
@@ -569,6 +588,7 @@ function render({ roots, spaces, deleted }, can, environment) {
   if (may) {
     creating(document.getElementById('create'));
     creating(document.getElementById('first'));
+    ready(document.getElementById(spaces.length ? 'create' : 'first'));
   }
   document.getElementById('list').hidden = spaces.length === 0;
   document.getElementById('onboarding').hidden = spaces.length !== 0;

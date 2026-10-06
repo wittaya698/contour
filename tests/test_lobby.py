@@ -254,6 +254,21 @@ class LobbyPageTest(unittest.TestCase):
         self.assertIn("multiple = true", creating)
         self.assertIn("references: await sent(dropped)", creating)
 
+    def test_opened_on_its_create_form_the_form_is_ready_and_named(self):
+        """`#create=<name>` is how the connector sends a picture pasted into a
+        chat to the form it can be dropped on (ADR 0025, decision 11): read once,
+        on whichever form is showing, then taken off the address so a reload is
+        the list as it is."""
+        self.assertIn("location.hash.startsWith('#create')", self.page)
+        ready = self.function("ready")
+        self.assertIn("name.value = asked", ready)
+        self.assertIn("focus()", ready)
+        self.assertIn("scrollIntoView", ready)
+        self.assertIn("history.replaceState", ready)
+        render = self.function("render")
+        self.assertIn("ready(document.getElementById(spaces.length ? 'create' : 'first'))",
+                      render)
+
     def test_references_are_sent_as_read_never_drawn(self):
         """Drawing or resizing a picture re-encodes it, and refs/ would hold a
         copy that is not the user's file."""

@@ -12,10 +12,10 @@ dropped; `open` gains that. A path offered is still taken by `create`.
 
 ## Acceptance criteria
 
-- [ ] `status` carries the plain sentences
-- [ ] `open` can open the lobby on its create form with a name
-- [ ] The pasted-picture instruction sends the user to the form, not for a path
-- [ ] `create` from paths is unchanged
+- [x] `status` carries the plain sentences
+- [x] `open` can open the lobby on its create form with a name
+- [x] The pasted-picture instruction sends the user to the form, not for a path
+- [x] `create` from paths is unchanged
 
 ## Blocked by
 

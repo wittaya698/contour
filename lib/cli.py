@@ -383,7 +383,8 @@ def on_mcp(cmd, rest, held):
         "picture": lambda args: picture(named(args.get("space")), args.get("picture")),
         "spec": lambda args: spec(named(args.get("space"))),
         "spend": lambda args: spent(named(args.get("space"))),
-        "open": lambda args: opened(args.get("page"), args.get("space")),
+        "open": lambda args: opened(args.get("page"), args.get("space"),
+                                    create=bool(args.get("create")), name=args.get("name")),
         "create": lambda args: created(args.get("name"), args.get("references") or [])})
     return 0
 
@@ -396,9 +397,13 @@ def on_spaces(cmd, rest, held):
 
 def on_lobby(cmd, rest, held):
     from lib import lobby
+    if rest and rest[0] != "--create":
+        print(usage(), file=sys.stderr)
+        return 2
     return emit(lobby.serve(
         listing, grace=seconds("CONTOUR_LOBBY_GRACE", lobby.GRACE_S),
-        hidden_grace=seconds("CONTOUR_LOBBY_HIDDEN_GRACE", lobby.HIDDEN_GRACE_S)))
+        hidden_grace=seconds("CONTOUR_LOBBY_HIDDEN_GRACE", lobby.HIDDEN_GRACE_S),
+        create=(rest[1] if len(rest) > 1 else "") if rest else None))
 
 
 def on_rename(cmd, rest, held):
@@ -873,8 +878,10 @@ def named(name):
 
 
 def status(root):
-    """Is it green, and if not why (ADR 0024, decisions 3 and 6)."""
-    from lib import lock, marks, panel, store, vetoes
+    """Is it green, and if not why (ADR 0024, decisions 3 and 6) — and the
+    same, as the pages say it (ADR 0025, decision 11): beside the report lines,
+    so a chat can say what the console's panel says."""
+    from lib import lock, marks, panel, store, verdict as plainly, vetoes
     here = space.layout(root)
     verdict = store.load(here.dot / panel.NAME, None)
     said = [] if verdict else ["never checked: no verdict here is not a green one"]
@@ -882,7 +889,8 @@ def status(root):
     held = held_by(rec) if rec and lock.alive(rec) else None
     if held and verdict:
         said.append(f"a run is live ({held}); this verdict is from before it")
-    return {"verdict": verdict, "held": held, "said": said,
+    return {"verdict": verdict, "plain": verdict and plainly.say(verdict),
+            "held": held, "said": said,
             "marks": sum(1 for m in marks.load(here.marks) if marks.is_open(m)),
             "vetoes": vetoes.uncommitted(root),
             "doctor": out_of_step(root)}
@@ -953,17 +961,21 @@ def spent(root):
                                      "session's cost is tools/tokens.py's to read"]}
 
 
-def opened(page, name):
+def opened(page, called, create=False, name=None):
     """Start the page where the user acts, and say only whether it started
     (ADR 0024, decision 5). Never its URL: that carries the secret behind
-    every gate, and a chat is no place for it."""
+    every gate, and a chat is no place for it.
+
+    The lobby can be opened on its create form, with `name` filled in: where a
+    picture pasted into the chat is dropped (ADR 0025, decision 11)."""
     from lib import enter
     if page == "lobby":
-        enter.page(Path.home(), "lobby")    # every space's page stands in none
+        asked = ("--create", *([name] if name else ())) if create else ()
+        enter.page(Path.home(), "lobby", *asked)    # every space's page stands in none
         return {"page": page, "space": None, "refused": None}
     if page not in ("console", "canvas"):
         raise LookupError(f"no page {page!r}: console, lobby or canvas")
-    root = named(name)
+    root = named(called)
     here = presence.live(root)
     if page == "console":
         refused = enter.into(root, here)

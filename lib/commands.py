@@ -89,8 +89,10 @@ TABLE = (
             (("mcp", "the connector: Claude Desktop reads the spaces over stdio"),
              ("mcp --config", "the block to paste into Desktop's config; writes nothing")),
             "on_mcp"),
-    Command("lobby", NONE, False, False, None,
-            (("lobby", "every space on this machine, on one page"),), "on_lobby"),
+    Command("lobby", (0, 2), False, False, None,
+            (("lobby", "every space on this machine, on one page"),
+             ("lobby --create [name]", "the same, opened on its create form")),
+            "on_lobby"),
     Command("rename", (1, 3), True, False, "spec-write",
             (("rename <name>", "propose renaming this space; --yes does it, --json "
                                "says it for a client"),), "on_rename"),

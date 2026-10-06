@@ -19,8 +19,11 @@ INSTRUCTIONS = "\n".join((
     "it changes nothing in a space.",
     "A spec changes only inside its space, argued from a span the user can see on the canvas.",
     "To change a model, open its console.",
-    "A picture pasted into the chat is not a reference: you hold what you saw, not the file, "
-    "so ask for the file's path.",
+    "A picture pasted into the chat is not a reference: you hold what you saw, not the file. "
+    "Open the lobby on its create form (open, with create, and the name if one was given), "
+    "where the user drops the file; a path they offer, create takes.",
+    "Your answers are read as a page reads, in plain words: from status, say its plain "
+    "sentences, not its report lines.",
 ))
 """Facts about the connector, not a copy of the rules (ADR 0024, decision 4): what it
 cannot do needs no rule here, and what it can say is steered to a span."""
@@ -58,10 +61,14 @@ TOOLS = (
                      "properties": {"space": {"type": "string"}}}},
     {"name": "open",
      "description": "Open the page where the user acts: a space's console or "
-                    "canvas, or the lobby. Says whether it opened, never where.",
+                    "canvas, or the lobby — with create, on its create form, the "
+                    "new model's name filled in if given. Says whether it opened, "
+                    "never where.",
      "inputSchema": {"type": "object", "required": ["page"],
                      "properties": {"page": {"enum": ["console", "lobby", "canvas"]},
-                                    "space": {"type": "string"}}}},
+                                    "space": {"type": "string"},
+                                    "create": {"type": "boolean"},
+                                    "name": {"type": "string"}}}},
     {"name": "create",
      "description": "Make a new model space from reference pictures on disk, "
                     "and open its console to draft the spec. Takes their paths, "

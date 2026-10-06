@@ -36,6 +36,18 @@ never its address with the secret in it. One lobby lists every space, so a
 second is a second tab of the same list (ADR 0025, decision 12)."""
 SHOW = signal.SIGUSR1
 """What a second `contour lobby` sends the running one: show yourself."""
+SHOWN = "lobby-show.json"
+"""Where, on the page, a second `contour lobby` asked to be shown: a signal
+carries no words, so they are left beside the record before it is sent."""
+
+
+def fragment(create):
+    """The part of the lobby's address its page reads and its server never
+    sees: `#create`, and the name to fill in, when it is opened on its create
+    form. None is the list as it is."""
+    if create is None:
+        return ""
+    return "#create" + (f"={urllib.parse.quote(create)}" if create else "")
 
 REFERENCE_CAP = 20 * 2**20
 """How large one dropped reference may be: a photo, not a video."""
@@ -319,7 +331,7 @@ def recorded(lobby):
     """Say this lobby is the running one for as long as the block lasts, and
     show it again whenever a second `contour lobby`, or a page's *Models*,
     asks. Taken back only if it is still this one's."""
-    signal.signal(SHOW, lambda number, frame: webbrowser.open(lobby.url))
+    signal.signal(SHOW, lambda number, frame: webbrowser.open(lobby.url + asked_to_show()))
     record = {"pid": os.getpid(), "host": socket.gethostname(), "origin": lobby.origin}
     path = policy.home() / RECORD
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -332,13 +344,27 @@ def recorded(lobby):
                 path.unlink()
 
 
-def serve(listing, grace=GRACE_S, hidden_grace=HIDDEN_GRACE_S, open_browser=True):
+def asked_to_show():
+    """The fragment a second `contour lobby` left, taken so it is used once."""
+    path = policy.home() / SHOWN
+    try:
+        said = json.loads(path.read_text())
+        path.unlink()
+    except (OSError, ValueError):
+        return ""
+    return said if isinstance(said, str) and said.startswith("#") else ""
+
+
+def serve(listing, grace=GRACE_S, hidden_grace=HIDDEN_GRACE_S, open_browser=True,
+          create=None):
     """One lobby session, start to last line. Blocks until the tab closes.
 
     Or, when a lobby is already running, shows that one and starts nothing: its
-    address is its own to open, since it carries its secret."""
+    address is its own to open, since it carries its secret. `create`, a name or
+    "", opens either on the create form, with that name filled in."""
     there = running()
     if there:
+        (policy.home() / SHOWN).write_text(json.dumps(fragment(create)))
         os.kill(there["pid"], SHOW)
         return {"ok": True, "lines": ["lobby already open — shown again"]}
     lobby = Lobby(listing, grace=grace, hidden_grace=hidden_grace)
@@ -347,7 +373,7 @@ def serve(listing, grace=GRACE_S, hidden_grace=HIDDEN_GRACE_S, open_browser=True
     try:
         with recorded(lobby):
             if open_browser:      # inside: a Ctrl-C can land while a browser opens
-                webbrowser.open(url)
+                webbrowser.open(url + fragment(create))
             lobby.wait()
     except KeyboardInterrupt:
         lobby.stop()

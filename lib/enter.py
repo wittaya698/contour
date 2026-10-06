@@ -62,10 +62,10 @@ def console(space, begin=None, of=None):
              *(("--of", str(of)) if of else ()))
 
 
-def page(where, command):
-    """Start `contour <command>` in `where`, and return without waiting for it:
-    a page whose Done is the user's, on the page (ADR 0024, decision 5)."""
-    detached(where, sys.executable, str(CONTOUR), command)
+def page(where, command, *args):
+    """Start `contour <command> [args]` in `where`, and return without waiting
+    for it: a page whose Done is the user's, on the page (ADR 0024, decision 5)."""
+    detached(where, sys.executable, str(CONTOUR), command, *args)
 
 
 def detached(where, *argv):
