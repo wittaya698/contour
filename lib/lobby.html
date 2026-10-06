@@ -112,12 +112,15 @@ function cell(text, cls) {
 // outcome when something is (ADR 0025, decision 10). A remote is a warning,
 // since a model is never pushed (rule 8); what `contour doctor` would call
 // drift, a missing copy or rules the agent cannot see is one thing an update
-// puts right (ADR 0026).
-function health(s) {
+// puts right (ADR 0026), and `update`, where there is one, is its action.
+function health(s, update) {
   const said = [];
   if (s.remotes.length) said.push(para('has a remote — a model is never pushed', 'warn'));
-  if (s.scaffold.missing.length || s.scaffold.drift.length || !s.rules)
-    said.push(para('needs an update', 'muted'));
+  if (s.scaffold.missing.length || s.scaffold.drift.length || !s.rules) {
+    const needs = para('needs an update', 'muted');
+    if (update) needs.append(' ', button('Update…', update));
+    said.push(needs);
+  }
   return said;
 }
 
@@ -206,10 +209,20 @@ function row(s, can, environment) {
   strong.textContent = s.name;
   strong.title = s.path;
   name.append(strong, verdict(s.verdict), para(ago(s.worked), 'muted'));
+  // The room under the row a rename, an update or a delete lays itself out in.
+  const under = document.createElement('tr');
+  under.hidden = true;
+  const room = document.createElement('td');
+  room.colSpan = 3;
+  room.className = 'panel';
+  under.append(room);
   // Until a commit in the space carries the rename, which the lobby never
   // makes (rule 5): the listing reads this from git each time.
   if (s.renamed) name.append(para('renamed from ' + s.renamed.from + ', not saved yet', 'warn'));
-  name.append(...health(s));
+  // So, until then, is an update: its changed rules sit unsaved (ADR 0026,
+  // decision 4).
+  if (s.updated) name.append(para('updated, not saved yet', 'warn'));
+  name.append(...health(s, can.has('update') && (() => { under.hidden = false; updating(s, room); })));
   // A console already serving the space, from its presence. Entering again
   // would start a second one, and the lobby never sees the first one's URL.
   const open = s.presence.some(p => p.kind === 'console');
@@ -217,12 +230,6 @@ function row(s, can, environment) {
   const said = para('', 'warn');
   name.append(said);
   const actions = cell('', 'actions');
-  const under = document.createElement('tr');
-  under.hidden = true;
-  const room = document.createElement('td');
-  room.colSpan = 3;
-  room.className = 'panel';
-  under.append(room);
   // Open is the row's one button. The rest sit behind one control, and each
   // lays itself out in the room under the row (ADR 0025, decision 10).
   if (can.has('enter') && !open) {
@@ -435,6 +442,42 @@ function proposal(p, s, name, room) {
   const row = document.createElement('div');
   row.className = 'actions';
   row.append(go, back);
+  room.replaceChildren(...parts, row);
+}
+
+// An update, as `contour update --dry-run` says it: what it will change, and
+// what it will leave alone and why — and only under all of it, the confirm.
+// The click confirms this dry run and no other: it goes back with the request,
+// and the server refuses it if the command now says something else (ADR 0026,
+// decision 2).
+function updating(s, room, p) {
+  if (!p) {
+    ask('/update', { path: s.path }).then(r => r.json()).then(p => updating(s, room, p));
+    return;
+  }
+  const cancel = button('Cancel', () => { room.parentElement.hidden = true; });
+  if (p.refused) {
+    room.replaceChildren(para('Not updated: ' + p.refused, 'warn'), cancel);
+    return;
+  }
+  const parts = [para('Bring ' + s.name + '’s rules up to date with Contour?')];
+  const changes = [...p.replaced.map(rel => rel + ': replaced with Contour’s current one'),
+                   ...p.written.map(rel => rel + ': written (it was missing)')];
+  parts.push(...list('Changes', changes.length ? changes : ['nothing to replace']));
+  if (p.left.length)
+    parts.push(...list('Left alone', p.left.map(l => l.what + ' — ' + l.why)));
+  parts.push(para(p.unseen, 'warn'),
+             para('Nothing is saved: the space lists as updated until you save in it.', 'muted'));
+  const go = button('Confirm update', () => {
+    go.disabled = true;
+    ask('/update', { path: s.path, shown: p }).then(r => r.json()).then(done => {
+      if (done.refused) return updating(s, room, done);
+      load();
+    });
+  }, 'go');
+  const row = document.createElement('div');
+  row.className = 'actions';
+  row.append(go, cancel);
   room.replaceChildren(...parts, row);
 }
 

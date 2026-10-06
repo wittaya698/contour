@@ -843,7 +843,8 @@ def reading(root, now):
                          "missing": [r for r, s in found.items() if s == "missing"]},
             "rules": sees_rules(root),
             "presence": presence.live(root),
-            "renamed": rename.uncommitted(root)}
+            "renamed": rename.uncommitted(root),
+            "updated": update.uncommitted(root)}
 
 
 def viewed(here):

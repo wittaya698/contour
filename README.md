@@ -272,6 +272,10 @@ to them what you would otherwise do in a terminal:
   ends none of them.
 - **rename** shows everything it will change before it changes anything, and
   never commits; the space lists as renamed until you do.
+- **update** sits beside a row's *needs an update*. It shows what
+  `contour update --dry-run` says, what it will replace and what it will leave
+  alone and why, then does it on confirm. It never commits; the space lists as
+  *updated, not saved yet* until you do.
 - **delete** writes a `git bundle` of the space into `~/.contour/trash` first,
   and you confirm by typing its name. Deleted spaces are listed, and can be
   restored or purged from there.
@@ -279,7 +283,7 @@ to them what you would otherwise do in a terminal:
 
 Every action is the command of the same name, run for you; the refusals are the
 command's own. A space open in a canvas or a console says so in the list, and
-cannot be renamed or deleted from under it. Only enter and create's handover
+cannot be renamed, updated or deleted from under it. Only enter and create's handover
 need the console's environment; without one, the lobby shows the line that
 makes it.
 

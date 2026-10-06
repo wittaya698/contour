@@ -19,11 +19,26 @@ from . import space as space_lib
 UNSEEN = presence.UNSEEN
 
 
-def recorded(root):
-    """The toolkit commit the space's marker names, or None."""
-    marker = (root / space_lib.MARKER).read_text()
+def named(marker):
+    """The toolkit commit a marker's text names, or None."""
     return next((l.split(":", 1)[1].strip() for l in marker.splitlines()
                  if l.startswith("toolkit:")), None)
+
+
+def recorded(root):
+    """The toolkit commit the space's marker names, or None."""
+    return named((root / space_lib.MARKER).read_text())
+
+
+def uncommitted(root):
+    """`{"from": toolkit commit}` while an update is not yet in a commit, else
+    None. Read from git each time and stored nowhere, as `rename.uncommitted`
+    is: the marker at HEAD names one toolkit commit and the marker on disk
+    another. A space with no commit has nothing to have been updated from."""
+    was = git.show(root, "HEAD", str(space_lib.MARKER))
+    if was is None:
+        return None
+    return {"from": named(was)} if named(was) != recorded(root) else None
 
 
 def then(toolkit, commit, rel):

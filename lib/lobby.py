@@ -52,7 +52,7 @@ def fragment(create):
 REFERENCE_CAP = 20 * 2**20
 """How large one dropped reference may be: a photo, not a video."""
 
-CAN = ("create", "rename", "delete", "restore", "purge")
+CAN = ("create", "rename", "update", "delete", "restore", "purge")
 """What the lobby can do beyond listing, for the page to ask about. Each action
 arrives as a capability with the command that performs it, and a button
 for one the host cannot perform is a button that fails
@@ -84,6 +84,7 @@ class Lobby(Page):
                 ("POST", "/create"): self.create,
                 ("GET", "/location"): lambda q: {"default": str(self.location())},
                 ("POST", "/rename"): self.rename,
+                ("POST", "/update"): self.update,
                 ("POST", "/delete"): self.delete,
                 ("POST", "/restore"): self.restore,
                 ("POST", "/purge"): self.purge,
@@ -155,6 +156,24 @@ class Lobby(Page):
             return dict(now, refused="the proposal changed since it was shown; "
                                      "read this one, then confirm it")
         return contour(asked["path"], "rename", asked["name"], "--yes", "--json")
+
+    def update(self, asked):
+        """`contour update` in the space the page named, its answer as it gave
+        it (ADR 0026, decision 2). Asked with no `shown`, the dry run: what it
+        will change, and what it will leave alone and why. A confirm carries the
+        dry run the page showed, and is the confirm of that one only, as a
+        rename's is.
+
+        A path the listing does not hold is None: not found."""
+        if asked.get("path") not in {s["path"] for s in self.listing()["spaces"]}:
+            return None
+        now = contour(asked["path"], "update", "--dry-run", "--json")
+        if "shown" not in asked or now["refused"]:
+            return now
+        if asked["shown"] != now:
+            return dict(now, refused="what it would do changed since it was shown; "
+                                     "read this, then confirm it")
+        return contour(asked["path"], "update", "--json")
 
     def delete(self, asked):
         """`contour delete` in the space the page named, its answer as it gave

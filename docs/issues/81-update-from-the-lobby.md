@@ -11,9 +11,9 @@ confirm. Refusals come back in `contour update`'s words. Afterwards the row says
 
 ## Acceptance criteria
 
-- [ ] Update shows the dry run before doing anything
-- [ ] Refusals read as the command words them
-- [ ] The row says *updated, not saved yet* until a commit carries it
+- [x] Update shows the dry run before doing anything
+- [x] Refusals read as the command words them
+- [x] The row says *updated, not saved yet* until a commit carries it
 
 ## Blocked by
 
