@@ -1,10 +1,11 @@
 """How many vetoes git does not hold yet, for readers below the console.
 
 Read-only on purpose. A veto has one writer, the user at a gate, and its only
-door is `console/vetoes.py`; but the connector asks this count too (ADR 0024,
+door is `console/vetoes.py`; but the connector asks this count (ADR 0024,
 decision 3), and the launcher may never import the console. So the count lives
-here and the console asks it here, and the page and a chat cannot disagree
-about how many are at risk.
+here. The console page once asked it too, and no longer shows one: *n vetoes
+uncommitted* is a sentence about commits, and commit is hidden there (ADR 0025,
+decision 7).
 """
 import json
 from pathlib import Path

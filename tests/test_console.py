@@ -27,7 +27,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from console import spend
-from lib import marks as marks_store, panel, views
+from lib import marks as marks_store, panel, views, vetoes as vetoes_reading
 
 from test_launcher import stages, stub_blender
 
@@ -1213,6 +1213,17 @@ class VetoTest(ConsoleCase):
         self.transcript(url, lambda ev: any(e["kind"] == "result" for e in ev))
         return url
 
+    def test_a_veto_reads_as_the_act_it_refused(self):
+        """*You said no to*, then the act in the gate's own words and the
+        user's reason (ADR 0025, decision 7): one table, `lib/gate.py`'s, so the
+        panel cannot name a refusal differently from the gate that took it."""
+        space = self.space()
+        self.built(space)
+        url = self.vetoed(space)
+        said, = self.ask(url, "/vetoes")[1]["vetoes"]
+        self.assertEqual((said["act"], said["reason"]),
+                         ("Save this version?", "not until the neck measures 280"))
+
     def test_a_veto_naming_a_part_is_promoted_to_a_sheet_mark(self):
         """Promotion is what turns a fact about a moment into an open question
         about the model (ADR 0019, decision 15).
@@ -1242,6 +1253,20 @@ class VetoTest(ConsoleCase):
         kept, = self.vetoes(space)
         self.assertEqual(kept["promoted"], got["id"])
         self.assertEqual(kept["reason"], "not until the neck measures 280")
+
+    def test_a_pinned_veto_says_the_part_it_was_pinned_to(self):
+        """*Pin this to a part* makes the mark promotion made, and the panel
+        then says *pinned to cap* — the part, which the user chose, and not the
+        mark's id, which they never saw."""
+        space = self.space()
+        self.built(space)
+        (space / "out" / "parts.json").write_text(json.dumps({"1": "cap"}))
+        url = self.vetoed(space)
+        said, = self.ask(url, "/vetoes")[1]["vetoes"]
+        self.assertIsNone(said["pinned"])
+        self.ask(url, "/promote", {"id": "v1", "part": "cap"})
+        said, = self.ask(url, "/vetoes")[1]["vetoes"]
+        self.assertEqual(said["pinned"], "cap")
 
     def refused(self, url, body):
         """A promotion the console will not make. 404 and not a 200 carrying a
@@ -1300,44 +1325,29 @@ class VetoTest(ConsoleCase):
                          "the pruner did not run, so this proves nothing")
         self.assertEqual((space / "vetoes.json").read_bytes(), before)
 
-    def test_the_page_is_told_how_many_vetoes_are_uncommitted(self):
+    def test_a_veto_rides_the_next_commit_and_the_page_counts_nothing(self):
         """Tracked is not committed, and an uncommitted veto dies exactly as an
-        ignored one would (ADR 0019, decision 33).
+        ignored one would (ADR 0019, decision 33). The console still commits
+        nothing and proposes no records-only commit, because a veto-only commit
+        describes no model state: the veto rides the next *Save this version*.
 
-        So the console's contribution is visibility and nothing else: it does not
-        commit, and it does not propose a records-only commit at run end, because
-        a veto-only commit describes no model state. The count is of vetoes `HEAD`
-        does not hold — not of whether the file is dirty — so the ordinary case,
-        where earlier vetoes already shipped and this one has not, reads true.
+        What changed is the page (ADR 0025, decision 7). *n vetoes uncommitted*
+        was a sentence about commits, and commit is hidden — so the page is
+        handed no count to show. The risk ADR 0019 decision 33 stated, that
+        `git checkout .` loses one, is unchanged and now not signposted.
         """
         space = self.repo(self.space())
         self.built(space)
-        _, url = self.driven({"call": {"tool": "Bash", "command": "git commit -m one"}},
-                             {"call": {"tool": "Bash", "command": "git commit -m two"}},
-                             space=space)
-        self.ask(url, "/run", {"prompt": "tidy up"})
-        first, _ = self.gate(url)
-        self.ask(url, "/verdict", {"id": first["id"], "allow": False,
-                                   "reason": "measure the neck first"})
-        self.transcript(url, lambda ev: any(e["kind"] == "result" for e in ev))
+        url = self.vetoed(space, reason="measure the neck first")
         _, said = self.ask(url, "/vetoes")
-        self.assertEqual(said["uncommitted"], 1)
+        self.assertNotIn("uncommitted", said)
         self.assertEqual([v["id"] for v in said["vetoes"]], ["v1"])
+        self.assertEqual(vetoes_reading.committed(space), set())
         self.git(space, "add", "-A")
         self.git(space, "commit", "-qm", "the neck, and what it did not become")
-        _, said = self.ask(url, "/vetoes")
-        self.assertEqual(said["uncommitted"], 0)
-        self.assertEqual([v["id"] for v in said["vetoes"]], ["v1"],
+        self.assertEqual(vetoes_reading.committed(space), {"v1"})
+        self.assertEqual([v["id"] for v in self.ask(url, "/vetoes")[1]["vetoes"]], ["v1"],
                          "a committed veto left the file")
-        # And the next one is exposure again — one, not two: what is counted is
-        # the vetoes git does not hold, not whether the file has been touched.
-        second = self.transcript(
-            url, lambda ev: len([e for e in ev if e["kind"] == "gate"]) == 2)
-        at = [e for e in second if e["kind"] == "gate"][1]
-        self.ask(url, "/verdict", {"id": at["id"], "allow": False,
-                                   "reason": "and the beak before that"})
-        self.transcript(url, lambda ev: len([e for e in ev if e["kind"] == "result"]) == 2)
-        self.assertEqual(self.ask(url, "/vetoes")[1]["uncommitted"], 1)
 
     def test_the_veto_surface_is_declared_against_the_host_that_gates(self):
         """One page, two hosts (ADR 0019, decision 23). Only a console gates, so
@@ -1388,8 +1398,10 @@ class VetoTest(ConsoleCase):
         """Rule 5, flat: the console gets no privilege a terminal would not get,
         including over its own records (ADR 0019, decisions 18 and 33).
 
-        It has a live reason to run git — the exposure count asks `HEAD` what it
-        holds — and that is exactly where a commit would be easiest to slip in.
+        It had a live reason to run git — the page's count of uncommitted vetoes
+        asked `HEAD` what it held, until ADR 0025 decision 7 took the count off
+        the page — and a reason like that is exactly where a commit would be
+        easiest to slip in.
         So a word that would change a repository is a finding wherever it is
         passed: a veto reaches git with the change it prevented, by the user's
         hand and in the commit where the tolerance did not get widened.
@@ -1414,8 +1426,6 @@ class VetoTest(ConsoleCase):
         said = self.transcript(url, lambda ev: any(e["kind"] == "ended" for e in ev))
         for event in said:
             self.assertNotIn("commit", (event.get("text") or "").lower(), event)
-        # and the exposure is still just a number, which is the whole offer
-        self.assertEqual(self.ask(url, "/vetoes")[1]["uncommitted"], 1)
 
 
 class SeedTest(ConsoleCase):

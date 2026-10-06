@@ -90,9 +90,7 @@
   #vetoes { border-top: 1px solid var(--line); padding-top: 12px; }
   #denied { padding-left: 0; list-style: none; }
   #denied li { font-size: 12px; margin-bottom: 8px; }
-  #denied .call { font-family: ui-monospace, SFMono-Regular, monospace;
-                  font-size: 11px; opacity: .7; word-break: break-all; }
-  #exposure { font-size: 12px; color: var(--pin); }
+  #denied .act { opacity: .7; }
   #unwatched { border-top: 1px solid var(--line); padding-top: 12px; }
   /* Reached only by the spend line's link while it is empty (ADR 0025, decision 9). */
   #unasked:empty::before { content: "Nothing yet. Always, on a build gate, puts one here.";
@@ -258,13 +256,12 @@
       </li>
     </template>
   </section>
-  <!-- What was refused, and what it is still exposed to. Here and not in
-       `contour check`: a veto is never open, so a line about one would never go
-       away, and a status line that is always present is furniture nobody reads
-       (ADR 0019, decision 28). The exposure is the console's whole contribution
-       to getting one into git — it does not commit, and it does not offer to:
-       a veto-only commit describes no model state, and this one belongs in the
-       commit where the tolerance did not get widened (ADR 0019, decision 33). -->
+  <!-- What was refused. Here and not in `contour check`: a veto is never
+       open, so a line about one would never go away, and a status line that is
+       always present is furniture nobody reads (ADR 0019, decision 28). No
+       count of the ones git does not hold yet: that is a sentence about
+       commits, and commit is hidden. A veto rides the next *Save this version*
+       as before (ADR 0025, decision 7). -->
   <!-- What runs without asking for this model, each with Undo. Written only
        by the user's own act — *Always* on a build gate, or by hand — and listed
        so that every one of them can be taken back where it was given
@@ -296,8 +293,7 @@
     </div>
   </section>
   <section id="vetoes" data-needs="drive" hidden>
-    <h1>Vetoes</h1>
-    <p id="exposure"></p>
+    <h1>You said no to</h1>
     <ol id="denied"></ol>
   </section>
   <button id="done" data-unless="drive" data-closed="Canvas closed">Done</button>
@@ -420,7 +416,7 @@ function drive() {
   }, 600);
 }
 
-// What was refused, and what is still only on disk. The whole section goes away
+// What was refused. The whole section goes away
 // when nothing has been refused: a space where nobody has said no has nothing to
 // show, and an empty list under a heading is furniture.
 async function refreshVetoes() {
@@ -428,13 +424,6 @@ async function refreshVetoes() {
   if (!said) return;
   const section = document.getElementById('vetoes');
   section.hidden = !said.vetoes.length;
-  const exposure = document.getElementById('exposure');
-  // Said only while it is true. Tracked is not committed, and an uncommitted
-  // veto dies exactly as an ignored one would — so this is a live number and not
-  // a label: it goes to zero in the commit that carries the change it prevented.
-  exposure.textContent = said.uncommitted
-    ? said.uncommitted + ' veto' + (said.uncommitted === 1 ? '' : 'es') + ' uncommitted'
-    : '';
   const list = document.getElementById('denied');
   list.replaceChildren();
   for (const veto of said.vetoes) list.append(vetoed(veto));
@@ -513,23 +502,24 @@ function unwatched(rows) {
   }
 }
 
-// One veto, and the one thing that can be done with it. Promotion is what turns
+// One veto — the act it refused, in the gate's words, and the user's reason —
+// and the one thing that can be done with it. Pinning is what turns
 // a fact about a moment into an open question about the model, and it names a
 // part because that is what gives the mark a position — the user picks it, since
 // guessing which part the sentence was about would attribute a claim to them
 // (ADR 0019, decision 15).
 function vetoed(veto) {
   const li = document.createElement('li');
-  const call = document.createElement('div');
-  call.className = 'call';
-  call.textContent = veto.category + '  ' + veto.tool;
+  const act = document.createElement('div');
+  act.className = 'act';
+  act.textContent = veto.act;
   const why = document.createElement('div');
   why.textContent = veto.reason || '';
-  li.append(call, why);
-  if (veto.promoted) {
+  li.append(act, why);
+  if (veto.pinned) {
     const said = document.createElement('span');
     said.className = 'who';
-    said.textContent = 'promoted to ' + veto.promoted;
+    said.textContent = 'pinned to ' + veto.pinned;
     li.append(said);
     return li;
   }
@@ -541,7 +531,7 @@ function vetoed(veto) {
   }
   const button = document.createElement('button');
   button.className = 'shut';
-  button.textContent = 'promote to a mark';
+  button.textContent = 'Pin this to a part';
   button.addEventListener('click', async () => {
     const res = await ask('/promote', { id: veto.id, part: pick.value });
     if (!res.ok) return;

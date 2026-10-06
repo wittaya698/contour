@@ -16,7 +16,7 @@ pruner has to tell them apart, and the first bug is that it does not.
 """
 from pathlib import Path
 
-from lib import agent, marks, space as space_lib, store, views
+from lib import agent, gate, marks, space as space_lib, store, views
 from lib import vetoes as reading
 
 NAME = reading.NAME
@@ -107,18 +107,29 @@ def promote(space, veto_id, part):
     return mark
 
 
-committed = reading.committed
-"""The ids `HEAD` holds, asked in `lib/` so the connector's count is this one."""
+def shown(space):
+    """What the page says about vetoes: every one, as *You said no to* reads it.
 
-
-def exposure(space):
-    """What the page says about vetoes: all of them, and how many are at risk.
-
-    The count is the console's whole contribution to ADR 0019's decision 33. It does not
-    commit them — that is rule 5 flat — and it does not propose a records-only
-    commit at run end either, because a veto-only commit describes no model state
-    and would have to be skipped past by anyone reading history to understand how
-    the model got here. *I stopped you widening that tolerance* belongs in the
-    commit where the tolerance did not get widened.
+    No count of how many git does not hold (ADR 0025, decision 7): *n vetoes
+    uncommitted* is a sentence about commits, and commit is hidden. The console
+    still commits nothing — rule 5 flat — and still proposes no records-only
+    commit at run end, because a veto-only commit describes no model state.
+    *I stopped you widening that tolerance* rides the next *Save this version*,
+    the commit where the tolerance did not get widened.
     """
-    return {"vetoes": load(space), "uncommitted": reading.uncommitted(space)}
+    parts = {m.get("id"): m.get("part")
+             for m in marks.load(space_lib.layout(space).marks)}
+    return {"vetoes": [said(v, parts) for v in load(space)]}
+
+
+def said(veto, parts):
+    """One veto as the panel reads it: the act it refused, in the gate's own
+    words, and the part it was pinned to (ADR 0025, decision 7). Added on the
+    way out and never written to the file — the record holds the category and
+    the mark, and the words are the table's.
+
+    The part is read off the mark, which the user chose it for. A mark the
+    pruner has since taken (ADR 0018) leaves its id, which is still true."""
+    act = gate.WORDS.get(veto.get("category"), (veto.get("category"),))[0]
+    pinned = veto.get("promoted")
+    return {**veto, "act": act, "pinned": parts.get(pinned) or pinned}

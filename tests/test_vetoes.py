@@ -1,8 +1,8 @@
 """The veto count below the console (ADR 0024, decision 3).
 
-The console page and the connector both say *n vetoes uncommitted*, and both
-ask `lib/vetoes.py`, so the two cannot disagree. What is counted is what `HEAD`
-does not hold, asked of git.
+The connector says *n vetoes uncommitted*, asked of `lib/vetoes.py`. The
+console page no longer counts them (ADR 0025, decision 7). What is counted is
+what `HEAD` does not hold, asked of git.
 """
 import json
 import subprocess

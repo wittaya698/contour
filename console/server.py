@@ -183,10 +183,10 @@ class Console:
                                body.get("reason"), always=bool(body.get("always")))
 
     def vetoes(self, query):
-        """`GET /vetoes`: every veto in this space, and how many git does not
-        hold. A console route, because a veto has one writer and the page that
-        shows it is the page that made it."""
-        return veto_store.exposure(self.space)
+        """`GET /vetoes`: every veto in this space, as the page says it. A
+        console route, because a veto has one writer and the page that shows it
+        is the page that made it."""
+        return veto_store.shown(self.space)
 
     def promoted(self, body):
         """`POST /promote`: a veto about a part becomes a sheet mark.

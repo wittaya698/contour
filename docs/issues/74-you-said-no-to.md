@@ -13,10 +13,10 @@ commit, and nothing about how it gets there changes.
 
 ## Acceptance criteria
 
-- [ ] The heading and each line read as decided
-- [ ] Pin this to a part makes the same mark promotion made
-- [ ] No count of uncommitted vetoes is shown
-- [ ] A veto still reaches git with the next approved commit
+- [x] The heading and each line read as decided
+- [x] Pin this to a part makes the same mark promotion made
+- [x] No count of uncommitted vetoes is shown
+- [x] A veto still reaches git with the next approved commit
 
 ## Blocked by
 
