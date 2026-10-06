@@ -134,6 +134,22 @@ class GatePageTest(unittest.TestCase):
         """*SPEC-WRITE* is the term; the page names the act (ADR 0025, 1)."""
         self.assertNotIn('class="category"', self.template)
 
+    def test_a_verdict_closes_the_gate_it_answers(self):
+        """The transcript's verdict names its gate, and the page closes that
+        gate on it — not on the click. A reloaded tab replays the gate and the
+        verdict and never clicked anything; drawn from the click, it would offer
+        Allow on a call that already ran."""
+        page = PAGE.read_text(encoding="utf-8")
+        turn = page.split("function turn(", 1)[1].split("\n}\n", 1)[0]
+        self.assertIn("event.kind === 'verdict'", turn)
+        self.assertIn("li.dataset.gate = event.id", self.script)
+        # Declared once: a page script's later function of the same name wins.
+        self.assertEqual(page.count("function closeGate("), 1)
+        answered = page.split("function closeGate(", 1)[1].split("\n}\n", 1)[0]
+        self.assertIn('[data-gate="${event.id}"]', answered)
+        self.assertIn("said.allow", answered)
+        self.assertIn("said.deny", answered)
+
 
 SPEC = """model: chair
 revision: 2

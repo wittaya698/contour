@@ -157,6 +157,10 @@
   #turns .gate { border: 1px solid var(--pin); border-radius: 6px; padding: 8px;
                  display: flex; flex-direction: column; gap: 6px; }
   #turns .act { font-weight: 700; color: var(--pin); }
+  /* Answered: no longer waiting on anybody, so no longer in the waiting colour. */
+  #turns .gate.answered { border-color: var(--line); }
+  #turns .gate.answered .act { color: inherit; }
+  #turns .gate .answer { margin: 4px 0 0; opacity: .6; }
   #turns .changes { margin: 0; padding-left: 18px; }
   #turns .changes:empty, #turns .spans:empty { display: none; }
   #turns .raw summary { cursor: pointer; opacity: .6; font-size: 11px; }
@@ -554,6 +558,7 @@ function vetoed(veto) {
 // One line of the transcript.
 function turn(event) {
   if (event.kind === 'gate') return gate(event);
+  if (event.kind === 'verdict') return closeGate(event);
   if (event.kind === 'call') return activity(event);
   const li = document.createElement('li');
   li.className = event.kind;
@@ -595,6 +600,9 @@ function activity(event) {
 function gate(event) {
   const li = document.getElementById('gate').content.firstElementChild.cloneNode(true);
   const said = event.said;
+  li.dataset.gate = event.id;
+  li.dataset.allow = said.allow;
+  li.dataset.deny = said.deny;
   li.querySelector('.act').textContent = said.act;
   for (const change of said.changes) {
     const item = document.createElement('li');
@@ -622,6 +630,30 @@ function gate(event) {
   li.querySelector('.always').addEventListener('click', () => answer(true, true));
   li.querySelector('.deny').addEventListener('click', () => answer(false));
   return li;
+}
+
+// A gate, answered. Closed by the verdict on the transcript and not by the
+// click, so a reloaded tab, which replays both and clicked nothing, ends on the
+// same answered gate as the tab that answered it. A verdict with no gate on
+// screen is still a line.
+function closeGate(event) {
+  const li = document.getElementById('turns').querySelector(`li[data-gate="${event.id}"]`);
+  if (!li) {
+    const line = document.createElement('li');
+    line.className = 'verdict';
+    line.textContent = event.text || '';
+    return line;
+  }
+  li.classList.add('answered');
+  li.querySelector('.because').remove();
+  li.querySelector('.pair').remove();
+  const said = { allow: li.dataset.allow, deny: li.dataset.deny };
+  const was = document.createElement('p');
+  was.className = 'answer';
+  was.textContent = (event.allowed ? said.allow : said.deny)
+    + (event.text ? ' — ' + event.text : '');
+  li.append(was);
+  return null;
 }
 
 // The call, as one line to read. Read is all it is: what goes back is the
