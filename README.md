@@ -206,6 +206,11 @@ the error bar covers the arithmetic between the ends, not where they were put.
 An agent span is a question, and you answer it on the canvas: **adopt** (it is
 right, and yours from then on), **correct** (drag its ends where they belong; it
 is re-measured), or **reject** (with one line of why; its number is not used).
+When spans are waiting, the canvas says *Claude has 4 questions about your
+pictures* and steps through them one at a time, each zoomed on its reference:
+*Yes, that's it*, *Let me move it* and *Wrong thing…* are adopt, correct and
+reject, and *skip for now* leaves one unanswered. Answering from the marks list
+still works.
 `contour measure --standing m4` says whether a span's number may go into a
 proposal: yours, the agent's own reading for a snapped span you have not
 answered yet, or not at all — a by-eye span waits for your answer, and a
@@ -220,9 +225,14 @@ the photograph.
 **`contour-console` drives the agent behind a gate** (ADR 0019). Same page, one
 more capability: a transcript on one side, the current sheet on the other, and
 every call that means something — a build, a spec write, a commit, a push —
-stopping to ask you first. What you answer is a verdict and a sentence, never an
-edited call: the agent writes the code, you say what you think of it. A denial is
-kept as a **veto** in the space, because it is why two builds differ.
+stopping to ask you first. A gate says the act in plain words, *Claude wants to
+build the model to check its work* or *Claude wants to change the spec*, and
+under it what would change: *seat depth 600 → 640 mm*, and the span the number
+came from. The raw call is a click away. What you answer is a verdict and a
+sentence, never an edited call: the agent writes the code, you say what you
+think of it. A commit asks *Save this version?*. A denial is kept as a **veto**
+in the space, because it is why two builds differ, and the page lists them under
+*You said no to*.
 
 ```sh
 cd /path/to/Contour               # once, in the toolkit checkout
@@ -236,11 +246,26 @@ contour-console
 What runs unwatched is yours to set, in `~/.contour/ask-list.yaml`. It has no
 presets: a category it does not name is gated, so the first run asks about
 everything and you tune it downward — `contour asks` prints what is in force and
-`contour intents` prints the categories there are to name. Select open marks
+`contour intents` prints the categories there are to name. A build gate also
+offers *Always for this model*, which lets later builds in that space through
+unasked; the page lists what runs unasked, each with Undo. Spec writes,
+reference writes and saving never offer it, and neither does push. Select open marks
 before starting and they compose into the prompt, and at the end the run says of
 each one whether it was addressed, left alone, or orphaned by a part that went
-away. What the run cost appears as it happens, per turn, and `tools/tokens.py`
+away. What the run cost is one quiet line, *12 turns*, saying too how many
+turns gates cost; the token breakdown is a click away, and `tools/tokens.py`
 reads it afterwards in the same units it reports a terminal session in.
+
+The page is written for someone who has never opened a terminal (ADR 0025).
+Under the sheet it says whether the model is right: *matches the spec*, or one
+plain sentence per check that fails, *Height is 1640 mm; the spec wants 1700,
+give or take 5*. The transcript shows each call as one line of what was done,
+*Built the model — 2 things don't match*, with the raw call a click away, and
+the agent itself speaks in the same plain words. **Export** runs
+`contour export` once the build is green, and a card shows the file with
+Download and Show in Finder. Words worth learning, like *spec* and *span*,
+explain themselves where they first appear. Every page carries the header
+*Models › chair*, and *Models* goes back to the lobby.
 
 Nothing about the console is load-bearing for the pipeline: `contour selftest`
 proves a clone with none of it installed still builds, verifies, renders and
@@ -252,9 +277,13 @@ exports.
 contour lobby                      # from anywhere; no space needed
 ```
 
-The lobby is a page above the spaces (ADR 0021). It lists every space it finds
-with the health `contour spaces` and `contour doctor` already compute, and does
-to them what you would otherwise do in a terminal:
+The lobby is a page above the spaces (ADR 0021). Each space is a row: the
+model's last sheet, or a reference before its first build, its name, whether
+it matches its spec, and when it was last worked on. Health shows only when
+something is wrong: *needs an update*, or a remote, which a model must never
+have. There is one lobby: running `contour lobby` again shows the one already
+open, and `contour lobby --create [name]` opens it on the create form. It does
+to the spaces what you would otherwise do in a terminal:
 
 - **create** runs `contour init`, defaulting to `project/` under the toolkit,
   then opens the new space's console with the new-space flow as its first
@@ -283,9 +312,9 @@ to them what you would otherwise do in a terminal:
 
 Every action is the command of the same name, run for you; the refusals are the
 command's own. A space open in a canvas or a console says so in the list, and
-cannot be renamed, updated or deleted from under it. Only enter and create's handover
-need the console's environment; without one, the lobby shows the line that
-makes it.
+cannot be renamed, updated or deleted from under it. Only enter and create's
+handover need the console's environment; without one, the lobby shows the line
+that makes it.
 
 The lobby looks where `contour spaces` does: the directory holding the toolkit,
 or the folders in `$CONTOUR_SPACES`, separated by `:`.
@@ -304,7 +333,8 @@ there is no link on `PATH`, the command says so and exits 1.
 
 Today the connector answers eight tools. `spaces` is the same reading as
 `contour spaces --json`. `status` takes a space and gives its last check's
-verdict, open marks, uncommitted vetoes and toolkit drift. `log` gives the tail
+verdict, in the console's plain sentences beside the report lines, and its open
+marks, uncommitted vetoes and toolkit drift. `log` gives the tail
 of a space's last Blender log and says which stage wrote it. `picture` shows a
 space's sheet, filmstrip or worksheet and says whether it is still current; it
 never renders one. Desktop shows the picture inside the tool call's row, so
@@ -317,8 +347,10 @@ console as the lobby does, and a canvas on a space a console already serves.
 paths of images on disk, and it makes the space where the lobby would, copies
 them into `refs/` byte for byte, and opens its console on the new-space flow.
 It refuses any path that is not a `.png`, `.jpg` or `.webp` image before
-anything is made, and drafts no spec. A picture pasted into the chat is not a
-reference, so it asks for the file's path instead.
+anything is made, and drafts no spec. A picture pasted into the chat is not the
+file, so it is not taken as a reference: `open` brings up the lobby on its
+create form instead, the name filled in if you gave one, for the file to be
+dropped there. Its answers are meant to read as the pages do, in plain words.
 Inside a space it never builds, writes, marks or holds anything: to change a
 model, open its console. Every space it finds is visible to the chat,
 so what you ask about goes to the model provider. Installing the connector is
@@ -337,7 +369,7 @@ the choice to allow that, and Desktop asks before each call.
 | `contour doctor` | is this space still in step with the toolkit |
 | `contour update [--dry-run]` | bring this space's rules in step, where nobody edited them |
 | `contour spaces [name]` | list model spaces, or print one's path |
-| `contour lobby` | every space on this machine, on one page |
+| `contour lobby [--create [name]]` | every space on this machine, on one page; or opened on its create form |
 | `contour mcp` | the connector, for Claude Desktop; `--config` prints its block |
 | `contour rename <name>` | propose renaming this space; `--yes` does it |
 | `contour delete <name>` | propose deleting this space; `--yes` does it, leaving a bundle |
@@ -351,13 +383,13 @@ the choice to allow that, and Desktop asks before each call.
 | `contour worksheet` | every span drawn onto its reference -> `worksheet.png` |
 | `contour filmstrip [clip]` | a clip as six side and six front frames -> `out/filmstrip.png` |
 | `contour run <cmd>...` | hold this space for one run, then release it |
-| `contour asks` | what this space lets through, and what asks |
+| `contour asks` | what this space lets through, and what asks; `--always build` and `--undo <c>` are the page's |
 | `contour intents` | the call categories a gate can ask about |
 | `contour-console` | drive a run from the browser, behind a gate |
 | `contour-console --begin <flow>` | the same, its run begun on `new-space` or `variation --of <space>` |
 
-The commands a client reads — `init`, `spaces`, `rename`, `delete`, `restore`,
-`purge` — take `--json`, which is how the lobby runs them. The model commands
+The commands a client reads — `init`, `spaces`, `rename`, `update`, `delete`,
+`restore`, `purge`, `asks` — take `--json`, which is how the lobby runs them. The model commands
 run inside a model space and take no model name. Outside one
 they refuse and say so, rather than guessing. Every one of them is stdlib except
 `contour-console`, which is a separate executable for exactly that reason.
