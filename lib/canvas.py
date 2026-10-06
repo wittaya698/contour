@@ -39,7 +39,7 @@ class Canvas(Page):
 
     def __init__(self, sheet, marks, mask=None, parts=None, resolve=None,
                  refs=None, can=MARKS_ONLY, routes=None, views=None,
-                 blend=None, verdict=None):
+                 blend=None, verdict=None, name=None):
         # What this host can do, for the page to ask about. The caller's to
         # declare and not the Canvas's to infer: the console's extra surface
         # is the console's, and a Canvas that guessed would guess wrong for
@@ -67,6 +67,9 @@ class Canvas(Page):
         # `.blend` in place, so the fingerprints alone cannot tell a current
         # picture from one of a build that never finished.
         self.verdict = Path(verdict) if verdict else None
+        # The space's name, for the header every page carries: *Models ›
+        # oak-chair* (ADR 0025, decision 12).
+        self.name = name
         self.captured = []
         self.pruned = None
         self._lock = threading.Lock()         # two posts can land at once
@@ -78,8 +81,8 @@ class Canvas(Page):
                 ("GET", "/mask.png"): lambda q: png(self.mask_bytes()),
                 ("GET", "/ref"): lambda q: self.ref(q.get("name", "")),
                 ("GET", "/refs.json"): lambda q: refs_store.listing(self.refs),
-                ("GET", "/sheet.json"): lambda q: panel_state.state(
-                    self.views, self.blend, self.verdict, self.marks),
+                ("GET", "/sheet.json"): lambda q: dict(panel_state.state(
+                    self.views, self.blend, self.verdict, self.marks), model=self.name),
                 ("GET", "/parts.json"): lambda q: self.parts_table(),
                 # Absent is an answer: a space that has never built has no
                 # picture yet, and a panel with nothing in it is the truth about
@@ -96,7 +99,11 @@ class Canvas(Page):
                 ("POST", "/correct"): lambda b: self.answer(
                     self.corrected, b.get("id"), b.get("pixel"), b.get("to")),
                 ("POST", "/reject"): lambda b: self.answer(
-                    marks_store.reject, b.get("id"), b.get("why"))}
+                    marks_store.reject, b.get("id"), b.get("why")),
+                # The header's *Models* (ADR 0025, decision 12): the lobby, shown
+                # if one is running and started if not — `contour lobby` decides
+                # which, so the page and a terminal cannot disagree.
+                ("POST", "/models"): lambda b: models()}
 
     def ref(self, name):
         """One of the user's photographs, or None when there is no such one."""
@@ -214,6 +221,13 @@ class Canvas(Page):
 
 
 
+def models():
+    """Start `contour lobby`, which shows the running lobby or becomes it."""
+    from lib import enter
+    enter.page(Path.home(), "lobby")    # every space's page stands in none
+    return {"lobby": True}
+
+
 def png(blob):
     """Bytes as a PNG answer, or None for a 404 when there are none."""
     return Blob((blob, "image/png")) if blob else None
@@ -221,7 +235,7 @@ def png(blob):
 
 
 def serve(sheet, marks, mask=None, parts=None, resolve=None, refs=None,
-          views=None, blend=None, verdict=None, open_browser=True):
+          views=None, blend=None, verdict=None, name=None, open_browser=True):
     """One canvas session, start to report. Blocks until the page says done.
 
     The first Contour command that waits rather than shoots, so it is also the
@@ -237,7 +251,7 @@ def serve(sheet, marks, mask=None, parts=None, resolve=None, refs=None,
     # the build has moved past just as easily, and resolution already refuses one
     # (ADR 0018). Said while the user is looking rather than when they press Done.
     canvas = Canvas(sheet, marks, mask, parts, resolve, refs,
-                    views=views, blend=blend, verdict=verdict)
+                    views=views, blend=blend, verdict=verdict, name=name)
     url = canvas.start()
     print(f"canvas at {url}  —  click the sheet, then press Done", flush=True)
     if open_browser:

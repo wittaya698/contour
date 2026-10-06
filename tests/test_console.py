@@ -252,9 +252,21 @@ class ServesTest(ConsoleCase):
     def test_the_console_serves_the_page_it_shares_with_the_canvas(self):
         """`lib/canvas.html`, not a copy: two copies of the page would drift,
         and the one that drifts is the one nobody is looking at."""
+        from lib.page import LINKED, LOOK
         _, url = self.launch()
         with urllib.request.urlopen(url, timeout=10) as r:
-            self.assertEqual(r.read(), (ROOT / "lib" / "canvas.html").read_bytes())
+            got = r.read().decode()
+        page = (ROOT / "lib" / "canvas.html").read_text(encoding="utf-8")
+        self.assertEqual(got.split("<style data-look>", 1)[0], page.split(LINKED, 1)[0])
+        self.assertIn(LOOK.read_text(encoding="utf-8"), got, "the one look, in it")
+        self.assertTrue(got.endswith(page.split(LINKED, 1)[1]))
+
+    def test_the_header_names_the_space_the_console_serves(self):
+        """*Models › oak-chair*: the space's own name, as the lobby lists it
+        (ADR 0025, decision 12)."""
+        space = self.space()
+        _, url = self.launch(space)
+        self.assertEqual(self.ask(url, "/sheet.json")[1]["model"], space.name)
 
     def test_the_page_is_served_the_spaces_own_sheet(self):
         """What is on the page is this space's render, not the toolkit's idea of

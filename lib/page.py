@@ -21,9 +21,17 @@ import threading
 import time
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 
 TOKEN_HEADER = "X-Contour-Token"
 TOKEN_PARAM = "t"
+
+LOOK = Path(__file__).resolve().parent / "look.css"
+"""The one stylesheet every page takes its look from (ADR 0025, decision 12)."""
+LINKED = '<link rel="stylesheet" href="look.css">'
+"""Where a page asks for it. Served in its place, inside the page, because a
+`<link>` cannot carry this session's token and the stylesheet would otherwise
+be the one request that proves nothing."""
 
 
 class Blob(tuple):
@@ -88,7 +96,7 @@ class _Handler(BaseHTTPRequestHandler):
         page.touched()
         url = urllib.parse.urlparse(self.path)
         if url.path == "/":
-            return self._bytes(page.html.read_bytes(), "text/html; charset=utf-8")
+            return self._bytes(page.body(), "text/html; charset=utf-8")
         if url.path == "/can":
             return self._json({"can": list(page.can)})
         return self._route("GET", url.path, {k: v[0] for k, v in
@@ -180,6 +188,13 @@ class Page:
         self._server = None
         self._thread = None
         self._addr = None
+
+    def body(self):
+        """The page as a browser gets it: its HTML with the one stylesheet in
+        place of the link that asks for it."""
+        html = self.html.read_text(encoding="utf-8")
+        look = f'<style data-look>\n{LOOK.read_text(encoding="utf-8")}</style>'
+        return html.replace(LINKED, look, 1).encode()
 
     def served(self):
         """This host's own content, as {(method, path): handler}. A handler

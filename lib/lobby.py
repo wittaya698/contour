@@ -10,13 +10,18 @@ Its lifetime is the tab. There is no Done button: a list has nothing to finish,
 so a page that stopped beating is the only ending there is.
 """
 import base64
+import contextlib
 import json
+import os
+import signal
+import socket
 import subprocess
 import sys
+import urllib.parse
 import webbrowser
 from pathlib import Path
 
-from lib import enter, refs, space
+from lib import enter, lock, policy, refs, space
 from lib.page import Blob, Page
 
 PAGE = Path(__file__).resolve().parent / "lobby.html"
@@ -24,6 +29,13 @@ CONTOUR = PAGE.parent.parent / "contour"
 GRACE_S = 10          # beats are seconds apart; this is several missed ones
 HIDDEN_GRACE_S = 60 * 60   # a background tab's timers may stop; a quit browser
                            # is caught here, and a lingering lobby costs a port
+
+RECORD = "lobby.json"
+"""The running lobby, said in `~/.contour`: its pid and where it listens, and
+never its address with the secret in it. One lobby lists every space, so a
+second is a second tab of the same list (ADR 0025, decision 12)."""
+SHOW = signal.SIGUSR1
+"""What a second `contour lobby` sends the running one: show yourself."""
 
 REFERENCE_CAP = 20 * 2**20
 """How large one dropped reference may be: a photo, not a video."""
@@ -282,15 +294,61 @@ def contour(space, *args):
     return json.loads(r.stdout)
 
 
+def running():
+    """The running lobby's record, or None. Alive by the hold's rule, on this
+    machine, and listening where it said — so a pid since reused by something
+    else is never sent a signal meant for a lobby."""
+    try:
+        record = json.loads((policy.home() / RECORD).read_text())
+    except (OSError, ValueError):
+        return None
+    if not isinstance(record, dict) or record.get("host") != socket.gethostname():
+        return None
+    if not lock.alive(record):
+        return None
+    where = urllib.parse.urlparse(str(record.get("origin")))
+    try:
+        socket.create_connection((where.hostname, where.port), timeout=1).close()
+    except (OSError, TypeError, ValueError):
+        return None
+    return record
+
+
+@contextlib.contextmanager
+def recorded(lobby):
+    """Say this lobby is the running one for as long as the block lasts, and
+    show it again whenever a second `contour lobby`, or a page's *Models*,
+    asks. Taken back only if it is still this one's."""
+    signal.signal(SHOW, lambda number, frame: webbrowser.open(lobby.url))
+    record = {"pid": os.getpid(), "host": socket.gethostname(), "origin": lobby.origin}
+    path = policy.home() / RECORD
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(record))
+    try:
+        yield
+    finally:
+        with contextlib.suppress(OSError, ValueError):
+            if json.loads(path.read_text()) == record:
+                path.unlink()
+
+
 def serve(listing, grace=GRACE_S, hidden_grace=HIDDEN_GRACE_S, open_browser=True):
-    """One lobby session, start to last line. Blocks until the tab closes."""
+    """One lobby session, start to last line. Blocks until the tab closes.
+
+    Or, when a lobby is already running, shows that one and starts nothing: its
+    address is its own to open, since it carries its secret."""
+    there = running()
+    if there:
+        os.kill(there["pid"], SHOW)
+        return {"ok": True, "lines": ["lobby already open — shown again"]}
     lobby = Lobby(listing, grace=grace, hidden_grace=hidden_grace)
     url = lobby.start()
     print(f"lobby at {url}", flush=True)
     try:
-        if open_browser:          # inside: a Ctrl-C can land while a browser opens
-            webbrowser.open(url)
-        lobby.wait()
+        with recorded(lobby):
+            if open_browser:      # inside: a Ctrl-C can land while a browser opens
+                webbrowser.open(url)
+            lobby.wait()
     except KeyboardInterrupt:
         lobby.stop()
         return {"ok": True, "lines": ["lobby closed — interrupted"]}

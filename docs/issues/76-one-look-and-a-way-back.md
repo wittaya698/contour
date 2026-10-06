@@ -11,9 +11,9 @@ the lobby, starting one if none is running.
 
 ## Acceptance criteria
 
-- [ ] Both pages render from the one stylesheet, light and dark
-- [ ] The header shows on the lobby, the canvas and the console
-- [ ] Models opens the running lobby, or starts one
+- [x] Both pages render from the one stylesheet, light and dark
+- [x] The header shows on the lobby, the canvas and the console
+- [x] Models opens the running lobby, or starts one
 
 ## Blocked by
 

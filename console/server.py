@@ -135,7 +135,7 @@ class Console:
             # so the panel can be labelled rather than quietly authoritative
             # (ADR 0019, decision 13).
             views=here.views, blend=here.blend,
-            verdict=here.dot / panel_state.NAME,
+            verdict=here.dot / panel_state.NAME, name=self.space.resolve().name,
             routes={("POST", "/run"): self.started,
                     ("GET", "/events"): self.transcript,
                     ("POST", "/verdict"): self.verdict,

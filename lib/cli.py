@@ -295,7 +295,7 @@ def on_canvas(cmd, rest, held):
                               resolve=lambda: stage(["resolve"]),
                               refs=HERE.refs, views=HERE.views,
                               blend=HERE.blend,
-                              verdict=HERE.dot / panel.NAME)
+                              verdict=HERE.dot / panel.NAME, name=PROJECT.name)
     return emit(report)
 
 

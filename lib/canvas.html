@@ -1,14 +1,11 @@
 <!doctype html>
 <meta charset="utf-8">
 <title>contour canvas</title>
+<link rel="stylesheet" href="look.css">
 <style>
-  :root { color-scheme: light dark; --ink: #1b1b1b; --bg: #f4f4f2; --line: #c9c7c0; --pin: #d8442f; --agent: #2f6fd8; }
-  @media (prefers-color-scheme: dark) {
-    :root { --ink: #e8e6e0; --bg: #17181a; --line: #3a3c40; }
-  }
-  * { box-sizing: border-box; }
-  body { margin: 0; height: 100vh; display: flex; font: 14px/1.5 ui-sans-serif, system-ui, sans-serif;
-         color: var(--ink); background: var(--bg); }
+  /* The header across the top; the sheet and the column side by side under it. */
+  body { height: 100vh; display: flex; flex-direction: column; }
+  #under { flex: 1; min-height: 0; display: flex; }
   #stage { flex: 1; position: relative; overflow: auto; padding: 12px; }
   #wrap { position: relative; display: inline-block; }
   canvas { display: block; max-width: 100%; height: auto; cursor: crosshair; }
@@ -20,9 +17,6 @@
   li.closed::marker { color: var(--line); }
   .view { opacity: .55; font-size: 12px; }
   form { display: flex; flex-direction: column; gap: 8px; }
-  input, button { font: inherit; padding: 7px 9px; border: 1px solid var(--line);
-                  border-radius: 6px; background: transparent; color: inherit; }
-  button { cursor: pointer; }
   #done { border-color: var(--pin); color: var(--pin); }
   #hint { opacity: .6; font-size: 12px; }
   /* The label: quiet while the picture is of the build on disk, and the colour
@@ -30,13 +24,9 @@
   #build { margin: 8px 0 0; font-size: 12px; opacity: .6;
            font-family: ui-monospace, SFMono-Regular, monospace; }
   #build.old { opacity: 1; color: var(--pin); }
-  /* Whether the model is right (ADR 0025, decision 4): green is one quiet line
-     and red is loud, each failure one sentence; what passed stays folded. */
-  #verdict { margin: 4px 0 0; font-size: 13px; }
-  #verdict .line { margin: 0; opacity: .6; }
-  #verdict.red .line { opacity: 1; color: var(--pin); font-weight: 600; }
-  #verdict ul { margin: 4px 0 0; padding-left: 18px; }
-  #verdict details { font-size: 12px; opacity: .6; margin-top: 4px; }
+  /* The verdict, in the header: the look's, laid out on one line with the
+     crumbs and its failures under them. */
+  #verdict { font-size: 13px; }
   .pin { position: absolute; width: 20px; height: 20px; margin: -10px 0 0 -10px;
          border-radius: 50%; background: var(--pin); color: #fff; font-size: 11px;
          font-weight: 700; display: grid; place-items: center; pointer-events: none; }
@@ -192,17 +182,21 @@
   body:not(.asked) [data-needs],
   body:not(.asked) [data-unless] { display: none !important; }
 </style>
+<!-- The header every page carries (ADR 0025, decision 12): Models, which goes
+     back to the lobby; this model's name; and whether it is right — said in
+     words and never on the sheet, because a check knows a number, not a place
+     (ADR 0019, decision 13; ADR 0025, decision 4). -->
+<header class="top"><nav><a class="models" href="">Models</a><span class="sep">›</span><span class="model"></span></nav>
+  <div id="verdict" class="verdict" hidden><p class="line"></p><ul class="failing"></ul>
+    <details><summary>what matched</summary><ul class="passing"></ul></details></div></header>
+<div id="under">
 <div id="stage"><div id="strip"></div><div id="wrap"><canvas id="sheet"></canvas></div>
   <!-- Which build this is a picture of. Beside the picture, because it is a fact
        about what you are looking at and is read while looking at it. A sheet is
        only ever of a finished build, so an unlabelled one is authoritative about
        whichever build happens to be on disk (ADR 0019, decision 13). -->
   <p id="build"></p>
-  <!-- Whether the model is right, under the label and never on the sheet: a
-       check knows a number, not a place, so it is said in words beside the
-       picture (ADR 0019, decision 13; ADR 0025, decision 4). -->
-  <div id="verdict" hidden><p class="line"></p><ul class="failing"></ul>
-    <details><summary>what matched</summary><ul class="passing"></ul></details></div></div>
+</div>
 <aside>
   <!-- Claude's questions about the references, one at a time: each unanswered
        agent span, zoomed, with its number and the three answers in words
@@ -329,6 +323,7 @@
   </section>
   <button id="done" data-unless="drive" data-closed="Canvas closed">Done</button>
 </aside>
+</div>
 <script>
 // This session's token, from the URL the command opened (ADR 0019). Localhost
 // is not a boundary for a server that takes POSTs, so every request carries it.
@@ -723,6 +718,7 @@ ask('/parts.json').then(r => r.json()).then(t => parts = t);
 // already refuses to resolve marks against one — this says so while the user is
 // still looking, instead of at the moment they press Done.
 const label = document.getElementById('build');
+const model = document.querySelector('header.top .model');
 let drawn = null;                            // the build the canvas is holding
 
 async function labelled() {
@@ -732,6 +728,7 @@ async function labelled() {
                        said.build && !said.current ? 'not current: ' + said.why : '',
                        said.marks || ''].filter(Boolean).join('  —  ');
   label.classList.toggle('old', Boolean(said.build) && !said.current);
+  model.textContent = said.model || '';
   verdict(said.verdict);
   // A new build means a new sheet. Redrawn here rather than on a timer, so the
   // picture changes when the thing it is a picture of does and at no other time.
@@ -742,6 +739,15 @@ async function labelled() {
   }
 }
 
+// Models, in the header: back to the lobby (ADR 0025, decision 12). Asked of
+// this page's own host, which opens the running lobby or starts one — the page
+// never holds the lobby's address, because that carries the lobby's secret.
+function backToModels(e) {
+  e.preventDefault();
+  ask('/models', {});
+}
+document.querySelector('header.top .models').addEventListener('click', backToModels);
+
 // The sentences come whole from the server's one table (`lib/verdict.py`); the
 // page lays them out and words none of its own.
 const told = document.getElementById('verdict');
@@ -749,6 +755,7 @@ function verdict(said) {
   told.hidden = !said;
   if (!said) return;
   told.classList.toggle('red', said.ok === false);   // null: not known either way
+  told.classList.toggle('ok', said.ok === true);
   told.querySelector('.line').textContent = said.line;
   const list = (cls, items) => told.querySelector(cls).replaceChildren(
     ...items.map(text => { const li = document.createElement('li');

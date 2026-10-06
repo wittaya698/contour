@@ -4,36 +4,18 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Models</title>
+<link rel="stylesheet" href="look.css">
 <style>
-  :root { --bg: #fafaf8; --fg: #1d1d1b; --muted: #6b6b66; --line: #e2e2dc;
-          --warn: #a3470d; --ok: #2f6b3a; }
-  @media (prefers-color-scheme: dark) {
-    :root { --bg: #18181a; --fg: #ececea; --muted: #9a9a94; --line: #2e2e31;
-            --warn: #f0a46b; --ok: #8fcf98; }
-  }
-  body { margin: 0; background: var(--bg); color: var(--fg);
-         font: 15px/1.5 system-ui, -apple-system, sans-serif; }
   main { max-width: 960px; margin: 0 auto; padding: 32px 16px; }
   h1 { font-size: 20px; margin: 0 0 4px; }
   h2 { font-size: 16px; margin: 32px 0 4px; }
-  .muted { color: var(--muted); }
   table { width: 100%; border-collapse: collapse; margin-top: 24px; }
   th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line);
            vertical-align: top; }
   th { font-weight: 600; font-size: 13px; color: var(--muted); }
   td.num { text-align: right; font-variant-numeric: tabular-nums; }
-  code { font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; }
-  .warn { color: var(--warn); }
-  .ok { color: var(--ok); }
   .wrap { overflow-x: auto; }
   #onboarding { margin-top: 24px; max-width: 640px; }
-  button { font: inherit; padding: 4px 10px; border: 1px solid var(--line);
-           border-radius: 6px; background: transparent; color: var(--fg); cursor: pointer; }
-  button.go { border-color: var(--fg); font-weight: 600; }
-  button.danger { border-color: var(--warn); color: var(--warn); font-weight: 600; }
-  button:disabled { opacity: 0.45; cursor: default; }
-  input { font: inherit; padding: 4px 8px; border: 1px solid var(--line);
-          border-radius: 6px; background: transparent; color: var(--fg); }
   .panel { padding: 12px 10px 16px; }
   .panel h3 { font-size: 13px; color: var(--muted); margin: 12px 0 4px; font-weight: 600; }
   .panel ul { margin: 0; padding-left: 18px; }
@@ -54,8 +36,6 @@
   td.thumb div { background: transparent; border-style: dashed; }
   td.thumb div.cut { border-style: solid; background-color: #fff; background-repeat: no-repeat; }
   td p { margin: 2px 0; }
-  p.verdict { font-weight: 600; }
-  ul.failing { margin: 2px 0 4px; padding-left: 18px; color: var(--warn); font-size: 14px; }
   td.actions { white-space: nowrap; text-align: right; }
   details.menu { display: inline-block; position: relative; margin-left: 6px; }
   details.menu summary { list-style: none; cursor: pointer; padding: 4px 10px;
@@ -68,6 +48,9 @@
 </style>
 </head>
 <body>
+<!-- The header every page carries (ADR 0025, decision 12). Here, Models is
+     where you are, so it is a name and not a way back. -->
+<header class="top"><nav><span class="models">Models</span></nav></header>
 <main>
   <h1>Models</h1>
   <p class="muted" id="roots"></p>
@@ -139,12 +122,14 @@ function health(s) {
 // one plain sentence; the passing ones are the console's to show.
 function verdict(v) {
   const box = document.createElement('div');
+  box.className = 'verdict';
   if (!v) {
-    box.append(para('not built yet', 'muted verdict'));
+    box.append(para('not built yet', 'line'));
     return box;
   }
   // `ok` is null for a verdict that cannot tell: neither green nor red.
-  box.append(para(v.line, (v.ok ? 'ok' : v.ok === false ? 'warn' : 'muted') + ' verdict'));
+  if (v.ok !== null) box.classList.add(v.ok ? 'ok' : 'red');
+  box.append(para(v.line, 'line'));
   if (v.failing.length) {
     const ul = document.createElement('ul');
     ul.className = 'failing';

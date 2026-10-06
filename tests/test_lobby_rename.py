@@ -47,8 +47,13 @@ class LobbyRenameCase(RenameCase):
         self.open()
 
     def open(self, **popen):
-        """`contour lobby` over the test's environment, as it stands now."""
-        proc = subprocess.Popen([sys.executable, str(CONTOUR), "lobby"],
+        """`contour lobby` over the test's environment, as it stands now. The
+        one this test opened before is stopped first: one lobby runs at a time,
+        and a second would only show the first (ADR 0025, decision 12)."""
+        if getattr(self, "proc", None) and self.proc.poll() is None:
+            self.proc.kill()
+            self.proc.wait(timeout=30)
+        proc = self.proc = subprocess.Popen([sys.executable, str(CONTOUR), "lobby"],
                                 cwd=str(self.tmp), env=self.env, text=True,
                                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                 **popen)
