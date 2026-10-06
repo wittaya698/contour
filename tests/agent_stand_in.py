@@ -58,6 +58,13 @@ def drive(prompt, options, gate, say):
             # cannot run — so the effect on the store is produced here instead,
             # and what is under test stays the console's reading of it.
             marks.orphan(Path(options["cwd"]) / marks.NAME, set(step["rebuilt"]))
+        if "use" in step:
+            # A tool call as the transcript hears of it, the way the driver
+            # says every `ToolUseBlock`: the tool and its input, raw. Not gated
+            # here — a read carries no intent, and what is under test is the
+            # line the page shows for it (issue 72).
+            used = dict(step["use"])
+            say("call", tool=used.pop("tool"), call=used)
         if "call" in step:
             # Asked for, then reported — the two halves an agent actually has.
             # What comes back from the gate is a verdict and a sentence, never an

@@ -14,11 +14,11 @@ A tool or command the table does not know is shown raw, never hidden.
 
 ## Acceptance criteria
 
-- [ ] Every `contour` command has an activity line, and a test fails when a new one has none
-- [ ] Each line expands to the raw call
-- [ ] Consecutive read-only calls fold into one line
-- [ ] A reloaded tab shows the same lines as before the reload
-- [ ] An unknown tool shows its raw call
+- [x] Every `contour` command has an activity line, and a test fails when a new one has none
+- [x] Each line expands to the raw call
+- [x] Consecutive read-only calls fold into one line
+- [x] A reloaded tab shows the same lines as before the reload
+- [x] An unknown tool shows its raw call
 
 ## Blocked by
 

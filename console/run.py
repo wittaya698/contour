@@ -13,7 +13,7 @@ import threading
 from pathlib import Path
 
 from console import launcher, seed, spend, vetoes
-from lib import gate as gate_words, intent, lock, marks, policy
+from lib import activity, gate as gate_words, intent, lock, marks, policy
 
 
 class Stopped(Exception):
@@ -345,10 +345,29 @@ class Run:
             # reloaded tab gets the figure back with everything else instead of
             # whatever was spent after it reconnected.
             return self.say("spend", **spend.total(self.space, here))
+        if kind == "call":
+            # What the call did, in words, beside the call itself, which the
+            # page keeps one click away (ADR 0025, decision 8).
+            fields["activity"] = activity.line(fields.get("tool"), fields.get("call") or {})
+            fields["fold"] = None
         with self._lock:
             event = {"n": len(self.events), "kind": kind, **fields}
+            if kind == "call" and fields["tool"] in activity.QUIET:
+                self.fold(event)
             self.events.append(event)
         return event
+
+    def fold(self, event):
+        """Fold a read into the reads just before it. The event names the
+        first of them, and says the line as it now stands — so the page
+        redraws one line, and a reloaded tab, replaying every event, ends on
+        the same words. Spend between them is not a line, so it breaks
+        nothing; anything else said in between starts a new fold."""
+        last = next((e for e in reversed(self.events) if e["kind"] != "spend"), None)
+        event["fold"] = (last["fold"] if last and last["kind"] == "call"
+                         and last.get("fold") is not None else event["n"])
+        event["activity"] = activity.looked(
+            1 + sum(1 for e in self.events if e.get("fold") == event["fold"]))
 
     def since(self, n):
         """The transcript from a cursor, and the cursor to ask with next."""

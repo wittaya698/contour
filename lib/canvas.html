@@ -153,6 +153,10 @@
   #turns .changes { margin: 0; padding-left: 18px; }
   #turns .changes:empty, #turns .spans:empty { display: none; }
   #turns .raw summary { cursor: pointer; opacity: .6; font-size: 11px; }
+  /* An activity line: what the call did, its call beside it and folded away. */
+  #turns .did { display: flex; flex-wrap: wrap; gap: 0 10px; align-items: baseline; }
+  #turns .did .raw { flex-basis: auto; }
+  #turns .did .raw[open] { flex-basis: 100%; }
   #turns .call { display: block; margin-top: 4px;
                  font-family: ui-monospace, SFMono-Regular, monospace;
                  font-size: 11px; word-break: break-all; }
@@ -392,7 +396,8 @@ function drive() {
       // the transcript would bury what the agent actually said under an
       // accountant, so the running total replaces itself in one place.
       if (event.kind === 'spend') { spendLine(event); continue; }
-      turns.append(turn(event));
+      const line = turn(event);
+      if (line) turns.append(line);         // a folded read redrew its line
     }
     if (said.events.length) turns.scrollTop = turns.scrollHeight;
     if (said.events.some(e => e.kind === 'ended')) state.textContent = 'no run';
@@ -537,10 +542,38 @@ function vetoed(veto) {
 // One line of the transcript.
 function turn(event) {
   if (event.kind === 'gate') return gate(event);
+  if (event.kind === 'call') return activity(event);
   const li = document.createElement('li');
   li.className = event.kind;
   li.textContent = event.text || '';
   return li;
+}
+
+// One call, as what it did, with the call itself a click away (ADR 0025,
+// decision 8). The words come whole from the console (`lib/activity.py`); one it
+// has none for is shown raw, never hidden. A read folded into the line before it
+// redraws that line and adds no other: it is null to the caller, and a reloaded
+// tab replaying every event ends on the same words.
+function activity(event) {
+  const turns = document.getElementById('turns');
+  const folded = event.fold != null && turns.querySelector(`li[data-fold="${event.fold}"]`);
+  const li = folded || document.createElement('li');
+  if (!folded) {
+    li.className = 'did';
+    if (event.fold != null) li.dataset.fold = event.fold;
+    const raw = document.createElement('details');
+    raw.className = 'raw';
+    raw.innerHTML = '<summary>the exact call</summary>';
+    li.append(document.createElement('span'), raw);
+  }
+  li.firstChild.textContent = event.activity || called(event);
+  // A line that is already the raw call has nothing behind it to open.
+  li.querySelector('.raw').hidden = !event.activity;
+  const call = document.createElement('span');
+  call.className = 'call';
+  call.textContent = called(event);
+  li.querySelector('.raw').append(call);
+  return folded ? null : li;
 }
 
 // The line that is waiting for you. Two answers and a sentence: the reason goes

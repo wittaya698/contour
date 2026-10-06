@@ -9,8 +9,6 @@ permission callback — and translation is all it is allowed to be. There is
 nothing here to configure: `run.options` hands over what the agent is told, and
 this passes it through rather than adding to it.
 """
-import json
-
 import anyio
 from claude_agent_sdk import (AssistantMessage, ClaudeAgentOptions,
                              ClaudeSDKClient, ConversationResetMessage,
@@ -47,8 +45,8 @@ async def session(prompt, options, gate, say):
             ClaudeAgentOptions(**options, can_use_tool=can_use_tool)) as client:
         await client.query(prompt)
         async for message in client.receive_response():
-            for kind, text in said(message):
-                say(kind, text=text)
+            for kind, fields in said(message):
+                say(kind, **fields)
             # What the turn cost, over the same seam and as its own kind: the
             # console records it and shows it, and neither is this file's
             # business (ADR 0019, decision 37). Per assistant message, because
@@ -61,27 +59,25 @@ async def session(prompt, options, gate, say):
 
 def said(message):
     """One SDK message, in the transcript's words. Anything else is dropped:
-    this is a control surface, and a surface showing everything shows nothing."""
+    this is a control surface, and a surface showing everything shows nothing.
+
+    A tool call goes over raw — its tool and its input — and the console words
+    it (ADR 0025, decision 8): wording it here would be a second table."""
     if isinstance(message, AssistantMessage):
         for block in message.content:
             if isinstance(block, TextBlock) and block.text.strip():
-                yield "text", block.text.strip()
+                yield "text", {"text": block.text.strip()}
             elif isinstance(block, ToolUseBlock):
-                yield "call", f"{block.name}  {brief(block.input)}"
+                yield "call", {"tool": block.name, "call": dict(block.input)}
     elif isinstance(message, ConversationResetMessage):
-        yield "limit", "the conversation was compacted — the run carries on"
+        yield "limit", {"text": "the conversation was compacted — the run carries on"}
     elif isinstance(message, SystemMessage) and "compact" in (message.subtype or ""):
         # News, not an ending. A limit the user did not choose must not interrupt
         # work they were watching, which is the timeout argument again — and the
         # spec is read from disk rather than recalled precisely so that a
         # compacted run has not had its goalposts moved by the harness.
-        yield "limit", "the conversation was compacted — the run carries on"
+        yield "limit", {"text": "the conversation was compacted — the run carries on"}
     elif isinstance(message, ResultMessage) and message.is_error:
-        yield "text", f"the harness reported an error: {message.result or message.subtype}"
+        yield "text", {"text": "the harness reported an error: "
+                               f"{message.result or message.subtype}"}
 
-
-def brief(call):
-    """A tool's input as one line. The call is shown, never offered."""
-    if not isinstance(call, dict):
-        return str(call)
-    return str(call.get("command") or call.get("file_path") or json.dumps(call))[:400]
