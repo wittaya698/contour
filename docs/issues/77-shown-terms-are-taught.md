@@ -12,9 +12,16 @@ correctly without it.
 
 ## Acceptance criteria
 
-- [ ] Each shown term has its line where it first appears
-- [ ] A dismissed explanation stays dismissed for that viewer
-- [ ] With browser storage unavailable the page still renders and explains
+- [x] Each shown term has its line where it first appears
+- [x] A dismissed explanation stays dismissed for that viewer
+- [x] With browser storage unavailable the page still renders and explains
+
+**As built (2026-10-06):** the memory is kept on this computer, in
+`~/.contour/taught.json`, not in browser storage. Every page is served on a
+port of its own, so the browser's storage would forget a closed line the next
+time any page opened, and the lobby would never hear what the canvas was told.
+The third criterion holds of that record: unreadable or unreachable, every
+line is shown.
 
 ## Blocked by
 

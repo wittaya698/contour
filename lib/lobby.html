@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Models</title>
 <link rel="stylesheet" href="look.css">
+<script src="teach.js"></script>
 <style>
   main { max-width: 960px; margin: 0 auto; padding: 32px 16px; }
   h1 { font-size: 20px; margin: 0 0 4px; }
@@ -56,6 +57,9 @@
   <p class="muted" id="roots"></p>
   <div id="create" hidden></div>
   <div class="wrap" id="list" hidden>
+    <!-- Every row's verdict is said against its spec (ADR 0025, decision 1;
+         issue 77), so the word is taught once, above them. -->
+    <div id="taught-spec"></div>
     <table>
       <tbody id="rows"></tbody>
     </table>
@@ -340,7 +344,7 @@ function creating(room, of) {
   const row = document.createElement('div');
   row.className = 'actions';
   row.append(name, location, b);
-  room.replaceChildren(row, drop, said);
+  room.replaceChildren(row, teach('reference'), drop, said);
 }
 
 // Each file as the lobby takes it: its name, and its bytes read raw and sent
@@ -556,6 +560,8 @@ function purging(d, room, p) {
 // Empty is onboarding, not an empty table: someone with no spaces is standing
 // where someone with ten is (ADR 0021, decision 1). The trash is its own list,
 // so a deleted space never reads as a live one.
+document.getElementById('taught-spec').append(teach('spec'));
+
 function render({ roots, spaces, deleted }, can, environment) {
   document.getElementById('roots').textContent = 'Looking in ' + roots.join(', ');
   const may = can.has('create');

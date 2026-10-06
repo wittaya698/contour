@@ -38,3 +38,11 @@ header.top nav .sep { margin: 0 6px; color: var(--muted); font-weight: 400; }
 .verdict.red .line { color: var(--warn); font-weight: 600; }
 .verdict ul.failing { margin: 2px 0 4px; padding-left: 18px; color: var(--warn); }
 .verdict details { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+/* A shown term's one line (ADR 0025, decision 1; issue 77): quiet, beside what
+   it explains, and gone once the viewer says they have it. */
+.teach { margin: 4px 0; font-size: 12px; color: var(--muted); }
+.teach strong { color: var(--fg); font-weight: 600; }
+.teach button.shut { border: 0; padding: 0 0 0 6px; font-size: 11px; opacity: .7;
+                     text-decoration: underline; }
+.teach[hidden] { display: none; }

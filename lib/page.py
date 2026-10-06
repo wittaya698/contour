@@ -23,15 +23,22 @@ import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+from lib import taught
+
 TOKEN_HEADER = "X-Contour-Token"
 TOKEN_PARAM = "t"
 
 LOOK = Path(__file__).resolve().parent / "look.css"
 """The one stylesheet every page takes its look from (ADR 0025, decision 12)."""
+SCRIPT = Path(__file__).resolve().parent / "teach.js"
+"""What teaches a shown term on any page (issue 77)."""
 LINKED = '<link rel="stylesheet" href="look.css">'
 """Where a page asks for it. Served in its place, inside the page, because a
 `<link>` cannot carry this session's token and the stylesheet would otherwise
 be the one request that proves nothing."""
+TEACH = '<script src="teach.js"></script>'
+"""Where a page asks for the shown terms' lines (issue 77), served in its
+place for the same reason."""
 
 
 class Blob(tuple):
@@ -99,6 +106,8 @@ class _Handler(BaseHTTPRequestHandler):
             return self._bytes(page.body(), "text/html; charset=utf-8")
         if url.path == "/can":
             return self._json({"can": list(page.can)})
+        if url.path == "/taught":
+            return self._json({"closed": taught.closed()})
         return self._route("GET", url.path, {k: v[0] for k, v in
                                              urllib.parse.parse_qs(url.query).items()})
 
@@ -120,6 +129,8 @@ class _Handler(BaseHTTPRequestHandler):
             return self._json(page.beat(hidden=bool(body.get("hidden"))))
         if self.path == "/going":
             return self._json(page.going())
+        if self.path == "/taught":
+            return self._json({"closed": taught.close(body.get("closed"))})
         if self.path == "/done":
             self._json({"done": True})
             return page.finish()
@@ -194,7 +205,10 @@ class Page:
         place of the link that asks for it."""
         html = self.html.read_text(encoding="utf-8")
         look = f'<style data-look>\n{LOOK.read_text(encoding="utf-8")}</style>'
-        return html.replace(LINKED, look, 1).encode()
+        lines = json.dumps(taught.LINES).replace("</", "<\\/")
+        teach = (f'<script data-teach>\nconst TAUGHT = {lines};\n'
+                 f'{SCRIPT.read_text(encoding="utf-8")}</script>')
+        return html.replace(LINKED, look, 1).replace(TEACH, teach, 1).encode()
 
     def served(self):
         """This host's own content, as {(method, path): handler}. A handler

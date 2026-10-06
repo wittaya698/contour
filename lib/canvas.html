@@ -2,6 +2,7 @@
 <meta charset="utf-8">
 <title>contour canvas</title>
 <link rel="stylesheet" href="look.css">
+<script src="teach.js"></script>
 <style>
   /* The header across the top; the sheet and the column side by side under it. */
   body { height: 100vh; display: flex; flex-direction: column; }
@@ -87,7 +88,7 @@
      0022, decision 3). Its line is broken on the picture and it says so in the
      list, so a number nothing measured never passes for one that was. */
   li.byeye .how { color: var(--agent); font-style: italic; }
-  .verdict { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; opacity: .7; }
+  #list .verdict, #turns .verdict { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; opacity: .7; }
   .shut { border: 0; padding: 0 0 0 6px; font-size: 12px; opacity: .6; text-decoration: underline; }
   /* A veto: the sentence is the point, so it is the part that reads normally.
      Bordered like nothing — it is a record and not a thing waiting for you. */
@@ -218,6 +219,11 @@
   <h1>Marks</h1>
   <ol id="list"></ol>
   <p id="hint">Click the sheet, then type one line.</p>
+  <!-- The words the hint above has just used, each taught in one line until the
+       viewer closes it (ADR 0025, decision 1; issue 77): the sheet's while the
+       sheet is showing, a reference's while one is. -->
+  <div id="taught-sheet"></div>
+  <div id="taught-ref" hidden></div>
   <form id="entry" hidden>
     <span class="view" id="where"></span>
     <input id="text" placeholder="what is wrong here" autocomplete="off">
@@ -684,6 +690,10 @@ const wrap = document.getElementById('wrap'), list = document.getElementById('li
 const entry = document.getElementById('entry'), text = document.getElementById('text');
 const where = document.getElementById('where'), hint = document.getElementById('hint');
 const strip = document.getElementById('strip');
+const taughtSheet = document.getElementById('taught-sheet');
+const taughtRef = document.getElementById('taught-ref');
+taughtSheet.append(teach('sheet'), teach('mark'));
+taughtRef.append(teach('reference'), teach('span'));
 let marks = [], pending = null, added = 0, parts = {};
 // Whether this host can run an agent, and which open marks the next run is to be
 // seeded with. Ids and not marks: `draw()` rebuilds the list from scratch, and a
@@ -751,6 +761,7 @@ document.querySelector('header.top .models').addEventListener('click', backToMod
 // The sentences come whole from the server's one table (`lib/verdict.py`); the
 // page lays them out and words none of its own.
 const told = document.getElementById('verdict');
+told.querySelector('.line').after(teach('spec'));    // the spec is whose word it is
 function verdict(said) {
   told.hidden = !said;
   if (!said) return;
@@ -776,6 +787,8 @@ function show(name) {
   entry.hidden = true;
   for (const b of strip.children) b.classList.toggle('on', (b.dataset.ref || null) === name);
   text.placeholder = name ? 'here is what I meant' : 'what is wrong here';
+  taughtSheet.hidden = !!name;
+  taughtRef.hidden = !name;
   hint.textContent = name ? 'Click the reference, or drag across a distance.'
                           : 'Click the sheet, then type one line.';
   // Keyed on the build and not on the clock: a new build is an address this

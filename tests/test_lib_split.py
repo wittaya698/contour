@@ -37,7 +37,7 @@ print(" ".join(sorted({n.split(".")[0] for n in set(sys.modules) - before}
 FREE = ("agent", "badges", "canvas", "checks", "cli", "commands", "activity", "connector", "delete", "enter", "exported",
         "filmstrip", "gate", "git", "glb", "intent", "lobby", "lock", "marks", "mask", "miniyaml",
         "ops_whitelist", "page", "panel", "policy", "presence", "refs",
-        "rename", "restore", "revision", "signals", "space", "span", "spend", "store",
+        "rename", "restore", "revision", "signals", "space", "span", "spend", "store", "taught",
         "units", "verdict", "vetoes", "views", "worksheet")
 
 # Runs inside Blender, and may import anything in FREE — the ban is one way.

@@ -78,6 +78,15 @@ decide about it, and *hidden* if it only explains how something works.
 | **Shown in plain words** | The page names the act, never the term — the term stays true underneath | **gate** (*Claude wants to change the spec — allow?*), **veto** (*not this, because…*; listed under *You said no to*), **promoted** (*Pin this to a part*), **round-trip** (*checked: it reopens the same as it was built*), **anchor** (*how big is it in real life?*), **green** / **red** (*matches the spec* / *2 things don't match the spec*), **agent span**'s answers (*Yes, that's it* / *Let me move it* / *Wrong thing* for adopt / correct / reject), **by eye** (*Claude placed these ends by eye — check them closely*) |
 | **Hidden** | Machinery. Gone from the page, or turned into the outcome it causes | **toolkit**, commit, **bundle**, hold, **presence**, revision, **category** |
 
+**Taught as** — the one line a shown term carries where a page first shows it,
+until the viewer closes it (issue 77):
+
+- **reference** — A picture you give of what you want. Claude measures it and never changes it.
+- **sheet** — Claude's picture of what it built: four views, on a grid of one-metre squares.
+- **mark** — A note pinned to one spot on a picture: click the spot, then type one line.
+- **span** — A distance on a reference, end to end: drag across it, and Claude measures it.
+- **spec** — What the model has to be, written as numbers. A build matches it or it doesn't.
+
 **Model** on a page means **model space**. The two are one-to-one, so the page
 says *model* and a variation is *a new model from this one*.
 
