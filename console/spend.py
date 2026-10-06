@@ -32,7 +32,12 @@ def total(space, run):
     """
     lines = load(space, run)
     figures = {k: sum(t.get(k, 0) for t in lines) for k in FIGURES}
-    return {"turns": len(lines), **figures, "weighted": weigh(figures)}
+    # The stops a turn has followed, and the turns that followed one: what the
+    # gates cost, counted the way `lib/spend.runs` counts it for the accounting
+    # (ADR 0025, decision 9). A stop after the last turn has cost nothing yet.
+    return {"turns": len(lines), **figures, "weighted": weigh(figures),
+            "stops": max((t.get("gates", 0) for t in lines), default=0),
+            "after_stops": sum(1 for t in lines if t.get("gates", 0))}
 
 
 def record(space, run, usage, gates=0, prompt=""):

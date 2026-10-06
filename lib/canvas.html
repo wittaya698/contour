@@ -94,6 +94,9 @@
                   font-size: 11px; opacity: .7; word-break: break-all; }
   #exposure { font-size: 12px; color: var(--pin); }
   #unwatched { border-top: 1px solid var(--line); padding-top: 12px; }
+  /* Reached only by the spend line's link while it is empty (ADR 0025, decision 9). */
+  #unasked:empty::before { content: "Nothing yet. Always, on a build gate, puts one here.";
+                           opacity: .6; font-size: 12px; }
   #unasked { padding-left: 0; list-style: none; margin: 4px 0 0; }
   #unasked li { font-size: 12px; margin-bottom: 4px; }
   #export { border-top: 1px solid var(--line); padding-top: 12px; }
@@ -112,7 +115,11 @@
   /* Measurement, so it reads as an instrument and not as a warning: there is no
      threshold here to be near. */
   #spend { font-size: 11px; opacity: .6; margin: 0 0 4px;
-           font-variant-numeric: tabular-nums; }
+           font-variant-numeric: tabular-nums; display: flex; flex-wrap: wrap;
+           gap: 0 10px; align-items: baseline; }
+  #spend a { color: inherit; }
+  #spend summary { cursor: pointer; }
+  #spend details[open] { flex-basis: 100%; }
   #end { border-color: var(--pin); color: var(--pin); }
   textarea { font: inherit; padding: 7px 9px; border: 1px solid var(--line);
              border-radius: 6px; background: transparent; color: inherit;
@@ -198,7 +205,12 @@
     <h1>Run</h1>
     <ol id="turns"></ol>
     <p id="state">no run yet</p>
-    <p id="spend" data-needs="drive"></p>
+    <!-- What the run has cost: turns, and the stops that cost turns, with the
+         tokens one click behind (ADR 0025, decision 9). -->
+    <div id="spend" data-needs="drive">
+      <span class="said"></span>
+      <details class="tokens" hidden><summary>tokens</summary><span></span></details>
+    </div>
     <!-- Prose, not a skill chosen from a list: the space's skills self-trigger
          on their descriptions, so picking one first moves a decision from the
          agent, which reads it from context, to the user, who has not described
@@ -871,23 +883,38 @@ function draw() {
   });
 }
 
-// What this run has cost so far, in the units `tools/tokens.py` reports in — and
-// never before a turn has been spent: a cost that cannot be known must not be
-// guessed at, and a wrong estimate is worse than none (ADR 0019, decision 37).
-// The gate count is here for the reason the figure is: a gate buys a turn of
-// re-explanation, and seeing what that costs is what makes tuning the ask-list
-// downward an informed act rather than an irritated one.
+// What this run has cost so far: its turns, and — only when gates have cost
+// turns — how many, linking to what runs without asking, which is ADR 0019
+// decision 37's *informed act* made one click long (ADR 0025, decision 9). The
+// tokens sit behind a click, in the units `tools/tokens.py` reports in. Never
+// before a turn has been spent: a cost that cannot be known must not be
+// guessed at, and a wrong estimate is worse than none.
 function spendLine(event) {
   const line = document.getElementById('spend');
   if (!line) return;                       // the launcher's page; no run to cost
-  if (!event) { line.textContent = ''; return; }
-  const parts = [round(event.cache_read) + ' cached', round(event.input) + ' fresh',
-                 round(event.output) + ' out', round(event.weighted) + ' weighted'];
-  if (event.gates) {
-    parts.push(event.gates + (event.gates === 1 ? ' gate' : ' gates'));
+  const said = line.querySelector('.said');
+  const tokens = line.querySelector('.tokens');
+  said.replaceChildren();
+  tokens.hidden = !event;
+  if (!event) return;
+  said.append(event.turns + (event.turns === 1 ? ' turn' : ' turns'));
+  if (event.after_stops) {
+    const stops = document.createElement('a');
+    stops.href = '#unwatched';
+    stops.textContent = event.stops + (event.stops === 1 ? ' stop' : ' stops')
+      + ' cost ' + event.after_stops
+      + (event.after_stops === 1 ? ' extra turn' : ' extra turns');
+    // Shown even while nothing runs without asking: that is the list an
+    // *Always* would go into, and the link is what makes the act informed.
+    stops.addEventListener('click', () => {
+      const list = document.getElementById('unwatched');
+      if (list) list.hidden = false;
+    });
+    said.append(' · ', stops);
   }
-  line.textContent = event.turns + (event.turns === 1 ? ' turn · ' : ' turns · ')
-    + parts.join(' · ');
+  tokens.querySelector('span').textContent = [
+    round(event.cache_read) + ' cached', round(event.input) + ' fresh',
+    round(event.output) + ' out', round(event.weighted) + ' weighted'].join(' · ');
 }
 
 // A token count as a person reads one. The same thresholds the accounting uses,

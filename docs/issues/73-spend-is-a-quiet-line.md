@@ -12,9 +12,9 @@ still no limit.
 
 ## Acceptance criteria
 
-- [ ] The default line shows turns, and stops only when they cost turns
-- [ ] The stops phrase links to the unwatched list
-- [ ] The token breakdown is one click away and matches `tools/tokens.py`'s figures
+- [x] The default line shows turns, and stops only when they cost turns
+- [x] The stops phrase links to the unwatched list
+- [x] The token breakdown is one click away and matches `tools/tokens.py`'s figures
 
 ## Blocked by
 
