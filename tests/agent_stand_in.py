@@ -65,6 +65,12 @@ def drive(prompt, options, gate, say):
             # (ADR 0019, decision 13).
             wanted = dict(step["call"])
             allow, reason = gate(wanted.pop("tool", "Bash"), wanted)
+            if allow and step.get("execute"):
+                # What the SDK does with an allowed shell call: runs it, in the
+                # space, with the run's environment — so a launcher command
+                # made inside a run is made as one (issue 71).
+                subprocess.run(wanted["command"], shell=True, cwd=options["cwd"],
+                               env=options["env"], capture_output=True, text=True)
             # `ran` is what the agent was actually left holding, so a gate that
             # had quietly rewritten the call would be visible from outside.
             say("result", allowed=allow, text=reason or "done", ran=wanted)

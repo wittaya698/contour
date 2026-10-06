@@ -96,6 +96,14 @@
   #unwatched { border-top: 1px solid var(--line); padding-top: 12px; }
   #unasked { padding-left: 0; list-style: none; margin: 4px 0 0; }
   #unasked li { font-size: 12px; margin-bottom: 4px; }
+  #export { border-top: 1px solid var(--line); padding-top: 12px; }
+  #export .card { font-size: 12px; margin-top: 8px; }
+  #export .card p { margin: 2px 0; }
+  #export .older { color: var(--pin); }
+  #export .differs { padding-left: 16px; margin: 2px 0; }
+  /* A link, so the browser saves the file; drawn as the button beside it. */
+  #export .download { flex: 1; text-align: center; padding: 7px 9px; color: inherit;
+                      border: 1px solid var(--line); border-radius: 6px; text-decoration: none; }
   /* The run, when the host is one that owns a build. Above the ending, because
      the ending is what you reach for last. */
   #run { border-top: 1px solid var(--line); padding-top: 12px; display: flex;
@@ -246,6 +254,27 @@
     <h1>Runs without asking</h1>
     <ul id="unasked"></ul>
   </section>
+  <!-- Export, and the file handed over: two ways in, the button and the agent
+       inside a run, and this one card for either (ADR 0025, decision 5). The
+       button is offered on a green build alone, and waits for a run, since
+       export takes the space's hold. Download and Show in Finder are what a
+       person who never opened `exports/` needs to have the file. -->
+  <section id="export" data-needs="drive">
+    <h1>Export</h1>
+    <button id="exportIt" disabled>Export</button>
+    <p class="why" id="exportWhy"></p>
+    <div class="card" hidden>
+      <p><strong class="name"></strong> <span class="size"></span></p>
+      <p class="by"></p>
+      <p class="roundtrip"></p>
+      <ul class="differs"></ul>
+      <p class="older" hidden>older than the last build — export again</p>
+      <div class="pair">
+        <a class="download" download>Download</a>
+        <button class="reveal">Show in Finder</button>
+      </div>
+    </div>
+  </section>
   <section id="vetoes" data-needs="drive" hidden>
     <h1>Vetoes</h1>
     <p id="exposure"></p>
@@ -346,6 +375,11 @@ function drive() {
   refreshVetoes();
   setInterval(refreshVetoes, 2000);
   refreshUnwatched();
+  refreshExport();
+  setInterval(refreshExport, 2000);
+  document.getElementById('exportIt').addEventListener('click', exportIt);
+  document.querySelector('#export .reveal').addEventListener('click',
+    () => ask('/reveal', {}));
 
   // Polled from a cursor, so a reloaded tab gets the whole run back rather than
   // whatever happened after it reconnected.
@@ -383,6 +417,49 @@ async function refreshVetoes() {
   const list = document.getElementById('denied');
   list.replaceChildren();
   for (const veto of said.vetoes) list.append(vetoed(veto));
+}
+
+// Whether the button may export, and the card for the last file, whoever made
+// it. The words come whole from the server (`lib/exported.py`).
+let exportBusy = false;
+async function refreshExport() {
+  const said = await ask('/export').then(r => r.json()).catch(() => null);
+  if (said) exportShown(said);
+}
+
+function exportShown(said) {
+  const button = document.getElementById('exportIt');
+  button.disabled = exportBusy || !said.offered.can;
+  if (!exportBusy) button.textContent = 'Export';
+  document.getElementById('exportWhy').textContent = said.offered.why || '';
+  const card = document.querySelector('#export .card');
+  card.hidden = !said.card;
+  if (!said.card) return;
+  const c = said.card;
+  card.querySelector('.name').textContent = c.name;
+  card.querySelector('.size').textContent = c.size;
+  card.querySelector('.by').textContent =
+    c.by === 'claude' ? 'exported by Claude, in a run' : 'exported by you';
+  card.querySelector('.roundtrip').textContent = c.roundtrip;
+  card.querySelector('.differs').replaceChildren(...c.differs.map(text => {
+    const li = document.createElement('li'); li.textContent = text; return li; }));
+  card.querySelector('.older').hidden = !c.older;
+  const download = card.querySelector('.download');
+  download.href = asset('/export.glb');
+  download.download = c.name;
+}
+
+// Spawned by the console, not asked of the agent: no run, no turn, no gate.
+async function exportIt() {
+  const button = document.getElementById('exportIt');
+  exportBusy = true;
+  button.disabled = true;
+  button.textContent = 'Exporting…';
+  const said = await ask('/export', {}).then(r => r.json()).catch(() => null);
+  exportBusy = false;
+  if (!said) return refreshExport();
+  exportShown(said);
+  if (!said.exported) document.getElementById('exportWhy').textContent = said.said.join(' ');
 }
 
 // What runs without asking for this model. Asked again after an *Always* and

@@ -16,12 +16,12 @@ newer build exists the card says *older than the last build — export again*.
 
 ## Acceptance criteria
 
-- [ ] The button exports with no agent turn, and only on a green build
-- [ ] During a run the button is disabled, worded as decided
-- [ ] An export by the agent in a run shows on the same card, saying so
-- [ ] The card states the round-trip outcome in plain words
-- [ ] Download hands over the `.glb` byte for byte, and Show in Finder reveals it
-- [ ] A build after the export marks the card as older than the last build
+- [x] The button exports with no agent turn, and only on a green build
+- [x] During a run the button is disabled, worded as decided
+- [x] An export by the agent in a run shows on the same card, saying so
+- [x] The card states the round-trip outcome in plain words
+- [x] Download hands over the `.glb` byte for byte, and Show in Finder reveals it
+- [x] A build after the export marks the card as older than the last build
 
 ## Blocked by
 

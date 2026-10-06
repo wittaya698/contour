@@ -29,7 +29,7 @@ def stages(dirpath):
         if trace.exists() else []
 
 
-def stub_blender(dirpath, ok=True, crash=False):
+def stub_blender(dirpath, ok=True, crash=False, differs=False):
     """A Blender that writes the report the launcher reads, names the stage it
     was asked for, and records it.
 
@@ -38,6 +38,9 @@ def stub_blender(dirpath, ok=True, crash=False):
     succeeds. `crash` is a `build.py` that raised, which leaves no report at all
     and no geometry, and is a different event with a different sheet (ADR 0019,
     decision 29). The trace is how a test can tell what the launcher did.
+
+    An export writes a file where the space keeps one, so a page can hand it
+    over; `differs` is a round-trip that read it back other than it was built.
     """
     verdict = "true" if ok else "false"
     script = dirpath / "blender-stub"
@@ -47,7 +50,11 @@ def stub_blender(dirpath, ok=True, crash=False):
         'for a in "$@"; do last="$a"; done',
         "ok=true; code=0",
         f'if [ "$last" = build ]; then ok={verdict}; code={0 if ok else 1}; fi',
+        'if [ "$last" = export ]; then mkdir -p "$CONTOUR_PROJECT/exports"; '
+        'printf "glTF stub bytes" > "$CONTOUR_PROJECT/exports/$(basename "$CONTOUR_PROJECT").glb"; fi',
     ]
+    if differs:
+        lines.append('if [ "$last" = roundtrip ]; then ok=false; code=1; fi')
     if crash:
         lines.append("exit 1")                # no report: Blender died mid-stage
     else:

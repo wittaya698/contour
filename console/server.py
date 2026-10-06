@@ -7,6 +7,7 @@ would put *what a mark is* in two places that drift silently, both still parsing
 the old shape.
 """
 import os
+import subprocess
 import sys
 import threading
 import time
@@ -17,6 +18,7 @@ from console import run as run_lib
 from console import vetoes as veto_store
 from console import launcher
 from lib import canvas as canvas_lib
+from lib import exported
 from lib import gate as gate_words
 from lib import panel as panel_state
 from lib import policy, presence, signals
@@ -124,6 +126,7 @@ class Console:
         # mark goes — and a restatement is a copy that can go out of step
         # (slice 17).
         here = space_lib.layout(self.space)
+        self.dot, self.blend = here.dot, here.blend
         self.run = run_lib.Run(self.space)
         self.canvas = canvas_lib.Canvas(
             sheet=here.sheet, marks=here.marks,
@@ -140,6 +143,10 @@ class Console:
                     ("POST", "/promote"): self.promoted,
                     ("GET", "/asks"): self.asks,
                     ("POST", "/undo"): self.undone,
+                    ("GET", "/export"): self.export_card,
+                    ("POST", "/export"): self.exporting,
+                    ("GET", "/export.glb"): self.handed,
+                    ("POST", "/reveal"): self.revealed,
                     ("POST", "/end"): self.ending})
 
     def started(self, body):
@@ -204,6 +211,43 @@ class Console:
         (ADR 0021, decision 3); answered with the list as it now stands."""
         launcher.run(self.space, "asks", "--undo", str(body.get("category")), "--json")
         return self.asks({})
+
+    def export_card(self, query):
+        """`GET /export`: whether the button may export, and the last export's
+        card, or None before one."""
+        return {"offered": exported.offer(self.dot / panel_state.NAME, self.run.live),
+                "card": exported.card(self.dot / exported.NAME, self.blend)}
+
+    def exporting(self, body):
+        """`POST /export`: the button. `contour export` spawned as the console
+        spawns everything, with no agent turn (ADR 0025, decision 5); answered
+        with the card it leaves, and what the launcher said when it failed."""
+        offered = exported.offer(self.dot / panel_state.NAME, self.run.live)
+        if not offered["can"]:
+            return {"exported": False, "said": [offered["why"]], **self.export_card({})}
+        ok, said = launcher.run(self.space, "export")
+        return {"exported": ok, "said": [] if ok else said, **self.export_card({})}
+
+    def handed(self, query):
+        """`GET /export.glb`: the file itself, byte for byte, for Download."""
+        glb = exported.file(self.dot / exported.NAME)
+        return canvas_lib.Blob((glb.read_bytes(), "model/gltf-binary")) if glb else None
+
+    def revealed(self, body):
+        """`POST /reveal`: Show in Finder. `$CONTOUR_REVEAL` stands in for
+        Finder the way `$BLENDER` stands in for Blender; off a Mac, the folder
+        is opened instead, since there is no file manager to select it in."""
+        glb = exported.file(self.dot / exported.NAME)
+        if glb is None:
+            return {"revealed": False}
+        if os.environ.get("CONTOUR_REVEAL"):
+            argv = [os.environ["CONTOUR_REVEAL"], str(glb)]
+        elif sys.platform == "darwin":
+            argv = ["open", "-R", str(glb)]
+        else:
+            argv = ["xdg-open", str(glb.parent)]
+        done = subprocess.run(argv, capture_output=True, timeout=10)
+        return {"revealed": done.returncode == 0}
 
     def start(self):
         url = self.canvas.start()

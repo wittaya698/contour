@@ -232,10 +232,16 @@ def on_build(cmd, rest, held):
         return say_marks(emit(draw(rep)))
     if cmd != "export":
         return emit(stage([cmd]))
+    from lib import exported
     rep = stage(["export"])
     if not rep["ok"]:
+        exported.record(OUT / exported.NAME, rep, HERE.glb, HERE.blend)
         return emit(rep)
     rt = stage(["roundtrip"], first=False)
+    # For the console's card, whichever door this came through (ADR 0025,
+    # decision 5): a run's own export says so by the run it was made inside.
+    exported.record(OUT / exported.NAME, rt, HERE.glb, HERE.blend,
+                    run=os.environ.get("CONTOUR_RUN"))
     rt["lines"] = rep["lines"] + rt["lines"]
     return emit(rt)
 
