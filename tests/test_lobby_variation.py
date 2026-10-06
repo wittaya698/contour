@@ -37,7 +37,7 @@ class VariationTest(LobbyVariationCase):
         self.assertIn(str(self.space / "spec.yaml"), prompt)
         self.assertIn(str(self.space / "build.py"), prompt)
         self.assertIn("for reference", prompt)
-        self.assertIn("new-space flow", prompt)
+        self.assertIn("new-space skill", prompt)
 
     def test_it_holds_what_init_makes_and_nothing_from_the_source(self):
         by_hand = self.snapshot(self.made_by_hand("alpha-lite"))

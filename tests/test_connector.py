@@ -719,7 +719,7 @@ class CreateTest(PagesCase):
         self.assertEqual(sorted(p.name for p in refs.iterdir()), ["front.jpg", "side.png"])
         self.assertEqual((refs / "front.jpg").read_bytes(), self.JPEG)
         self.assertEqual((refs / "side.png").read_bytes(), PictureTest.PNG)
-        self.assertIn("new-space flow", self.begun_on())
+        self.assertIn("new-space skill", self.begun_on())
         [url] = self.urls()
         self.assertSecretless(text, url)
 

@@ -9,25 +9,30 @@ A model is its own directory and its own git repository — a *model space* — 
 it is never pushed (ADR 0015). There are no variant branches: a variation of an
 existing model is a new space, not a branch of that one.
 
-## 1. Get the intent first
+## 1. Get the intent first, in plain words
 
-Do not write anything until you have, from the user:
+Do not write anything until you have it. Ask the way the user thinks about the
+object, not the way the spec is laid out, and in the words the space's
+`CLAUDE.md` gives under *Speaking to the user* (ADR 0025, decisions 2 and 3):
 
-- **What the object is** — concrete, not a category.
-- **Overall dimensions in millimetres**, with a tolerance each. If they are
-  working from reference images rather than numbers, what you need instead is
-  **one anchor** — a single real-world dimension for that set of images. Ask
-  for it; never guess it. Pictures carry proportion, never scale, and a guessed
+- **What is it?** Concrete, not a category.
+- **How big is it in real life?** With numbers, overall dimensions in
+  millimetres. With pictures, one real measurement is enough — its height, say —
+  and every other dimension is read off the pictures from it. Never guess it.
+  That measurement is the spec's *anchor*: your word, never one you say to the
+  user, who is only ever asked how big it is. Pictures carry proportion, never scale, and a guessed
   scale is wrong on every dimension at once, so verify goes green on a model
   that is uniformly the wrong size and only the user at the gate would see it
-  (ADR 0016). With no anchor, do not draft `dimensions` at all.
-- **A triangle budget.** If the user has no number, propose one from the object
-  class and the engine target, and say what you assumed.
-- **Named parts** the model must contain.
-- Anything prose-only that matters but cannot be measured.
+  (ADR 0016). With no answer, do not draft `dimensions` at all.
+- **Where will it be seen?** In what game or engine, how close, on what device.
+  This is what the triangle budget and the tolerances come from.
+- **What parts must it have?** These become the named parts.
+- Anything else that matters but cannot be measured.
 
-If the user cannot answer a field, propose a value and mark it clearly as your
-assumption. Do not invent silently — the spec is *their* intent (ADR 0002).
+**Never ask the user for a tolerance or a triangle budget.** Propose both
+yourself, from what it is and where it will be seen, and say they are yours.
+If the user cannot answer anything else, propose a value and mark it clearly as
+your assumption. Do not invent silently — the spec is *their* intent (ADR 0002).
 
 ## 2. Name it and place it
 
@@ -72,11 +77,12 @@ in (ADR 0015). Do the rest from inside the space, and tell the user that a
 session opened there picks up its rules and one opened in the toolkit does not.
 Run git from inside the space too, never from the toolkit root.
 
-## 4. Save the references, then draft the spec
+## 4. Draft the spec
 
-If the user supplied reference images, save them into `refs/` *before* writing
-geometry, at original fidelity. They usually arrive in a chat log, which is not
-storage, and they are the one input nothing can regenerate.
+Reference pictures dropped on the lobby's create are already in `refs/` before
+the console opens (issue 65). In a terminal session they arrive in the chat
+instead, which is not storage: save them into `refs/` *before* writing geometry,
+at original fidelity, since they are the one input nothing can regenerate.
 
 Draft `spec.yaml` from `schema/spec.schema.yaml` in the toolkit (`init` prints
 its path). Delete fields that genuinely do not apply and leave nothing at a
@@ -123,7 +129,8 @@ what its label says it does. Once, at that checkpoint — not after every span.
 proposing tol 15` is something the user can argue with; `tol: 20` alone is not.
 A tolerance says how far the build may stray from intent — it is not a place to
 hide how roughly you measured. State both; only the tolerance reaches the spec
-(ADR 0016).
+(ADR 0016). To the user, a tolerance is *how far off it may be*: *depth 640 mm,
+measured ±3 on span m4 — I'd let it be 15 mm off*.
 
 Drafting a spec is invited here, at the user's request. *Revising* one later is
 a different act with its own gate — propose, wait for confirmation, then write
@@ -138,7 +145,7 @@ contract, and the agent does not get to author it alone.
 ## 5. Commit the contract before any geometry
 
 Once the user accepts the spec, offer a first commit of `spec.yaml`, `refs/` and
-the marker alone, with no `build.py` yet. History then shows the contract was
+the marker alone, with no `build.py` yet — asked as *Save this version?*. History then shows the contract was
 accepted before a vertex existed, which is the discipline ADR 0002 is for.
 Commit only on their explicit say-so (rule 5). From that commit the spec is
 tracked, the guard refuses further writes to it, and rule 1 applies in full.

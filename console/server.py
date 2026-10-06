@@ -39,19 +39,20 @@ HIDDEN_GRACE_S = IDLE_S   # a background tab's timers may stop; no longer than
 TOOLKIT = Path(__file__).resolve().parent.parent
 
 NEW_SPACE = (
-        "This space was just made with `contour init`, and nothing is in it "
-        "yet. Start the model with the new-space flow, as the toolkit's skill "
-        f"describes it ({TOOLKIT}/.claude/skills/new-space/SKILL.md); the space "
-        "is made, so its naming and placing step is done.\n"
-        "1. Get the intent first: what the object is, its dimensions with a "
-        "tolerance each, a triangle budget, its named parts. Write nothing "
-        "until you have it.\n"
-        "2. Save the user's reference images in refs/.\n"
-        "3. Ask for the anchor: one real-world dimension for those images. "
-        "Never guess it.\n"
+        "A new model, just made: nothing is in it yet. Start it the way the "
+        "toolkit's new-space skill says "
+        f"({TOOLKIT}/.claude/skills/new-space/SKILL.md); it is already named and "
+        "made, so skip that step.\n"
+        "1. Before writing anything, ask the user, in plain words: What is it? "
+        "How big is it in real life? Where will it be seen? What parts must it "
+        "have? One real measurement is enough when there are pictures; never "
+        "guess one.\n"
+        "2. Any reference pictures the user gave are already in refs/. Measure "
+        "them; never change them.\n"
+        "3. Propose the tolerances and the triangle budget yourself, from what "
+        "it is and where it will be seen, and say they are yours.\n"
         "4. Draft spec.yaml, and flag every number you chose rather than the "
-        "user, tolerances loudest. Propose it; the user confirms it before it "
-        "is written (rule 1).")
+        "user, tolerances first. Ask the user before writing it (rule 1).")
 
 
 def variation(of):
@@ -64,8 +65,7 @@ def variation(of):
         f"This space is a variation of {source.name}, at {source.root}. Read its "
         f"{source.spec} and {source.build} for reference only: copy neither, and "
         "never write in that space. This space's spec.yaml is its own contract, "
-        "drafted and confirmed here like any new one; reference images it needs "
-        "the user brings into this space's refs/.\n" + NEW_SPACE)
+        "drafted and confirmed here like any new one.\n" + NEW_SPACE)
 
 
 BEGIN = {"new-space": lambda of: NEW_SPACE, "variation": variation}

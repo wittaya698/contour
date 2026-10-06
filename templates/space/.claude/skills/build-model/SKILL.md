@@ -31,8 +31,8 @@ traceback or a Blender-level error.
 pass. While a check is red the spec is not on the table at all: fix `build.py`,
 or report the failure and stop.
 
-**When the spec itself is wrong**, and the check is *green*, say so — and bring
-the measurement that shows it. Illustratively: *depth reads 640 mm ±3 on span
+**When the spec itself is wrong**, and the check is *green*, say so — *I'd like
+to change the spec* — and bring the measurement that shows it. Illustratively: *depth reads 640 mm ±3 on span
 m4, against a tolerance of 600 ±20*. That is the case this route exists for.
 
 The measurement is a span, drawn with `contour measure` and named in the
@@ -76,7 +76,9 @@ Look at the 4-view sheet. Check specifically for what measurement cannot catch:
 parts in the wrong place or orientation, gaps, intersections, proportions that
 read wrong against the 1 m grid.
 
-Then show the user the verify report and the sheet, and say what changed.
+Then show the user the verify report and the sheet, and say what changed — in
+the words of *Speaking to the user* in `CLAUDE.md`: *matches the spec*, or *2
+things don't match the spec* and what they are, never *green* or *red*.
 
 When the spec has `clips:` and they are green, the sheet shows the rest pose
 and nothing of the motion. At that checkpoint, and not before:
@@ -102,7 +104,8 @@ judgement that you are done or stuck, which is the same claim in either place.
 
 ## Commit
 
-Only after the user explicitly approves. Then:
+Only after the user explicitly approves. Ask *Save this version?* — never
+*commit?* — and when they say yes:
 
 ```sh
 git add -A

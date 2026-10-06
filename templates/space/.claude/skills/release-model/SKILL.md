@@ -39,7 +39,11 @@ model to compensate.
 contour render
 ```
 
-Show the user the sheet and the full verify report. Releasing is their decision.
+Show the user the sheet and the full verify report. Releasing is their decision:
+ask *Release this as version <N>?*, in the words of *Speaking to the user* in
+`CLAUDE.md`. The folder, the commit and the tag are how it is done, not what you
+ask about. A release commits, so their yes is also the answer to *Save this
+version?* — ask once, not twice.
 
 ## 4. Assemble the release package
 
@@ -69,6 +73,8 @@ when tags and folders disagree. It is **not built yet**; until it is, the steps
 above are manual and the disagreement check is yours to make.
 
 ## 5. Tell the user what to do with it
+
+In plain words: what each file is for, not how it was made.
 
 - `release/v<N>/<NAME>.glb` is the engine file.
 - The `.blend` beside it is the archived source asset; their `work/scene.blend`

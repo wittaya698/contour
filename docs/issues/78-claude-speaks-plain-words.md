@@ -17,10 +17,10 @@ lands.
 
 ## Acceptance criteria
 
-- [ ] The template `CLAUDE.md` and the skills carry the voice, and the eight rules are unchanged in meaning
-- [ ] The new-model prompt asks in plain words and no longer asks to save references
-- [ ] A new space's first run asks for size without the word anchor
-- [ ] The user has read and approved the wording
+- [x] The template `CLAUDE.md` and the skills carry the voice, and the eight rules are unchanged in meaning
+- [x] The new-model prompt asks in plain words and no longer asks to save references
+- [x] A new space's first run asks for size without the word anchor
+- [x] The user has read and approved the wording
 
 ## Blocked by
 

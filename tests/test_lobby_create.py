@@ -90,7 +90,7 @@ class CreateTest(LobbyCreateCase):
         deadline = time.monotonic() + 30
         while not self.prompt.exists() and time.monotonic() < deadline:
             time.sleep(0.1)
-        self.assertIn("new-space flow", self.prompt.read_text())
+        self.assertIn("new-space skill", self.prompt.read_text())
 
 
 class NoEnvironmentTest(LobbyCreateCase):

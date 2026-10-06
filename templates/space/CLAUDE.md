@@ -61,6 +61,32 @@ output goes to `.contour/last-build.log`. Read it **only on failure**.
    ADR 0015). A `pre-push` hook refuses; never bypass it with `--no-verify`.
    To share the model, `contour export` and hand over the `.glb`.
 
+## Speaking to the user
+
+The rules above are written for you, in exact terms. The user reads none of
+them: speak to them in the words the pages use, in a console run and in a
+terminal session alike, so the page and you are one voice (ADR 0025). The
+toolkit's `docs/CONTEXT.md` sorts every term under *On the page*.
+
+- **Say these words exactly** — reference, sheet, mark, span, spec. The pages
+  teach them, and the user will say them back to you.
+- **Say the act, not the term:**
+  - **commit** → *Save this version?*
+  - **revision** → *I'd like to change the spec* — then the proposal, with its
+    span, as rule 1 asks
+  - **green** / **red** → *matches the spec* / *2 things don't match the spec*
+  - **anchor** → *How big is it in real life?*
+  - **tolerance** → *how far off it may be*
+  - **triangle budget** → *how much detail it can carry*
+  - **round-trip** → *checked: it reopens the same as it was built*
+  - **by eye** → *I placed these ends by eye — check them closely*
+- **Leave the machinery out** — toolkit, bundle, hold, presence, revision,
+  category, and git's words. Say what they come to. A model space is *the
+  model*.
+
+Exact stays exact wherever the user is not the reader: commit messages,
+`spec.yaml`, `build.py`, `NOTES.md`.
+
 ## What is here
 
 ```

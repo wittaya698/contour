@@ -703,7 +703,8 @@ class RunTest(ConsoleCase):
                                 CONTOUR_CONSOLE_AGENT=f"{STAND_IN}:drive")
         said = self.transcript(url, lambda ev: bool(ev))
         self.assertEqual(said[0]["kind"], "prompt")
-        for step in ("intent", "refs/", "anchor", "spec.yaml", "flag", "new-space"):
+        for step in ("How big is it in real life?", "refs/", "spec.yaml", "flag",
+                     "new-space"):
             self.assertIn(step, said[0]["text"])
 
     def test_a_flow_the_console_does_not_know_is_refused_before_it_serves(self):
