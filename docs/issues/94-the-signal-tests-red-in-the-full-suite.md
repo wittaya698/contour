@@ -54,8 +54,8 @@ No new vocabulary.
 - [x] Which test leaves the process behind, or that none does, is found and written down here — none does; see below
 - [x] If something leaks: it no longer does — nothing leaks, so there was nothing to stop
 - [ ] ~~`SignalTest` sees only servers this suite launched~~ — declined, see below
-- [ ] Full `unittest discover -s tests` green twice in a row on one machine, with `SignalTest` unchanged in what it asserts — once so far (2026-10-09, 1079 tests); the second waits for a machine with no other run on it
-- [ ] `contour selftest` green — likewise
+- [x] Full `unittest discover -s tests` green twice in a row on one machine, with `SignalTest` unchanged in what it asserts — 2026-10-10, 1082 tests, 287s and 274s, no other run on the machine and no `console.server` left after either
+- [x] `contour selftest` green — PASS, 316.2s, `mutants 26/26` and `roundtrip 16/16`
 
 ## What it came to
 
