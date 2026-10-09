@@ -346,6 +346,7 @@ sliced work is.
 | [27](27-a-terminated-console-lets-go.md) | A terminated console lets go of the space | AFK | — |
 | [39](39-a-background-tab-is-not-a-closed-one.md) | A background tab is not a closed one | AFK | — |
 | [94](94-the-signal-tests-red-in-the-full-suite.md) | The signal tests go red in the full suite | AFK | — |
+| [95](95-the-suite-waits-on-itself.md) | The suite waits on itself | AFK | — |
 
 **27 came out of slice 17's own suite runs.** `contour-console` forwards `SIGINT`
 and not `SIGTERM`, so every console a test terminates leaves its server running —
@@ -366,3 +367,9 @@ from another file reaches them through `servers()`, which counts the whole
 machine. Either 27's no-leak guarantee has slipped or the comparison is racy; the
 slice finds out which, and does not loosen the assertions to get there. It was
 neither: a second suite run on the same machine. The README now says one at a time.
+
+**95 came out of the same timing.** Most of the suite's 301 s is waiting. Every
+page server's `shutdown()` sits out `serve_forever`'s default 0.5 s poll, and
+macOS adds about 0.25 s to the first run of each stub a test writes in `setUp`.
+Patching the poll alone took one full run to 184 s, all green; the slice
+re-measures on an idle machine before and after.
