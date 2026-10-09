@@ -310,6 +310,32 @@ update* on the lobby's row forever, because the update rightly leaves it alone.
 85 stands alone, but changes `update`'s spelling, so a terminal habit of
 `contour update` stops acting until it says `--yes`.
 
+## Batch 9 — the unattended run
+
+From [ADR 0027](../adr/0027-the-unattended-run.md), which is Proposed and holds
+the reasoning and the rejected alternatives; the words are in CONTEXT.md
+(**unattended run**, **requester**, **request**, **channel**). Seven AFK and one
+HITL.
+
+| # | Slice | Type | Blocked by |
+|---|---|---|---|
+| [86](86-a-space-records-its-latest-run.md) | A space records its latest run | AFK | — |
+| [87](87-a-stop-that-answers-no-gate.md) | A stop that answers no gate | AFK | 86 |
+| [88](88-a-ceiling.md) | A ceiling | AFK | 87 |
+| [89](89-contour-request.md) | `contour request` starts an unattended run | AFK | 86, 88 |
+| [90](90-a-question-parks-the-run.md) | A question parks the run | AFK | 89 |
+| [91](91-the-channel.md) | The channel | AFK | 89 |
+| [92](92-the-connector-asks-and-stops.md) | The connector asks and stops | AFK | 89, 91 |
+| [93](93-accept-adr-0027.md) | Accept ADR 0027 | HITL | 90, 92 |
+
+**86, 87 and 88 are worth having even if no request ever arrives.** The record
+covers attended runs, the stop is the page's too, and a ceiling is inert until a
+run carries one.
+
+**89 is the wide one, and stays whole,** for issue 08's reason: split, there is
+a merged state in which an unattended run exists without its floor or its
+ceiling, and with a hand-loosened ask-list that state saves versions overnight.
+
 ## Found in flight
 
 Not from either review — a defect the work turned up, filed where the rest of the
