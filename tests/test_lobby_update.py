@@ -14,6 +14,7 @@ import test_lobby_rename
 from test_update import OLD, RULES, UpdateCase
 
 from lib.lobby import PAGE    # noqa: E402
+from executables import executable  # noqa: E402
 
 
 class UpdatedUnsavedTest(UpdateCase):
@@ -41,9 +42,8 @@ class LobbyUpdateCase(UpdateCase):
 
     def setUp(self):
         super().setUp()
-        quiet = self.tmp / "no-browser"
-        quiet.write_text("#!/bin/sh\nexit 0\n")     # $BROWSER, so none opens
-        quiet.chmod(0o755)
+        quiet = executable(self.tmp / "no-browser",   # $BROWSER, so none opens
+                           "#!/bin/sh\nexit 0\n")
         self.env["BROWSER"] = str(quiet)
         self.open()
 

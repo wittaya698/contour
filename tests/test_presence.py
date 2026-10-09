@@ -23,6 +23,7 @@ sys.path.insert(0, str(ROOT))
 
 from lib import presence                  # noqa: E402
 from test_console import ConsoleCase      # noqa: E402
+from executables import executable  # noqa: E402
 
 
 class CanvasPresenceTest(unittest.TestCase):
@@ -31,9 +32,8 @@ class CanvasPresenceTest(unittest.TestCase):
         self.tmp = Path(tempfile.mkdtemp()).resolve()
         self.spaces = self.tmp / "spaces"
         self.spaces.mkdir()
-        quiet = self.tmp / "no-browser"
-        quiet.write_text("#!/bin/sh\nexit 0\n")     # $BROWSER, so none opens
-        quiet.chmod(0o755)
+        quiet = executable(self.tmp / "no-browser",   # $BROWSER, so none opens
+                           "#!/bin/sh\nexit 0\n")
         self.env = dict(os.environ, CONTOUR_SPACES=str(self.spaces),
                         CONTOUR_HOME=str(self.tmp / "home"),
                         BROWSER=str(quiet))

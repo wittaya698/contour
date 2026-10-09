@@ -27,6 +27,12 @@ from lib import taught
 
 TOKEN_HEADER = "X-Contour-Token"
 TOKEN_PARAM = "t"
+POLL_S = 0.05
+"""How often the serving loop looks up to see whether it was told to stop.
+`shutdown` waits for that look, so this is how long every stop takes: the
+default half second was a port still bound and a terminal not yet given back on
+every Done, closed tab and signal (issue 95). Idle, it is twenty wake-ups a
+second, which nothing notices."""
 
 LOOK = Path(__file__).resolve().parent / "look.css"
 """The one stylesheet every page takes its look from (ADR 0025, decision 12)."""
@@ -234,7 +240,8 @@ class Page:
         self._server = ThreadingHTTPServer(("127.0.0.1", 0), _Handler)
         self._server.page = self
         self._addr = self._server.server_address
-        self._thread = threading.Thread(target=self._server.serve_forever, daemon=True)
+        self._thread = threading.Thread(target=self._server.serve_forever,
+                                        args=(POLL_S,), daemon=True)
         self._thread.start()
         if self.grace is not None:
             threading.Thread(target=self._watch, daemon=True).start()

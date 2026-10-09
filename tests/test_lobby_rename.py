@@ -16,6 +16,7 @@ import urllib.request
 from test_rename import CONTOUR, RenameCase
 
 from lib.page import TOKEN_HEADER    # noqa: E402
+from executables import executable  # noqa: E402
 
 
 class RenamedUncommittedTest(RenameCase):
@@ -40,9 +41,8 @@ class LobbyRenameCase(RenameCase):
 
     def setUp(self):
         super().setUp()
-        quiet = self.tmp / "no-browser"
-        quiet.write_text("#!/bin/sh\nexit 0\n")     # $BROWSER, so none opens
-        quiet.chmod(0o755)
+        quiet = executable(self.tmp / "no-browser",   # $BROWSER, so none opens
+                           "#!/bin/sh\nexit 0\n")
         self.env["BROWSER"] = str(quiet)
         self.open()
 

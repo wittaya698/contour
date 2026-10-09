@@ -28,6 +28,7 @@ from lib.canvas import Canvas    # noqa: E402
 from lib.lobby import Lobby    # noqa: E402
 from lib.page import LOOK    # noqa: E402
 from client import open_url, post    # noqa: E402
+from executables import executable  # noqa: E402
 
 CONTOUR = ROOT / "contour"
 
@@ -126,9 +127,8 @@ class WayBackTest(unittest.TestCase):
         self.tmp = Path(tempfile.mkdtemp()).resolve()
         (self.tmp / "spaces").mkdir()
         self.opened = self.tmp / "opened"
-        browser = self.tmp / "browser"
-        browser.write_text(f'#!/bin/sh\necho "$1" >> {self.opened}\n')
-        browser.chmod(0o755)
+        browser = executable(self.tmp / "browser",       # `opened` is beside it
+                             '#!/bin/sh\necho "$1" >> "$(dirname "$0")/opened"\n')
         self.env = {"CONTOUR_SPACES": str(self.tmp / "spaces"),
                     "CONTOUR_HOME": str(self.tmp / "home"), "BROWSER": str(browser)}
         self.addCleanup(self.stop_lobbies)

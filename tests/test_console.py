@@ -318,7 +318,7 @@ class ServesTest(ConsoleCase):
         closed tab's (issue 39)."""
         proc, url = self.launch(CONTOUR_CONSOLE_GRACE="0.5")
         self.ask(url, "/beat", {"hidden": True})
-        time.sleep(2)
+        time.sleep(2)                         # four graces' worth
         self.assertIsNone(proc.poll(), "the console ended under a hidden tab")
 
     def test_a_hidden_tab_that_never_comes_back_still_ends(self):

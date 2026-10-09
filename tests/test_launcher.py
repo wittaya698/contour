@@ -14,6 +14,7 @@ import tempfile
 import unittest
 import urllib.request
 from pathlib import Path
+from executables import executable
 
 ROOT = Path(__file__).resolve().parent.parent
 CONTOUR = ROOT / "contour"
@@ -46,7 +47,7 @@ def stub_blender(dirpath, ok=True, crash=False, differs=False):
     script = dirpath / "blender-stub"
     lines = [
         "#!/bin/sh",
-        f'echo "$@" >> "{dirpath / "stages"}"',
+        'echo "$@" >> "$(dirname "$0")/stages"',
         'for a in "$@"; do last="$a"; done',
         "ok=true; code=0",
         f'if [ "$last" = build ]; then ok={verdict}; code={0 if ok else 1}; fi',
@@ -67,9 +68,7 @@ def stub_blender(dirpath, ok=True, crash=False, differs=False):
             '"$ok" "$last" "$ok" > "$CONTOUR_REPORT"',
             "exit $code",
         ]
-    script.write_text("\n".join(lines) + "\n")
-    script.chmod(0o755)
-    return script
+    return executable(script, "\n".join(lines) + "\n")
 
 
 class LauncherTest(unittest.TestCase):
@@ -285,9 +284,8 @@ class LauncherTest(unittest.TestCase):
         """
         (self.space / "sheet.png").write_bytes(b"\x89PNG\r\n\x1a\npixels")
         self.mark()
-        quiet = self.tmp / "no-browser"
-        quiet.write_text("#!/bin/sh\nexit 0\n")     # $BROWSER, so none opens
-        quiet.chmod(0o755)
+        quiet = executable(self.tmp / "no-browser",   # $BROWSER, so none opens
+                           "#!/bin/sh\nexit 0\n")
         proc = subprocess.Popen(
             [sys.executable, str(CONTOUR), "canvas"], cwd=str(self.space),
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,

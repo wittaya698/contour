@@ -25,6 +25,7 @@ sys.path.insert(0, str(ROOT))
 from lib import connector  # noqa: E402
 from lib import marks, views  # noqa: E402
 from test_launcher import stub_blender  # noqa: E402
+from executables import executable  # noqa: E402
 
 
 def talk(*messages, tools=None):
@@ -560,9 +561,8 @@ class PagesCase(InSpaceCase):
     def setUp(self):
         super().setUp()
         self.opened = self.tmp / "opened"
-        browser = self.tmp / "browser"
-        browser.write_text(f'#!/bin/sh\necho "$PPID $1" >> "{self.opened}"\n')
-        browser.chmod(0o755)
+        browser = executable(self.tmp / "browser",       # `opened` is beside it
+                             '#!/bin/sh\necho "$PPID $1" >> "$(dirname "$0")/opened"\n')
         self.env.update(BROWSER=str(browser), CONTOUR_CONSOLE_PYTHON=sys.executable)
         self.addCleanup(self.close_pages)
 
@@ -632,7 +632,7 @@ class OpenTest(PagesCase):
         self.env["CONTOUR_CONSOLE_PYTHON"] = str(self.tmp / "no-python")
         _, said = self.open("console", space="alpha")
         self.assertIn("no console environment; make one", said["refused"])
-        time.sleep(1)
+        time.sleep(1)                         # long enough for one started anyway to show
         self.assertFalse(self.opened.exists(), "a page was opened anyway")
 
     def test_open_canvas_returns_and_the_canvas_outlives_the_connector(self):
@@ -655,7 +655,7 @@ class OpenTest(PagesCase):
         with presence.present(self.space, "console"):
             _, said = self.open("canvas", space="alpha")
         self.assertEqual(said["refused"], "already open in a console; its page can mark")
-        time.sleep(1)
+        time.sleep(1)                         # long enough for one started anyway to show
         self.assertFalse(self.opened.exists(), "a canvas was opened anyway")
 
     def test_open_lobby_needs_no_space_and_outlives_the_connector(self):
@@ -777,7 +777,7 @@ class CreateTest(PagesCase):
             self.assertIn(str(bad), said["refused"])
             self.assertIsNone(said["path"])
             self.assertFalse(self.space.exists(), bad)
-        time.sleep(1)
+        time.sleep(1)                         # long enough for one started anyway to show
         self.assertFalse(self.opened.exists(), "a console was opened anyway")
 
     def test_two_references_of_one_name_are_refused(self):
@@ -816,7 +816,7 @@ class CreateTest(PagesCase):
         self.assertIn("python3 -m venv .venv", said["next"])
         self.assertIn(f"cd {self.space}", said["next"])
         self.assertIn("contour-console --begin new-space", said["next"])
-        time.sleep(1)
+        time.sleep(1)                         # long enough for one started anyway to show
         self.assertFalse(self.opened.exists(), "a console was opened anyway")
 
 

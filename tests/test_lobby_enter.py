@@ -13,6 +13,7 @@ import unittest
 import urllib.error
 
 from test_lobby_rename import LobbyRenameCase
+from executables import executable
 
 
 class LobbyEnterCase(LobbyRenameCase):
@@ -65,7 +66,7 @@ class EnterTest(LobbyEnterCase):
         [console] = self.wait_for_console()
         os.killpg(lobby.pid, signal.SIGINT)
         self.assertEqual(lobby.wait(timeout=30), 0, lobby.stdout.read())
-        time.sleep(1)
+        time.sleep(1)                         # long enough for one started anyway to show
         from lib import presence
         self.assertEqual(presence.live(self.space), [console])
 
@@ -85,7 +86,7 @@ class EnterTest(LobbyEnterCase):
         said = self.enter()
         self.assertIn("already open in a console", said["refused"])
         self.assertIn(str(console["pid"]), said["refused"])
-        time.sleep(1)
+        time.sleep(1)                         # long enough for one started anyway to show
         self.assertEqual(self.consoles(), [console])
 
     def test_a_directory_the_lobby_does_not_list_is_not_a_space_to_enter(self):
@@ -94,7 +95,7 @@ class EnterTest(LobbyEnterCase):
                 self.enter(path)
             self.assertEqual(no.exception.code, 404)
             no.exception.close()
-        time.sleep(1)
+        time.sleep(1)                         # long enough for one started anyway to show
         self.assertEqual(self.consoles(), [])
 
 
@@ -107,8 +108,8 @@ class RevealTest(LobbyEnterCase):
         shim = self.tmp / "bin"
         shim.mkdir(exist_ok=True)
         self.opened = self.tmp / "opened"
-        (shim / "open").write_text(f'#!/bin/sh\necho "$@" >> "{self.opened}"\n')
-        (shim / "open").chmod(0o755)
+        executable(shim / "open",                        # `opened` is beside `bin/`
+                   '#!/bin/sh\necho "$@" >> "$(dirname "$0")/../opened"\n')
         self.env["PATH"] = f"{shim}:{os.environ['PATH']}"
         return super().open(**popen)
 
@@ -146,7 +147,7 @@ class NoEnvironmentTest(LobbyEnterCase):
         self.assertNotIn("enter", self.ask("/can")["can"])
         said = self.enter()
         self.assertIn("no console environment", said["refused"])
-        time.sleep(1)
+        time.sleep(1)                         # long enough for one started anyway to show
         self.assertEqual(self.consoles(), [])
 
     def test_the_page_is_given_the_line_contour_console_prints_to_make_one(self):

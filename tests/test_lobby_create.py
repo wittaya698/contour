@@ -106,7 +106,7 @@ class NoEnvironmentTest(LobbyCreateCase):
         self.assertIn("python3 -m venv .venv", said["next"])
         self.assertIn(f"cd {self.spaces / 'beta'}", said["next"])
         self.assertIn("contour-console --begin new-space", said["next"])
-        time.sleep(1)
+        time.sleep(1)                         # long enough for one started anyway to show
         self.assertFalse(self.prompt.exists())
         self.assertEqual(self.listed("beta")["presence"], [])
 
@@ -190,7 +190,7 @@ class LobbyRefusalTest(LobbyCreateCase):
                 said = self.create(name)
                 self.assertTrue(said["refused"])
                 self.assertEqual(sorted(self.tmp.rglob("*")), before)
-        time.sleep(1)
+        time.sleep(1)                         # long enough for one started anyway to show
         self.assertFalse(self.prompt.exists())
 
 

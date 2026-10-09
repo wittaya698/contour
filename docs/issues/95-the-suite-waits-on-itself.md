@@ -88,11 +88,22 @@ No new vocabulary.
 
 ## Acceptance criteria
 
-- [ ] Stopping a `Page` no longer waits out a 0.5 s poll, and the console, the lobby and the canvas each still let go of their port and their space on every path issue 27 covers
-- [ ] No test pays first-exec cost for a stub it could have written once; `--durations` shows no flat ~0.25 s or ~0.5 s floor that comes from either cause
-- [ ] Every deliberate wait in (3) still outlasts what it proves, and says so in a comment where it does not already
-- [ ] Full `unittest discover -s tests` green twice in a row, alone on the machine, with the wall time before and after written down here
-- [ ] `contour selftest` green
+- [x] Stopping a `Page` no longer waits out a 0.5 s poll, and the console, the lobby and the canvas each still let go of their port and their space on every path issue 27 covers. `POLL_S = 0.05` in `lib/page.py`; `test_stopping` holds a stop under 0.2 s and the port closed after it, and `SignalTest` is green in both runs below
+- [x] No test pays first-exec cost for a stub it could have written once. `tests/executables.py` writes each distinct body once per run and links each test to it; the per-test stubs (`stub_blender`, the `quiet` browsers, the connector's and one-look's browsers, the lobby's `open` shim) find their files beside `$0`. Stubs written once, inside a single test, are left as they are
+- [x] Every deliberate wait in (3) still outlasts what it proves, and says so in a comment where it does not already. The `time.sleep(1)` after a refusal, and `test_console`'s hidden-grace wait, now say so; none was shortened
+- [x] Full `unittest discover -s tests` green twice in a row, alone on the machine, with the wall time before and after written down here
+- [x] `contour selftest` green
+
+## What it came to
+
+Measured 2026-10-10, alone on the machine, with no `console.server` left after any run:
+
+| | Before (94's quiet runs) | After |
+|---|---|---|
+| full suite | 287 s, 274 s (1082 tests) | **167 s, 168 s** (1089 tests) |
+| `contour selftest` | 316.2 s | **181.5 s** |
+
+The shutdown poll alone took the suite to 193 s, and the stubs took it from 193 s to 167 s. What remains at the top of `--durations` is the deliberate waits in (3).
 
 ## Blocked by
 

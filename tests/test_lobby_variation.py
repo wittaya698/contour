@@ -80,7 +80,7 @@ class RefusedVariationTest(LobbyVariationCase):
                 said = self.vary("alpha-lite", of=of)
                 self.assertTrue(said["refused"])
                 self.assertEqual(sorted(self.tmp.rglob("*")), before)
-        time.sleep(1)
+        time.sleep(1)                         # long enough for one started anyway to show
         self.assertFalse(self.prompt.exists())
 
 

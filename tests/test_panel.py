@@ -24,6 +24,7 @@ from lib.canvas import Canvas
 
 from client import get
 from test_launcher import stub_blender
+from executables import executable
 
 CONTOUR = Path(__file__).resolve().parent.parent / "contour"
 
@@ -210,9 +211,8 @@ class PanelTest(PanelCase):
         self.built()
         (self.tmp / ".contour").mkdir(exist_ok=True)
         (self.tmp / ".contour" / "project").write_text("toolkit: stub\n")
-        quiet = self.tmp / "no-browser"
-        quiet.write_text("#!/bin/sh\nexit 0\n")      # $BROWSER, so none opens
-        quiet.chmod(0o755)
+        quiet = executable(self.tmp / "no-browser",   # $BROWSER, so none opens
+                           "#!/bin/sh\nexit 0\n")
         proc = subprocess.Popen(
             [sys.executable, str(CONTOUR), "canvas"], cwd=str(self.tmp),
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,

@@ -30,10 +30,11 @@ from lib import commands, connector, delete, git, presence, rename, restore, rev
 ROOT = Path(__file__).resolve().parent.parent
 BLENDER = os.environ.get("BLENDER", "/Applications/Blender.app/Contents/MacOS/Blender")
 TIMEOUT_S = 300
-UNITS_TIMEOUT_S = 600
-"""The unit suite's own limit, apart from one Blender run's: the suite outgrew
-300s (333s on master, 2026-10-09), and a hung Blender is still caught early.
-Slow tests are their own issue; this only lets selftest say what it found."""
+UNITS_TIMEOUT_S = 300
+"""The unit suite's own limit, apart from one Blender run's. It was raised to
+600s when the suite outgrew 300s (333s on master, 2026-10-09), and came back
+once issue 95 took the suite to ~166s inside selftest (2026-10-10). A suite
+that nears it again is slow tests to fix, not a limit to raise."""
 
 
 def usage():
