@@ -20,6 +20,7 @@ from lib import span
 from lib.canvas import Canvas
 from client import get, open_url, post
 from test_console import ConsoleCase
+from budget import slow
 
 QUESTION = {"extent": "across", "of": None, "anchor": 1700.0,
             "tol": 0.05, "bg_tol": 0.10}
@@ -246,6 +247,7 @@ class NoAgentSpellingTest(AnswerCase):
     """The agent asks; it never answers its own question. As with closing a
     mark, it has no spelling for any of the three."""
 
+    @slow("six launcher runs, one per spelling refused")
     def test_no_agent_command_can_adopt_correct_or_reject(self):
         (self.tmp / ".contour").mkdir()
         (self.tmp / ".contour" / "project").write_text("toolkit: stub\n")

@@ -35,6 +35,13 @@ UNITS_TIMEOUT_S = 300
 600s when the suite outgrew 300s (333s on master, 2026-10-09), and came back
 once issue 95 took the suite to ~166s inside selftest (2026-10-10). A suite
 that nears it again is slow tests to fix, not a limit to raise."""
+UNITS_BUDGET_S = 200
+"""Where selftest starts saying the suite is slow: about 1.2x its time when
+issue 95 was done (~166s), so drift is a `warn` line while it is small, well
+before `UNITS_TIMEOUT_S` stops the run."""
+PER_TEST_S = 2.5
+"""One test over this, not marked `@slow("why")` (tests/budget.py), is named in
+selftest's report. The total says the suite got slow; this says which test."""
 
 
 def usage():
@@ -832,7 +839,8 @@ def unit_tests():
     """
     env = {k: v for k, v in os.environ.items() if k != "BLENDER"}
     try:
-        r = subprocess.run([sys.executable, "-m", "unittest", "discover", "-s", "tests"],
+        r = subprocess.run([sys.executable, "-m", "unittest", "discover", "-s", "tests",
+                            "--durations", "0"],
                            cwd=str(ROOT), env=env, capture_output=True, text=True,
                            timeout=UNITS_TIMEOUT_S)
     except subprocess.TimeoutExpired:
@@ -841,7 +849,45 @@ def unit_tests():
     tail = (r.stderr or r.stdout).strip().splitlines()
     ran = next((l for l in tail if l.startswith("Ran ")), "ran ?")
     return {"ok": r.returncode == 0,
-            "lines": [ran] if r.returncode == 0 else tail[-12:]}
+            "lines": [ran] if r.returncode == 0 else tail[-12:],
+            "warn": budget_warnings(r.stderr, ROOT / "tests")}
+
+
+def budget_warnings(output, tests_dir):
+    """What a unit run's own report says about its time: the total against
+    `UNITS_BUDGET_S`, and each test over `PER_TEST_S` that no `@slow` excuses.
+    `output` is unittest's, run with `--durations 0`. Read, never imported:
+    importing a test module would take the suite's lock (tests/one_run.py)."""
+    import ast
+    warned = []
+    total = re.search(r"^Ran \d+ tests? in ([\d.]+)s", output, re.M)
+    if total and float(total.group(1)) > UNITS_BUDGET_S:
+        warned.append(f"the unit tests took {float(total.group(1)):.0f}s, over their "
+                      f"{UNITS_BUDGET_S}s budget; --durations names the slowest (issue 95)")
+    marked = {}
+
+    def excused(test_id):
+        module, cls, method = (test_id.split(".") + ["", ""])[:3]
+        if module not in marked:
+            try:
+                tree = ast.parse((Path(tests_dir) / f"{module}.py").read_text())
+            except (OSError, SyntaxError):
+                tree = None
+            marked[module] = set() if tree is None else {
+                (c.name, f.name) for c in tree.body if isinstance(c, ast.ClassDef)
+                for f in c.body if isinstance(f, ast.FunctionDef)
+                and any(isinstance(d, ast.Call) and getattr(d.func, "id", None) == "slow"
+                        for d in f.decorator_list)}
+        return (cls, method) in marked[module]
+
+    over = [(float(s), test_id) for s, test_id in
+            re.findall(r"^([\d.]+)s\s+\S+ \(([\w.]+)\)\s*$", output, re.M)
+            if float(s) > PER_TEST_S and not excused(test_id)]
+    if over:
+        named = ", ".join(f"{test_id} {s:.1f}s" for s, test_id in sorted(over, reverse=True)[:3])
+        more = f" and {len(over) - 3} more" if len(over) > 3 else ""
+        warned.append(f"{len(over)} over {PER_TEST_S}s without @slow: {named}{more}")
+    return warned
 
 
 def fixture_tests():
@@ -876,6 +922,7 @@ def stage_selftest():
     ok &= units["ok"]
     lines.append(f"{'ok  ' if units['ok'] else 'FAIL'} {'units':<10}"
                  + " | ".join(units["lines"]))
+    lines += [f"warn {'units':<10}{line}" for line in units.get("warn", [])]
     if not units["ok"]:
         lines.insert(0, "selftest FAIL (%.1fs)" % (time.time() - t0))
         return {"ok": False, "lines": lines}

@@ -31,6 +31,8 @@ from console import spend
 from lib import marks as marks_store, panel, views, vetoes as vetoes_reading
 
 from test_launcher import stages, stub_blender
+import one_run     # one suite run per machine (issue 94)
+from budget import slow
 
 CONSOLE = ROOT / "contour-console"
 STAND_IN = Path(__file__).resolve().parent / "agent_stand_in.py"
@@ -312,6 +314,7 @@ class ServesTest(ConsoleCase):
         self.assertEqual(self.beat(url), 200)
         self.assertEqual(proc.wait(timeout=30), 0)
 
+    @slow("outlasts four graces under a hidden tab")
     def test_a_tab_that_said_it_is_hidden_outlives_the_grace(self):
         """A browser slows or stops the timers of a tab nobody is looking at:
         you enter a space, then go back to the lobby. That silence is not a
@@ -360,6 +363,7 @@ class ServesTest(ConsoleCase):
         caught.exception.close()
         self.assertIsNone(proc.poll(), "the console is still standing")
 
+    @slow("waits out a 2s idle timeout while the tab beats")
     def test_an_idle_console_exits_even_while_the_tab_is_still_beating(self):
         """A beat proves a tab is open, not that anybody is there, so a beat must
         not reset the idle clock — or the tab left open on Friday keeps the run
@@ -713,6 +717,7 @@ class RunTest(ConsoleCase):
         spoken = [e for e in said if e["kind"] == "verdict"][0]
         self.assertEqual(spoken["text"], "not until the neck measures 280")
 
+    @slow("outlasts three idle timeouts at a gate")
     def test_an_unanswered_gate_waits_and_holds_off_the_idle_timeout(self):
         """Silence is not a verdict, in either direction. The console never
         answers a gate on the user's behalf, and slice 06's idle timeout must not
@@ -738,6 +743,7 @@ class RunTest(ConsoleCase):
         self.assertEqual(proc.wait(timeout=40), 0)
         self.assertIn("idle", proc.stdout.read())
 
+    @slow("outlasts four hidden graces at a gate")
     def test_a_hidden_tab_at_a_gate_never_ends_the_console(self):
         """Gone to the lobby, or to another app, while a gate waits: the
         console waits too, past every grace, because ending the run would

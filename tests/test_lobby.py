@@ -24,6 +24,8 @@ sys.path.insert(0, str(ROOT))
 from lib.lobby import PAGE, Lobby    # noqa: E402
 from lib.page import TOKEN_HEADER    # noqa: E402
 from executables import executable  # noqa: E402
+import one_run  # noqa: E402     # one suite run per machine (issue 94)
+from budget import slow  # noqa: E402
 
 
 class LobbyTest(unittest.TestCase):
@@ -91,6 +93,7 @@ class LobbyTest(unittest.TestCase):
         with urllib.request.urlopen(req, timeout=10) as r:
             r.read()
 
+    @slow("outlasts four graces under a hidden tab")
     def test_a_tab_that_said_it_is_hidden_outlives_the_grace(self):
         """A browser slows or stops the timers of a tab nobody is looking at, so
         a hidden tab's silence is not a closed tab's (issue 39)."""

@@ -14,6 +14,7 @@ import urllib.error
 
 from test_lobby_rename import LobbyRenameCase
 from executables import executable
+import one_run     # one suite run per machine (issue 94)
 
 
 class LobbyEnterCase(LobbyRenameCase):

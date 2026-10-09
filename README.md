@@ -33,7 +33,8 @@ to prove the checks can actually fail. If it passes, you are installed.
 that prove none outlives its test count every `console.server` on the machine —
 on purpose, since an orphan has no parent to report it. A second run alongside,
 from another terminal, worktree or agent session, looks to them like a leak
-(issue 94).
+(issue 94). So the suite holds a lock for the length of a run (`tests/one_run.py`),
+and a second run is refused at once, naming the pid of the one already going.
 
 ### The console needs an environment; `./contour` still does not
 

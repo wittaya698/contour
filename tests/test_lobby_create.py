@@ -13,6 +13,7 @@ import unittest
 
 from test_lobby_enter import LobbyEnterCase
 from test_rename import RenameCase
+import one_run     # one suite run per machine (issue 94)
 
 STAND_IN = os.path.join(os.path.dirname(os.path.abspath(__file__)), "agent_stand_in.py")
 

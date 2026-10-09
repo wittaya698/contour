@@ -26,6 +26,7 @@ from lib import connector  # noqa: E402
 from lib import marks, views  # noqa: E402
 from test_launcher import stub_blender  # noqa: E402
 from executables import executable  # noqa: E402
+import one_run  # noqa: E402     # one suite run per machine (issue 94)
 
 
 def talk(*messages, tools=None):

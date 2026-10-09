@@ -9,6 +9,7 @@ import base64
 import unittest
 
 from test_lobby_create import LobbyCreateCase
+import one_run     # one suite run per machine (issue 94)
 
 
 def dropped(name, data):

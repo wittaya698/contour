@@ -20,6 +20,7 @@ import unittest
 from collections import namedtuple
 
 from test_update import OLD, UpdateCase
+from budget import slow
 
 Row = namedtuple("Row", "cmd word wrong proposes acted in_space")
 
@@ -69,6 +70,7 @@ class ConfirmingCase(UpdateCase):
 
 class ShapeTest(ConfirmingCase):
 
+    @slow("every confirming command, four launcher runs each")
     def test_every_command_that_confirms_refuses_proposes_then_does_it(self):
         for n, row in enumerate(ROWS):
             with self.subTest(command=row.cmd):
