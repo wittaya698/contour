@@ -173,8 +173,10 @@ def moved(root, name, toolkit, proposal):
     return None
 
 
-def lines(proposal):
-    """The proposal as a person reads it."""
+def lines(proposal, done=False):
+    """The proposal as a person reads it, or the rename it became."""
+    if done:
+        return [f"ok   renamed to {proposal['to']}", f"     cd {proposal['to']}"]
     out = [f"rename {proposal['from']}", f"    -> {proposal['to']}", "", "changes:"]
     out += [f"  {c['what']:<11} {c['from']} -> {c['to']}"
             + ("   (its header only: the rest is yours)" if c.get("only") == "header" else "")

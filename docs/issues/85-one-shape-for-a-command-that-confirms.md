@@ -29,12 +29,12 @@ each keeps only which word its page sends — `delete` re-reads the listed name,
 
 ## Acceptance criteria
 
-- [ ] One table-driven test runs every confirming command through propose, refuse and `--yes`
-- [ ] A name or id typed as `--yes` is refused as a wrong one, for every command
-- [ ] `contour update` with no flags changes nothing and names `--yes`; `--dry-run` is a usage error
-- [ ] The lobby's update preview and confirm still work, through the one route
-- [ ] `cli.py` has one handler for the five, and no command parses its own `--yes` or `--json`
-- [ ] No `--dry-run` remains: the help row in `commands.py`, `update.lines`' closing hint, the README's two mentions and `lobby.html`'s comment say `--yes`
+- [x] One table-driven test runs every confirming command through propose, refuse and `--yes`
+- [x] A name or id typed as `--yes` is refused as a wrong one, for every command
+- [x] `contour update` with no flags changes nothing and names `--yes`; `--dry-run` is a usage error
+- [x] The lobby's update preview and confirm still work, through the one route
+- [x] `cli.py` has one handler for the five, and no command parses its own `--yes` or `--json`
+- [x] No `--dry-run` remains: the help row in `commands.py`, `update.lines`' closing hint, the README's two mentions and `lobby.html`'s comment say `--yes`
 
 ## Blocked by
 

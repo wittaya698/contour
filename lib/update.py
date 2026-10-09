@@ -138,5 +138,5 @@ def lines(said, done):
     if done:
         out += ["", "not saved yet: the next commit you approve carries it"]
     else:
-        out += ["", said["unseen"], "", "nothing changed. to do it: contour update"]
+        out += ["", said["unseen"], "", "nothing changed. to do it: contour update --yes"]
     return out

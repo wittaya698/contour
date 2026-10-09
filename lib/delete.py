@@ -115,8 +115,10 @@ def perform(root, name):
         lock.release(root, mine)
 
 
-def lines(proposal):
-    """The proposal as a person reads it."""
+def lines(proposal, done=False):
+    """The proposal as a person reads it, or the delete it became."""
+    if done:
+        return [f"ok   deleted {proposal['path']}", f"     its bundle: {proposal['bundle']}"]
     return [f"delete {proposal['path']}",
             f"    bundle -> {proposal['bundle']}", "",
             proposal["disk"], proposal["left"], "", proposal["unseen"], "",

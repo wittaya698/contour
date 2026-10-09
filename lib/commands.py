@@ -23,10 +23,20 @@ The columns:
               rendered from them — so a command cannot be undocumented and a
               removed one cannot linger
     handler   the name of the function in `lib/cli.py` that runs it
+    confirms  None, or how a command that confirms is asked (issue 85): one
+              handler applies it, so none parses its own `--yes` or `--json`
 """
 from collections import namedtuple
 
-Command = namedtuple("Command", "name arity space holds category usage handler")
+Command = namedtuple("Command", "name arity space holds category usage handler confirms",
+                     defaults=(None,))
+
+Confirms = namedtuple("Confirms", "word proposes takes", defaults=(True, ()))
+"""A command that confirms. `word` is what its first word is — `name`, `id`,
+or None for none — taken verbatim, so a typed `--yes` is a wrong name and never
+a confirm. Without `--yes` it proposes and writes nothing, unless `proposes`
+is False: `restore` has no proposal and acts on its own word. `takes` names
+the flags beyond `--yes` and `--json` it accepts, each with a value."""
 
 ANY = (1, None)
 NONE = (0, 0)
@@ -79,9 +89,9 @@ TABLE = (
     Command("doctor", NONE, True, False, None,
             (("doctor", "is this space in step with the toolkit"),), "on_doctor"),
     Command("update", (0, 2), True, False, None,
-            (("update", "bring this space's rules in step with the toolkit, where "
-                        "nobody edited them; --dry-run says what it would do, --json "
-                        "says it for a client"),), "on_update"),
+            (("update", "propose bringing this space's rules in step with the toolkit, "
+                        "where nobody edited them; --yes does it, --json says it for "
+                        "a client"),), "on_confirming", Confirms(None)),
     Command("migrate-marks", NONE, True, False, None,
             (("migrate-marks", "rewrite this space's marks into one spelling"),),
             "on_migrate_marks"),
@@ -99,16 +109,20 @@ TABLE = (
             "on_lobby"),
     Command("rename", (1, 3), True, False, "spec-write",
             (("rename <name>", "propose renaming this space; --yes does it, --json "
-                               "says it for a client"),), "on_rename"),
+                               "says it for a client"),), "on_confirming",
+            Confirms("name")),
     Command("delete", (1, 3), True, False, "ref-write",
             (("delete <name>", "propose deleting this space; --yes deletes it, leaving "
-                               "a bundle, --json says it for a client"),), "on_delete"),
-    Command("restore", (1, 4), False, False, None,
+                               "a bundle, --json says it for a client"),),
+            "on_confirming", Confirms("name")),
+    Command("restore", (1, 5), False, False, None,
             (("restore <id> [--to <dir>]", "clone a deleted space back from its bundle; "
-                                           "--json says it for a client"),), "on_restore"),
+                                           "--json says it for a client"),),
+            "on_confirming", Confirms("id", proposes=False, takes=("--to",))),
     Command("purge", (1, 3), False, False, "ref-write",
             (("purge <id>", "propose removing a deleted space's bundle; --yes removes "
-                            "it for good, --json says it for a client"),), "on_purge"),
+                            "it for good, --json says it for a client"),),
+            "on_confirming", Confirms("id")),
     Command("intents", NONE, False, False, None,
             (("intents", "the call categories a gate can ask about"),), "on_intents"),
     Command("asks", (0, 3), False, False, None,

@@ -11,6 +11,7 @@ so a page that stopped beating is the only ending there is.
 """
 import base64
 import contextlib
+import functools
 import json
 import os
 import signal
@@ -21,7 +22,7 @@ import urllib.parse
 import webbrowser
 from pathlib import Path
 
-from lib import enter, lock, policy, refs, space
+from lib import commands, enter, lock, policy, refs, space
 from lib.page import Blob, Page
 
 PAGE = Path(__file__).resolve().parent / "lobby.html"
@@ -60,6 +61,21 @@ for one the host cannot perform is a button that fails
 they can be."""
 
 
+ASKS = {
+    "rename": ("space", lambda asked, it: asked["name"], "shown"),
+    "update": ("space", None, "shown"),
+    "delete": ("space", lambda asked, it: it["name"], "name"),
+    "restore": ("trash", lambda asked, it: it["id"], None),
+    "purge": ("trash", lambda asked, it: it["id"], "typed"),
+}
+"""What the page sends each command that confirms: where it runs, the word it
+proposes with, and what its confirm carries. `shown` is the proposal the page
+showed, which must be what the command says now. `name` is the name the user
+typed, which the command judges against the space's own. `typed` is an id the
+user typed, which must be the bundle the page showed: the command removes any
+bundle it is given. `restore` proposes nothing and acts on its id."""
+
+
 def granted():
     """What this host can do: everything in `CAN`; `enter` only where the
     console's environment exists (ADR 0021, decision 2); and `reveal`, open in
@@ -83,11 +99,8 @@ class Lobby(Page):
         return {("GET", "/spaces"): lambda q: self.listing(),
                 ("POST", "/create"): self.create,
                 ("GET", "/location"): lambda q: {"default": str(self.location())},
-                ("POST", "/rename"): self.rename,
-                ("POST", "/update"): self.update,
-                ("POST", "/delete"): self.delete,
-                ("POST", "/restore"): self.restore,
-                ("POST", "/purge"): self.purge,
+                **{("POST", f"/{c.name}"): functools.partial(self.confirming, c.name)
+                   for c in commands.TABLE if c.confirms},
                 ("GET", "/environment"): lambda q: {"console": enter.environment()},
                 ("POST", "/enter"): self.enter,
                 ("POST", "/reveal"): self.reveal,
@@ -137,82 +150,46 @@ class Lobby(Page):
             return {"path": None, "next": None, "refused": refused}
         return made(str(asked.get("name") or ""), location, of=of, pictures=pictures)
 
-    def rename(self, asked):
-        """`contour rename` in the space the page named, its answer as it
-        gave it: the rules are the command's, and so is every refusal.
+    def confirming(self, cmd, asked):
+        """A command that confirms, run as its row in the table says, its answer
+        as it gave it: the rules are the command's, and so is every refusal
+        (issue 85). What is this page's is which word it sends and what it
+        confirms with (`ASKS`).
 
-        A confirm carries the proposal the page showed, and is the confirm of
-        that proposal only (rule 1): asked again, the command must say the
-        same, or nothing is done and the page has a new one to show.
-
-        A path the listing does not hold is no space of the page's: None, which
-        the server answers as not found."""
-        if asked.get("path") not in {s["path"] for s in self.listing()["spaces"]}:
+        A confirm is the confirm of what the page showed only (rule 1): asked
+        again, the command must say the same, or nothing is done and the page
+        has a new proposal to show. A space or a bundle the listing does not
+        hold is no space of the page's: None, which the server answers as not
+        found. Spaces are run in; the trash is run from the toolkit, since
+        there is no space to stand in until a bundle has been restored."""
+        shape = next(c for c in commands.TABLE if c.name == cmd).confirms
+        where, word, confirm = ASKS[cmd]
+        if where == "space":
+            listed, key = {s["path"]: s for s in self.listing()["spaces"]}, asked.get("path")
+        else:
+            listed, key = {d["id"]: d for d in self.listing()["deleted"]}, asked.get("id")
+        if key not in listed:
             return None
-        now = contour(asked["path"], "rename", asked["name"], "--json")
-        if "shown" not in asked or now["refused"]:
+        stand = key if where == "space" else CONTOUR.parent
+        to = ["--to", str(asked["to"])] if "--to" in shape.takes and asked.get("to") else []
+        words = [word(asked, listed[key])] if word else []
+
+        def run(*said, yes=False):
+            return contour(stand, cmd, *said, *to, *(["--yes"] if yes else []), "--json")
+        if not shape.proposes:
+            return run(*words)
+        if confirm == "name":
+            # The name the user typed, and the command judges it.
+            return run(str(asked["name"]), yes=True) if "name" in asked else run(*words)
+        now = run(*words)
+        if confirm not in asked or now["refused"]:
             return now
-        if asked["shown"] != now:
+        if confirm == "shown" and asked["shown"] != now:
             return dict(now, refused="the proposal changed since it was shown; "
                                      "read this one, then confirm it")
-        return contour(asked["path"], "rename", asked["name"], "--yes", "--json")
-
-    def update(self, asked):
-        """`contour update` in the space the page named, its answer as it gave
-        it (ADR 0026, decision 2). Asked with no `shown`, the dry run: what it
-        will change, and what it will leave alone and why. A confirm carries the
-        dry run the page showed, and is the confirm of that one only, as a
-        rename's is.
-
-        A path the listing does not hold is None: not found."""
-        if asked.get("path") not in {s["path"] for s in self.listing()["spaces"]}:
-            return None
-        now = contour(asked["path"], "update", "--dry-run", "--json")
-        if "shown" not in asked or now["refused"]:
-            return now
-        if asked["shown"] != now:
-            return dict(now, refused="what it would do changed since it was shown; "
-                                     "read this, then confirm it")
-        return contour(asked["path"], "update", "--json")
-
-    def delete(self, asked):
-        """`contour delete` in the space the page named, its answer as it gave
-        it. Asked with no name, the proposal, for the space the listing names;
-        asked with the name the user typed, the delete — and the command, not
-        this, judges whether what was typed is the space's name.
-
-        A path the listing does not hold is None: not found."""
-        listed = {s["path"]: s["name"] for s in self.listing()["spaces"]}
-        if asked.get("path") not in listed:
-            return None
-        if "name" not in asked:
-            return contour(asked["path"], "delete", listed[asked["path"]], "--json")
-        return contour(asked["path"], "delete", str(asked["name"]), "--yes", "--json")
-
-    def restore(self, asked):
-        """`contour restore` of a bundle the listing holds, its answer as it
-        gave it. Run from the toolkit, since there is no space to stand in
-        until it has been restored. An id the listing does not hold is None:
-        not found."""
-        if asked.get("id") not in {d["id"] for d in self.listing()["deleted"]}:
-            return None
-        to = ["--to", str(asked["to"])] if asked.get("to") else []
-        return contour(CONTOUR.parent, "restore", asked["id"], *to, "--json")
-
-    def purge(self, asked):
-        """`contour purge` of a bundle the listing holds. Asked with no typed
-        id, the proposal; with one, the removal — but only of the bundle the
-        page showed. The command takes any id it is given, so a typed id that
-        names some other bundle is refused here, before it can remove that one.
-        An id the listing does not hold is None: not found."""
-        if asked.get("id") not in {d["id"] for d in self.listing()["deleted"]}:
-            return None
-        now = contour(CONTOUR.parent, "purge", asked["id"], "--json")
-        if "typed" not in asked or now["refused"]:
-            return now
-        if asked["typed"] != asked["id"]:
-            return dict(now, refused=f"to remove this bundle, type {asked['id']}")
-        return contour(CONTOUR.parent, "purge", asked["id"], "--yes", "--json")
+        if confirm == "typed" and asked["typed"] != key:
+            return dict(now, refused=f"to remove this bundle, type {key}")
+        return run(*words, yes=True)
 
     def enter(self, asked):
         """Start a console on a space the listing holds, refused as

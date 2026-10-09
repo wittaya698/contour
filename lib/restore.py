@@ -79,8 +79,15 @@ def purge(id):
     return said
 
 
-def purge_lines(said):
-    """The purge proposal as a person reads it."""
+def lines(said, done=True):
+    """A restore as a person reads it: it has no proposal, so it is always done."""
+    return [f"ok   restored {said['path']}", f"     cd {said['path']}"]
+
+
+def purge_lines(said, done=False):
+    """The purge proposal as a person reads it, or the removal it became."""
+    if done:
+        return [f"ok   removed {said['bundle']}"]
     return [f"remove {said['bundle']}", f"    {said['name']}, deleted {said['deleted']}", "",
             said["copy"], said["gone"], "",
             f"nothing changed. to do it: contour purge {said['id']} --yes"]

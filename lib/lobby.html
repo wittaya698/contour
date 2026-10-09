@@ -447,9 +447,9 @@ function proposal(p, s, name, room) {
   room.replaceChildren(...parts, row);
 }
 
-// An update, as `contour update --dry-run` says it: what it will change, and
-// what it will leave alone and why — and only under all of it, the confirm.
-// The click confirms this dry run and no other: it goes back with the request,
+// An update, as `contour update` proposes it: what it will change, and what it
+// will leave alone and why — and only under all of it, the confirm, which is
+// `--yes`. The click confirms this proposal and no other: it goes back with the request,
 // and the server refuses it if the command now says something else (ADR 0026,
 // decision 2).
 function updating(s, room, p) {

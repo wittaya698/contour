@@ -30,6 +30,10 @@ from lib import commands, connector, delete, git, presence, rename, restore, rev
 ROOT = Path(__file__).resolve().parent.parent
 BLENDER = os.environ.get("BLENDER", "/Applications/Blender.app/Contents/MacOS/Blender")
 TIMEOUT_S = 300
+UNITS_TIMEOUT_S = 600
+"""The unit suite's own limit, apart from one Blender run's: the suite outgrew
+300s (333s on master, 2026-10-09), and a hung Blender is still caught early.
+Slow tests are their own issue; this only lets selftest say what it found."""
 
 
 def usage():
@@ -348,24 +352,6 @@ def on_doctor(cmd, rest, held):
     return emit(doctor())
 
 
-def on_update(cmd, rest, held):
-    """Updates, or with `--dry-run` says what it would (ADR 0026).
-
-    `holds` is False in the table and the hold is taken in `update.perform`,
-    as rename's is: a run already holding the space is a refusal worded the
-    way rename words it, not the launcher's own."""
-    if not set(rest) <= {"--dry-run", "--json"}:
-        print(usage(), file=sys.stderr)
-        return 2
-    done = "--dry-run" not in rest
-    said = (update.perform if done else update.propose)(PROJECT, ROOT)
-    if "--json" in rest:
-        return emit({"ok": not said["refused"], "lines": [json.dumps(said, indent=2)]})
-    if said["refused"]:
-        return emit({"ok": False, "lines": [f"FAIL update  {said['refused']}"]})
-    return emit({"ok": True, "lines": update.lines(said, done)})
-
-
 def on_migrate_marks(cmd, rest, held):
     return emit(migrate_marks())
 
@@ -415,92 +401,53 @@ def on_lobby(cmd, rest, held):
         create=(rest[1] if len(rest) > 1 else "") if rest else None))
 
 
-def on_rename(cmd, rest, held):
-    """Proposes, or with `--yes` does what it proposed (ADR 0021, decision 5).
+CONFIRMING = {
+    "rename": (lambda w, o: rename.propose(PROJECT, w, ROOT),
+               lambda w, o: rename.perform(PROJECT, w, ROOT), rename.lines),
+    "delete": (lambda w, o: delete.propose(PROJECT, w),
+               lambda w, o: delete.perform(PROJECT, w), delete.lines),
+    "update": (lambda w, o: update.propose(PROJECT, ROOT),
+               lambda w, o: update.perform(PROJECT, ROOT), update.lines),
+    "purge": (lambda w, o: restore.proposed_purge(w),
+              lambda w, o: restore.purge(w), restore.purge_lines),
+    "restore": (None, lambda w, o: restore.restore(w, ROOT, o.get("--to")), restore.lines),
+}
+"""What each command that confirms asks of its own module: the proposal, the
+act, and the lines a terminal reads. Everything else is `on_confirming`'s."""
 
-    `holds` is False in the table and the hold is taken in `rename.perform`:
-    the lock file moves with the directory, so it has to be released at the
-    new path, which `main` does not know.
+
+def on_confirming(cmd, rest, held):
+    """Every command that confirms, as its row's `confirms` says (issue 85).
+
+    The first word, if the row takes one, is the name or id verbatim: what a
+    page sends is whatever was typed, and a typed `--yes` must be a wrong name
+    and not a confirm. Then `--yes`, `--json`, and the flags the row takes.
+    Without `--yes` it proposes and writes nothing (ADR 0021, decision 5; ADR
+    0026, second amendment). The commands that write take their own hold:
+    `rename`'s lock moves with the directory and `delete`'s goes with it, so
+    the table's `holds` is False and `main` takes none.
     """
-    names = [w for w in rest if not w.startswith("--")]
-    if len(names) != 1:
-        print(usage(), file=sys.stderr)
-        return 2
-    said = (rename.perform if "--yes" in rest else rename.propose)(PROJECT, names[0], ROOT)
-    if "--json" in rest:
-        return emit({"ok": not said["refused"], "lines": [json.dumps(said, indent=2)]})
-    if said["refused"]:
-        return emit({"ok": False, "lines": [f"FAIL rename  {said['refused']}"]})
-    if "--yes" in rest:
-        return emit({"ok": True, "lines": [f"ok   renamed to {said['to']}",
-                                           f"     cd {said['to']}"]})
-    return emit({"ok": True, "lines": rename.lines(said)})
-
-
-def on_delete(cmd, rest, held):
-    """Proposes, or with `--yes` deletes, leaving a bundle (ADR 0021, decision 6).
-
-    `holds` is False in the table and the hold is taken in `delete.perform`:
-    the lock file is inside the space, and goes with it. The name is the
-    first word whatever it says, because what a page sends is whatever was
-    typed, and a typed `--yes` must be a wrong name and not a confirm.
-    """
-    typed, flags = rest[0], rest[1:]
-    if not set(flags) <= {"--yes", "--json"}:
-        print(usage(), file=sys.stderr)
-        return 2
-    said = (delete.perform if "--yes" in flags else delete.propose)(PROJECT, typed)
-    if "--json" in flags:
-        return emit({"ok": not said["refused"], "lines": [json.dumps(said, indent=2)]})
-    if said["refused"]:
-        return emit({"ok": False, "lines": [f"FAIL delete  {said['refused']}"]})
-    if "--yes" in flags:
-        return emit({"ok": True, "lines": [f"ok   deleted {said['path']}",
-                                           f"     its bundle: {said['bundle']}"]})
-    return emit({"ok": True, "lines": delete.lines(said)})
-
-
-def on_restore(cmd, rest, held):
-    """A deleted space, cloned back from its bundle (ADR 0021, decision 6)."""
+    shape = next(c for c in commands.TABLE if c.name == cmd).confirms
     words = list(rest)
-    as_json = "--json" in words
-    if as_json:
-        words.remove("--json")
-    to = None
-    if "--to" in words:
-        i = words.index("--to")
-        if i + 1 >= len(words):
+    word = words.pop(0) if shape.word else None
+    flags, given = set(), {}
+    while words:
+        w = words.pop(0)
+        if w in ("--yes", "--json"):
+            flags.add(w)
+        elif w in shape.takes and words:
+            given[w] = words.pop(0)
+        else:
             print(usage(), file=sys.stderr)
             return 2
-        to = words.pop(i + 1)
-        words.pop(i)
-    if len(words) != 1:
-        print(usage(), file=sys.stderr)
-        return 2
-    said = restore.restore(words[0], ROOT, to)
-    if as_json:
-        return emit({"ok": not said["refused"], "lines": [json.dumps(said, indent=2)]})
-    if said["refused"]:
-        return emit({"ok": False, "lines": [f"FAIL restore  {said['refused']}"]})
-    return emit({"ok": True, "lines": [f"ok   restored {said['path']}",
-                                       f"     cd {said['path']}"]})
-
-
-def on_purge(cmd, rest, held):
-    """Proposes removing a bundle from the trash, or with `--yes` removes it.
-    The id is the first word whatever it says, as `delete`'s name is."""
-    typed, flags = rest[0], rest[1:]
-    if not set(flags) <= {"--yes", "--json"}:
-        print(usage(), file=sys.stderr)
-        return 2
-    said = (restore.purge if "--yes" in flags else restore.proposed_purge)(typed)
+    propose, act, lines = CONFIRMING[cmd]
+    done = "--yes" in flags or not shape.proposes
+    said = (act if done else propose)(word, given)
     if "--json" in flags:
         return emit({"ok": not said["refused"], "lines": [json.dumps(said, indent=2)]})
     if said["refused"]:
-        return emit({"ok": False, "lines": [f"FAIL purge  {said['refused']}"]})
-    if "--yes" in flags:
-        return emit({"ok": True, "lines": [f"ok   removed {said['bundle']}"]})
-    return emit({"ok": True, "lines": restore.purge_lines(said)})
+        return emit({"ok": False, "lines": [f"FAIL {cmd}  {said['refused']}"]})
+    return emit({"ok": True, "lines": lines(said, done)})
 
 
 def seconds(name, fallback):
@@ -883,9 +830,13 @@ def unit_tests():
     mutants are for (ADR 0009).
     """
     env = {k: v for k, v in os.environ.items() if k != "BLENDER"}
-    r = subprocess.run([sys.executable, "-m", "unittest", "discover", "-s", "tests"],
-                       cwd=str(ROOT), env=env, capture_output=True, text=True,
-                       timeout=TIMEOUT_S)
+    try:
+        r = subprocess.run([sys.executable, "-m", "unittest", "discover", "-s", "tests"],
+                           cwd=str(ROOT), env=env, capture_output=True, text=True,
+                           timeout=UNITS_TIMEOUT_S)
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "lines": [f"the unit tests ran past {UNITS_TIMEOUT_S}s "
+                                       f"and were stopped"]}
     tail = (r.stderr or r.stdout).strip().splitlines()
     ran = next((l for l in tail if l.startswith("Ran ")), "ran ?")
     return {"ok": r.returncode == 0,
