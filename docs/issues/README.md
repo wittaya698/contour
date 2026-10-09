@@ -364,4 +364,5 @@ it.
 full `discover` and pass alone, as does all of `test_console.py` — so a process
 from another file reaches them through `servers()`, which counts the whole
 machine. Either 27's no-leak guarantee has slipped or the comparison is racy; the
-slice finds out which, and does not loosen the assertions to get there.
+slice finds out which, and does not loosen the assertions to get there. It was
+neither: a second suite run on the same machine. The README now says one at a time.

@@ -19,6 +19,7 @@ import tempfile
 import threading
 import time
 import unittest
+from unittest import mock
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -125,10 +126,30 @@ class ConsoleCase(unittest.TestCase):
         Asked of the machine and not of the shim, because the failure this looks
         for is a server that outlived the process that launched it: a child the
         parent still knows about is not the thing that wedges a space.
+
+        `pgrep` exits 1 for none found and higher for could not look; only the
+        first is an empty set (issue 94).
         """
         found = subprocess.run(["pgrep", "-f", "console.server"],
                                capture_output=True, text=True)
+        if found.returncode > 1:
+            raise RuntimeError(f"could not count servers: {found.stderr.strip()}")
         return {int(pid) for pid in found.stdout.split()}
+
+    def named(self, pids):
+        """Each pid as what it runs and who started it, for a failure message.
+
+        A server this suite did not expect is the evidence issue 94 is waiting
+        on, and it may be gone by the time anybody reads the log, so it is
+        described the moment it is seen."""
+        lines = []
+        for pid in sorted(pids):
+            ps = subprocess.run(["ps", "-o", "ppid=,command=", "-p", str(pid)],
+                                capture_output=True, text=True)
+            parent, _, command = ps.stdout.strip().partition(" ")
+            lines.append(f"pid {pid}: parent {parent} {command.strip()}" if parent
+                         else f"pid {pid}: gone")
+        return "; ".join(lines)
 
     def ask(self, url, path, body=None):
         """One request, exactly as the page makes it: the token in a header,
@@ -463,8 +484,9 @@ class SignalTest(ConsoleCase):
         self.addCleanup(self.reap, started)
         proc.terminate()
         proc.wait(timeout=30)
-        self.assertEqual(self.servers() & started, set(),
-                         "the server outlived the console that launched it")
+        left = self.servers() & started
+        self.assertEqual(left, set(), "the server outlived the console that launched it: "
+                         + self.named(left))
         with self.assertRaises((urllib.error.URLError, OSError)):
             urllib.request.urlopen(url, timeout=5).read()
 
@@ -512,8 +534,9 @@ class SignalTest(ConsoleCase):
         self.assertEqual(code, 128 + int(signal.SIGHUP))
         self.assertIn("SIGHUP", said)
         self.assertNotIn("Traceback", said)
-        self.assertEqual(self.servers() - before, set(),
-                         "the server outlived the terminal it was hung up on")
+        new = self.servers() - before
+        self.assertEqual(new, set(), "the server outlived the terminal it was hung up on: "
+                         f"{self.named(new)}; there before: {sorted(before)}")
 
     def test_a_console_killed_outright_still_lets_go_of_the_space(self):
         """SIGKILL is the one thing forwarding cannot reach: nothing runs after
@@ -537,9 +560,13 @@ class SignalTest(ConsoleCase):
         deadline = time.monotonic() + 30
         while time.monotonic() < deadline and self.servers() & started:
             time.sleep(0.25)
-        self.assertEqual(self.servers() & started, set(),
-                         "the server outlived the console nobody could stop")
-        self.assertIsNone(lock.holder(space), "the run kept the space it was holding")
+        left = self.servers() & started
+        self.assertEqual(left, set(), "the server outlived the console nobody could stop: "
+                         + self.named(left))
+        held = lock.holder(space)
+        self.assertIsNone(held, f"the run kept the space it was holding: {held}; "
+                          f"{self.named({held['pid']}) if held else ''}; "
+                          f"started: {sorted(started)}")
 
     def test_the_cleanup_this_suite_runs_puts_back_what_it_launched(self):
         """The bill this issue came from. Every console test ends through
@@ -551,10 +578,13 @@ class SignalTest(ConsoleCase):
         it puts back."""
         before = self.servers()
         proc, _ = self.launch()
-        self.assertEqual(len(self.servers() - before), 1, "no server started")
+        new = self.servers() - before
+        self.assertEqual(len(new), 1, f"one new server, not {self.named(new) or 'none'}; "
+                         f"there before: {sorted(before)}")
         self.finish(proc)
-        self.assertEqual(self.servers() - before, set(),
-                         "the suite's own cleanup leaves servers behind")
+        new = self.servers() - before
+        self.assertEqual(new, set(), "the suite's own cleanup leaves servers behind: "
+                         + self.named(new))
 
     def reap(self, pids):
         """Kill what the test proved should not be there, so one red does not
@@ -564,6 +594,38 @@ class SignalTest(ConsoleCase):
                 os.kill(pid, signal.SIGKILL)
             except OSError:
                 pass
+
+
+class CountingTest(ConsoleCase):
+    """The count `SignalTest` stands on (issue 94). Three of its tests went red
+    once in a full `discover` and never again on demand, so what they report
+    when they go red is the only evidence the next time will leave. An empty
+    count that was really a failed `pgrep` would make a server already there
+    look new, and end a wait for one to go before it had."""
+
+    def test_a_count_that_could_not_be_taken_says_so_rather_than_none(self):
+        bin_dir = Path(tempfile.mkdtemp())
+        fake = bin_dir / "pgrep"
+        fake.write_text("#!/bin/sh\necho 'pgrep: Cannot get process list' >&2\nexit 3\n")
+        fake.chmod(0o755)
+        with mock.patch.dict(os.environ, {"PATH": f"{bin_dir}:{os.environ['PATH']}"}):
+            with self.assertRaisesRegex(RuntimeError, "Cannot get process list"):
+                self.servers()
+
+    def test_a_stray_is_named_by_what_it_runs_and_who_started_it(self):
+        stray = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)",
+                                  "console.server-stand-in"])
+        self.addCleanup(stray.wait)
+        self.addCleanup(stray.kill)
+        said = self.named({stray.pid})
+        self.assertIn(f"pid {stray.pid}", said)
+        self.assertIn(f"parent {os.getpid()}", said)
+        self.assertIn("console.server-stand-in", said)
+
+    def test_a_stray_already_gone_is_named_as_gone(self):
+        gone = subprocess.Popen([sys.executable, "-c", "pass"])
+        gone.wait()
+        self.assertIn(f"pid {gone.pid}: gone", self.named({gone.pid}))
 
 
 class RunTest(ConsoleCase):

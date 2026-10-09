@@ -28,6 +28,13 @@ ln -s "$PWD/contour" ~/.local/bin/   # so you can run it from a model space
 re-imports it, and deliberately corrupts the build and the `.glb` in 37 ways
 to prove the checks can actually fail. If it passes, you are installed.
 
+**One suite run per machine at a time.** `selftest` and
+`python3 -m unittest discover -s tests` both start real consoles, and the tests
+that prove none outlives its test count every `console.server` on the machine —
+on purpose, since an orphan has no parent to report it. A second run alongside,
+from another terminal, worktree or agent session, looks to them like a leak
+(issue 94).
+
 ### The console needs an environment; `./contour` still does not
 
 Everything above is the launcher, and the launcher keeps the promise: stdlib

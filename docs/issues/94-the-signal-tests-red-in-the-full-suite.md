@@ -51,11 +51,54 @@ No new vocabulary.
 
 ## Acceptance criteria
 
-- [ ] Which test leaves the process behind, or that none does, is found and written down here
-- [ ] If something leaks: it no longer does, and the suite's `console.server` count is the same before and after a full run
-- [ ] `SignalTest` sees only servers this suite launched, and still sees one that outlived its parent
-- [ ] Full `unittest discover -s tests` green twice in a row on one machine, with `SignalTest` unchanged in what it asserts
-- [ ] `contour selftest` green
+- [x] Which test leaves the process behind, or that none does, is found and written down here — none does; see below
+- [x] If something leaks: it no longer does — nothing leaks, so there was nothing to stop
+- [ ] ~~`SignalTest` sees only servers this suite launched~~ — declined, see below
+- [ ] Full `unittest discover -s tests` green twice in a row on one machine, with `SignalTest` unchanged in what it asserts — once so far (2026-10-09, 1079 tests); the second waits for a machine with no other run on it
+- [ ] `contour selftest` green — likewise
+
+## What it came to
+
+**Nothing leaks. A second suite was running on the same machine.** While
+this was being chased, another agent session was timing the suite in a loop
+— `test_canvas`, `test_lobby`, `test_panel`, `test_connector`,
+`test_console`, over and over. `servers()` counts every `console.server` on the
+machine, as it should, so that session's consoles looked like strays to this
+one's `SignalTest`. That accounts for all three reds and for every later sign
+of a leak:
+
+- After each test file, run alone, no `console.server` was left alive (all
+  files, 2026-10-09).
+- Run in one process with the live servers logged after every test: the
+  consoles that `test_connector`, `test_lobby_create`, `test_lobby_enter` and
+  `test_lobby_variation` deliberately start outside the test live on for a test
+  or two and then go, as designed. None of them is alive while `test_console` runs.
+- `SignalTest` alone, eight times under full CPU load: green. A failed `pgrep`
+  under process churn and a forked child carrying its parent's command line
+  were both tried as explanations and neither reproduced.
+- A "leak" that came back 14 times in 15 from `test_lobby_create` was the
+  other session's consoles. Every SIGTERM this suite's own cleanup sent was
+  traced and every server it sent one to went.
+
+**Scoping the count was declined.** The way to make `SignalTest` blind to
+another run is to mark each server a run launches and count only those. That
+fixes the counting and nothing else: two runs on one machine still compete for
+its ports and its process table, and any other machine-wide check would have to
+learn the same trick. Instead the README says it outright — **one suite run per machine at a
+time** — and the count stays machine-wide, which is the property issue 27 needs.
+
+**What changed in the harness**, test-first, `SignalTest`'s assertions
+untouched:
+
+- `servers()` raises when `pgrep` could not look (exit above 1), rather than
+  answering an empty set. An empty `before` makes a server already there look
+  new, and an empty set in a wait ends the wait before the server has gone.
+- `named(pids)` describes each pid as what it runs and who started it, at the
+  moment it is seen, and `SignalTest`'s failure messages carry it, along with
+  what was there before. The next time one of them goes red, the log says whose
+  server it was, and a concurrent run shows up as a parent that is not this
+  suite. A mutant planting a stray in the cleanup test was caught with both
+  pids named.
 
 ## Blocked by
 
