@@ -200,3 +200,18 @@ extension in place of the pasted block — neither researched.
 not wait on it: it starts at the first page and assumes someone has installed.
 **If nobody decides:** a person who has never used a terminal is installed by
 someone who has.
+
+
+## 15. A requester on another machine
+
+Decided 2026-10-09, while grilling the unattended run: a **requester** is on
+this machine — a local agent or the user — and asks over stdio or loopback, as
+the connector is reached. A requester elsewhere (a cloud routine, an
+orchestrator on another host) needs a listening endpoint, a stable port and a
+stored credential, which ADR 0021 decision 3 holds back until a real consumer
+exists. It would also make someone other than the owner the one who starts
+sending a space's references to a model provider (ADR 0019 decision 40).
+
+**Blocks:** nothing today; there is no remote requester.
+**If nobody decides:** requests stay local, and a remote agent reaches a space
+only through a person, or a local agent, on its machine.
