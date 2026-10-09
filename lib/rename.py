@@ -12,7 +12,7 @@ says, so what the user read is what was written.
 """
 import re
 
-from . import git, lock, policy, presence, revision
+from . import git, lock, policy, presence, revision, update
 from . import space as space_lib
 
 MODEL = re.compile(r"^model:[^\n]*$", re.M)
@@ -59,8 +59,13 @@ def uncommitted(root):
 
 
 def rewritten(root, change, toolkit):
-    """A scaffold file as it reads under the new name: the template's, or,
-    for one the user has written in, theirs under the template's header."""
+    """A scaffold file as it reads under the new name: the template's — the one
+    it was written from, if the toolkit has moved on since, so a rename never
+    brings newer rules in — or, for one the user has written in, theirs under
+    the template's header."""
+    if change.get("of"):
+        return update.then(toolkit, change["of"], change["what"]).replace(
+            "<NAME>", change["to"])
     now = space_lib.template(toolkit, change["what"], change["to"])
     if change["only"] != "header":
         return now
@@ -100,21 +105,30 @@ def propose(root, name, toolkit, mine=None):
                     {"what": "revision:", "from": revision.of(text),
                      "to": revision.of(text) + 1}]
     untouched = []
-    for rel in space_lib.SCAFFOLD:
-        was, now = (space_lib.template(toolkit, rel, n) for n in (old, name))
-        f = root / rel
-        if was == now or not f.exists():
+    made_from = update.recorded(root)
+    for rel, stands in update.standing(root, toolkit).items():
+        if stands == "missing":
             continue
-        text = f.read_text()
-        if text == was:
+        if stands == "behind":
+            # Unedited, so whole: as the template it was written from, under
+            # the new name, wherever in the file the name is (issue 83).
+            if "<NAME>" in update.then(toolkit, made_from, rel):
+                changes.append({"what": rel, "from": old, "to": name, "only": None,
+                                "of": made_from})
+            continue
+        was, now = (space_lib.template(toolkit, rel, n) for n in (old, name))
+        if was == now:
+            continue
+        text = (root / rel).read_text()
+        if stands == "in step":
             changes.append({"what": rel, "from": old, "to": name, "only": None})
         elif text.split("\n", 1)[0] == was.split("\n", 1)[0] != now.split("\n", 1)[0]:
-            # Drifted, so the user has written in it: the header is the name
+            # Edited, so the user has written in it: the header is the name
             # and is the rename's, and everything under it stays theirs. A
             # header with no name in it has nothing to rename.
             changes.append({"what": rel, "from": old, "to": name, "only": "header"})
         else:
-            untouched.append(rel)      # drifted where the name is: the user's to settle
+            untouched.append(rel)      # edited where the name is: the user's to settle
     leaves = []
     if policy.names(root):
         leaves.append({"what": "ask-list", "path": str(policy.ask_list()),
@@ -186,7 +200,7 @@ def lines(proposal):
             + ("   (its header only: the rest is yours)" if c.get("only") == "header" else "")
             for c in proposal["changes"]]
     if proposal["untouched"]:
-        out += ["", "untouched (drifted from the template; may still say the old name):"]
+        out += ["", "untouched (edited since it was written; may still say the old name):"]
         out += [f"  {rel}" for rel in proposal["untouched"]]
     if proposal["leaves"]:
         out += ["", "leaves behind:"]

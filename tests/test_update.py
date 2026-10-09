@@ -157,17 +157,80 @@ class UpdateTest(UpdateCase):
         (self.space / SETTINGS).write_text(then(SETTINGS, "alpha") + "\n")
         self.assertEqual(self.contour("update").returncode, 0)
         said = self.contour("doctor").stdout
-        self.assertEqual([l for l in said.splitlines() if l.startswith(("DRIFT", "MISS"))],
-                         [f"DRIFT {SETTINGS} — differs from the toolkit's template"])
+        self.assertEqual([l for l in said.splitlines()
+                          if l.startswith(("DRIFT", "MISS", "BEHIND", "EDITED"))],
+                         [f"EDITED {SETTINGS} — yours; update leaves it"])
         self.assertIn(f"ok   toolkit {self.toolkit_head()}", said)
+        self.assertNotIn("run contour update", said)
 
     def test_doctor_points_a_space_behind_at_update(self):
-        self.assertIn("run contour update", self.contour("doctor").stdout)
+        said = self.contour("doctor").stdout
+        self.assertIn(f"BEHIND {RULES} — the toolkit has moved on", said)
+        self.assertIn("run contour update", said)
 
     def test_it_leaves_its_changes_unsaved(self):
         self.assertEqual(self.contour("update").returncode, 0)
         self.assertIn(RULES, self.git("status", "--porcelain"))
         self.assertEqual(self.git("log", "--format=%s").split(), ["alpha"])
+
+
+class StandingTest(UpdateCase):
+    """How each copy stands: the one answer `doctor`, the lobby's row, the
+    connector and `rename` read (issue 83)."""
+
+    def test_a_copy_the_template_moved_on_from_is_behind(self):
+        self.assertEqual(update.standing(self.space, ROOT)[RULES], "behind")
+
+    def test_after_an_update_every_copy_is_in_step(self):
+        self.assertEqual(self.contour("update").returncode, 0)
+        self.assertEqual(set(update.standing(self.space, ROOT).values()), {"in step"})
+
+    def test_an_edit_on_the_current_toolkit_is_edited_and_not_behind(self):
+        """The case the lobby once offered an update for that could never clear."""
+        self.assertEqual(self.contour("update").returncode, 0)
+        with open(self.space / RULES, "a") as f:
+            f.write("\nmy own rule\n")
+        self.assertEqual(update.standing(self.space, ROOT)[RULES], "edited")
+
+    def test_a_deleted_copy_is_missing(self):
+        (self.space / SETTINGS).unlink()
+        self.assertEqual(update.standing(self.space, ROOT)[SETTINGS], "missing")
+
+    def test_the_lobby_row_asks_for_an_update_until_one_is_made_and_never_for_an_edit(self):
+        """What the row's *needs an update* is read from, as `spaces --json`
+        hands it to the lobby."""
+        def row():
+            r = self.contour("spaces", "--json", cwd=self.spaces)
+            [s] = [s for s in json.loads(r.stdout)["spaces"] if s["name"] == "alpha"]
+            return s["scaffold"]
+        self.assertIn(RULES, row()["behind"])
+        self.assertEqual(self.contour("update").returncode, 0)
+        self.assertEqual(row(), {"behind": [], "edited": [], "missing": []})
+        with open(self.space / RULES, "a") as f:
+            f.write("\nmy own rule\n")
+        self.assertEqual(row(), {"behind": [], "edited": [RULES], "missing": []})
+
+    def test_rename_carries_a_behind_copy_across_without_bringing_newer_rules(self):
+        """A skill names the space below its `---`, so a header-only rewrite
+        cannot rename it; unedited, it is rewritten whole — as its own old
+        template under the new name, so a rename never updates (issue 83)."""
+        skill = ".claude/skills/build-model/SKILL.md"
+        older = toolkit_git("rev-parse", "--short", toolkit_git(
+            "log", "-1", "--format=%h", "--", f"templates/space/{skill}").strip()
+            + "^").strip()
+        self.behind(self.space, older)
+        self.assertEqual(update.standing(self.space, ROOT)[skill], "behind")
+        said = json.loads(self.contour("rename", "beta", "--json").stdout)
+        self.assertNotIn(skill, said["untouched"])
+        self.assertEqual(self.contour("rename", "beta", "--yes").returncode, 0)
+        beta = self.spaces / "beta"
+        old = toolkit_git("show", f"{older}:templates/space/{skill}")
+        self.assertEqual((beta / skill).read_text(), old.replace("<NAME>", "beta"))
+        self.assertEqual(update.standing(beta, ROOT)[skill], "behind")
+
+    def test_a_recorded_commit_history_lacks_makes_a_differing_copy_edited(self):
+        self.behind(self.space, "0" * 40)
+        self.assertEqual(update.standing(self.space, ROOT)[RULES], "edited")
 
 
 class WrittenFromTest(unittest.TestCase):

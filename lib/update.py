@@ -1,12 +1,13 @@
 """Updating a model space: its copies brought in step with the toolkit, where
 nobody edited them (ADR 0026).
 
-`doctor` says *drift* when a copy differs from **today's** template, which
-cannot tell a file the template moved on from apart from one somebody edited.
-The space's marker records the toolkit commit it was made from, and the
-toolkit's own history holds the template as it was then: a copy that still
-equals that was never touched, and may be replaced. Anything else is somebody's,
-and is named and left.
+A copy that differs from **today's** template may be one the template moved
+on from, or one somebody edited. The space's marker records the toolkit commit
+it was made from, and the toolkit's own history holds the template as it was
+then: a copy that still equals that was never touched, and may be replaced.
+Anything else is somebody's, and is named and left. `standing` is that
+judgement, and the one `doctor`, the lobby, the connector and `rename` read
+(issue 83).
 
 `propose` changes nothing and `perform` does what it says, as a rename does.
 """
@@ -60,27 +61,40 @@ def written_from(text, template):
     return re.fullmatch(pattern, text) is not None
 
 
+def standing(root, toolkit):
+    """How each copy in `root` stands against the toolkit: `in step` (today's
+    template), `behind` (the template at the recorded commit, unedited, and
+    moved on since), `edited`, or `missing`. The one answer `doctor`, the
+    lobby's row, the connector and `rename` read (issue 83). A recorded commit
+    this clone's history lacks leaves nothing to tell an edit from, so every
+    copy that differs counts as edited (ADR 0026)."""
+    was, said = recorded(root), {}
+    for rel in space_lib.SCAFFOLD:
+        f = root / rel
+        if not f.exists():
+            said[rel] = "missing"
+            continue
+        text = f.read_text()
+        if text == space_lib.template(toolkit, rel, root.name):
+            said[rel] = "in step"
+            continue
+        old = then(toolkit, was, rel)
+        said[rel] = "behind" if old is not None and written_from(text, old) else "edited"
+    return said
+
+
 def propose(root, toolkit, mine=None):
     """What updating the space at `root` would do. Writes nothing."""
     was, now = recorded(root), git.head(toolkit) or "unknown"
-    replaced, written, left = [], [], []
-    for rel in space_lib.SCAFFOLD:
-        f, today = root / rel, space_lib.template(toolkit, rel, root.name)
-        if not f.exists():
-            written.append(rel)
-            continue
-        text = f.read_text()
-        if text == today:
-            continue
-        old = then(toolkit, was, rel)
-        if old is None:
-            left.append({"what": rel, "why": f"toolkit {was} is not in this toolkit's "
-                                             f"history, so there is nothing to tell an "
-                                             f"edit from"})
-        elif written_from(text, old):
-            replaced.append(rel)
-        else:
-            left.append({"what": rel, "why": f"edited since toolkit {was}; yours to merge"})
+    stands = standing(root, toolkit)
+    replaced = [rel for rel, s in stands.items() if s == "behind"]
+    written = [rel for rel, s in stands.items() if s == "missing"]
+    left = [{"what": rel,
+             "why": f"edited since toolkit {was}; yours to merge"
+             if then(toolkit, was, rel) is not None
+             else f"toolkit {was} is not in this toolkit's history, so there is "
+                  f"nothing to tell an edit from"}
+            for rel, s in stands.items() if s == "edited"]
     return {"path": str(root), "from": was, "to": now, "replaced": replaced,
             "written": written, "left": left, "unseen": UNSEEN,
             "refused": presence.occupied(root, "update", mine)}

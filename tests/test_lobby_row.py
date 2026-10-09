@@ -229,8 +229,12 @@ class RowPageTest(unittest.TestCase):
         self.assertNotIn("in step", self.page)
         self.assertNotIn("template", health)
         self.assertIn("'has a remote — a model is never pushed', 'warn'", health)
-        for wrong in ("s.scaffold.missing.length", "s.scaffold.drift.length", "!s.rules"):
+        for wrong in ("s.scaffold.missing.length", "s.scaffold.behind.length", "!s.rules"):
             self.assertIn(wrong, health)
+        # An edited copy is the user's, and an update leaves it: offering one
+        # for it is a line no update can clear (issue 83).
+        self.assertNotIn("edited", health)
+        self.assertNotIn("drift", health)
         self.assertIn("'needs an update'", health)
 
 

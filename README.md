@@ -420,7 +420,7 @@ A model space, anywhere on disk, its own git repository:
     marks.json    located comments and spans, from both sides   (ADR 0018)
     vetoes.json   calls you refused at a gate, and why            (ADR 0019)
     NOTES.md      what is deferred, and what is undecided
-    CLAUDE.md     the agent's rules          (copied from the toolkit; `contour doctor` flags drift, `contour update` mends it)
+    CLAUDE.md     the agent's rules          (copied from the toolkit; `contour doctor` says which are behind or edited, `contour update` brings the behind ones in step)
     .claude/      the spec guard's settings, and the build and release skills
     .contour/     the marker, plus logs               (git-ignored)
     out/          generated .blend, filmstrip, scratch (git-ignored)

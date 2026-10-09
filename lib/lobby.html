@@ -110,13 +110,15 @@ function cell(text, cls) {
 
 // What a row says about health: nothing, when nothing is wrong, and the
 // outcome when something is (ADR 0025, decision 10). A remote is a warning,
-// since a model is never pushed (rule 8); what `contour doctor` would call
-// drift, a missing copy or rules the agent cannot see is one thing an update
-// puts right (ADR 0026), and `update`, where there is one, is its action.
+// since a model is never pushed (rule 8); a copy behind the toolkit, a missing
+// one or rules the agent cannot see is one thing an update puts right
+// (ADR 0026), and `update`, where there is one, is its action. A copy the user
+// changed is theirs, and an update leaves it, so it is said nowhere here
+// (issue 83).
 function health(s, update) {
   const said = [];
   if (s.remotes.length) said.push(para('has a remote — a model is never pushed', 'warn'));
-  if (s.scaffold.missing.length || s.scaffold.drift.length || !s.rules) {
+  if (s.scaffold.missing.length || s.scaffold.behind.length || !s.rules) {
     const needs = para('needs an update', 'muted');
     if (update) needs.append(' ', button('Update…', update));
     said.push(needs);
@@ -426,7 +428,7 @@ function proposal(p, s, name, room) {
     c.what + (c.what.endsWith(':') ? ' ' : ': ') + c.from + ' → ' + c.to
     + (c.only === 'header' ? ' (its header only: the rest is yours)' : ''))));
   if (p.untouched.length)
-    parts.push(...list('Untouched (drifted from the template; may still say the old name)',
+    parts.push(...list('Left as you changed them (they may still say the old name)',
                        p.untouched));
   if (p.leaves.length)
     parts.push(...list('Leaves behind', p.leaves.map(l => l.what + ': ' + l.path + ' — ' + l.why)));

@@ -17,7 +17,7 @@ so a copy that only fell behind lands in its *untouched* list.
 
 `lib/update.py` gains the one answer: for each file `SCAFFOLD` lists, whether it
 is *in step*, *behind* (unedited, and the template has moved on), *edited*, or
-*missing*, judged as decision 1 judges it — the template at the recorded commit,
+*missing*, judged as ADR 0026 decision 1 judges it — the template at the recorded commit,
 written for one name used throughout. A recorded commit missing from this
 clone's history makes every differing copy *edited*, with that as its reason.
 `update.propose` becomes a fold over it. `cli.scaffold` is deleted, and the
@@ -25,22 +25,24 @@ clone's history makes every differing copy *edited*, with that as its reason.
 
 Everything that reported drift reads the answer instead. `spaces --json`'s
 `scaffold` becomes `{behind, edited, missing}`. The lobby's row says *needs an
-update* only when an update would change something — a copy behind or missing,
-the recorded commit moved, or rules the agent cannot see — and says nothing of an
+update* only when an update would change a copy — one behind or missing, or
+rules the agent cannot see — and says nothing of an
 edited copy, which is the user's and not something the space needs. `doctor`
 still names an edited copy, for a developer, and says it is theirs.
-`rename.propose` rewrites a copy that is in step or behind whole, and only the
-header of an edited one.
+`rename.propose` rewrites a copy that is in step or behind whole — a behind one
+as the template was at the recorded commit, under the new name, so a rename
+never brings newer rules in — and only the header of an edited one.
 
 ## Acceptance criteria
 
-- [ ] The four states, tested on the one function over a temp space and a temp toolkit repository with two commits
-- [ ] A space with only an edited copy, on the current toolkit, shows no *needs an update* on its row
-- [ ] A copy that is behind shows *needs an update*, and after the update the row says nothing
-- [ ] `doctor` says `EDITED` for an edited copy and `BEHIND` for a behind one; no `DRIFT` remains
-- [ ] The connector's `status` reports `{toolkit, behind, edited, missing}`
-- [ ] `rename` rewrites a behind, unedited copy whole rather than listing it as untouched
-- [ ] `cli.scaffold` is gone, and `toolkit:` is parsed only by `update.named`
+- [x] The four states, tested on the one function over a temp space, against the toolkit's own history
+- [x] A space with only an edited copy, on the current toolkit, shows no *needs an update* on its row
+- [x] A copy that is behind shows *needs an update*, and after the update the row says nothing
+- [x] `doctor` says `EDITED` for an edited copy and `BEHIND` for a behind one; no `DRIFT` remains
+- [x] The connector's `status` reports `{toolkit, behind, edited, missing}`
+- [x] `rename` rewrites a behind, unedited copy as its old template under the new name, rather than listing it as untouched
+- [x] A recorded commit that moved, with every copy in step, is not *needs an update*
+- [x] `cli.scaffold` is gone, and `toolkit:` is parsed only by `update.named`
 
 ## Blocked by
 

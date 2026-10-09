@@ -307,17 +307,18 @@ class ReadingTest(InSpaceCase):
         self.assertEqual(said["vetoes"], 2)
 
     def test_status_says_what_doctor_finds_out_of_step(self):
-        """The same scaffold comparison `doctor` and `spaces` make, so the three
-        cannot disagree about which files have drifted."""
+        """How each copy stands, the one answer `doctor` and `spaces` read, so
+        the three cannot disagree about a copy (issue 83)."""
         said, _ = self.tool("status", space="alpha")
-        self.assertEqual(said["doctor"], {"toolkit": "current", "drift": [],
-                                          "missing": []})
+        self.assertEqual(said["doctor"], {"toolkit": "current", "behind": [],
+                                          "edited": [], "missing": []})
         with open(self.space / "CLAUDE.md", "a") as f:
             f.write("\nmy own rule\n")
         (self.space / ".claude" / "settings.json").unlink()
         said, _ = self.tool("status", space="alpha")
-        self.assertEqual(said["doctor"]["drift"], ["CLAUDE.md"])
+        self.assertEqual(said["doctor"]["edited"], ["CLAUDE.md"])
         self.assertEqual(said["doctor"]["missing"], [".claude/settings.json"])
+        self.assertEqual(said["doctor"]["behind"], [])
 
     def test_a_space_spaces_does_not_resolve_is_refused_in_its_words(self):
         said, failed = self.tool("status", space="nope")

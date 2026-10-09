@@ -678,17 +678,6 @@ def init_refusal(name, new, base):
     return None
 
 
-def scaffold(root):
-    """Each scaffold file in `root` against the toolkit's template: `missing`,
-    `drift` (present, but not what the template writes for this space's name),
-    or `ok`. Asked by `doctor` of the space it stands in and by `spaces` of
-    every space, so the two cannot disagree about which files have drifted."""
-    return {rel: "missing" if not (root / rel).exists()
-            else "ok" if (root / rel).read_text() == space.template(ROOT, rel, root.name)
-            else "drift"
-            for rel in SCAFFOLD}
-
-
 def sees_rules(root):
     """Whether an agent working in `root` is given the hard rules (open
     question 13): a `CLAUDE.md` of its own, or the toolkit's above it, which
@@ -699,23 +688,24 @@ def sees_rules(root):
 
 def doctor():
     """Is this space still in step with the toolkit, and still unpushable."""
-    lines, ok = [], True
-    for rel, state in scaffold(PROJECT).items():
+    lines, ok, mend = [], True, False
+    for rel, state in update.standing(PROJECT, ROOT).items():
         if state == "missing":
             lines.append(f"MISS {rel} — run contour update to write it")
-            ok = False
-        elif state == "drift":
-            lines.append(f"DRIFT {rel} — differs from the toolkit's template")
-            ok = False
+            ok, mend = False, True
+        elif state == "behind":
+            lines.append(f"BEHIND {rel} — the toolkit has moved on")
+            ok, mend = False, True
+        elif state == "edited":
+            # The user's own rules, and not something the space needs: an
+            # update leaves it, so it is no reason to send anybody there.
+            lines.append(f"EDITED {rel} — yours; update leaves it")
         else:
             lines.append(f"ok   {rel}")
-    marker = (PROJECT / MARKER).read_text()
-    was = next((l.split(":", 1)[1].strip() for l in marker.splitlines()
-                if l.startswith("toolkit:")), "unknown")
-    now = toolkit_commit()
+    was, now = update.recorded(PROJECT) or "unknown", toolkit_commit()
     lines.append(f"{'ok  ' if was == now else 'NOTE'} toolkit {was}"
                  + ("" if was == now else f" -> {now} since this space was created"))
-    if not ok or was != now:
+    if mend:
         lines.append("     run contour update: it replaces what nobody edited, "
                      "and names what it leaves")
     remotes = git.remotes(PROJECT)
@@ -820,10 +810,8 @@ def reading(root, now):
     """One space as `spaces` reports it, derived from the space on every call
     and never stored. The text form and the JSON form both print this, so they
     cannot disagree about which spaces exist or which are behind (slice 28)."""
-    marker = (root / MARKER).read_text()
-    was = next((l.split(":", 1)[1].strip() for l in marker.splitlines()
-                if l.startswith("toolkit:")), None)
-    found = scaffold(root)
+    was = update.recorded(root)
+    found = update.standing(root, ROOT)
     from lib import panel, refs, store, verdict
     here = space.layout(root)
     kept = store.load(here.dot / panel.NAME, None)
@@ -839,8 +827,8 @@ def reading(root, now):
                         "state": "unknown" if was is None
                         else "current" if was == now else "behind"},
             "commits": git.commits(root), "remotes": git.remotes(root),
-            "scaffold": {"drift": [r for r, s in found.items() if s == "drift"],
-                         "missing": [r for r, s in found.items() if s == "missing"]},
+            "scaffold": {s: [r for r, stands in found.items() if stands == s]
+                         for s in ("behind", "edited", "missing")},
             "rules": sees_rules(root),
             "presence": presence.live(root),
             "renamed": rename.uncommitted(root),
@@ -1035,7 +1023,7 @@ def refused_create(why):
 
 def out_of_step(root):
     """What `doctor` would find behind the toolkit here: `reading`'s half of
-    it, so a chat, `spaces` and `doctor` name the same drifted files."""
+    it, so a chat, `spaces` and `doctor` say the same of every copy."""
     said = reading(root, toolkit_commit())
     return {"toolkit": said["toolkit"]["state"], **said["scaffold"]}
 
