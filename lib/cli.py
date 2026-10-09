@@ -392,6 +392,21 @@ def on_mcp(cmd, rest, held):
     return 0
 
 
+def on_status(cmd, rest, held):
+    """The connector's `status`, for a requester without MCP (ADR 0027,
+    decision 8): one reading behind both, so they cannot disagree. Named, not
+    stood in, because a requester stands outside the space it asked of."""
+    if rest[1] != "--json":
+        print(usage(), file=sys.stderr)
+        return 2
+    try:
+        root = space.named(rest[0], ROOT)
+    except LookupError as e:
+        return emit({"ok": False, "lines": [f"FAIL {e}"]})
+    print(json.dumps(survey.status(root), indent=2))
+    return 0
+
+
 def on_spaces(cmd, rest, held):
     if rest == ["--json"]:
         return emit(spaces(as_json=True))

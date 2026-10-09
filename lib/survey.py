@@ -150,11 +150,14 @@ def held_by(rec):
 def status(root):
     """Is it green, and if not why (ADR 0024, decisions 3 and 6) — and the
     same, as the pages say it (ADR 0025, decision 11): beside the report lines,
-    so a chat can say what the console's panel says."""
-    from . import lock, marks, panel, store, verdict as plainly, vetoes
+    so a chat can say what the console's panel says. And the space's latest
+    run, which is what a requester comes back for (ADR 0027, decision 8),
+    or None where nothing has run."""
+    from . import last_run, lock, marks, panel, store, verdict as plainly, vetoes
     here = space_lib.layout(root)
     verdict = store.load(here.dot / panel.NAME, None)
     said = [] if verdict else ["never checked: no verdict here is not a green one"]
+    run = last_run.read(root)
     rec = lock.holder(root)
     held = held_by(rec) if rec and lock.alive(rec) else None
     if held and verdict:
@@ -163,7 +166,7 @@ def status(root):
             "held": held, "said": said,
             "marks": sum(1 for m in marks.load(here.marks) if marks.is_open(m)),
             "vetoes": vetoes.uncommitted(root),
-            "doctor": out_of_step(root)}
+            "doctor": out_of_step(root), "run": run}
 
 
 def log(root, lines=40):

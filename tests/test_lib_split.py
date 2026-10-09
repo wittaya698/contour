@@ -35,7 +35,7 @@ print(" ".join(sorted({n.split(".")[0] for n in set(sys.modules) - before}
 # Runs outside Blender: the launcher, the canvas, the stores. Standard library
 # only, because `./contour` has to work on a clone with nothing installed.
 FREE = ("agent", "badges", "canvas", "checks", "cli", "commands", "activity", "connector", "delete", "enter", "exported",
-        "filmstrip", "gate", "git", "glb", "intent", "lobby", "lock", "marks", "mask", "miniyaml",
+        "filmstrip", "gate", "git", "glb", "intent", "last_run", "lobby", "lock", "marks", "mask", "miniyaml",
         "ops_whitelist", "page", "panel", "policy", "presence", "refs",
         "rename", "restore", "revision", "signals", "space", "span", "spend", "store", "survey", "taught",
         "units", "update", "verdict", "vetoes", "views", "worksheet")

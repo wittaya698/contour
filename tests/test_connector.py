@@ -241,6 +241,38 @@ class InSpaceCase(SpacesCase):
 class ReadingTest(InSpaceCase):
     """`status` and `log` (issue 59)."""
 
+    def test_status_carries_the_latest_run(self):
+        """What a requester comes back for (ADR 0027, decision 8; issue 86)."""
+        from console import last_run
+        last_run.write(self.space, {"run": "r1", "prompt": "make the beak longer",
+                                    "requester": None, "vetoes": [],
+                                    "state": "waiting for you",
+                                    "act": "Save this version?"})
+        said, _ = self.tool("status", space="alpha")
+        self.assertEqual(said["run"]["state"], "waiting for you")
+        self.assertEqual(said["run"]["act"], "Save this version?")
+
+    def test_the_launcher_reads_the_same_status_for_a_client_without_mcp(self):
+        from console import last_run
+        last_run.write(self.space, {"run": "r1", "prompt": "make the beak longer",
+                                    "requester": None, "vetoes": [],
+                                    "state": "running"})
+        r = self.contour("status", "alpha", "--json")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(json.loads(r.stdout), self.tool("status", space="alpha")[0])
+
+    def test_the_launchers_read_refuses_a_space_it_cannot_find(self):
+        r = self.contour("status", "nowhere", "--json")
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("nowhere", r.stdout + r.stderr)
+
+    def test_status_says_when_nothing_has_run(self):
+        """By an empty run and not a line in `said`, which is for what
+        qualifies the verdict: a space never asked anything is not a worry."""
+        said, _ = self.tool("status", space="alpha")
+        self.assertIn("run", said)
+        self.assertIsNone(said["run"])
+
     def test_status_is_the_last_checks_verdict_after_a_later_stage(self):
         """The filmstrip ran last and its log says so; the verdict is the check's."""
         self.assertEqual(self.run_in("check", ok=False).returncode, 1)

@@ -99,6 +99,10 @@ TABLE = (
             (("spaces [name]", "list model spaces, or print one's path"),
              ("spaces --json", "the same list and its health, for a client to read")),
             "on_spaces"),
+    Command("status", (2, 2), False, False, None,
+            (("status <name> --json", "a space's last verdict and latest run, as the "
+                                      "connector's status says them, for a client"),),
+            "on_status"),
     Command("mcp", (0, 1), False, False, None,
             (("mcp", "the connector: Claude Desktop reads the spaces over stdio"),
              ("mcp --config", "the block to paste into Desktop's config; writes nothing")),

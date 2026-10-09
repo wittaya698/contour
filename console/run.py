@@ -12,8 +12,9 @@ import secrets
 import threading
 from pathlib import Path
 
-from console import launcher, seed, spend, vetoes
+from console import last_run, launcher, seed, spend, vetoes
 from lib import activity, gate as gate_words, intent, lock, marks, policy
+from lib.last_run import ENDED
 
 
 class Stopped(Exception):
@@ -29,6 +30,9 @@ class Stopped(Exception):
 
 HERE = Path(__file__).resolve().parent
 DEFAULT = f"{HERE / 'agent.py'}:drive"
+
+PASSING = ("act",)
+"""What the run record says only while the state that set it lasts."""
 
 
 def driver(spec=None):
@@ -102,6 +106,7 @@ class Run:
         self.seeded = []                      # the marks this run was started from
         self.gates = 0                        # gates this run has stopped at
         self.prompt = ""                      # what this run was asked to do
+        self.latest = None                    # what the space's run record says
         self._lock = threading.Lock()
         self._thread = None
 
@@ -118,6 +123,9 @@ class Run:
         self.gates = 0
         self.prompt = prompt
         self.record = lock.take(self.space, "console run")
+        self.latest = {"run": self.record["run"], "prompt": prompt,
+                       "requester": None, "vetoes": []}
+        self.now("running")
         self.say("prompt", text=prompt)
         self._thread = threading.Thread(target=self._go, args=(prompt,),
                                         daemon=True)
@@ -146,10 +154,12 @@ class Run:
             (self.drive or driver())(prompt, options(self.space, self.record),
                                      self.gate, self.say)
             self.told()
+            self.now("finished", closing=self.proposal())
             self.say("ended", text="the agent stopped")
         except Stopped:
             pass                              # `end` already said so, once
         except Exception as e:
+            self.now("stopped", why=f"the run failed: {e}")
             self.say("ended", text=f"the run failed: {e}")
         finally:
             self.stop()
@@ -179,6 +189,7 @@ class Run:
         # most, the run stopped with work still outstanding.
         self.told()
         self.stopped = True
+        self.now("stopped", why="you ended the run")
         self.say("ended", text="you ended the run")
         waiting, self.pending = self.pending, None
         if waiting is not None:
@@ -196,6 +207,19 @@ class Run:
         """
         lock.release(self.space, self.record)
         self.record = None
+
+    def now(self, state, **said):
+        """Rewrite the space's run record in a new state (ADR 0027, decision
+        8): what a requester reads to learn where a run it asked for is."""
+        # Under the transcript's lock: the gate's thread and the page's both
+        # write it, and a run the page ended must not be revived by the gate
+        # it ended letting go a moment later.
+        with self._lock:
+            if self.latest.get("state") in ENDED:
+                return                        # how a run ended is how it ended
+            kept = {k: v for k, v in self.latest.items() if k not in PASSING}
+            self.latest = {**kept, "state": state, **said}
+            last_run.write(self.space, self.latest)
 
     def gate(self, tool, payload):
         """Stop, and wait for the user. Returns (allow, reason).
@@ -240,10 +264,14 @@ class Run:
         # and answered from it, and the agent is holding this dict: shared, it
         # would be a route from a verdict back into the call, which is the one
         # thing a gate must not be able to do.
+        said = gate_words.say(category, self.space, tool, payload, self.proposal())
         self.say("gate", id=waiting["id"], category=category, tool=tool,
-                 call=dict(payload), said=gate_words.say(category, self.space, tool, payload,
-                                     self.proposal()))
+                 call=dict(payload), said=said)
+        # The act and nothing under it: the call and what it would change are
+        # the page's, where the argument for them is (rule 1).
+        self.now("waiting for you", act=said["act"])
         waiting["answered"].wait()
+        self.now("running")
         # Counted here and not at an ask-list allow: what costs a turn is the
         # stopping and the asking. A call the user allowed in advance cost the
         # agent nothing to have made.
@@ -322,6 +350,10 @@ class Run:
             # the change it prevented (ADR 0019, decisions 15 and 33).
             vetoes.record(self.space, waiting["category"], waiting["tool"],
                           waiting["call"], reason)
+            # The act and the user's reason, never the call (rule 1).
+            act = gate_words.WORDS.get(waiting["category"], (waiting["category"],))[0]
+            with self._lock:
+                self.latest["vetoes"].append({"act": act, "reason": reason})
         self.say("verdict", id=at, allowed=bool(allow), text=reason or "")
         waiting["answered"].set()
         return {"answered": True}

@@ -17,11 +17,11 @@ is made on the page (rule 1).
 
 ## Acceptance criteria
 
-- [ ] A run in a console writes the record, and every change of state rewrites it
-- [ ] A parked gate reads *waiting for you* and names the act, never the diff or the call's arguments
-- [ ] A finished run carries the verdict, the closing message, the spend and the vetoes
-- [ ] A second run replaces the first; nothing resumes from the record
-- [ ] The connector's `status` and the launcher's JSON read return it, and a space with no run says so
+- [x] A run in a console writes the record, and every change of state rewrites it
+- [x] A parked gate reads *waiting for you* and names the act, never the diff or the call's arguments
+- [x] A finished run carries the verdict, the closing message, the spend and the vetoes
+- [x] A second run replaces the first; nothing resumes from the record
+- [x] The connector's `status` and the launcher's JSON read return it, and a space with no run says so
 
 ## Blocked by
 

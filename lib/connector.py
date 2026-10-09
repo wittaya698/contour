@@ -40,7 +40,7 @@ TOOLS = (
      "inputSchema": {"type": "object", "properties": {}}},
     {"name": "status",
      "description": "Is a space green, and if not why: its last check's verdict, "
-                    "open marks, uncommitted vetoes, and toolkit drift.",
+                    "open marks, uncommitted vetoes, toolkit drift, and its latest run.",
      "inputSchema": {"type": "object", "required": ["space"],
                      "properties": {"space": {"type": "string"}}}},
     {"name": "log",
