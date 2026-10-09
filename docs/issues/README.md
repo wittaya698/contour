@@ -345,6 +345,7 @@ sliced work is.
 |---|---|---|---|
 | [27](27-a-terminated-console-lets-go.md) | A terminated console lets go of the space | AFK | — |
 | [39](39-a-background-tab-is-not-a-closed-one.md) | A background tab is not a closed one | AFK | — |
+| [94](94-the-signal-tests-red-in-the-full-suite.md) | The signal tests go red in the full suite | AFK | — |
 
 **27 came out of slice 17's own suite runs.** `contour-console` forwards `SIGINT`
 and not `SIGTERM`, so every console a test terminates leaves its server running —
@@ -358,3 +359,9 @@ without a beat to mean their tab closed, and browsers stop the beats of a tab in
 background. So entering a space and going back to the list killed the console, and
 leaving the browser behind the terminal killed the lobby. 36's manual check waits on
 it.
+
+**94 came out of timing the suite.** Three of `SignalTest`'s five tests fail in a
+full `discover` and pass alone, as does all of `test_console.py` — so a process
+from another file reaches them through `servers()`, which counts the whole
+machine. Either 27's no-leak guarantee has slipped or the comparison is racy; the
+slice finds out which, and does not loosen the assertions to get there.
