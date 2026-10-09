@@ -10,6 +10,7 @@ from . import git
 from . import space as space_lib
 
 FIELD = re.compile(r"^revision:\s*(\d+)\s*$", re.M)
+MODEL = re.compile(r"^model:[^\n]*$", re.M)
 
 
 def of(text):
@@ -18,6 +19,12 @@ def of(text):
     so the word inside an indented block scalar is not mistaken for the field."""
     m = FIELD.search(text or "")
     return int(m.group(1)) if m else 0
+
+
+def model(text):
+    """The name a spec gives its model, or None."""
+    m = MODEL.search(text or "")
+    return m.group(0).split(":", 1)[1].strip() if m else None
 
 
 def unbumped(root):

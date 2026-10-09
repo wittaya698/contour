@@ -397,7 +397,9 @@ class ServesTest(ConsoleCase):
         space = self.space()
         opening = space / "browser-opening"
         slow = Path(tempfile.mkdtemp()) / "browser"
-        slow.write_text(f"#!/bin/sh\ntouch {opening}\nsleep 30\n")
+        # Its own output elsewhere: a stand-in holding the console's pipe open
+        # kept the read below waiting out its sleep after the console had gone.
+        slow.write_text(f"#!/bin/sh\nexec >/dev/null 2>&1\ntouch {opening}\nsleep 30\n")
         slow.chmod(0o755)
         proc = subprocess.Popen(
             [str(CONSOLE)], cwd=str(space), stdout=subprocess.PIPE,

@@ -101,7 +101,7 @@ class UpdateTest(UpdateCase):
         self.assertNotEqual(then(RULES, "alpha"), self.now(RULES))
         edited = then(SETTINGS, "alpha") + "\n"
         (self.space / SETTINGS).write_text(edited)
-        r = self.contour("update")
+        r = self.contour("update", "--yes")
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertEqual((self.space / RULES).read_text(), self.now(RULES))
         self.assertEqual((self.space / SETTINGS).read_text(), edited)
@@ -114,18 +114,18 @@ class UpdateTest(UpdateCase):
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         beta = self.spaces / "beta"
         self.assertEqual((beta / RULES).read_text(), then(RULES, "beta"))
-        r = self.contour("update", cwd=beta)
+        r = self.contour("update", "--yes", cwd=beta)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertEqual((beta / RULES).read_text(), self.now(RULES, "beta"))
         self.assertIn(RULES, r.stdout)
-        self.assertEqual(self.json("--dry-run", cwd=beta)["left"], [])
+        self.assertEqual(self.json(cwd=beta)["left"], [])
 
     def test_a_recorded_commit_missing_from_history_overwrites_nothing(self):
         """A rewritten history, or a space from another machine: nothing to tell
         an edit from, so every differing file counts as one."""
         self.behind(self.space, "0" * 40)
         before = {rel: (self.space / rel).read_text() for rel in space_lib.SCAFFOLD}
-        said = self.json()
+        said = self.json("--yes")
         self.assertIsNone(said["refused"])
         self.assertEqual(said["replaced"], [])
         self.assertIn(RULES, [l["what"] for l in said["left"]])
@@ -137,37 +137,100 @@ class UpdateTest(UpdateCase):
     def test_a_missing_file_is_written(self):
         recipes = ".claude/skills/build-model/references/bpy-recipes.md"
         (self.space / recipes).unlink()
-        r = self.contour("update")
+        r = self.contour("update", "--yes")
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertEqual((self.space / recipes).read_text(), self.now(recipes))
         self.assertIn("written", r.stdout)
 
-    def test_a_dry_run_changes_nothing_and_says_what_it_would(self):
+    def test_without_yes_it_changes_nothing_and_says_what_it_would(self):
         before = self.snapshot()
-        r = self.contour("update", "--dry-run")
+        r = self.contour("update")
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertEqual(self.snapshot(), before)
         self.assertIn(RULES, r.stdout)
         self.assertIn("nothing changed", r.stdout)
         moved_on = [rel for rel in space_lib.SCAFFOLD if then(rel, "alpha") != self.now(rel)]
         self.assertIn(RULES, moved_on)
-        self.assertEqual(self.json("--dry-run")["replaced"], moved_on)
+        self.assertEqual(self.json()["replaced"], moved_on)
 
     def test_doctor_finds_the_space_in_step_but_for_what_was_left(self):
         (self.space / SETTINGS).write_text(then(SETTINGS, "alpha") + "\n")
-        self.assertEqual(self.contour("update").returncode, 0)
+        self.assertEqual(self.contour("update", "--yes").returncode, 0)
         said = self.contour("doctor").stdout
-        self.assertEqual([l for l in said.splitlines() if l.startswith(("DRIFT", "MISS"))],
-                         [f"DRIFT {SETTINGS} — differs from the toolkit's template"])
+        self.assertEqual([l for l in said.splitlines()
+                          if l.startswith(("DRIFT", "MISS", "BEHIND", "EDITED"))],
+                         [f"EDITED {SETTINGS} — yours; update leaves it"])
         self.assertIn(f"ok   toolkit {self.toolkit_head()}", said)
+        self.assertNotIn("run contour update", said)
 
     def test_doctor_points_a_space_behind_at_update(self):
-        self.assertIn("run contour update", self.contour("doctor").stdout)
+        said = self.contour("doctor").stdout
+        self.assertIn(f"BEHIND {RULES} — the toolkit has moved on", said)
+        self.assertIn("run contour update", said)
 
     def test_it_leaves_its_changes_unsaved(self):
-        self.assertEqual(self.contour("update").returncode, 0)
+        self.assertEqual(self.contour("update", "--yes").returncode, 0)
         self.assertIn(RULES, self.git("status", "--porcelain"))
         self.assertEqual(self.git("log", "--format=%s").split(), ["alpha"])
+
+
+class StandingTest(UpdateCase):
+    """How each copy stands: the one answer `doctor`, the lobby's row, the
+    connector and `rename` read (issue 83)."""
+
+    def test_a_copy_the_template_moved_on_from_is_behind(self):
+        self.assertEqual(update.standing(self.space, ROOT)[RULES], "behind")
+
+    def test_after_an_update_every_copy_is_in_step(self):
+        self.assertEqual(self.contour("update", "--yes").returncode, 0)
+        self.assertEqual(set(update.standing(self.space, ROOT).values()), {"in step"})
+
+    def test_an_edit_on_the_current_toolkit_is_edited_and_not_behind(self):
+        """The case the lobby once offered an update for that could never clear."""
+        self.assertEqual(self.contour("update", "--yes").returncode, 0)
+        with open(self.space / RULES, "a") as f:
+            f.write("\nmy own rule\n")
+        self.assertEqual(update.standing(self.space, ROOT)[RULES], "edited")
+
+    def test_a_deleted_copy_is_missing(self):
+        (self.space / SETTINGS).unlink()
+        self.assertEqual(update.standing(self.space, ROOT)[SETTINGS], "missing")
+
+    def test_the_lobby_row_asks_for_an_update_until_one_is_made_and_never_for_an_edit(self):
+        """What the row's *needs an update* is read from, as `spaces --json`
+        hands it to the lobby."""
+        def row():
+            r = self.contour("spaces", "--json", cwd=self.spaces)
+            [s] = [s for s in json.loads(r.stdout)["spaces"] if s["name"] == "alpha"]
+            return s["scaffold"]
+        self.assertIn(RULES, row()["behind"])
+        self.assertEqual(self.contour("update", "--yes").returncode, 0)
+        self.assertEqual(row(), {"behind": [], "edited": [], "missing": []})
+        with open(self.space / RULES, "a") as f:
+            f.write("\nmy own rule\n")
+        self.assertEqual(row(), {"behind": [], "edited": [RULES], "missing": []})
+
+    def test_rename_carries_a_behind_copy_across_without_bringing_newer_rules(self):
+        """A skill names the space below its `---`, so a header-only rewrite
+        cannot rename it; unedited, it is rewritten whole — as its own old
+        template under the new name, so a rename never updates (issue 83)."""
+        skill = ".claude/skills/build-model/SKILL.md"
+        older = toolkit_git("rev-parse", "--short", toolkit_git(
+            "log", "-1", "--format=%h", "--", f"templates/space/{skill}").strip()
+            + "^").strip()
+        self.behind(self.space, older)
+        self.assertEqual(update.standing(self.space, ROOT)[skill], "behind")
+        said = json.loads(self.contour("rename", "beta", "--json").stdout)
+        self.assertNotIn(skill, said["untouched"])
+        self.assertEqual(self.contour("rename", "beta", "--yes").returncode, 0)
+        beta = self.spaces / "beta"
+        old = toolkit_git("show", f"{older}:templates/space/{skill}")
+        self.assertEqual((beta / skill).read_text(), old.replace("<NAME>", "beta"))
+        self.assertEqual(update.standing(beta, ROOT)[skill], "behind")
+
+    def test_a_recorded_commit_history_lacks_makes_a_differing_copy_edited(self):
+        self.behind(self.space, "0" * 40)
+        self.assertEqual(update.standing(self.space, ROOT)[RULES], "edited")
 
 
 class WrittenFromTest(unittest.TestCase):
@@ -188,11 +251,11 @@ class WrittenFromTest(unittest.TestCase):
 
 class RefusalTest(UpdateCase):
     """Where a rename refuses, worded as rename words it (ADR 0026, decision 3),
-    and with every file where it was, under the dry run and without it."""
+    and with every file where it was, asked and confirmed."""
 
     def refused(self, *reason):
         before = self.snapshot()
-        for flags in ((), ("--dry-run",)):
+        for flags in ((), ("--yes",)):
             with self.subTest(flags=flags):
                 r = self.contour("update", *flags)
                 self.assertEqual(r.returncode, 1, r.stdout + r.stderr)

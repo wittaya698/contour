@@ -1,6 +1,6 @@
 # 0026 — Update: a space's copies brought in step, where nobody edited them
 
-**Status:** Accepted, amended · 2026-10-07 (proposed 2026-10-05) · **extends [ADR 0015](0015-model-spaces.md) (its copies gain a way back into step) and [ADR 0021](0021-the-lobby.md) (the lobby gains an action)**
+**Status:** Accepted, amended twice · 2026-10-08 (proposed 2026-10-05) · **extends [ADR 0015](0015-model-spaces.md) (its copies gain a way back into step) and [ADR 0021](0021-the-lobby.md) (the lobby gains an action)**
 
 > **Accepted on its tracer bullet, with decision 1 amended** (issue 82).
 > Used by hand on 2026-10-07 over this machine's six spaces, every one of
@@ -25,6 +25,15 @@
 > edited. A copy is now unedited when it equals the old template written for
 > **one name, used throughout**, whichever name that is. Two names in one file
 > is still an edit.
+>
+> **Second amendment, 2026-10-08** (architecture review). `contour update`
+> proposes by default and acts with `--yes`, as `rename`, `delete` and `purge`
+> do; `--dry-run` is gone. One rule for every command that changes a space:
+> without `--yes` it says what it would do. The substance of decision 1 is
+> unchanged. In the same review, *how a copy stands* — in step, behind, edited
+> or missing — became the one answer `doctor`, the lobby's row, the connector
+> and `rename` read, so an edited copy no longer reads as *needs an update*
+> (see CONTEXT.md, **update**).
 
 ## Context
 

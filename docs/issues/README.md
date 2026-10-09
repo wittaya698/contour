@@ -292,6 +292,24 @@ the user reads it before it lands. 70 and 82 are the verdicts on the two ADRs,
 as 63 was on 0024; 70 needs only a plain lobby and a plain gate, and the other
 page slices can land on either side of it.
 
+## Batch 8 — the launcher's leftovers
+
+From an architecture review on 2026-10-08, of the complexity batch 2 left behind
+in `lib/cli.py`. The decisions are in CONTEXT.md (**update**, **survey**) and in
+ADR 0026's second amendment. All AFK.
+
+| # | Slice | Type | Blocked by |
+|---|---|---|---|
+| [83](83-one-answer-to-how-a-copy-stands.md) | One answer to how a copy stands | AFK | — |
+| [84](84-the-survey.md) | The survey: a space as seen from outside it | AFK | 83 |
+| [85](85-one-shape-for-a-command-that-confirms.md) | One shape for a command that confirms | AFK | — |
+
+**83 fixes a defect, so it lands first.** An edited copy reads as *needs an
+update* on the lobby's row forever, because the update rightly leaves it alone.
+84 moves the survey out of `cli.py` and should carry 83's states, not `drift`.
+85 stands alone, but changes `update`'s spelling, so a terminal habit of
+`contour update` stops acting until it says `--yes`.
+
 ## Found in flight
 
 Not from either review — a defect the work turned up, filed where the rest of the

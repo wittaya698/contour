@@ -302,7 +302,7 @@ to the spaces what you would otherwise do in a terminal:
 - **rename** shows everything it will change before it changes anything, and
   never commits; the space lists as renamed until you do.
 - **update** sits beside a row's *needs an update*. It shows what
-  `contour update --dry-run` says, what it will replace and what it will leave
+  `contour update` proposes, what it will replace and what it will leave
   alone and why, then does it on confirm. It never commits; the space lists as
   *updated, not saved yet* until you do.
 - **delete** writes a `git bundle` of the space into `~/.contour/trash` first,
@@ -367,7 +367,7 @@ the choice to allow that, and Desktop asks before each call.
 | `contour selftest` | the fixture through every stage, plus 37 mutants |
 | `contour init <name> [--to <dir>]` | create a model space here, or in `<dir>` |
 | `contour doctor` | is this space still in step with the toolkit |
-| `contour update [--dry-run]` | bring this space's rules in step, where nobody edited them |
+| `contour update` | propose bringing this space's rules in step, where nobody edited them; `--yes` does it |
 | `contour spaces [name]` | list model spaces, or print one's path |
 | `contour lobby [--create [name]]` | every space on this machine, on one page; or opened on its create form |
 | `contour mcp` | the connector, for Claude Desktop; `--config` prints its block |
@@ -420,7 +420,7 @@ A model space, anywhere on disk, its own git repository:
     marks.json    located comments and spans, from both sides   (ADR 0018)
     vetoes.json   calls you refused at a gate, and why            (ADR 0019)
     NOTES.md      what is deferred, and what is undecided
-    CLAUDE.md     the agent's rules          (copied from the toolkit; `contour doctor` flags drift, `contour update` mends it)
+    CLAUDE.md     the agent's rules          (copied from the toolkit; `contour doctor` says which are behind or edited, `contour update` brings the behind ones in step)
     .claude/      the spec guard's settings, and the build and release skills
     .contour/     the marker, plus logs               (git-ignored)
     out/          generated .blend, filmstrip, scratch (git-ignored)

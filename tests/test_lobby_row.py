@@ -1,9 +1,10 @@
 """A lobby row is a picture and a verdict (ADR 0025, decision 10; issue 67).
 
-What the row shows is read off the space, by `contour spaces --json`, the one
-reading the lobby serves (ADR 0021, decision 3): spaces `contour init` made in a
-temporary directory that `$CONTOUR_SPACES` points at, and what a check would
-have left in them, written as a check writes it.
+What the row shows is read off the space by the survey, the one reading the
+lobby serves and `contour spaces --json` prints (ADR 0021, decision 3; issue
+84), in this process: spaces `contour init` made in a temporary directory that
+`$CONTOUR_SPACES` points at, and what a check would have left in them, written
+as a check writes it.
 """
 import json
 import os
@@ -16,12 +17,13 @@ import urllib.parse
 import urllib.request
 from datetime import datetime
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parent.parent
 CONTOUR = ROOT / "contour"
 sys.path.insert(0, str(ROOT))
 
-from lib import panel, store    # noqa: E402
+from lib import panel, store, survey    # noqa: E402
 from lib.lobby import PAGE, Lobby    # noqa: E402
 
 
@@ -47,6 +49,9 @@ class RowTest(unittest.TestCase):
         self.spaces.mkdir()
         self.env = dict(os.environ, CONTOUR_SPACES=str(self.spaces),
                         CONTOUR_HOME=str(self.tmp / "home"))
+        patched = mock.patch.dict(os.environ, self.env)
+        patched.start()
+        self.addCleanup(patched.stop)
 
     def contour(self, *args, cwd=None):
         return subprocess.run([sys.executable, str(CONTOUR), *args],
@@ -62,8 +67,7 @@ class RowTest(unittest.TestCase):
         store.save(root / ".contour" / panel.NAME, verdict)
 
     def row(self, name):
-        said = json.loads(self.contour("spaces", "--json").stdout)
-        return next(s for s in said["spaces"] if s["name"] == name)
+        return next(s for s in survey.listing()["spaces"] if s["name"] == name)
 
     def test_a_checked_model_is_listed_with_its_verdict_in_plain_words(self):
         """Issue 66's words, so the row and the console say the same thing."""
@@ -120,9 +124,8 @@ class RowTest(unittest.TestCase):
         return datetime.fromisoformat(self.row(name)["worked"]).timestamp()
 
     def lobby(self):
-        """A lobby serving what `contour spaces --json` prints."""
-        lobby = Lobby(lambda: json.loads(self.contour("spaces", "--json").stdout),
-                      grace=None)
+        """A lobby serving what the survey reads, as `contour lobby`'s does."""
+        lobby = Lobby(survey.listing, grace=None)
         self.addCleanup(lobby.stop)
         lobby.start()
         return lobby
@@ -229,8 +232,12 @@ class RowPageTest(unittest.TestCase):
         self.assertNotIn("in step", self.page)
         self.assertNotIn("template", health)
         self.assertIn("'has a remote — a model is never pushed', 'warn'", health)
-        for wrong in ("s.scaffold.missing.length", "s.scaffold.drift.length", "!s.rules"):
+        for wrong in ("s.scaffold.missing.length", "s.scaffold.behind.length", "!s.rules"):
             self.assertIn(wrong, health)
+        # An edited copy is the user's, and an update leaves it: offering one
+        # for it is a line no update can clear (issue 83).
+        self.assertNotIn("edited", health)
+        self.assertNotIn("drift", health)
         self.assertIn("'needs an update'", health)
 
 

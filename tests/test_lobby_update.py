@@ -28,7 +28,7 @@ class UpdatedUnsavedTest(UpdateCase):
         self.assertIsNone(self.listed()["alpha"]["updated"])
 
     def test_an_update_reads_as_unsaved_until_the_next_commit(self):
-        self.contour("update")
+        self.contour("update", "--yes")
         self.assertEqual(self.listed()["alpha"]["updated"], {"from": OLD})
         self.git("commit", "-qam", "updated")
         self.assertIsNone(self.listed()["alpha"]["updated"])
@@ -53,11 +53,11 @@ class LobbyUpdateCase(UpdateCase):
 
 class LobbyProposalTest(LobbyUpdateCase):
 
-    def test_asking_shows_the_command_s_dry_run_and_changes_nothing(self):
+    def test_asking_shows_the_command_s_proposal_and_changes_nothing(self):
         before = self.snapshot()
         said = self.update()
         self.assertEqual(self.snapshot(), before)
-        self.assertEqual(said, self.json("--dry-run"))
+        self.assertEqual(said, self.json())
         self.assertIn(RULES, said["replaced"])
 
     def test_it_offers_update(self):
@@ -84,7 +84,7 @@ class LobbyPerformTest(LobbyUpdateCase):
         self.assertEqual(listed["alpha"]["updated"], {"from": OLD})
         self.assertEqual(self.git("log", "--format=%s").split(), ["alpha"])
 
-    def test_a_confirm_for_a_dry_run_that_has_since_changed_is_refused(self):
+    def test_a_confirm_for_a_proposal_that_has_since_changed_is_refused(self):
         """Here a copy edited after the page showed it would be replaced: the
         click must not overwrite the edit."""
         shown = self.update()
@@ -109,7 +109,7 @@ class LobbyRefusalTest(LobbyUpdateCase):
         shown = self.update()
         obstacle()
         before = self.snapshot()
-        command = self.json("--dry-run")["refused"]
+        command = self.json()["refused"]
         self.assertTrue(command)
         for more in ({}, {"shown": shown}):
             with self.subTest(confirm=bool(more)):
@@ -147,7 +147,7 @@ class PageTest(unittest.TestCase):
         self.assertIn("'Update…'", health)
         self.assertIn("can.has('update')", self.function("row"))
 
-    def test_the_confirm_exists_only_under_the_whole_dry_run(self):
+    def test_the_confirm_exists_only_under_the_whole_proposal(self):
         """What it will change, and what it will leave alone and why, before it
         does anything (ADR 0026, decision 2)."""
         self.assertEqual(self.page.count("'Confirm update'"), 1)

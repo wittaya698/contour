@@ -381,9 +381,10 @@ class SpacesTest(unittest.TestCase):
                                               "scaffold", "rules")},
                          {"toolkit": {"commit": self.head, "state": "current"},
                           "commits": 0, "remotes": [],
-                          "scaffold": {"drift": [], "missing": []}, "rules": True})
+                          "scaffold": {"behind": [], "edited": [], "missing": []},
+                          "rules": True})
 
-    def test_drifted_and_missing_scaffolding_is_what_doctor_would_say(self):
+    def test_edited_and_missing_scaffolding_is_what_doctor_would_say(self):
         """The same findings `contour doctor` prints in that space, as data."""
         alpha = self.init("alpha")
         with open(alpha / "CLAUDE.md", "a") as f:
@@ -391,10 +392,10 @@ class SpacesTest(unittest.TestCase):
         (alpha / ".claude" / "skills" / "release-model" / "SKILL.md").unlink()
         [row] = self.listing()
         self.assertEqual(row["scaffold"],
-                         {"drift": ["CLAUDE.md"],
+                         {"behind": [], "edited": ["CLAUDE.md"],
                           "missing": [".claude/skills/release-model/SKILL.md"]})
         said = self.contour("doctor", cwd=alpha).stdout
-        self.assertIn("DRIFT CLAUDE.md", said)
+        self.assertIn("EDITED CLAUDE.md", said)
         self.assertIn("MISS .claude/skills/release-model/SKILL.md", said)
 
     def test_a_space_with_a_remote_is_reported_and_fails_the_listing(self):
