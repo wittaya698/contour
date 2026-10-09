@@ -38,6 +38,12 @@ the case forwarding cannot reach and why the server watches its parent instead.
 """
 
 
+ENDING_RUN = signal.SIGUSR1
+"""What `contour stop` sends a console: end the run, keep the console
+(ADR 0027, decision 9). Not one of `STOPPING`, which end the console itself —
+a page open on the space stays open after its run is stopped."""
+
+
 def raising(*numbers):
     """Have these signals raise `Arrived` in the main thread from now on."""
     def arrived(number, frame):

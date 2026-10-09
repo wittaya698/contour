@@ -35,6 +35,7 @@ CONTOUR = {
     "migrate-marks": "Rewrote the marks in the current spelling",
     "spaces": "Listed the models",
     "status": "Read how a model and its latest run stand",
+    "stop": "Stopped the run in a model",
     "mcp": "Started the Claude Desktop connection",
     "lobby": "Opened the list of models",
     "rename": "Renamed the model",

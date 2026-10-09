@@ -15,6 +15,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -31,6 +32,10 @@ def drive(prompt, options, gate, say):
             # console's transcript can read it: a console the lobby started
             # never told anybody its URL.
             Path(step["keep_prompt"]).write_text(prompt)
+        if "busy" in step:
+            # A long turn: the agent working, at no gate, for this many seconds.
+            # What a stop from outside has to be able to end (issue 87).
+            time.sleep(step["busy"])
         if "limit" in step:
             # What the harness says when it compacts. Said and not acted on: a
             # limit the user did not choose must not interrupt work they were

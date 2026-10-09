@@ -16,7 +16,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from console.run import Run    # noqa: E402
+from console.run import Run, Stopped    # noqa: E402
 from lib import last_run       # noqa: E402
 
 WAIT_S = 5
@@ -139,6 +139,29 @@ class StoppedTest(RecordCase):
         said = self.until("stopped")
         self.assertEqual(said["why"], "you ended the run")
         self.assertNotIn("act", said)
+
+    def test_a_stop_answers_no_gate(self):
+        """The parked call never happens and the agent is not told no, so it has
+        nothing to work around; and nobody refused anything, so no veto is kept
+        (ADR 0027, decision 9; issue 87)."""
+        (self.space / "spec.yaml").write_text("revision: 1\ndepth: 600\n")
+        told = []
+
+        def drive(prompt, options, gate, say):
+            try:
+                told.append(gate("Edit", dict(WaitingTest.WRITE)))
+            except Stopped:
+                told.append("stopped")
+                raise
+        run = self.started(drive)
+        self.until("waiting for you")
+        run.end()
+        self.until("stopped")
+        deadline = time.monotonic() + WAIT_S
+        while not told and time.monotonic() < deadline:
+            time.sleep(0.01)
+        self.assertEqual(told, ["stopped"])
+        self.assertFalse((self.space / "vetoes.json").exists())
 
     def test_a_run_that_failed_is_stopped_and_says_why(self):
         def drive(prompt, options, gate, say):

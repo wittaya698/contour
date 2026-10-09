@@ -983,7 +983,9 @@ class RunTest(ConsoleCase):
                            capture_output=True, text=True, timeout=60,
                            env=dict(os.environ, BLENDER="/nowhere/blender"))
         self.assertEqual(r.returncode, 3, r.stdout + r.stderr)
-        self.assertIn("is held by", r.stderr)
+        # Parked, so the refusal says what it is waiting for rather than whose
+        # pid holds it (ADR 0027, decision 9).
+        self.assertIn("is waiting for you: Claude wants to build the model", r.stderr)
         # The run's own builds are not refused by the run's own hold: the lock is
         # between sessions, and a session that could not build would make it
         # useless for the thing it protects.

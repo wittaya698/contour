@@ -175,25 +175,26 @@ class Run:
         if lines:
             self.say("seeds", text=lines)
 
-    def end(self):
+    def end(self, why="you ended the run"):
         """The user ends the run. Not the console: a run that ends and starts
         again never reaches compaction, so ending one is a thing to do often.
 
-        The gate that may be waiting is answered as a denial, because the agent
-        asked a question and *no* is the true answer to it now. From here on the
-        agent's words are dropped and its calls refused, and the space is given
-        back at once rather than when a thread notices.
+        The gate that may be waiting is answered by nobody: the call never
+        happens and the agent is not told no, which it would work around. It is
+        let go and stopped, and nothing is kept as a veto, because nobody
+        refused anything (ADR 0027, decision 9). From here on the agent's words
+        are dropped and its calls refused, and the space is given back at once
+        rather than when a thread notices.
         """
         # Before `stopped`, because after it the transcript takes nothing but
         # the ending itself — and this ending is the one where the report matters
         # most, the run stopped with work still outstanding.
         self.told()
         self.stopped = True
-        self.now("stopped", why="you ended the run")
-        self.say("ended", text="you ended the run")
+        self.now("stopped", why=why)
+        self.say("ended", text=why)
         waiting, self.pending = self.pending, None
         if waiting is not None:
-            waiting["allow"], waiting["reason"] = False, "the run was ended"
             waiting["answered"].set()
         self.stop()
         return {"ended": True}
@@ -271,6 +272,8 @@ class Run:
         # the page's, where the argument for them is (rule 1).
         self.now("waiting for you", act=said["act"])
         waiting["answered"].wait()
+        if self.stopped:
+            raise Stopped()
         self.now("running")
         # Counted here and not at an ask-list allow: what costs a turn is the
         # stopping and the asking. A call the user allowed in advance cost the

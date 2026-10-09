@@ -13,11 +13,11 @@ act and that the run can be opened or stopped.
 
 ## Acceptance criteria
 
-- [ ] `contour stop` ends a running run and a run parked at a gate, and gives back the hold
-- [ ] A parked call stopped this way is neither allowed nor recorded as a veto
-- [ ] The edits made before the stop are still in the space afterwards
-- [ ] The record says *stopped* and why
-- [ ] With a gate parked, the hold's refusal reads *<space> is waiting for you: <act>*
+- [x] `contour stop` ends a running run and a run parked at a gate, and gives back the hold
+- [x] A parked call stopped this way is neither allowed nor recorded as a veto
+- [x] The edits made before the stop are still in the space afterwards
+- [x] The record says *stopped* and why
+- [x] With a gate parked, the hold's refusal reads *<space> is waiting for you: <act>*
 
 ## Blocked by
 

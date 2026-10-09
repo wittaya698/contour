@@ -231,6 +231,8 @@ INTENTLESS = {
                      "to read and reaches a remote only past the commit gate",
     "spaces": "lists spaces on this machine",
     "status": "reads a space's verdict and latest run and writes nothing",
+    "stop": "ends a run and answers none of its gates, so it approves nothing; "
+            "a run cannot stop itself (ADR 0027, decision 9)",
     "lobby": "serves that list on a page and writes nothing; rename and delete "
              "arrive as commands of their own, classified there (ADR 0021)",
     "mcp": "is the connector, which a chat drives and an agent under a console "

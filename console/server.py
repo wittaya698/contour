@@ -7,6 +7,7 @@ would put *what a mark is* in two places that drift silently, both still parsing
 the old shape.
 """
 import os
+import signal
 import subprocess
 import sys
 import threading
@@ -174,6 +175,12 @@ class Console:
         agent session."""
         return self.run.end()
 
+    def stopping(self):
+        """`contour stop`, from outside: the page's own ending, said as whose
+        it was. A console with no run going has nothing to end."""
+        if self.run.live:
+            self.run.end("stopped with contour stop")
+
     def verdict(self, body):
         """`POST /verdict`: allow, or deny with a reason. Nothing else is read
         off the body — a gate has two answers and a sentence, and the call is
@@ -324,6 +331,11 @@ def main(argv, space):
     # a person, and the port, the hold and the presence below are given back
     # only on a path out of `wait` (issue 27).
     signals.raising(*signals.STOPPING)
+    # The run and not the console: a page open on the space stays open. Ended
+    # off the signal's frame, which may have interrupted the main thread
+    # anywhere, including inside the transcript's lock.
+    signal.signal(signals.ENDING_RUN, lambda number, frame: threading.Thread(
+        target=console.stopping, daemon=True).start())
     # Before the URL is printed, so nothing can have opened the page while the
     # space still looked unattended (issue 30).
     with presence.present(space, "console"):

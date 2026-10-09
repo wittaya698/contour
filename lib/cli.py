@@ -20,12 +20,13 @@ import json
 import os
 import re
 import shutil
+import socket
 import subprocess
 import sys
 import time
 from pathlib import Path
 
-from lib import commands, connector, delete, git, presence, rename, restore, revision, space, survey, update     # stdlib-only by test (ADR 0019, 29)
+from lib import commands, connector, delete, git, presence, rename, restore, revision, signals, space, survey, update     # stdlib-only by test (ADR 0019, 29)
 
 ROOT = Path(__file__).resolve().parent.parent
 BLENDER = os.environ.get("BLENDER", "/Applications/Blender.app/Contents/MacOS/Blender")
@@ -169,8 +170,7 @@ def hold(command, doing=None):
         rec = getattr(e, "record", None)
         if rec is None:
             raise
-        print(f"contour {command}: this space is held by {survey.held_by(rec)}.",
-              file=sys.stderr)
+        print(f"contour {command}: {survey.refusal(PROJECT, rec)}", file=sys.stderr)
         return None
 
 
@@ -390,6 +390,44 @@ def on_mcp(cmd, rest, held):
                                     create=bool(args.get("create")), name=args.get("name")),
         "create": lambda args: created(args.get("name"), args.get("references") or [])})
     return 0
+
+
+STOP_WAIT_S = 10
+"""How long `contour stop` waits for the console to give the space back."""
+
+
+def on_stop(cmd, rest, held):
+    """End the run in a named space (ADR 0027, decision 9). Only a console's
+    run, on this machine: a terminal's build is the person's own, at their own
+    Ctrl-C, and a pid on another host is not one this machine can signal."""
+    from lib import lock
+    name = rest[0]
+    try:
+        root = space.named(name, ROOT)
+    except LookupError as e:
+        return emit({"ok": False, "lines": [f"FAIL {e}"]})
+    rec = lock.holder(root)
+    if not rec or not lock.alive(rec):
+        return emit({"ok": False, "lines": [f"FAIL no run to stop in {name}"]})
+    if rec.get("command") != "console run" or rec.get("host") != socket.gethostname():
+        return emit({"ok": False, "lines": [
+            f"FAIL {name} is held by {survey.held_by(rec)}, which is not a console's "
+            f"run; contour stop ends only those"]})
+    if os.environ.get("CONTOUR_RUN") == rec.get("run"):
+        # Anyone but the run's own agent: one that could end its run at a gate
+        # would be choosing what becomes of the call it is waiting on.
+        return emit({"ok": False, "lines": [
+            f"FAIL a run cannot stop itself; the person stops it from the page"]})
+    os.kill(rec["pid"], signals.ENDING_RUN)
+    deadline = time.monotonic() + STOP_WAIT_S
+    while time.monotonic() < deadline:
+        if (lock.holder(root) or {}).get("run") != rec.get("run"):
+            return emit({"ok": True, "lines": [f"ok   stopped the run in {name}; "
+                                               f"its edits are left as they were"]})
+        time.sleep(0.05)
+    return emit({"ok": False, "lines": [
+        f"FAIL asked the run in {name} to stop; it still holds the space "
+        f"after {STOP_WAIT_S:g}s ({survey.held_by(rec)})"]})
 
 
 def on_status(cmd, rest, held):

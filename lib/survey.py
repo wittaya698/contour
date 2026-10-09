@@ -147,6 +147,19 @@ def held_by(rec):
     return f"pid {rec.get('pid', '?')} running {rec.get('command', 'something')}"
 
 
+def refusal(root, rec):
+    """Why a space refuses a caller, from the hold it met. A run parked at a
+    gate is waiting for a person, not busy, and its refusal says for what and
+    the two ways on (ADR 0027, decision 9)."""
+    from . import last_run
+    run = last_run.read(root) or {}
+    if run.get("run") == rec.get("run") and run.get("state") == "waiting for you":
+        name = Path(root).name
+        return (f"{name} is waiting for you: {run.get('act')}. Open it in its "
+                f"console, or stop the run with `contour stop {name}`.")
+    return f"this space is held by {held_by(rec)}."
+
+
 def status(root):
     """Is it green, and if not why (ADR 0024, decisions 3 and 6) — and the
     same, as the pages say it (ADR 0025, decision 11): beside the report lines,
