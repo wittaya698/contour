@@ -5,43 +5,11 @@ space stood (`lib/delete.py`). Restoring clones the bundle back to a space root,
 and the bundle stays in the trash until the user removes it: a restore is undone
 by deleting again, and that writes a new bundle.
 """
-import json
-import re
 from pathlib import Path
 
 from . import delete, git
 from . import space as space_lib
-
-
-STEM = re.compile(r"(?P<name>.+)-(?P<date>\d{4}-\d{2}-\d{2})(?:-\d+)?")
-"""A bundle's file name, as `delete.destination` spells it: the name and date
-are there too, for a bundle whose record beside it was lost."""
-
-
-def live(path):
-    """`path`, if a space stands there now, else None: a bundle whose space was
-    restored, or made again under the same name, is not the only copy, and
-    the list says so rather than offering a restore the path would refuse."""
-    return path if path and (Path(path) / space_lib.MARKER).is_file() else None
-
-
-def deleted():
-    """Every deleted space in the trash, oldest name first. Read from the files
-    each time, like the live list."""
-    found = []
-    for bundle in sorted(delete.trash().glob("*.bundle")):
-        try:
-            said = json.loads(delete.about(bundle).read_text())
-        except (OSError, ValueError):
-            said = {}
-        named = STEM.fullmatch(bundle.stem)
-        found.append({"id": bundle.stem,
-                      "name": said.get("name") or (named and named["name"]),
-                      "path": said.get("path"),
-                      "deleted": said.get("deleted") or (named and named["date"]),
-                      "live": live(said.get("path")),
-                      "bundle": str(bundle)})
-    return found
+from .survey import deleted   # the trash as the list shows it (issue 84)
 
 
 def refusal(gone, where, toolkit):

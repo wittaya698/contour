@@ -33,7 +33,7 @@ def recorded(root):
 
 def uncommitted(root):
     """`{"from": toolkit commit}` while an update is not yet in a commit, else
-    None. Read from git each time and stored nowhere, as `rename.uncommitted`
+    None. Read from git each time and stored nowhere, as `survey.renamed`
     is: the marker at HEAD names one toolkit commit and the marker on disk
     another. A space with no commit has nothing to have been updated from."""
     was = git.show(root, "HEAD", str(space_lib.MARKER))

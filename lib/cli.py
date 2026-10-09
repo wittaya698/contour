@@ -25,7 +25,7 @@ import sys
 import time
 from pathlib import Path
 
-from lib import commands, connector, delete, git, presence, rename, restore, revision, space, update     # stdlib-only by test (ADR 0019, 29)
+from lib import commands, connector, delete, git, presence, rename, restore, revision, space, survey, update     # stdlib-only by test (ADR 0019, 29)
 
 ROOT = Path(__file__).resolve().parent.parent
 BLENDER = os.environ.get("BLENDER", "/Applications/Blender.app/Contents/MacOS/Blender")
@@ -50,7 +50,7 @@ Asked of the space rather than derived here: `out/<name>.blend` was spelled in
 five places and `marks.json` in nine, all of them restating ADR 0015 (slice 17).
 """
 OUT = (HERE.dot if HERE else ROOT / ".contour")   # logs sit with whatever the command is about
-LOG = OUT / "last-build.log"
+LOG = OUT / survey.LOG
 REPORT = OUT / "report.json"
 
 
@@ -139,11 +139,6 @@ def say_marks(code):
     return code
 
 
-def held_by(rec):
-    """Who has the space, in one line the user can act on."""
-    return f"pid {rec.get('pid', '?')} running {rec.get('command', 'something')}"
-
-
 def hold(command, doing=None):
     """Take the space for the length of this call, or refuse and say who has it.
 
@@ -156,13 +151,13 @@ def hold(command, doing=None):
                            run=os.environ.get("CONTOUR_RUN"))
         if record.get("took_over"):
             print(f"ok   lock    took over the hold left by "
-                  f"{held_by(record['took_over'])}, which is gone")
+                  f"{survey.held_by(record['took_over'])}, which is gone")
         return record
     except Exception as e:
         rec = getattr(e, "record", None)
         if rec is None:
             raise
-        print(f"contour {command}: this space is held by {held_by(rec)}.",
+        print(f"contour {command}: this space is held by {survey.held_by(rec)}.",
               file=sys.stderr)
         return None
 
@@ -376,8 +371,9 @@ def on_migrate_marks(cmd, rest, held):
 
 
 def on_mcp(cmd, rest, held):
-    """The connector (ADR 0024): Desktop on the other end of stdin and stdout,
-    handed the readings it may call and nothing that writes.
+    """The connector (ADR 0024): Desktop on the other end of stdin and stdout.
+    It reads through the survey on its own; what is handed it here is the two
+    acts, open and create, and nothing else that writes (issue 84).
 
     `--config` prints Desktop's block and writes nothing: that file is the
     user's, and lists servers that are not Contour's.
@@ -395,12 +391,7 @@ def on_mcp(cmd, rest, held):
         print(usage(), file=sys.stderr)
         return 2
     connector.serve(sys.stdin, sys.stdout, {
-        "spaces": lambda args: listing(),
-        "status": lambda args: status(named(args.get("space"))),
-        "log": lambda args: log(named(args.get("space")), args.get("lines", 40)),
-        "picture": lambda args: picture(named(args.get("space")), args.get("picture")),
-        "spec": lambda args: spec(named(args.get("space"))),
-        "spend": lambda args: spent(named(args.get("space"))),
+        **connector.readings(),
         "open": lambda args: opened(args.get("page"), args.get("space"),
                                     create=bool(args.get("create")), name=args.get("name")),
         "create": lambda args: created(args.get("name"), args.get("references") or [])})
@@ -419,7 +410,7 @@ def on_lobby(cmd, rest, held):
         print(usage(), file=sys.stderr)
         return 2
     return emit(lobby.serve(
-        listing, grace=seconds("CONTOUR_LOBBY_GRACE", lobby.GRACE_S),
+        survey.listing, grace=seconds("CONTOUR_LOBBY_GRACE", lobby.GRACE_S),
         hidden_grace=seconds("CONTOUR_LOBBY_HIDDEN_GRACE", lobby.HIDDEN_GRACE_S),
         create=(rest[1] if len(rest) > 1 else "") if rest else None))
 
@@ -598,12 +589,6 @@ template = space.template      # `init` names its new space `space`
 stub = space.stub
 
 
-def toolkit_commit():
-    """Which toolkit this is, as a space's marker records it. `unknown` is the
-    spelling a person reads for *git could not say* (`lib/git.py`, slice 21)."""
-    return git.head(ROOT) or "unknown"
-
-
 def init(name, new=False, to=None):
     """Create a model space (ADR 0015): its own directory, its own git repo.
 
@@ -640,7 +625,7 @@ def init(name, new=False, to=None):
         kept.append(".gitignore")
     (space / ".contour" / "project").write_text(
         "# Contour model space (ADR 0015). This file is the marker: keep it tracked.\n"
-        f"toolkit: {toolkit_commit()}\n"
+        f"toolkit: {survey.toolkit_commit()}\n"
         f"toolkit_path: {ROOT}\n"
         f"created: {time.strftime('%Y-%m-%d')}\n")
     lines = [f"ok   {space}"]
@@ -651,7 +636,7 @@ def init(name, new=False, to=None):
     if failed:
         return {"ok": False, "path": str(space), "lines": [f"FAIL {failed}"]}
     lines += ["ok   git init, pre-push stub installed (this space is never pushed)",
-              f"ok   scaffolding copied from toolkit {toolkit_commit()}"]
+              f"ok   scaffolding copied from toolkit {survey.toolkit_commit()}"]
     if kept:
         lines.append(f"kept {len(kept)} existing file(s) untouched: {', '.join(kept)}")
     lines += [
@@ -678,14 +663,6 @@ def init_refusal(name, new, base):
     return None
 
 
-def sees_rules(root):
-    """Whether an agent working in `root` is given the hard rules (open
-    question 13): a `CLAUDE.md` of its own, or the toolkit's above it, which
-    Claude Code finds by walking up."""
-    return ((root / "CLAUDE.md").is_file()
-            or (ROOT in root.parents and (ROOT / "CLAUDE.md").is_file()))
-
-
 def doctor():
     """Is this space still in step with the toolkit, and still unpushable."""
     lines, ok, mend = [], True, False
@@ -702,7 +679,7 @@ def doctor():
             lines.append(f"EDITED {rel} — yours; update leaves it")
         else:
             lines.append(f"ok   {rel}")
-    was, now = update.recorded(PROJECT) or "unknown", toolkit_commit()
+    was, now = update.recorded(PROJECT) or "unknown", survey.toolkit_commit()
     lines.append(f"{'ok  ' if was == now else 'NOTE'} toolkit {was}"
                  + ("" if was == now else f" -> {now} since this space was created"))
     if mend:
@@ -806,171 +783,6 @@ def install_hooks():
     return {"ok": not override, "lines": lines}
 
 
-def reading(root, now):
-    """One space as `spaces` reports it, derived from the space on every call
-    and never stored. The text form and the JSON form both print this, so they
-    cannot disagree about which spaces exist or which are behind (slice 28)."""
-    was = update.recorded(root)
-    found = update.standing(root, ROOT)
-    from lib import panel, refs, store, verdict
-    here = space.layout(root)
-    kept = store.load(here.dot / panel.NAME, None)
-    return {"name": root.name, "path": str(root),
-            "verdict": verdict.say(kept) if kept else None,
-            # What a lobby row shows of it: the last sheet, or before there is
-            # one, what it is to be built from (ADR 0025, decision 10).
-            "picture": ("sheet" if here.sheet.is_file()
-                        else "reference" if refs.listing(here.refs) else None),
-            "view": viewed(here) if here.sheet.is_file() else None,
-            "worked": worked(here),
-            "toolkit": {"commit": was,
-                        "state": "unknown" if was is None
-                        else "current" if was == now else "behind"},
-            "commits": git.commits(root), "remotes": git.remotes(root),
-            "scaffold": {s: [r for r, stands in found.items() if stands == s]
-                         for s in ("behind", "edited", "missing")},
-            "rules": sees_rules(root),
-            "presence": presence.live(root),
-            "renamed": rename.uncommitted(root),
-            "updated": update.uncommitted(root)}
-
-
-def viewed(here):
-    """Where on the sheet its perspective view sits, as `{tile, size}`, or None.
-
-    One view and not four is what a row shows: at row size the four-view sheet
-    is four thumbnails of a thumbnail, and the perspective is the one that
-    reads as the model (ADR 0025, decision 10, as amended by issue 70). Read off
-    the views the sheet was drawn with; with none to read, the row shows the
-    whole sheet, which is still the model and only harder to see."""
-    try:
-        drawn = json.loads(here.views.read_text(encoding="utf-8"))
-        view = next(v for v in drawn["views"]
-                    if v.get("label") == "persp" or v.get("type") == "PERSP")
-        return {"tile": [int(n) for n in view["tile"]], "size": int(drawn["resolution"])}
-    except (OSError, ValueError, KeyError, TypeError, StopIteration):
-        return None
-
-
-def worked(here):
-    """When a space was last worked on, as ISO 8601: the newest of the files
-    the work touches — the spec, the build, the marks, the references, the
-    last check, and the marker `init` wrote, so a model nobody has touched
-    since it was made says when it was made. Not the last commit: most work
-    sits unsaved until the user says save (rule 5)."""
-    from datetime import datetime
-    from lib import panel
-    touched = [here.spec, here.build, here.marks, here.sheet, here.dot / panel.NAME,
-               here.root / MARKER, *(here.refs.iterdir() if here.refs.is_dir() else ())]
-    times = [p.stat().st_mtime for p in touched if p.is_file()]
-    return (datetime.fromtimestamp(max(times)).astimezone().isoformat(timespec="seconds")
-            if times else None)
-
-
-def listing():
-    """Every space and its health, as `contour spaces --json` prints it and the
-    lobby serves it: one reading, so the two cannot disagree."""
-    now = toolkit_commit()
-    return {"roots": [str(r) for r in space.roots(ROOT)],
-            "spaces": [reading(s, now) for s in space.spaces(space.roots(ROOT))],
-            "deleted": restore.deleted()}
-
-
-def named(name):
-    """The space a call names, resolved as `contour spaces <name>` resolves it:
-    a chat stands in no directory (ADR 0024, decision 3)."""
-    if not name:
-        raise LookupError("name a space: a chat stands in none")
-    said = spaces(name)
-    if not said["ok"]:
-        raise LookupError(said["lines"][0])
-    return Path(said["lines"][0])
-
-
-def status(root):
-    """Is it green, and if not why (ADR 0024, decisions 3 and 6) — and the
-    same, as the pages say it (ADR 0025, decision 11): beside the report lines,
-    so a chat can say what the console's panel says."""
-    from lib import lock, marks, panel, store, verdict as plainly, vetoes
-    here = space.layout(root)
-    verdict = store.load(here.dot / panel.NAME, None)
-    said = [] if verdict else ["never checked: no verdict here is not a green one"]
-    rec = lock.holder(root)
-    held = held_by(rec) if rec and lock.alive(rec) else None
-    if held and verdict:
-        said.append(f"a run is live ({held}); this verdict is from before it")
-    return {"verdict": verdict, "plain": verdict and plainly.say(verdict),
-            "held": held, "said": said,
-            "marks": sum(1 for m in marks.load(here.marks) if marks.is_open(m)),
-            "vetoes": vetoes.uncommitted(root),
-            "doctor": out_of_step(root)}
-
-
-def log(root, lines=40):
-    """The tail of `last-build.log`, and the stage its first line says wrote it.
-
-    Every stage rewrites the log, so after a check and a filmstrip it is the
-    filmstrip's; naming the writer is what keeps it from being read as the
-    cause of a red check it never saw (ADR 0024, decision 6).
-    """
-    try:
-        said = (space.layout(root).dot / LOG.name).read_text().splitlines()
-    except FileNotFoundError:
-        said = []
-    if not said:
-        return {"stage": None, "lines": [], "said": ["no log: nothing has run here"]}
-    first = said[0].removeprefix("$ ").split()
-    stage = "check" if first[:1] == ["build"] else first[0]
-    return {"stage": stage, "lines": said[len(said) - max(0, int(lines)):],
-            "said": [] if stage == "check"
-            else [f"this log is from {stage}, not the last check"]}
-
-
-def picture(root, which):
-    """One of the space's pictures and what it is of (ADR 0024, decision 3).
-    Read off disk only: nothing is rendered to answer.
-
-    The sheet and the filmstrip are of a build, and say so through the panel's
-    own comparison, so a chat and the console never disagree about one. The
-    worksheet is of the spans on the references, and is behind when they move.
-    """
-    from lib import filmstrip, panel, worksheet
-    here = space.layout(root)
-    of_build = lambda record: lambda: panel.state(
-        views=record, blend=here.blend, verdict=here.dot / panel.NAME)
-    path, reading = {
-        "sheet": (here.sheet, of_build(here.views)),
-        "filmstrip": (here.filmstrip, of_build(here.out / filmstrip.RECORD)),
-        "worksheet": (root / worksheet.NAME,
-                      lambda: worksheet.state(here.dot, here.marks)),
-    }.get(which, (None, None))
-    if path is None:
-        raise LookupError(f"no picture {which!r}: sheet, filmstrip or worksheet")
-    if not path.is_file():
-        return {"picture": which, "said": "not drawn yet"}
-    return connector.image(path.read_bytes(), reading())
-
-
-def spec(root):
-    """The spec as it is on disk, and the one line that says where it changes:
-    the instructions' own, so a chat arguing a tolerance is sent to draw a span
-    rather than handed a file it could propose to (ADR 0024, decision 4)."""
-    path = space.layout(root).spec
-    said = (path.read_text() if path.is_file()
-            else "no spec.yaml yet: a spec is drafted in the space's console\n")
-    return connector.text(said + ("" if said.endswith("\n") else "\n")
-                          + "\n" + connector.INSTRUCTIONS.splitlines()[1] + "\n")
-
-
-def spent(root):
-    """What the console's runs here cost, as `tools/tokens.py` reports them."""
-    from lib import spend
-    runs = spend.runs(root)
-    return {"runs": runs,
-            "said": [] if runs else ["no console has run here: a terminal "
-                                     "session's cost is tools/tokens.py's to read"]}
-
-
 def opened(page, called, create=False, name=None):
     """Start the page where the user acts, and say only whether it started
     (ADR 0024, decision 5). Never its URL: that carries the secret behind
@@ -985,7 +797,7 @@ def opened(page, called, create=False, name=None):
         return {"page": page, "space": None, "refused": None}
     if page not in ("console", "canvas"):
         raise LookupError(f"no page {page!r}: console, lobby or canvas")
-    root = named(called)
+    root = connector.named(called)
     here = presence.live(root)
     if page == "console":
         refused = enter.into(root, here)
@@ -1021,33 +833,24 @@ def refused_create(why):
     return {"path": None, "next": None, "refused": why}
 
 
-def out_of_step(root):
-    """What `doctor` would find behind the toolkit here: `reading`'s half of
-    it, so a chat, `spaces` and `doctor` say the same of every copy."""
-    said = reading(root, toolkit_commit())
-    return {"toolkit": said["toolkit"]["state"], **said["scaffold"]}
-
-
 def spaces(name=None, as_json=False):
-    """List the model spaces, or print one's path for `cd $(contour spaces x)`."""
-    found = space.spaces(space.roots(ROOT))
+    """List the model spaces, or print one's path for `cd $(contour spaces x)`.
+    Both lists print the survey's rows, so they cannot disagree (slice 28)."""
+    if name:
+        try:
+            return {"ok": True, "lines": [str(space.named(name, ROOT))]}
+        except LookupError as e:
+            return {"ok": False, "lines": [f"FAIL {e}"]}
+    said = survey.listing()
     if as_json:
-        said = listing()
         return {"ok": not any(s["remotes"] for s in said["spaces"]),
                 "lines": [json.dumps(said, indent=2)]}
-    if name:
-        hits = [s for s in found if s.name == name]
-        if len(hits) != 1:
-            return {"ok": False, "lines": [f"FAIL {len(hits)} spaces named {name!r}"
-                                           + (": " + ", ".join(str(h) for h in hits) if hits else "")]}
-        return {"ok": True, "lines": [str(hits[0])]}
-    if not found:
-        return {"ok": True, "lines": [f"no model spaces under "
-                                      f"{', '.join(str(r) for r in space.roots(ROOT))}",
+    if not said["spaces"]:
+        return {"ok": True, "lines": [f"no model spaces under {', '.join(said['roots'])}",
                                       "(set $CONTOUR_SPACES to look elsewhere)"]
-                + deleted_lines()}
-    now, lines, ok = toolkit_commit(), [], True
-    for s in (reading(s, now) for s in found):
+                + deleted_lines(said["deleted"])}
+    lines, ok = [], True
+    for s in said["spaces"]:
         home = s["path"].replace(str(Path.home()), "~")
         tk = s["toolkit"]
         state = f"({tk['state']})"
@@ -1056,12 +859,11 @@ def spaces(name=None, as_json=False):
         for r in s["remotes"]:
             lines.append(f"  WARN {s['name']} has a remote ({r}) — a model space is never pushed")
             ok = False
-    return {"ok": ok, "lines": lines + deleted_lines()}
+    return {"ok": ok, "lines": lines + deleted_lines(said["deleted"])}
 
 
-def deleted_lines():
+def deleted_lines(gone):
     """The trash, under the live list and apart from it (ADR 0021, decision 6)."""
-    gone = restore.deleted()
     if not gone:
         return []
     return ["", "deleted (restore with contour restore <id> [--to <dir>]):"] + [

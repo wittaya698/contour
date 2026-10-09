@@ -258,3 +258,13 @@ def spaces(where, depth=4):
                 continue
             dirs[:] = [x for x in dirs if not x.startswith(".") and x not in SKIP]
     return sorted(found)
+
+
+def named(name, toolkit):
+    """The one live space called `name`, found where `spaces` looks; a name is
+    a space's identity, so none or several is a LookupError saying which."""
+    hits = [s for s in spaces(roots(toolkit)) if s.name == name]
+    if len(hits) != 1:
+        raise LookupError(f"{len(hits)} spaces named {name!r}"
+                          + (": " + ", ".join(str(h) for h in hits) if hits else ""))
+    return hits[0]

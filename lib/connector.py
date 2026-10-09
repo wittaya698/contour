@@ -5,12 +5,16 @@ A stdio MCP server speaking the three methods it needs — `initialize`,
 prompts or sampling. Stdlib only, because it is part of the launcher and a bare
 clone has to serve it (ADR 0024, decision 1).
 
-This module is the protocol and the tools' definitions. What a tool does is
-handed to `serve` by `lib/cli.py`, which owns the readings, so the connector
-imports nothing of the launcher's and cannot reach a write the launcher has.
+This module is the protocol, the tools' definitions, and the shapes a chat is
+handed. What the reading tools say is the survey's, which writes nothing, so the
+connector imports it directly (issue 84). The two that act, open and create,
+are handed to `serve` by `lib/cli.py`, and nothing else of the launcher's is
+reachable from here.
 """
 import base64
 import json
+
+from . import space, survey
 
 LATEST = "2025-06-18"
 
@@ -97,6 +101,48 @@ def image(png, reading):
     return Content([{"type": "image", "mimeType": "image/png",
                      "data": base64.b64encode(png).decode("ascii")},
                     {"type": "text", "text": json.dumps(reading)}])
+
+
+def named(name):
+    """The space a call names. A chat stands in no directory, so it must name
+    one (ADR 0024, decision 3), and a name that resolves to none or several is
+    refused in the words `contour spaces <name>` would print."""
+    if not name:
+        raise LookupError("name a space: a chat stands in none")
+    try:
+        return space.named(name, survey.TOOLKIT)
+    except LookupError as e:
+        raise LookupError(f"FAIL {e}") from None
+
+
+def pictured(said):
+    """The survey's picture as Desktop shows it: the image and what it is of,
+    or, never drawn, the saying so."""
+    if "path" not in said:
+        return said
+    return image(said["path"].read_bytes(), said["of"])
+
+
+def specced(said):
+    """The spec as text, and the one line that says where it changes: the
+    instructions' own, so a chat arguing a tolerance is sent to draw a span
+    rather than handed a file it could propose to (ADR 0024, decision 4)."""
+    said = said if said is not None else \
+        "no spec.yaml yet: a spec is drafted in the space's console\n"
+    return text(said + ("" if said.endswith("\n") else "\n")
+                + "\n" + INSTRUCTIONS.splitlines()[1] + "\n")
+
+
+def readings():
+    """Every tool that only reads, each the survey's answer in a chat's shape."""
+    return {
+        "spaces": lambda args: survey.listing(),
+        "status": lambda args: survey.status(named(args.get("space"))),
+        "log": lambda args: survey.log(named(args.get("space")), args.get("lines", 40)),
+        "picture": lambda args: pictured(survey.picture(named(args.get("space")),
+                                                        args.get("picture"))),
+        "spec": lambda args: specced(survey.spec(named(args.get("space")))),
+        "spend": lambda args: survey.spent(named(args.get("space")))}
 
 
 def config(link):

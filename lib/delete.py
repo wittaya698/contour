@@ -15,14 +15,8 @@ import shutil
 import time
 from pathlib import Path
 
-from . import git, lock, policy, presence
-
-
-def trash():
-    """Where deleted spaces go: `~/.contour/trash`, beside the ask-list. Only
-    files, so the space scan, which looks for a marker in a directory, can
-    never take one for a live space."""
-    return policy.home() / "trash"
+from . import git, lock, presence
+from .survey import about, trash   # where the trash is, read where the trash is listed
 
 
 def destination(root):
@@ -33,11 +27,6 @@ def destination(root):
         n += 1
         to = trash() / f"{stem}-{n}.bundle"
     return to
-
-
-def about(bundle):
-    """The record beside a bundle of where its space stood, for restore."""
-    return bundle.with_suffix(".json")
 
 
 def record(root, bundle):
