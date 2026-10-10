@@ -388,7 +388,10 @@ def on_mcp(cmd, rest, held):
         **connector.readings(),
         "open": lambda args: opened(args.get("page"), args.get("space"),
                                     create=bool(args.get("create")), name=args.get("name")),
-        "create": lambda args: created(args.get("name"), args.get("references") or [])})
+        "create": lambda args: created(args.get("name"), args.get("references") or []),
+        "request": lambda args: requested(str(args.get("space") or ""), args.get("prose") or "",
+                                          args.get("as") or "a chat"),
+        "stop": lambda args: stopped(str(args.get("space") or ""))})
     return 0
 
 
@@ -397,37 +400,41 @@ STOP_WAIT_S = 10
 
 
 def on_stop(cmd, rest, held):
+    return emit(stopped(rest[0]))
+
+
+def stopped(name):
     """End the run in a named space (ADR 0027, decision 9). Only a console's
     run, on this machine: a terminal's build is the person's own, at their own
-    Ctrl-C, and a pid on another host is not one this machine can signal."""
+    Ctrl-C, and a pid on another host is not one this machine can signal. The
+    command's and the connector's, in the same words."""
     from lib import lock
-    name = rest[0]
     try:
         root = space.named(name, ROOT)
     except LookupError as e:
-        return emit({"ok": False, "lines": [f"FAIL {e}"]})
+        return {"ok": False, "lines": [f"FAIL {e}"]}
     rec = lock.holder(root)
     if not rec or not lock.alive(rec):
-        return emit({"ok": False, "lines": [f"FAIL no run to stop in {name}"]})
+        return {"ok": False, "lines": [f"FAIL no run to stop in {name}"]}
     if rec.get("command") != "console run" or rec.get("host") != socket.gethostname():
-        return emit({"ok": False, "lines": [
+        return {"ok": False, "lines": [
             f"FAIL {name} is held by {survey.held_by(rec)}, which is not a console's "
-            f"run; contour stop ends only those"]})
+            f"run; contour stop ends only those"]}
     if os.environ.get("CONTOUR_RUN") == rec.get("run"):
         # Anyone but the run's own agent: one that could end its run at a gate
         # would be choosing what becomes of the call it is waiting on.
-        return emit({"ok": False, "lines": [
-            f"FAIL a run cannot stop itself; the person stops it from the page"]})
+        return {"ok": False, "lines": [
+            f"FAIL a run cannot stop itself; the person stops it from the page"]}
     os.kill(rec["pid"], signals.ENDING_RUN)
     deadline = time.monotonic() + STOP_WAIT_S
     while time.monotonic() < deadline:
         if (lock.holder(root) or {}).get("run") != rec.get("run"):
-            return emit({"ok": True, "lines": [f"ok   stopped the run in {name}; "
-                                               f"its edits are left as they were"]})
+            return {"ok": True, "lines": [f"ok   stopped the run in {name}; "
+                                         f"its edits are left as they were"]}
         time.sleep(0.05)
-    return emit({"ok": False, "lines": [
+    return {"ok": False, "lines": [
         f"FAIL asked the run in {name} to stop; it still holds the space "
-        f"after {STOP_WAIT_S:g}s ({survey.held_by(rec)})"]})
+        f"after {STOP_WAIT_S:g}s ({survey.held_by(rec)})"]}
 
 
 def on_status(cmd, rest, held):
@@ -557,10 +564,8 @@ START_WAIT_S = 10
 
 
 def on_request(cmd, rest, held):
-    """Start an unattended run in a named space (ADR 0027, decisions 3, 5 and
-    6), and say so as JSON: started, or why not. Refused while the space is
-    held, while a console is open on it, and while no ceiling is set."""
-    from lib import ceiling, enter, last_run, lock, presence
+    """Start an unattended run in a named space, and say so as JSON: started,
+    or why not."""
     args = list(rest)
     requester = "the command line"
     if "--as" in args:
@@ -573,12 +578,20 @@ def on_request(cmd, rest, held):
     if len(args) != 2:
         print(usage(), file=sys.stderr)
         return 2
-    name, prose = args
+    said = requested(*args, requester)
+    print(json.dumps(said, indent=2))
+    return 0 if said["started"] else 1
+
+
+def requested(name, prose, requester):
+    """Start an unattended run in a named space (ADR 0027, decisions 3, 5 and
+    6): its run and space, or why not. Refused while the space is held, while a
+    console is open on it, and while no ceiling is set. The command's and the
+    connector's, so a chat is refused in the words a terminal is."""
+    from lib import ceiling, enter, last_run, lock, presence
 
     def answer(why=None, **said):
-        print(json.dumps({"started": why is None, **said,
-                          **({"why": why} if why else {})}, indent=2))
-        return 0 if why is None else 1
+        return {"started": why is None, **said, **({"why": why} if why else {})}
     try:
         root = space.named(name, ROOT)
     except LookupError as e:

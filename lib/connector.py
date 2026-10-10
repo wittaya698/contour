@@ -7,8 +7,8 @@ clone has to serve it (ADR 0024, decision 1).
 
 This module is the protocol, the tools' definitions, and the shapes a chat is
 handed. What the reading tools say is the survey's, which writes nothing, so the
-connector imports it directly (issue 84). The two that act, open and create,
-are handed to `serve` by `lib/cli.py`, and nothing else of the launcher's is
+connector imports it directly (issue 84). The four that act — open, create,
+request and stop, each the command's own (ADR 0027, decision 5) — are handed to `serve` by `lib/cli.py`, and nothing else of the launcher's is
 reachable from here.
 """
 import base64
@@ -19,8 +19,9 @@ from . import space, survey
 LATEST = "2025-06-18"
 
 INSTRUCTIONS = "\n".join((
-    "This connector reads Contour's model spaces, opens their pages and makes new ones; "
-    "it changes nothing in a space.",
+    "This connector reads Contour's model spaces, opens their pages, makes new ones, "
+    "and asks for a run nobody watches (request) and ends one (stop); it never answers "
+    "a gate or a question: to bring the user to one, open the space's console.",
     "A spec changes only inside its space, argued from a span the user can see on the canvas.",
     "To change a model, open its console.",
     "A picture pasted into the chat is not a reference: you hold what you saw, not the file. "
@@ -81,6 +82,20 @@ TOOLS = (
                      "properties": {"name": {"type": "string"},
                                     "references": {"type": "array",
                                                    "items": {"type": "string"}}}}},
+    {"name": "request",
+     "description": "Ask for a run in a space nobody is watching: the prose is the "
+                    "whole of what it is asked. Says started and its run, or why not. "
+                    "Where it stops for the user, its console has the page.",
+     "inputSchema": {"type": "object", "required": ["space", "prose"],
+                     "properties": {"space": {"type": "string"},
+                                    "prose": {"type": "string"},
+                                    "as": {"type": "string",
+                                           "description": "who is asking, for the record"}}}},
+    {"name": "stop",
+     "description": "End the run in a space, as `contour stop` does: answers no gate, "
+                    "and leaves its edits as they were.",
+     "inputSchema": {"type": "object", "required": ["space"],
+                     "properties": {"space": {"type": "string"}}}},
 )
 """Every tool's definition, coarse on purpose: each one sits in Desktop's
 context on every turn (ADR 0024, decision 3)."""

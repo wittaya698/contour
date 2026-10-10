@@ -339,7 +339,7 @@ servers already there, and restart Desktop. The block names the `contour` link
 from Install, not the checkout, so moving the toolkit is still only a relink. If
 there is no link on `PATH`, the command says so and exits 1.
 
-Today the connector answers eight tools. `spaces` is the same reading as
+Today the connector answers ten tools. `spaces` is the same reading as
 `contour spaces --json`. `status` takes a space and gives its last check's
 verdict, in the console's plain sentences beside the report lines, and its open
 marks, uncommitted vetoes and toolkit drift. `log` gives the tail
@@ -358,9 +358,13 @@ It refuses any path that is not a `.png`, `.jpg` or `.webp` image before
 anything is made, and drafts no spec. A picture pasted into the chat is not the
 file, so it is not taken as a reference: `open` brings up the lobby on its
 create form instead, the name filled in if you gave one, for the file to be
-dropped there. Its answers are meant to read as the pages do, in plain words.
-Inside a space it never builds, writes, marks or holds anything: to change a
-model, open its console. Every space it finds is visible to the chat,
+dropped there. `request` and `stop` are `contour request` and `contour stop`,
+with the same arguments and the same refusals: a chat can ask for a run nobody
+watches and end one, and that is all it can start in a space. It never answers
+a gate or a question; when a run waits on you, `open` brings up its console's
+page. Its answers are meant to read as the pages do, in plain words. Otherwise
+it never builds, writes, marks or holds anything in a space: to change a model
+yourself, open its console. Every space it finds is visible to the chat,
 so what you ask about goes to the model provider. Installing the connector is
 the choice to allow that, and Desktop asks before each call.
 

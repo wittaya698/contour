@@ -11,10 +11,10 @@ a question; and to bring the person to one, it uses `open`.
 
 ## Acceptance criteria
 
-- [ ] `request` starts a run and returns the command's refusals in its words
-- [ ] `stop` ends a run as `contour stop` does
-- [ ] The instructions say what the connector does now, and nothing claims it changes nothing
-- [ ] No tool answers a gate or a question, and no result carries a console URL
+- [x] `request` starts a run and returns the command's refusals in its words
+- [x] `stop` ends a run as `contour stop` does
+- [x] The instructions say what the connector does now, and nothing claims it changes nothing
+- [x] No tool answers a gate or a question, and no result carries a console URL
 
 ## Blocked by
 

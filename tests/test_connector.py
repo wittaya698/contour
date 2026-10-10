@@ -54,7 +54,9 @@ class ProtocolTest(unittest.TestCase):
         self.assertEqual(got["result"]["protocolVersion"], "2025-06-18")
 
     def test_the_instructions_describe_the_connector_in_five_lines(self):
-        """ADR 0024, decision 4: it reads and opens and changes nothing; a spec changes
+        """ADR 0024, decision 4, as ADR 0027 decision 5 left it: it reads, opens,
+        makes, and asks for runs and stops them, and never answers a gate or a
+        question, bringing the person to one with open; a spec changes
         inside its space, from a span on the canvas; the console is where the
         model changes. ADR 0025, decision 11: a pasted picture is answered with
         the lobby's create form, where the file can be dropped, and never by
@@ -62,7 +64,9 @@ class ProtocolTest(unittest.TestCase):
         [got] = talk(call(1, "initialize", protocolVersion=connector.LATEST))
         said = got["result"]["instructions"].splitlines()
         self.assertEqual(len(said), 5)
-        self.assertIn("changes nothing", said[0])
+        self.assertNotIn("changes nothing", got["result"]["instructions"])
+        for word in ("request", "stop", "never answers a gate or a question", "open"):
+            self.assertIn(word, said[0])
         self.assertIn("span", said[1])
         self.assertIn("canvas", said[1])
         self.assertIn("console", said[2])
