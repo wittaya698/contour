@@ -164,7 +164,6 @@ class Console:
             routes={("POST", "/run"): self.started,
                     ("GET", "/events"): self.transcript,
                     ("POST", "/verdict"): self.verdict,
-                    ("POST", "/answer"): self.answered,
                     ("GET", "/approvals"): self.approvals,
                     ("POST", "/approval"): self.approved,
                     ("GET", "/vetoes"): self.vetoes,
@@ -229,13 +228,6 @@ class Console:
         return self.run.answer(body.get("id"), body.get("allow"),
                                body.get("reason"), always=bool(body.get("always")))
 
-    def answered(self, body):
-        """`POST /answer`: the person's answers to the agent's question, one per
-        question it asked. The one way a question is answered: no command and
-        no connector tool has a spelling of this, because an answer becomes
-        intent (ADR 0027, decision 12)."""
-        return self.run.reply(body.get("id"), body.get("answers") or {})
-
     def approvals(self, query):
         """`GET /approvals`: what an unattended run set aside, oldest first,
         each as its gate would have shown it (ADR 0028, decision 3). A console
@@ -244,13 +236,18 @@ class Console:
 
     def approved(self, body):
         """`POST /approval`: allow, or deny with a reason, the oldest approval
-        waiting. Not while a run is going: it may still be changing the tree
+        waiting, or answer it if it is a question. Not while a run is going: it may still be changing the tree
         the call is applied to."""
         if self.run.live:
             return {"answered": False,
                     "why": "a run is under way; answer it when the run has ended"}
-        return approval_store.answer(self.space, body.get("id"), body.get("allow"),
-                                     body.get("reason"))
+        said = approval_store.answer(self.space, body.get("id"), body.get("allow"),
+                                     body.get("reason"), body.get("answers"))
+        if said and "prompt" in said:
+            # An answered question starts its own run, here, with the person
+            # watching: the run that asked it is over (ADR 0028, decision 2).
+            self.run.start(said.pop("prompt"))
+        return said
 
     def vetoes(self, query):
         """`GET /vetoes`: every veto in this space, as the page says it. A

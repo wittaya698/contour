@@ -102,23 +102,18 @@ class StartsTest(RequestCase):
         self.assertTrue(self.gone(), "the console outlived its run with no page open")
         self.assertIsNone(lock.holder(self.beaky))
 
-    def test_a_parked_question_outlives_the_idle_clock_and_a_stop_ends_it(self):
-        """Silence is not an answer (ADR 0027, decision 9): with nobody there,
-        the console waits at the question for as long as it takes, and ends with
-        its run when somebody stops it."""
+    def test_a_question_holds_nothing_and_the_console_goes_with_its_run(self):
+        """Set aside, not parked (ADR 0028, decision 2): the run finishes, the
+        console exits as any unattended one does, and the question waits in
+        the space for the person."""
+        from console import approvals
         said, _ = self.request("make the beak longer",
-                               script=({"ask": [{"question": "How long?"}]},),
-                               CONTOUR_CONSOLE_IDLE="1")
+                               script=({"ask": [{"question": "How long?"}]}, {"say": "done"}))
         self.assertTrue(said["started"], said)
-        self.until("waiting for you")
-        time.sleep(3)
-        self.assertTrue(presence.live(self.beaky), "the idle clock ended a parked gate")
-        self.assertEqual(last_run.read(self.beaky)["state"], "waiting for you")
-        r = subprocess.run([sys.executable, str(CONTOUR), "stop", "beaky"],
-                           cwd=str(self.root), capture_output=True, text=True, timeout=60,
-                           env=dict(os.environ, CONTOUR_SPACES=str(self.root)))
-        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-        self.assertTrue(self.gone(), "the console outlived its stopped run")
+        self.assertEqual(self.until("finished")["approvals"], ["How long?"])
+        self.assertTrue(self.gone(), "a question held the console")
+        self.assertIsNone(lock.holder(self.beaky))
+        self.assertEqual([a["category"] for a in approvals.load(self.beaky)], ["question"])
 
     def test_a_working_run_outlives_the_idle_clock(self):
         """No gate, no page: the run is what keeps the console, not a touch."""

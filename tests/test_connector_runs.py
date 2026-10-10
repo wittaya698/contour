@@ -10,7 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from test_channel import ASK, ChannelCase    # noqa: E402
+from test_channel import WORKING, ChannelCase    # noqa: E402
 from test_connector import call    # noqa: E402
 from test_console import STAND_IN    # noqa: E402
 
@@ -55,9 +55,9 @@ class RequestTest(RunsCase):
 
 class StopTest(RunsCase):
 
-    def test_stop_ends_a_parked_run_as_contour_stop_does(self):
-        self.requested(ASK)
-        self.until("waiting for you")
+    def test_stop_ends_an_unattended_run_as_contour_stop_does(self):
+        self.requested(WORKING)
+        self.until("running")
         _, said = self.tool("stop", space="alpha")
         self.assertEqual(said, {"ok": True, "lines": [
             "ok   stopped the run in alpha; its edits are left as they were"]})
@@ -103,10 +103,10 @@ class NoAnswerTest(RunsCase):
                              t["name"])
 
     def test_no_request_or_stop_carries_a_console_url(self):
-        text, said = self.tool("request", (ASK,),
+        text, said = self.tool("request", (WORKING,),
                                space="alpha", prose="make the beak longer")
         self.assertTrue(said["started"], said)
-        self.until("waiting for you")
+        self.until("running")
         stopped, _ = self.tool("stop", space="alpha")
         for said in (text, stopped):
             self.assertNotIn("http", said)

@@ -1,34 +1,34 @@
-"""A question parks the run (ADR 0027, decision 12; issue 90).
+"""A question is set aside too (ADR 0028, decision 2; issue 98).
 
 A question is the agent's `AskUserQuestion`, which reaches the console over the
-gate's seam like any call. In a run nobody is watching it parks the run as a gate
-does, the person answers it on the page, and the same run carries on with its
-context: ending the run instead would throw that away over a one-word answer.
+gate's seam like any call. In a run nobody is watching it no longer parks the
+run: it is kept with the approvals, the agent is told the person will answer it
+later and carries on, and the person's answer on the page starts a run of its
+own (`test_approvals_answered`), because nothing resumes. This undoes issue
+90's park.
 """
-import json
 import re
 import subprocess
 import sys
-import time
+import threading
 import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from test_console import STAND_IN    # noqa: E402
-from test_request import RequestCase    # noqa: E402
 from test_run_record import ROOT, RecordCase    # noqa: E402
 
+from console import approvals    # noqa: E402
 from console.run import Run    # noqa: E402
-from lib import last_run    # noqa: E402
 
 ASKED = {"questions": [{"question": "How long should the beak be?",
                         "header": "Beak", "multiSelect": False,
                         "options": [{"label": "300 mm", "description": "as drawn"},
                                     {"label": "340 mm", "description": "longer"}]}]}
+WAIT_S = 15
 
 
-class ParkedTest(RecordCase):
+class AsideTest(RecordCase):
 
     def asking(self, requester="the nightly agent"):
         """A run whose agent asks one question, and what the gate gave it."""
@@ -42,35 +42,15 @@ class ParkedTest(RecordCase):
         self.addCleanup(lambda: run.live and run.end())
         return run, given
 
-    def test_a_question_in_an_unattended_run_parks_it_and_the_record_shows_it(self):
-        self.asking()
-        said = self.until("waiting for you")
-        self.assertEqual(said["act"], "Claude has a question")
-        self.assertEqual(said["questions"], ["How long should the beak be?"])
-
-    def test_an_answer_resumes_the_same_run_with_the_answer_in_hand(self):
-        run, given = self.asking()
-        parked = self.until("waiting for you")
-        asked = next(e for e in run.since(0)["events"] if e["kind"] == "question")
-        answers = {"How long should the beak be?": "340 mm"}
-        self.assertEqual(run.reply(asked["id"], answers), {"answered": True})
+    def test_a_question_in_an_unattended_run_is_set_aside_and_the_run_goes_on(self):
+        _, given = self.asking()
         said = self.until("finished")
-        self.assertEqual(said["run"], parked["run"])
         self.assertEqual(said["closing"], "Then the beak it is.")
-        self.assertNotIn("questions", said)
-        self.assertEqual(given, [(True, answers)])
-
-    def test_an_answer_to_another_question_or_a_verdict_answers_nothing(self):
-        """A stale tab's reply lands on no later question, and a gate's
-        allow is not an answer: a question has no *allow*."""
-        run, given = self.asking()
-        self.until("waiting for you")
-        asked = next(e for e in run.since(0)["events"] if e["kind"] == "question")
-        self.assertIsNone(run.reply("not-this-one", {"q": "a"}))
-        self.assertIsNone(run.answer(asked["id"], True))
-        time.sleep(0.2)
-        self.assertEqual(last_run.read(self.space)["state"], "waiting for you")
-        self.assertEqual(given, [])
+        self.assertEqual(said["approvals"], ["How long should the beak be?"])
+        [(allow, why)] = given
+        self.assertFalse(allow)
+        self.assertIn("the user will answer it later", why)
+        self.assertIn("say in your closing", why)
 
     def test_an_attended_runs_question_is_unchanged(self):
         """Somebody is watching: the question is let through as any call that
@@ -80,43 +60,23 @@ class ParkedTest(RecordCase):
         self.assertEqual(given, [(True, None)])
         self.assertNotIn("questions", said)
 
-    def test_a_stop_ends_a_run_parked_on_a_question(self):
-        run, given = self.asking()
-        self.until("waiting for you")
+    def test_a_stop_leaves_a_question_set_aside_waiting(self):
+        """A stop ends the run and answers nothing (ADR 0028, decision 7)."""
+        set_aside = threading.Event()
+
+        def drive(prompt, options, gate, say):
+            gate("AskUserQuestion", dict(ASKED))
+            set_aside.set()
+            threading.Event().wait(WAIT_S)    # working on, till stopped
+            say("text", text="never said")
+        run = Run(self.space, drive=drive)
+        run.start("make the beak longer", ceiling=10**6, requester="the nightly agent")
+        self.addCleanup(lambda: run.live and run.end())
+        self.assertTrue(set_aside.wait(WAIT_S))
         run.end("stopped with contour stop")
         said = self.until("stopped")
-        self.assertEqual(said["why"], "stopped with contour stop")
-        self.assertNotIn("questions", said)
-        self.assertEqual(given, [])
-
-
-class PageTest(RequestCase):
-    """A console started on a request, parked on a question, and the page that
-    answers it."""
-
-    def test_a_parked_question_holds_the_console_and_the_page_answers_it(self):
-        """Past the idle clock with nobody beating, as a parked gate is held;
-        then one answer, and the run that asked is the run that finishes."""
-        proc, url = self.launch(self.beaky, "--request", "make the beak longer",
-                                "--requester", "the nightly agent",
-                                CONTOUR_HOME=str(self.home), CONTOUR_CONSOLE_IDLE="1",
-                                CONTOUR_CONSOLE_AGENT=f"{STAND_IN}:drive",
-                                CONTOUR_AGENT_SCRIPT=json.dumps([
-                                    {"ask": ASKED["questions"]}, {"say": "done"}]))
-        said = self.transcript(url, lambda ev: any(e["kind"] == "question" for e in ev))
-        asked = next(e for e in said if e["kind"] == "question")
-        self.assertEqual(asked["questions"], ASKED["questions"])
-        parked = self.until("waiting for you")
-        time.sleep(3)
-        self.assertIsNone(proc.poll(), "the idle clock ended a parked question")
-        self.keep_beating(url, proc)          # the person opens the page to answer
-        answers = {"How long should the beak be?": "340 mm"}
-        self.assertEqual(self.ask(url, "/answer", {"id": asked["id"], "answers": answers}),
-                         (200, {"answered": True}))
-        said = self.transcript(url, lambda ev: any(e["kind"] == "ended" for e in ev))
-        self.assertIn({"answers": answers},
-                      [{"answers": e.get("answers")} for e in said if e["kind"] == "result"])
-        self.assertEqual(self.until("finished")["run"], parked["run"])
+        self.assertEqual(said["approvals"], ["How long should the beak be?"])
+        self.assertEqual([a["tool"] for a in approvals.load(self.space)], ["AskUserQuestion"])
 
 
 class OnlyThePageTest(unittest.TestCase):
@@ -126,17 +86,27 @@ class OnlyThePageTest(unittest.TestCase):
     def test_the_one_caller_of_an_answer_is_the_pages_route(self):
         callers = sorted(str(f.relative_to(ROOT)) for d in ("lib", "console", "tools")
                          for f in (ROOT / d).rglob("*.py")
-                         if re.search(r"\.reply\(", f.read_text(encoding="utf-8")))
+                         if re.search(r"approval_store\.answer\(|approvals\.answer\(",
+                                      f.read_text(encoding="utf-8")))
         callers += [n for n in ("contour", "contour-console")
-                    if ".reply(" in (ROOT / n).read_text(encoding="utf-8")]
+                    if "approvals.answer(" in (ROOT / n).read_text(encoding="utf-8")]
         self.assertEqual(callers, ["console/server.py"])
 
-    def test_the_page_answers_with_the_answers_and_nothing_else(self):
+    def test_the_page_answers_a_question_set_aside_with_the_answers(self):
         page = (ROOT / "lib" / "canvas.html").read_text(encoding="utf-8")
         self.assertIn('<template id="question">', page)
-        body = re.search(r"ask\('/answer', \{([^}]*)\}", page.split("<script>", 1)[1])
-        self.assertIsNotNone(body, "the page never answers a question")
-        self.assertEqual(set(re.findall(r"(\w+):", body.group(1))), {"id", "answers"})
+        script = page.split("function approval(")[1].split("\n}\n")[0]
+        self.assertIn("a.category === 'question'", script)
+        body = re.search(r"ask\('/approval', \{ id: a\.id, answers: answers \}\)", script)
+        self.assertIsNotNone(body, "the page never answers a question set aside")
+
+    def test_no_run_waits_on_a_question_any_more(self):
+        """Nothing parks on one, so nothing answers one live (ADR 0028,
+        decision 2): no route and no line of the transcript for it."""
+        page = (ROOT / "lib" / "canvas.html").read_text(encoding="utf-8")
+        self.assertNotIn("'/answer'", page)
+        self.assertNotIn("def reply(", (ROOT / "console" / "run.py").read_text())
+        self.assertNotIn('"/answer"', (ROOT / "console" / "server.py").read_text())
 
 
 class DriverTest(unittest.TestCase):

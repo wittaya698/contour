@@ -31,11 +31,12 @@ class Stopped(Exception):
 HERE = Path(__file__).resolve().parent
 DEFAULT = f"{HERE / 'agent.py'}:drive"
 
-PASSING = ("act", "questions")
+PASSING = ("act",)
 """What the run record says only while the state that set it lasts."""
 
 QUESTION = "AskUserQuestion"
 """The tool an agent asks the person a question with (ADR 0027, decision 12)."""
+
 
 
 def driver(spec=None):
@@ -351,29 +352,30 @@ class Run:
         self.now("waiting for you", act=act, **said)
 
     def asked(self, payload):
-        """Park on a question in a run nobody is watching, and return
-        (True, the person's answers) once they have given them on the page.
+        """Set a question aside for the person, in a run nobody is watching,
+        and tell the agent so (ADR 0028, decision 2). Returns (False, why).
 
-        Parked and not ended: nothing resumes, so a run that ended on a question
-        would throw its working context away over a one-word answer. And only
-        the person answers it, because an answer becomes intent — *the anchor is
-        300 mm* from an agent reaches a spec write whose gate shows the diff and
-        not where the number came from (ADR 0027, decision 12).
+        Not parked: nothing resumes, so the run finishes what does not depend
+        on the answer, and the answer starts a run of its own later. And only
+        the person answers it, because an answer becomes intent — *the anchor
+        is 300 mm* from an agent reaches a spec write whose gate shows the diff
+        and not where the number came from (ADR 0027, decision 12).
         """
         questions = [dict(q) for q in payload.get("questions") or ()]
-        waiting = {"id": secrets.token_hex(8), "answered": threading.Event(),
-                   "answers": None, "question": True}
-        self.pending = waiting
-        self.say("question", id=waiting["id"], questions=questions)
-        # The text, so a requester can relay it; never an answer, which only
-        # the page takes.
-        self.parked("Claude has a question",
-                    questions=[q.get("question", "") for q in questions])
-        waiting["answered"].wait()
-        if self.stopped:
-            raise Stopped()
-        self.now("running")
-        return True, waiting["answers"]
+        asking = " ".join(q.get("question", "") for q in questions)
+        said = {"act": "Claude has a question", "questions": questions}
+        kept = approvals.set_aside(self.space, self.record["run"], approvals.QUESTION,
+                                   QUESTION, payload, said, self.proposal())
+        # The question's text and nothing else: it is the act, and what a
+        # requester relays is that one waits, never an answer to it.
+        with self._lock:
+            self.latest.setdefault("approvals", []).append(asking)
+        self.say("aside", id=kept["id"], category=approvals.QUESTION, act=asking,
+                 text=f"set aside for you to answer later: {asking}")
+        return False, ("set aside: the user will answer it later on the page, "
+                       "which starts a new run with the answer. Finish what "
+                       "does not depend on it, and say in your closing what you "
+                       "could not do without one")
 
     def proposal(self):
         """What the agent last said, which before a spec write is the case
@@ -432,8 +434,8 @@ class Run:
         two builds differ (ADR 0019, decision 13).
         """
         waiting = self.pending
-        if waiting is None or waiting["id"] != at or waiting.get("question"):
-            return None                       # a question has no *allow*
+        if waiting is None or waiting["id"] != at:
+            return None
         waiting["allow"], waiting["reason"] = bool(allow), reason
         self.pending = None
         if allow and always and waiting["category"] in policy.ALWAYS:
@@ -452,19 +454,6 @@ class Run:
             with self._lock:
                 self.latest["vetoes"].append({"act": act, "reason": reason})
         self.say("verdict", id=at, allowed=bool(allow), text=reason or "")
-        waiting["answered"].set()
-        return {"answered": True}
-
-    def reply(self, at, answers):
-        """The person's answers to the question that is waiting, or None if
-        none is. The page's alone: there is no command or connector spelling
-        of this, because an answer becomes intent (ADR 0027, decision 12)."""
-        waiting = self.pending
-        if waiting is None or waiting["id"] != at or not waiting.get("question"):
-            return None
-        waiting["answers"] = {str(q): str(a) for q, a in dict(answers).items()}
-        self.pending = None
-        self.say("answer", id=at, answers=waiting["answers"])
         waiting["answered"].set()
         return {"answered": True}
 

@@ -14,10 +14,10 @@ answers it. This undoes issue 90's park.
 
 ## Acceptance criteria
 
-- [ ] A question in an unattended run is set aside, and the run carries on to its end
-- [ ] The record shows the question's text, and nothing answers it but the page
-- [ ] Answering it on the page starts an attended run with the question and the answer as its first message
-- [ ] An attended run's questions are unchanged
+- [x] A question in an unattended run is set aside, and the run carries on to its end
+- [x] The record shows the question's text, and nothing answers it but the page
+- [x] Answering it on the page starts an attended run with the question and the answer as its first message
+- [x] An attended run's questions are unchanged
 
 ## Blocked by
 

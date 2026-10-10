@@ -1,4 +1,4 @@
-"""The channel: a pointer to a parked run, never a key (ADR 0027, decision 7;
+"""The channel: a pointer to an unattended run, never a key (ADR 0027, decision 7;
 issue 91).
 
 A requester that needs the person at a gate asks Contour to show them the page.
@@ -24,9 +24,10 @@ from lib import last_run, presence    # noqa: E402
 
 SPEC_WRITE = {"tool": "Edit", "file_path": "spec.yaml",
               "old_string": "a", "new_string": "b"}
-ASK = {"ask": [{"question": "How long should the beak be?"}]}
-"""What parks a run nobody is watching: a gate's act is set aside and the run
-goes on (ADR 0028, decision 1), but a question still waits for the person."""
+WORKING = {"busy": 30}
+"""What keeps a run nobody is watching under way: nothing parks one any more,
+since a gate's act and a question are both set aside and the run goes on
+(ADR 0028, decisions 1 and 2)."""
 WAIT_S = 15
 
 
@@ -72,8 +73,8 @@ class ChannelCase(PagesCase):
 class ShowTest(ChannelCase):
 
     def test_open_console_brings_up_an_unattended_consoles_page(self):
-        self.requested(ASK)
-        self.until("waiting for you")
+        self.requested(WORKING)
+        self.until("running")
         text, said = self.open()
         self.assertIsNone(said["refused"], said)
         [url] = self.urls()
@@ -83,8 +84,8 @@ class ShowTest(ChannelCase):
         self.assertEqual(int(self.opened.read_text().split()[0]), console["pid"])
 
     def test_asking_twice_opens_the_page_twice_and_never_a_second_console(self):
-        self.requested(ASK)
-        self.until("waiting for you")
+        self.requested(WORKING)
+        self.until("running")
         for _ in range(2):
             self.assertIsNone(self.open()[1]["refused"])
         deadline = time.monotonic() + WAIT_S
@@ -115,13 +116,6 @@ class RowTest(ChannelCase):
     def row(self):
         [alpha] = json.loads(self.contour("spaces", "--json").stdout)["spaces"]
         return alpha
-
-    def test_a_parked_run_reads_waiting_for_you_and_unattended(self):
-        self.requested(ASK)
-        self.until("waiting for you")
-        row = self.row()
-        self.assertEqual(row["waiting"], "Claude has a question")
-        self.assertTrue(row["unattended"])
 
     def test_a_working_or_finished_run_is_not_waiting(self):
         self.requested({"busy": 2}, {"say": "done"})
@@ -162,13 +156,13 @@ class LobbyTest(LobbyEnterCase):
             self.tmp / "browser", '#!/bin/sh\necho "$PPID $1" >> "$(dirname "$0")/opened"\n'))
         self.env.update(CONTOUR_CONSOLE_PYTHON=sys.executable,
                         CONTOUR_CONSOLE_AGENT=f"{STAND_IN}:drive",
-                        CONTOUR_AGENT_SCRIPT=json.dumps([ASK]))
+                        CONTOUR_AGENT_SCRIPT=json.dumps([WORKING]))
         self.addCleanup(self.close_consoles)
         said = json.loads(self.contour("request", "alpha", "make the beak longer",
                                        cwd=self.spaces).stdout)
         self.assertTrue(said["started"], said)
         deadline = time.monotonic() + WAIT_S
-        while (last_run.read(self.space) or {}).get("state") != "waiting for you":
+        while (last_run.read(self.space) or {}).get("state") != "running":
             self.assertLess(time.monotonic(), deadline, last_run.read(self.space))
             time.sleep(0.05)
 

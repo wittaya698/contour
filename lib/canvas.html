@@ -169,9 +169,9 @@
                flex-direction: column; gap: 6px; }
   #approvals .case { margin: 0; white-space: pre-line; opacity: .8; }
   /* A question: a gate's border, since it too is waiting for you. */
-  #turns .question .asked { margin: 0; padding-left: 18px; display: flex;
+  #run .question .asked { margin: 0; padding-left: 18px; display: flex;
                             flex-direction: column; gap: 6px; }
-  #turns .question .choices { display: flex; flex-wrap: wrap; gap: 4px; }
+  #run .question .choices { display: flex; flex-wrap: wrap; gap: 4px; }
   #turns .changes { margin: 0; padding-left: 18px; }
   #turns .changes:empty, #turns .spans:empty { display: none; }
   #turns .raw summary { cursor: pointer; opacity: .6; font-size: 11px; }
@@ -301,8 +301,8 @@
         </div>
       </li>
     </template>
-    <!-- The agent's question, in a run nobody was watching (ADR 0027,
-         decision 12). Answered here and nowhere else: an answer becomes intent,
+    <!-- The agent's question, set aside by a run nobody was watching (ADR 0028,
+         decision 2). Answered here and nowhere else: an answer becomes intent,
          and a requester relaying one would be an agent giving the anchor rule 1
          says the user gives. Each question takes one of its options or the
          person's own words. -->
@@ -610,8 +610,6 @@ function vetoed(veto) {
 function turn(event) {
   if (event.kind === 'gate') return gate(event);
   if (event.kind === 'verdict') return closeGate(event);
-  if (event.kind === 'question') return question(event);
-  if (event.kind === 'answer') return closeQuestion(event);
   if (event.kind === 'call') return activity(event);
   const li = document.createElement('li');
   li.className = event.kind;
@@ -702,15 +700,14 @@ async function refreshApprovals() {
 
 const OUTCOME = { 'applied': 'done', 'vetoed': 'you said no',
                   'no longer applies': 'no longer applies, so it was dropped',
-                  'refused': 'refused', 'failed': 'it failed' };
+                  'refused': 'refused', 'failed': 'it failed',
+                  'answered': 'answered, and a run starts on it' };
 
 // One approval: a gate, read later, with the agent's case for it, answered by
 // its own route. Only the next can be answered, because a save set aside after
 // a spec write must not be answered before it.
 function approval(a) {
-  const li = gate({ id: a.id, tool: a.tool, call: a.call, said: a }, async (allow, reason) => {
-    const said = await ask('/approval', { id: a.id, allow: allow, reason: reason })
-      .then(r => r.json()).catch(() => null);
+  const answered = said => {
     const line = document.createElement('li');
     line.className = 'verdict';
     line.textContent = said && said.answered
@@ -720,7 +717,18 @@ function approval(a) {
     approvalsShown = null;
     refreshApprovals();
     refreshVetoes();
-  });
+  };
+  if (a.category === 'question') {
+    // Answered here, and the answer starts a run in this console: the run
+    // that asked is over, and nothing resumes.
+    const li = question(a, async answers => answered(
+      await ask('/approval', { id: a.id, answers: answers }).then(r => r.json()).catch(() => null)));
+    if (!a.next) for (const b of li.querySelectorAll('button')) b.disabled = true;
+    return li;
+  }
+  const li = gate({ id: a.id, tool: a.tool, call: a.call, said: a }, async (allow, reason) =>
+    answered(await ask('/approval', { id: a.id, allow: allow, reason: reason })
+      .then(r => r.json()).catch(() => null)));
   delete li.dataset.gate;
   li.querySelector('.always').remove();
   if (a.case) {
@@ -736,14 +744,14 @@ function approval(a) {
   return li;
 }
 
-// The agent's question, parked until the person answers it. An option fills in
-// its question's answer and the person's own words may replace it; one Answer
-// sends them all, since the agent asked them together.
-function question(event) {
+// The agent's question, set aside until the person answers it (ADR 0028,
+// decision 2). An option fills in its question's answer and the person's own
+// words may replace it; one Answer sends them all, since the agent asked them
+// together.
+function question(asking, send) {
   const li = document.getElementById('question').content.firstElementChild.cloneNode(true);
-  li.dataset.question = event.id;
   const fields = {};
-  for (const asked of event.questions) {
+  for (const asked of asking.questions) {
     const item = document.createElement('li');
     const text = document.createElement('p');
     text.textContent = asked.question;
@@ -763,27 +771,13 @@ function question(event) {
     li.querySelector('.asked').append(item);
     fields[asked.question] = own;
   }
-  li.querySelector('.send').addEventListener('click', async () => {
+  li.querySelector('.send').addEventListener('click', () => {
     const answers = {};
     for (const [asked, own] of Object.entries(fields)) answers[asked] = own.value.trim();
     for (const b of li.querySelectorAll('button')) b.disabled = true;
-    await ask('/answer', { id: event.id, answers: answers });
+    send(answers);
   });
   return li;
-}
-
-// A question, answered: closed by the answer on the transcript, as a gate is by
-// its verdict, so a reloaded tab ends on the same answered question.
-function closeQuestion(event) {
-  const li = document.getElementById('turns').querySelector(`li[data-question="${event.id}"]`);
-  const was = document.createElement(li ? 'p' : 'li');
-  was.className = 'answer';
-  was.textContent = Object.values(event.answers || {}).join('; ');
-  if (!li) return was;
-  li.classList.add('answered');
-  li.querySelectorAll('input, .choices, .pair').forEach(n => n.remove());
-  li.append(was);
-  return null;
 }
 
 // A gate, answered. Closed by the verdict on the transcript and not by the

@@ -25,6 +25,9 @@ from lib import last_run    # noqa: E402
 SPEC_WRITE = ("Edit", {"file_path": "spec.yaml", "old_string": "revision: 1\ndepth: 600",
                        "new_string": "revision: 2\ndepth: 640"})
 SAVE = ("Bash", {"command": "git add -A && git commit -q -m 'a longer beak'"})
+ASKED = ("AskUserQuestion", {"questions": [{"question": "How long should the beak be?",
+                                            "options": [{"label": "300 mm"},
+                                                        {"label": "340 mm"}]}]})
 WAIT_S = 15
 
 
@@ -73,9 +76,17 @@ class AnsweredCase(ConsoleCase):
     def waiting(self, url):
         return self.ask(url, "/approvals")[1]["approvals"]
 
-    def answer(self, url, allow=True, reason=None, at=None):
+    def answer(self, url, allow=True, reason=None, at=None, answers=None):
         at = at or self.waiting(url)[0]["id"]
-        return self.ask(url, "/approval", {"id": at, "allow": allow, "reason": reason})[1]
+        return self.ask(url, "/approval", {"id": at, "allow": allow, "reason": reason,
+                                           **({"answers": answers} if answers else {})})[1]
+
+    def until(self, state):
+        deadline = time.monotonic() + WAIT_S
+        while (last_run.read(self.beaky) or {}).get("state") != state:
+            self.assertLess(time.monotonic(), deadline, last_run.read(self.beaky))
+            time.sleep(0.05)
+        return last_run.read(self.beaky)
 
 
 class ShownTest(AnsweredCase):
@@ -201,6 +212,28 @@ class GuardTest(AnsweredCase):
         self.assertEqual(said["outcome"], "refused")
         self.assertEqual((self.beaky / "refs" / "side.png").read_bytes(), b"the user's")
 
+
+
+class QuestionTest(AnsweredCase):
+    """A question set aside is answered in its place in the order, and the
+    answer starts a run of its own: nothing resumes (ADR 0028, decision 2)."""
+
+    def test_it_is_shown_in_its_place_with_its_question(self):
+        self.set_aside(SPEC_WRITE, ASKED)
+        shown = self.waiting(self.opened())
+        self.assertEqual([a["category"] for a in shown], ["spec-write", "question"])
+        self.assertEqual(shown[1]["questions"], ASKED[1]["questions"])
+
+    def test_answering_it_starts_an_attended_run_with_the_question_and_the_answer(self):
+        self.set_aside(ASKED)
+        url = self.opened()
+        said = self.answer(url, answers={"How long should the beak be?": "340 mm"})
+        self.assertEqual(said["outcome"], "answered")
+        record = self.until("finished")
+        self.assertIn("How long should the beak be?", record["prompt"])
+        self.assertIn("340 mm", record["prompt"])
+        self.assertIsNone(record["requester"])
+        self.assertEqual(self.waiting(url), [])
 
 
 class PageTest(unittest.TestCase):

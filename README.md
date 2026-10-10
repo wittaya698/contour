@@ -364,8 +364,9 @@ watches and end one, and that is all it can start in a space. It never answers
 a gate or a question. A run it asked for does not stop at a gate: the act is
 set aside for you, and the run carries on. Its console shows what waits, oldest
 first, with the diff and Claude's case, whenever you open it: allow makes the
-call then, and deny is a veto. When a run waits on a question,
-`open` brings up its console's page. Its answers are meant to read as the pages do, in plain words. Otherwise
+call then, and deny is a veto. A question is set aside the same way, in its
+place in the order: your answer starts a new run in that console, with the
+question and the answer as its first message. Its answers are meant to read as the pages do, in plain words. Otherwise
 it never builds, writes, marks or holds anything in a space: to change a model
 yourself, open its console. Every space it finds is visible to the chat,
 so what you ask about goes to the model provider. Installing the connector is

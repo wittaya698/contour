@@ -27,6 +27,10 @@ NAME = "approvals.json"
 
 PREFIX = "a"
 
+QUESTION = "question"
+"""The category a question is kept under, beside the gates' (ADR 0028,
+decision 2)."""
+
 
 def path(space):
     return space_lib.layout(space).dot / NAME
@@ -83,7 +87,7 @@ def unsaved(space):
     return [" ".join(line.split()) for line in said.splitlines() if line.strip()]
 
 
-def answer(space, at, allow, reason=None):
+def answer(space, at, allow, reason=None, answers=None):
     """The person's answer to the approval `at`, or None if none waits by that
     id. Only the oldest may be answered (ADR 0028, decision 3).
 
@@ -92,6 +96,10 @@ def answer(space, at, allow, reason=None):
     *no longer applies* (the tree moved under it, so nobody considered what it
     would now do, and it is no veto), *refused* by the guard a live call meets,
     or *failed*. Whichever, it is answered, and no longer waits.
+
+    A question has no allow: its `answers` are what answer it, and what comes
+    back carries the `prompt` a new run starts on, because nothing resumes
+    (ADR 0028, decision 2).
     """
     kept = load(space)
     found = next((a for a in kept if a["id"] == at), None)
@@ -99,6 +107,12 @@ def answer(space, at, allow, reason=None):
         return None
     if found is not kept[0]:
         return {"answered": False, "why": LATER}
+    if found["category"] == QUESTION:
+        if not answers:
+            return {"answered": False, "why": "a question is answered with its answers"}
+        save(space, [a for a in load(space) if a["id"] != at])
+        return {"answered": True, "id": at, "outcome": "answered", "said": "",
+                "prompt": asked(found["call"], answers)}
     if allow:
         try:
             outcome, said = applied(space, found)
@@ -109,6 +123,16 @@ def answer(space, at, allow, reason=None):
         outcome, said = "vetoed", reason or ""
     save(space, [a for a in load(space) if a["id"] != at])
     return {"answered": True, "id": at, "outcome": outcome, "said": said}
+
+
+def asked(call, answers):
+    """The first message of the run an answer starts: the question as it was
+    asked, and the person's answer to it, in their words and nobody else's."""
+    lines = ["In a run nobody was watching, you asked:"]
+    for q in call.get("questions") or ():
+        lines += [f"  {q.get('question', '')}",
+                  f"The user answers: {answers.get(q.get('question', ''), '(no answer)')}"]
+    return "\n".join(lines)
 
 
 def applied(space, approval):
