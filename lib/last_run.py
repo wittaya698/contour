@@ -16,8 +16,8 @@ marker: run state is this machine's, and never part of a version."""
 
 
 def waiting(space, act):
-    """A parked run, in the one sentence the hold's refusal and the console's
-    notification both say: the space, and what it is waiting for you to do."""
+    """A parked run, in the sentence the hold's refusal says: the space, and
+    what it is waiting for you to do."""
     return f"{Path(space).name} is waiting for you: {act}"
 
 

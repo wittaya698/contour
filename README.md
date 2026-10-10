@@ -361,8 +361,9 @@ create form instead, the name filled in if you gave one, for the file to be
 dropped there. `request` and `stop` are `contour request` and `contour stop`,
 with the same arguments and the same refusals: a chat can ask for a run nobody
 watches and end one, and that is all it can start in a space. It never answers
-a gate or a question; when a run waits on you, `open` brings up its console's
-page. Its answers are meant to read as the pages do, in plain words. Otherwise
+a gate or a question. A run it asked for does not stop at a gate: the act is
+set aside for you, and the run carries on. When a run waits on a question,
+`open` brings up its console's page. Its answers are meant to read as the pages do, in plain words. Otherwise
 it never builds, writes, marks or holds anything in a space: to change a model
 yourself, open its console. Every space it finds is visible to the chat,
 so what you ask about goes to the model provider. Installing the connector is

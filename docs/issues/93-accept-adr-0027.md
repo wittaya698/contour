@@ -36,7 +36,7 @@ in ADR 0027's acceptance block. In short:
 | Step | As written? |
 |---|---|
 | No ceiling: a request is refused | Yes |
-| The run edits and builds with no page open | Yes, once builds were on the space's ask-list. Before that the first build parked: decision 10 working, and the script's unstated assumption |
+| The run edits and builds with no page open | Yes, once builds were on the space's ask-list. Before that the first build parked: ADR 0027 decision 10 working, and the script's unstated assumption |
 | It parks at *save this version*, and the notification fires | Yes, and the user rejected both. Clicking the banner opens Script Editor |
 | `status` reads *waiting for you* with no diff | Not tried |
 | `open` brings the page up, no console URL in the chat | Yes |

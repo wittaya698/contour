@@ -18,7 +18,6 @@ sys.path.insert(0, str(ROOT))
 
 from console.run import Run, Stopped    # noqa: E402
 from lib import last_run       # noqa: E402
-import quiet    # noqa: E402,F401  # no notification on the screen (issue 91)
 
 WAIT_S = 5
 

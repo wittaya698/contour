@@ -8,12 +8,10 @@ caller. `$BROWSER` writes down what the browser was asked to open, as it does
 for every page a call starts.
 """
 import json
-import os
 import sys
 import time
 import unittest
 from pathlib import Path
-from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -21,14 +19,14 @@ from test_connector import PagesCase, call    # noqa: E402
 from test_console import STAND_IN    # noqa: E402
 from test_lobby_enter import LobbyEnterCase    # noqa: E402
 from executables import executable    # noqa: E402
-from test_run_record import RecordCase    # noqa: E402
 
-from console.run import Run    # noqa: E402
-
-from lib import last_run, notify, presence    # noqa: E402
+from lib import last_run, presence    # noqa: E402
 
 SPEC_WRITE = {"tool": "Edit", "file_path": "spec.yaml",
               "old_string": "a", "new_string": "b"}
+ASK = {"ask": [{"question": "How long should the beak be?"}]}
+"""What parks a run nobody is watching: a gate's act is set aside and the run
+goes on (ADR 0028, decision 1), but a question still waits for the person."""
 WAIT_S = 15
 
 
@@ -74,7 +72,7 @@ class ChannelCase(PagesCase):
 class ShowTest(ChannelCase):
 
     def test_open_console_brings_up_an_unattended_consoles_page(self):
-        self.requested({"call": SPEC_WRITE})
+        self.requested(ASK)
         self.until("waiting for you")
         text, said = self.open()
         self.assertIsNone(said["refused"], said)
@@ -85,7 +83,7 @@ class ShowTest(ChannelCase):
         self.assertEqual(int(self.opened.read_text().split()[0]), console["pid"])
 
     def test_asking_twice_opens_the_page_twice_and_never_a_second_console(self):
-        self.requested({"call": SPEC_WRITE})
+        self.requested(ASK)
         self.until("waiting for you")
         for _ in range(2):
             self.assertIsNone(self.open()[1]["refused"])
@@ -119,10 +117,10 @@ class RowTest(ChannelCase):
         return alpha
 
     def test_a_parked_run_reads_waiting_for_you_and_unattended(self):
-        self.requested({"call": SPEC_WRITE})
+        self.requested(ASK)
         self.until("waiting for you")
         row = self.row()
-        self.assertEqual(row["waiting"], "Claude wants to change the spec")
+        self.assertEqual(row["waiting"], "Claude has a question")
         self.assertTrue(row["unattended"])
 
     def test_a_working_or_finished_run_is_not_waiting(self):
@@ -153,66 +151,6 @@ class LobbyPageTest(unittest.TestCase):
                       "&& !s.unattended", self.row)
 
 
-class NotifiedTest(RecordCase):
-    """When a run nobody is watching parks, the console says so on this
-    machine itself, so reaching the person never rests on a requester relaying
-    anything. It names the space and the act and holds no link."""
-
-    def setUp(self):
-        super().setUp()
-        self.said = self.space / "notified"
-        notifier = executable(self.space / "notifier",
-                              '#!/bin/sh\nprintf "%s\\n" "$*" >> "$(dirname "$0")/notified"\n')
-        patched = mock.patch.dict(os.environ, {"CONTOUR_NOTIFIER": str(notifier),
-                                               "CONTOUR_HOME": str(self.space / "home")})
-        patched.start()
-        self.addCleanup(patched.stop)
-
-    def parked(self, tool, call, requester="the nightly agent"):
-        run = Run(self.space, drive=lambda prompt, options, gate, say: gate(tool, dict(call)))
-        run.start("make the beak longer", ceiling=10**6, requester=requester)
-        self.addCleanup(lambda: run.live and run.end())
-        deadline = time.monotonic() + WAIT_S
-        while (last_run.read(self.space) or {}).get("state") != "waiting for you":
-            self.assertLess(time.monotonic(), deadline, last_run.read(self.space))
-            time.sleep(0.01)
-        # The notifier runs on its own; long enough for one that was posted
-        # to have written, and for one that was not to have had the chance.
-        settle = time.monotonic() + (WAIT_S if requester else 1)
-        while not self.said.exists() and time.monotonic() < settle:
-            time.sleep(0.05)
-        time.sleep(0.1)
-        return self.said.read_text().splitlines() if self.said.exists() else []
-
-    def test_a_parked_gate_says_the_space_and_the_act(self):
-        said = self.parked("Edit", {"file_path": "spec.yaml", "old_string": "a",
-                                    "new_string": "b"})
-        self.assertEqual(said, [f"{self.space.name} is waiting for you: "
-                                f"Claude wants to change the spec"])
-
-    def test_a_parked_question_says_so_too(self):
-        said = self.parked("AskUserQuestion", {"questions": [{"question": "How long?"}]})
-        self.assertEqual(said, [f"{self.space.name} is waiting for you: "
-                                f"Claude has a question"])
-
-    def test_a_run_somebody_is_watching_posts_nothing(self):
-        self.assertEqual(self.parked("Edit", {"file_path": "spec.yaml",
-                                              "old_string": "a", "new_string": "b"},
-                                     requester=None), [])
-
-
-class OnMacTest(unittest.TestCase):
-    """What posts it with no hatch set, on this machine's kind of machine."""
-
-    def test_a_quote_in_the_words_stays_inside_the_notification(self):
-        with mock.patch.dict(os.environ, {"CONTOUR_NOTIFIER": ""}), \
-                mock.patch.object(notify.sys, "platform", "darwin"):
-            argv = notify.command('the "big" chair is waiting for you: a\\b')
-        self.assertEqual(argv, ["osascript", "-e", 'display notification '
-                                '"the \\"big\\" chair is waiting for you: a\\\\b" '
-                                'with title "Contour"'])
-
-
 class LobbyTest(LobbyEnterCase):
     """The lobby's enter, the other door to the same console."""
 
@@ -224,7 +162,7 @@ class LobbyTest(LobbyEnterCase):
             self.tmp / "browser", '#!/bin/sh\necho "$PPID $1" >> "$(dirname "$0")/opened"\n'))
         self.env.update(CONTOUR_CONSOLE_PYTHON=sys.executable,
                         CONTOUR_CONSOLE_AGENT=f"{STAND_IN}:drive",
-                        CONTOUR_AGENT_SCRIPT=json.dumps([{"call": SPEC_WRITE}]))
+                        CONTOUR_AGENT_SCRIPT=json.dumps([ASK]))
         self.addCleanup(self.close_consoles)
         said = json.loads(self.contour("request", "alpha", "make the beak longer",
                                        cwd=self.spaces).stdout)

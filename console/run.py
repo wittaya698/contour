@@ -12,9 +12,8 @@ import secrets
 import threading
 from pathlib import Path
 
-from console import last_run, launcher, seed, spend, vetoes
-from lib import activity, gate as gate_words, intent, lock, marks, notify, policy
-from lib import last_run as last_run_lib
+from console import approvals, last_run, launcher, seed, spend, vetoes
+from lib import activity, gate as gate_words, intent, lock, marks, policy
 from lib.last_run import ENDED
 
 
@@ -249,7 +248,8 @@ class Run:
             last_run.write(self.space, self.latest)
 
     def gate(self, tool, payload):
-        """Stop, and wait for the user. Returns (allow, reason) — or, for a
+        """Stop, and wait for the user — or, in a run nobody is watching, set the
+        call aside for them. Returns (allow, reason) — or, for a
         question in a run nobody is watching, (True, the person's answers).
 
         The launcher is asked what the call *means* and the answer is a category
@@ -286,6 +286,10 @@ class Run:
             # leaves by the same door an answered gate leaves by, so what has to
             # happen before an approved call still happens.
             return self.approved(True, None, category)
+        if self.requester is not None:
+            # Nobody to wait for: the act waits instead, and the run goes on
+            # (ADR 0028, decision 1).
+            return self.aside(category, tool, payload)
         # The gate carries its own id rather than its place in the transcript.
         # The page can only learn it from the event, so a verdict cannot arrive
         # before there is something to receive it, and a stale one from a
@@ -317,13 +321,34 @@ class Run:
         self.gates += 1
         return self.approved(waiting["allow"], waiting["reason"], category)
 
+    def aside(self, category, tool, payload):
+        """Set a call aside for the person, in a run nobody is watching, and
+        tell the agent so (ADR 0028, decision 1). Returns (False, why).
+
+        Not a park: the run goes on, and the call waits in the space with what
+        its gate would have shown, for whenever the person looks. Not a veto
+        either, because nobody refused it; the agent is told it waits, so that
+        it does not read a no and try the same thing another way.
+        """
+        case = self.proposal()
+        said = gate_words.say(category, self.space, tool, payload, case)
+        kept = approvals.set_aside(self.space, self.record["run"], category, tool,
+                                   payload, said, case)
+        # The act and nothing under it, as for a veto: the call, the diff and
+        # the case are the page's (rule 1).
+        with self._lock:
+            self.latest.setdefault("approvals", []).append(said["act"])
+        self.say("aside", id=kept["id"], category=category, act=said["act"],
+                 text=f"set aside for you to answer later: {said['act']}")
+        return False, (f"set aside for the user, who will answer it later on the "
+                       f"page ({said['act']}): carry on with what does not depend "
+                       f"on it, do not try it another way, and say in your closing "
+                       f"what waits on it")
+
     def parked(self, act, **said):
-        """Wait for the person, and say so: in the record, and, when nobody was
-        watching, on this machine itself, so that reaching them never rests on
-        a requester relaying anything (ADR 0027, decisions 7 and 8)."""
+        """Wait for the person, and say so in the record (ADR 0027, decision
+        8). Nothing is posted on the machine: no banner (ADR 0028, decision 4)."""
         self.now("waiting for you", act=act, **said)
-        if self.requester is not None:
-            notify.post(last_run_lib.waiting(self.space, act))
 
     def asked(self, payload):
         """Park on a question in a run nobody is watching, and return

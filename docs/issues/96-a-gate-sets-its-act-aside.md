@@ -16,12 +16,12 @@ go. An attended run's gates still wait for the person, as before.
 
 ## Acceptance criteria
 
-- [ ] A floor gate in an unattended run sets its act aside, the call is not made, and the run carries on to its end
-- [ ] A gate for a category not on the ask-list does the same
-- [ ] What is kept holds the call as written, the act, the diff and the agent's case; the run record holds only the act
-- [ ] The agent's tool result says the act was set aside for the person
-- [ ] No notification is posted, and nothing in the toolkit posts one
-- [ ] An attended run's gates are unchanged
+- [x] A floor gate in an unattended run sets its act aside, the call is not made, and the run carries on to its end
+- [x] A gate for a category not on the ask-list does the same
+- [x] What is kept holds the call as written, the act, the diff and the agent's case; the run record holds only the act
+- [x] The agent's tool result says the act was set aside for the person
+- [x] No notification is posted, and nothing in the toolkit posts one
+- [x] An attended run's gates are unchanged
 
 ## Blocked by
 

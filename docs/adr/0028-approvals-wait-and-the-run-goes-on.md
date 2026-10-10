@@ -57,7 +57,7 @@ answer later, and that it should finish what does not depend on the answer and
 say in its closing what it could not do without one. Only the person answers it,
 on the page, as ADR 0027 decision 12 says. Answering it later starts an attended
 run in that console whose first message is the question and the answer, because
-nothing resumes. This gives up decision 12's reason for parking, which was to keep
+nothing resumes. This gives up ADR 0027 decision 12's reason for parking, which was to keep
 the run's context over a one-word answer, in exchange for a run that does not stop
 dead at its first question.
 
@@ -102,7 +102,7 @@ answer them.* A stop does not answer them, and neither does the ceiling. Both st
 end the run, and what was set aside stays waiting.
 
 **8. Unchanged:** the floor (ADR 0027, decision 10) and why it holds with the page
-open (decision 11); the ceiling (13); a requester never answering anything (2); a
+open (ADR 0027, decision 11); the ceiling (13); a requester never answering anything (2); a
 request being prose alone (5); refusal while a console is open (6); the record
 being a status, not a history (8); and stop (9), except that a run no longer parks
 for it to interrupt.

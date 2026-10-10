@@ -32,7 +32,6 @@ from lib import marks as marks_store, panel, views, vetoes as vetoes_reading
 
 from test_launcher import stages, stub_blender
 import one_run     # one suite run per machine (issue 94)
-import quiet       # no notification on the screen (issue 91)
 from budget import slow
 
 CONSOLE = ROOT / "contour-console"

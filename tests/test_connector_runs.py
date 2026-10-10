@@ -10,7 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from test_channel import SPEC_WRITE, ChannelCase    # noqa: E402
+from test_channel import ASK, ChannelCase    # noqa: E402
 from test_connector import call    # noqa: E402
 from test_console import STAND_IN    # noqa: E402
 
@@ -56,7 +56,7 @@ class RequestTest(RunsCase):
 class StopTest(RunsCase):
 
     def test_stop_ends_a_parked_run_as_contour_stop_does(self):
-        self.requested({"call": SPEC_WRITE})
+        self.requested(ASK)
         self.until("waiting for you")
         _, said = self.tool("stop", space="alpha")
         self.assertEqual(said, {"ok": True, "lines": [
@@ -103,7 +103,7 @@ class NoAnswerTest(RunsCase):
                              t["name"])
 
     def test_no_request_or_stop_carries_a_console_url(self):
-        text, said = self.tool("request", ({"call": SPEC_WRITE},),
+        text, said = self.tool("request", (ASK,),
                                space="alpha", prose="make the beak longer")
         self.assertTrue(said["started"], said)
         self.until("waiting for you")

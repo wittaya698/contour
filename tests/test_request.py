@@ -102,11 +102,12 @@ class StartsTest(RequestCase):
         self.assertTrue(self.gone(), "the console outlived its run with no page open")
         self.assertIsNone(lock.holder(self.beaky))
 
-    def test_a_parked_gate_outlives_the_idle_clock_and_a_stop_ends_it(self):
-        """Silence is not a verdict (ADR 0027, decision 9): with nobody there,
-        the console waits at the gate for as long as it takes, and ends with its
-        run when somebody stops it."""
-        said, _ = self.request("make the beak longer", script=({"call": SPEC_WRITE},),
+    def test_a_parked_question_outlives_the_idle_clock_and_a_stop_ends_it(self):
+        """Silence is not an answer (ADR 0027, decision 9): with nobody there,
+        the console waits at the question for as long as it takes, and ends with
+        its run when somebody stops it."""
+        said, _ = self.request("make the beak longer",
+                               script=({"ask": [{"question": "How long?"}]},),
                                CONTOUR_CONSOLE_IDLE="1")
         self.assertTrue(said["started"], said)
         self.until("waiting for you")
@@ -147,30 +148,33 @@ class FloorTest(RecordCase):
         patched.start()
         self.addCleanup(patched.stop)
 
-    def gates(self, tool, call, requester):
-        """Whether this call stops at a gate, in a run started by `requester`."""
-        stopped = []
-        run = Run(self.space, drive=lambda prompt, options, gate, say: gate(tool, dict(call)))
+    def through(self, tool, call, requester):
+        """Whether this call is made without the person, in a run started by
+        `requester`: not parked, and not set aside for later."""
+        given = []
+        run = Run(self.space, drive=lambda prompt, options, gate, say:
+                  given.append(gate(tool, dict(call))))
         run.start("make the beak longer", ceiling=10**6, requester=requester)
         self.addCleanup(lambda: run.live and run.end())
         deadline = time.monotonic() + WAIT_S
         while run.live and time.monotonic() < deadline:
             if run.pending is not None:
-                stopped.append(True)
                 run.end()
+                return False
             time.sleep(0.01)
-        return bool(stopped)
+        [(allow, _)] = given
+        return allow
 
-    def test_an_unattended_run_gates_the_floor_whatever_the_list_says(self):
+    def test_an_unattended_run_holds_back_the_floor_whatever_the_list_says(self):
         for tool, call in FLOOR:
-            self.assertTrue(self.gates(tool, call, "the nightly agent"), call)
+            self.assertFalse(self.through(tool, call, "the nightly agent"), call)
 
     def test_an_unattended_run_lets_through_what_the_list_lets_through(self):
-        self.assertFalse(self.gates("Bash", {"command": "contour check"},
-                                    "the nightly agent"))
+        self.assertTrue(self.through("Bash", {"command": "contour check"},
+                                     "the nightly agent"))
 
     def test_an_attended_run_follows_the_list_alone(self):
-        self.assertFalse(self.gates(*FLOOR[0], None))
+        self.assertTrue(self.through(*FLOOR[0], None))
 
 
 class PageTest(RequestCase):
@@ -192,8 +196,10 @@ class PageTest(RequestCase):
     def test_opening_the_page_mid_run_does_not_lift_the_floor(self):
         proc, url = self.opened({"busy": 1}, {"call": SPEC_WRITE})
         self.keep_beating(url, proc)
-        gate, said = self.gate(url)
-        self.assertEqual(gate["category"], "spec-write")
+        said = self.transcript(url, lambda ev: any(e["kind"] == "aside" for e in ev))
+        [aside] = [e for e in said if e["kind"] == "aside"]
+        self.assertEqual(aside["category"], "spec-write")
+        self.assertNotIn("gate", [e["kind"] for e in said])
         self.assertIn("this run was asked for by the nightly agent; "
                       "some actions always ask you",
                       [e.get("text") for e in said])
