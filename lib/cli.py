@@ -552,6 +552,30 @@ def on_asks(cmd, rest, held):
     return emit({"ok": True, "lines": policy.report(PROJECT)})
 
 
+def on_ceiling(cmd, rest, held):
+    """Show, set or remove the ceiling (ADR 0027, decision 13). The person's,
+    beside the ask-list: a run that could raise its own limit would have none."""
+    from lib import ceiling
+    if not rest:
+        n = ceiling.read()
+        print(f"ceiling {n} weighted tokens per unattended run" if n is not None
+              else "no ceiling: an unattended run is refused until one is set")
+        return 0
+    if os.environ.get("CONTOUR_RUN"):
+        return emit({"ok": False, "lines": [
+            "FAIL a run cannot set its own ceiling; the person sets it"]})
+    if rest[0] == "--remove":
+        ceiling.remove()
+        return emit({"ok": True, "lines": [
+            "ok   no ceiling: an unattended run is refused until one is set"]})
+    try:
+        n = ceiling.set(int(rest[0]) if rest[0].isdigit() else rest[0])
+    except ValueError as e:
+        return emit({"ok": False, "lines": [f"FAIL {e}"]})
+    return emit({"ok": True, "lines": [f"ok   ceiling {n} weighted tokens per "
+                                       f"unattended run"]})
+
+
 def on_hook(cmd, rest, held):
     return run_hook(rest[0], rest[1:])
 

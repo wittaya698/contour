@@ -138,6 +138,12 @@ TABLE = (
                                      "for the page, not the agent"),
              ("asks --undo <category>", "ask about it again in this space; --json says "
                                         "it for a client")), "on_asks"),
+    Command("ceiling", (0, 1), False, False, None,
+            (("ceiling", "what an unattended run may spend, in weighted tokens"),
+             ("ceiling <n>", "stop unattended runs at n weighted tokens; for you, "
+                             "not the agent"),
+             ("ceiling --remove", "no ceiling, so unattended runs are refused")),
+            "on_ceiling"),
     Command("hook", ANY, False, False, None,
             (("hook <name>", "run a guard; for hooks to call, not you"),), "on_hook"),
 )

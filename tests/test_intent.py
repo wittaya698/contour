@@ -241,6 +241,9 @@ INTENTLESS = {
                "refuses any path or name already taken, so it overwrites nothing",
     "intents": "prints this very vocabulary",
     "asks": "prints the ask-list; gating the audit would gate reading the gate",
+    "ceiling": "prints the ceiling; the console refuses its agent the setting "
+               "of one outright, as it refuses the ask-list's writer (ADR 0027, "
+               "decision 13)",
     "hook": "is a guard, run by git and Claude Code rather than by an agent",
 }
 

@@ -14,10 +14,10 @@ a run somebody is watching.
 
 ## Acceptance criteria
 
-- [ ] The ceiling can be set, shown and removed, and nothing in a space writes it
-- [ ] A run carrying a ceiling stops at the first turn that reaches it, and not before
-- [ ] Reaching it is a stop: no gate answered, edits kept, the record says why
-- [ ] An attended run is never stopped by a ceiling
+- [x] The ceiling can be set, shown and removed, and nothing in a space writes it
+- [x] A run carrying a ceiling stops at the first turn that reaches it, and not before
+- [x] Reaching it is a stop: no gate answered, edits kept, the record says why
+- [x] An attended run is never stopped by a ceiling
 
 ## Blocked by
 

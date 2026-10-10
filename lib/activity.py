@@ -44,6 +44,7 @@ CONTOUR = {
     "purge": "Removed a deleted model for good",
     "intents": "Listed what Claude asks before doing",
     "asks": "Looked at what runs without asking",
+    "ceiling": "Looked at what a run left alone may spend",
     "hook": "Ran a safety check",
 }
 """`contour` command -> what it did. Every command `lib/commands.py` holds is

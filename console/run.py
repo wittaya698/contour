@@ -107,14 +107,19 @@ class Run:
         self.gates = 0                        # gates this run has stopped at
         self.prompt = ""                      # what this run was asked to do
         self.latest = None                    # what the space's run record says
+        self.ceiling = None                   # the weighted spend it stops at
         self._lock = threading.Lock()
         self._thread = None
 
-    def start(self, prompt, marks_selected=()):
+    def start(self, prompt, marks_selected=(), ceiling=None):
         """Begin. The prompt is the transcript's first line, because it is the
         first turn and the page is showing a conversation — so what is said there
         is the composed prompt and not the prose, because the composed one is
-        what the agent was actually given (ADR 0019, decision 21)."""
+        what the agent was actually given (ADR 0019, decision 21).
+
+        `ceiling` is what an unattended run may spend, in weighted tokens, before
+        it is stopped (ADR 0027, decision 13). A run somebody is watching carries
+        none: the stop is the person (ADR 0019, decision 37)."""
         prompt, self.seeded = seed.compose(self.space, prompt, marks_selected)
         # Hold the space first: a run whose transcript had started and whose
         # hold had been refused would be a run the user was watching happen
@@ -122,6 +127,7 @@ class Run:
         self.stopped = False
         self.gates = 0
         self.prompt = prompt
+        self.ceiling = ceiling
         self.record = lock.take(self.space, "console run")
         self.latest = {"run": self.record["run"], "prompt": prompt,
                        "requester": None, "vetoes": []}
@@ -236,10 +242,13 @@ class Run:
             raise Stopped()
         if policy.rewrites(tool, payload):
             # Not a gate: one the user allowed by reflex would be the agent
-            # granting itself builds by the user's hand. The list is written
-            # from the page, by the user (ADR 0025, decision 6).
-            why = ("the ask-list is the user's to change, from the page's "
-                   "Always and Undo; ask them instead")
+            # granting itself builds, or a bigger budget, by the user's hand.
+            # The list is written from the page, by the user (ADR 0025,
+            # decision 6), and the ceiling from a terminal (ADR 0027,
+            # decision 13).
+            why = ("the ask-list and the ceiling are the user's to change: the "
+                   "list from the page's Always and Undo, the ceiling from their "
+                   "terminal; ask them instead")
             self.say("refused", text=why)
             return False, why
         category = intent.classify(tool, payload)
@@ -379,7 +388,14 @@ class Run:
             # cost is watched, and it reads the transcript from a cursor — so a
             # reloaded tab gets the figure back with everything else instead of
             # whatever was spent after it reconnected.
-            return self.say("spend", **spend.total(self.space, here))
+            spent = spend.total(self.space, here)
+            event = self.say("spend", **spent)
+            if self.ceiling is not None and spent["weighted"] >= self.ceiling:
+                # The stop the user would have made, decided in advance: no gate
+                # answered, the edits kept (ADR 0027, decisions 9 and 13).
+                self.end(f"reached your limit of {self.ceiling}")
+                raise Stopped()
+            return event
         if kind == "call":
             # What the call did, in words, beside the call itself, which the
             # page keeps one click away (ADR 0025, decision 8).

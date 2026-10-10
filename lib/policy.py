@@ -216,16 +216,23 @@ def dumps(doc, indent=0):
 # a spec write: blunt on purpose, since a false positive costs an agent one
 # refused call and a false negative is an agent granting itself permissions.
 WRITER = re.compile(r"\bcontour\b.*\basks\b.*--(always|undo)\b", re.S)
+# And the ceiling's writer: `contour ceiling` with anything after it, since its
+# one reading is the bare word (ADR 0027, decision 13).
+LIMITER = re.compile(r"\bcontour\b.*\bceiling\b[ \t]+\S", re.S)
 
 
 def rewrites(tool, payload):
-    """Whether this call would change the ask-list, by the command that writes
-    it or by touching the file. The console refuses such a call from its agent
-    outright: the list is the user's, written from the page (ADR 0025,
-    decision 6), and an agent widening its own permissions is what it exists to
-    prevent."""
+    """Whether this call would change the ask-list or the ceiling, by the
+    command that writes it or by touching the file. The console refuses such a
+    call from its agent outright: the list is the user's, written from the page
+    (ADR 0025, decision 6), the ceiling is theirs from a terminal (ADR 0027,
+    decision 13), and an agent widening its own permissions or its own budget
+    is what each exists to prevent."""
+    from lib import ceiling           # which reads `home` from here
+    kept = (ask_list().name, ceiling.NAME)
     if tool in ("Write", "Edit", "MultiEdit", "NotebookEdit"):
         named = payload.get("file_path") or payload.get("notebook_path") or ""
-        return Path(named).name == ask_list().name
+        return Path(named).name in kept
     text = payload.get("command") or ""
-    return ask_list().name in text or bool(WRITER.search(text))
+    return any(name in text for name in kept) \
+        or bool(WRITER.search(text) or LIMITER.search(text))
