@@ -366,7 +366,10 @@ set aside for you, and the run carries on. Its console shows what waits, oldest
 first, with the diff and Claude's case, whenever you open it: allow makes the
 call then, and deny is a veto. A question is set aside the same way, in its
 place in the order: your answer starts a new run in that console, with the
-question and the answer as its first message. Its answers are meant to read as the pages do, in plain words. Otherwise
+question and the answer as its first message. Until they are answered, the
+lobby's row and `status` say how many wait and for what, never why, and a
+request to that space is refused; the chat asks whether you want to answer
+them now, which is `open`, or later. Its answers are meant to read as the pages do, in plain words. Otherwise
 it never builds, writes, marks or holds anything in a space: to change a model
 yourself, open its console. Every space it finds is visible to the chat,
 so what you ask about goes to the model provider. Installing the connector is

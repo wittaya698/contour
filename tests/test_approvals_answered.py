@@ -7,6 +7,7 @@ longer applies is dropped and is no veto, because nobody considered it.
 """
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -39,7 +40,10 @@ def git(space, *args):
 class AnsweredCase(ConsoleCase):
 
     def setUp(self):
-        self.beaky = self.space()
+        # A directory of its own, named as a space is: where `spaces` looks
+        # for it, there is nothing else to walk.
+        self.beaky = Path(tempfile.mkdtemp()) / "beaky"
+        shutil.move(str(self.space()), str(self.beaky))
         (self.beaky / ".gitignore").write_text(".contour/*\n!.contour/project\nsheet.png\n")
         (self.beaky / "spec.yaml").write_text("revision: 1\ndepth: 600\n")
         git(self.beaky, "init", "-q")

@@ -71,6 +71,10 @@ def row(root, now):
             # (ADR 0027, decision 7).
             "waiting": last_run.parked(root),
             "unattended": last_run.unattended(root),
+            # What waits in the space for the person, after its run has ended:
+            # the acts, never why (ADR 0028, decision 5).
+            "approvals": last_run.approvals(root),
+            "awaiting": last_run.awaiting(last_run.approvals(root)),
             "renamed": renamed(root),
             "updated": update.uncommitted(root)}
 
@@ -179,11 +183,14 @@ def status(root):
     held = held_by(rec) if rec and lock.alive(rec) else None
     if held and verdict:
         said.append(f"a run is live ({held}); this verdict is from before it")
+    waits = last_run.approvals(root)
+    if waits:
+        said.append(last_run.awaiting(waits))
     return {"verdict": verdict, "plain": verdict and plainly.say(verdict),
             "held": held, "said": said,
             "marks": sum(1 for m in marks.load(here.marks) if marks.is_open(m)),
             "vetoes": vetoes.uncommitted(root),
-            "doctor": out_of_step(root), "run": run}
+            "doctor": out_of_step(root), "run": run, "approvals": waits}
 
 
 def log(root, lines=40):

@@ -16,7 +16,7 @@ import subprocess
 import time
 from pathlib import Path
 
-from console import launcher, vetoes
+from console import last_run, launcher, vetoes
 from lib import intent, lock, marks, space as space_lib, store
 
 TOOLKIT = Path(__file__).resolve().parent.parent
@@ -55,6 +55,14 @@ def set_aside(space, run, category, tool, call, said, case):
                 "said": said, "case": case}
     save(space, kept + [approval])
     return approval
+
+
+def acts(space):
+    """What waits, as the run record says it: each act in its plain words, or
+    a question's text, and never the call, the diff or the case (ADR 0028,
+    decision 5)."""
+    return [" ".join(q.get("question", "") for q in a["call"].get("questions") or ())
+            if a["category"] == QUESTION else a["said"]["act"] for a in load(space)]
 
 
 def save(space, approvals):
@@ -110,7 +118,7 @@ def answer(space, at, allow, reason=None, answers=None):
     if found["category"] == QUESTION:
         if not answers:
             return {"answered": False, "why": "a question is answered with its answers"}
-        save(space, [a for a in load(space) if a["id"] != at])
+        dropped(space, at)
         return {"answered": True, "id": at, "outcome": "answered", "said": "",
                 "prompt": asked(found["call"], answers)}
     if allow:
@@ -121,8 +129,15 @@ def answer(space, at, allow, reason=None, answers=None):
     else:
         vetoes.record(space, found["category"], found["tool"], found["call"], reason)
         outcome, said = "vetoed", reason or ""
-    save(space, [a for a in load(space) if a["id"] != at])
+    dropped(space, at)
     return {"answered": True, "id": at, "outcome": outcome, "said": said}
+
+
+def dropped(space, at):
+    """No longer waiting, here and in the run record, which is where the lobby,
+    `status` and a request learn what waits: they never read this store."""
+    save(space, [a for a in load(space) if a["id"] != at])
+    last_run.amend(space, approvals=acts(space))
 
 
 def asked(call, answers):

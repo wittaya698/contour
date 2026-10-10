@@ -20,3 +20,9 @@ def write(space, record):
     beside = where.with_name(where.name + ".new")
     store.save(beside, record)
     os.replace(beside, where)
+
+
+def amend(space, **fields):
+    """Change some of the record and keep the rest: what waits in the space
+    moves when the person answers it, after the run that set it aside ended."""
+    write(space, {**store.load(path(space), {}), **fields})

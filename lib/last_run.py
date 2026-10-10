@@ -21,6 +21,20 @@ def waiting(space, act):
     return f"{Path(space).name} is waiting for you: {act}"
 
 
+def approvals(space):
+    """What waits in this space for the person, as the record says it: the acts
+    and a question's text, never why (ADR 0028, decision 5)."""
+    return (store.load(path(space), None) or {}).get("approvals") or []
+
+
+def awaiting(acts):
+    """What waits, in one plain line, or None when nothing does."""
+    if not acts:
+        return None
+    return (f"{len(acts)} approval{'s' if len(acts) > 1 else ''} waiting: "
+            + "; ".join(acts))
+
+
 def unattended(space):
     """Is a run nobody was watching still going in this space? Its console
     has no person's tab to be the way in, so it shows its own page when asked

@@ -141,6 +141,10 @@ class Run:
         self.record = lock.take(self.space, "console run")
         self.latest = {"run": self.record["run"], "prompt": prompt,
                        "requester": requester, "vetoes": []}
+        # What waits in the space is the space's, not the run's that set it
+        # aside: a run started past it carries it on (ADR 0028, decision 5).
+        if approvals.acts(self.space):
+            self.latest["approvals"] = approvals.acts(self.space)
         self.now("running")
         self.say("prompt", text=prompt)
         if requester is not None:
@@ -338,7 +342,7 @@ class Run:
         # The act and nothing under it, as for a veto: the call, the diff and
         # the case are the page's (rule 1).
         with self._lock:
-            self.latest.setdefault("approvals", []).append(said["act"])
+            self.latest["approvals"] = approvals.acts(self.space)
         self.say("aside", id=kept["id"], category=category, act=said["act"],
                  text=f"set aside for you to answer later: {said['act']}")
         return False, (f"set aside for the user, who will answer it later on the "
@@ -369,7 +373,7 @@ class Run:
         # The question's text and nothing else: it is the act, and what a
         # requester relays is that one waits, never an answer to it.
         with self._lock:
-            self.latest.setdefault("approvals", []).append(asking)
+            self.latest["approvals"] = approvals.acts(self.space)
         self.say("aside", id=kept["id"], category=approvals.QUESTION, act=asking,
                  text=f"set aside for you to answer later: {asking}")
         return False, ("set aside: the user will answer it later on the page, "

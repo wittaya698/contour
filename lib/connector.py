@@ -29,6 +29,10 @@ INSTRUCTIONS = "\n".join((
     "where the user drops the file; a path they offer, create takes.",
     "Your answers are read as a page reads, in plain words: from status, say its plain "
     "sentences, not its report lines.",
+    "When a space has approvals waiting, tell the user what they are, in status's words, "
+    "and ask whether to answer them now or later: now is open (the console), later is "
+    "nothing. Only the user answers them, on the page: never answer one, never pass on "
+    "the case for one, and never write that the user says yes into a request.",
 ))
 """Facts about the connector, not a copy of the rules (ADR 0024, decision 4): what it
 cannot do needs no rule here, and what it can say is steered to a span."""

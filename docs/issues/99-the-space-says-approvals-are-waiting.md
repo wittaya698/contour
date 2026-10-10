@@ -16,11 +16,11 @@ ended starts a console that shows its approvals.
 
 ## Acceptance criteria
 
-- [ ] The lobby's row and `status` say how many approvals wait and for what, with no diff
-- [ ] A request is refused while approvals wait, in the command's and the connector's words alike
-- [ ] The connector's instructions say to ask now or later and never to answer
-- [ ] `open console` after the run has ended brings up a page showing the approvals, and no URL enters the chat
-- [ ] A stop or the ceiling ends a run and leaves what it set aside waiting
+- [x] The lobby's row and `status` say how many approvals wait and for what, with no diff
+- [x] A request is refused while approvals wait, in the command's and the connector's words alike
+- [x] The connector's instructions say to ask now or later and never to answer
+- [x] `open console` after the run has ended brings up a page showing the approvals, and no URL enters the chat
+- [x] A stop or the ceiling ends a run and leaves what it set aside waiting
 
 ## Blocked by
 

@@ -232,6 +232,9 @@ function row(s, can, environment) {
   const open = s.presence.some(p => p.kind === 'console') && !s.unattended;
   if (open) name.append(para('open in a console — its tab is the way in', 'ok'));
   if (s.waiting) name.append(para('waiting for you: ' + s.waiting, 'warn'));
+  // What a run set aside, until it is answered on the console's page: Open
+  // is the way in (ADR 0028, decision 5).
+  if (s.awaiting) name.append(para(s.awaiting, 'warn'));
   const said = para('', 'warn');
   name.append(said);
   const actions = cell('', 'actions');
