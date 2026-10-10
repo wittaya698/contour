@@ -157,13 +157,17 @@
                   padding-left: 6px; opacity: .8; }
   /* A gate. Bordered in the colour every other *stop and look* on this page
      uses, because it is the one line of the transcript that is waiting for you. */
-  #turns .gate { border: 1px solid var(--pin); border-radius: 6px; padding: 8px;
+  #run .gate { border: 1px solid var(--pin); border-radius: 6px; padding: 8px;
                  display: flex; flex-direction: column; gap: 6px; }
-  #turns .act { font-weight: 700; color: var(--pin); }
+  #run .act { font-weight: 700; color: var(--pin); }
   /* Answered: no longer waiting on anybody, so no longer in the waiting colour. */
-  #turns .gate.answered { border-color: var(--line); }
-  #turns .gate.answered .act { color: inherit; }
-  #turns .gate .answer { margin: 4px 0 0; opacity: .6; }
+  #run .gate.answered { border-color: var(--line); }
+  #run .gate.answered .act { color: inherit; }
+  #run .gate .answer { margin: 4px 0 0; opacity: .6; }
+  /* An approval waiting: a gate, read later, with the agent's case above it. */
+  #approvals { margin: 0 0 8px; padding-left: 18px; display: flex;
+               flex-direction: column; gap: 6px; }
+  #approvals .case { margin: 0; white-space: pre-line; opacity: .8; }
   /* A question: a gate's border, since it too is waiting for you. */
   #turns .question .asked { margin: 0; padding-left: 18px; display: flex;
                             flex-direction: column; gap: 6px; }
@@ -240,6 +244,13 @@
        another. -->
   <section id="run" data-needs="drive">
     <h1>Run</h1>
+    <!-- What a run nobody was watching set aside for you, oldest first, each
+         as its gate would have shown it (ADR 0028, decision 3). Above the
+         transcript, because no new run starts until they are answered. -->
+    <div id="waiting" hidden>
+      <h2>Waiting for you</h2>
+      <ol id="approvals"></ol>
+    </div>
     <ol id="turns"></ol>
     <p id="state">no run yet</p>
     <!-- What the run has cost: turns, and the stops that cost turns, with the
@@ -438,6 +449,8 @@ function drive() {
   // route that host does not have.
   refreshVetoes();
   setInterval(refreshVetoes, 2000);
+  refreshApprovals();
+  setInterval(refreshApprovals, 2000);
   refreshUnwatched();
   refreshExport();
   setInterval(refreshExport, 2000);
@@ -637,7 +650,7 @@ function activity(event) {
 // back to the agent as the call's result, which makes it the cheapest correction
 // channel in the system — a sentence, at the moment it applies, instead of a
 // paragraph after the fact.
-function gate(event) {
+function gate(event, send) {
   const li = document.getElementById('gate').content.firstElementChild.cloneNode(true);
   const said = event.said;
   li.dataset.gate = event.id;
@@ -659,6 +672,7 @@ function gate(event) {
   const because = li.querySelector('.because');
   const answer = async (allow, always) => {
     for (const b of li.querySelectorAll('button')) b.disabled = true;
+    if (send) return send(allow, because.value.trim());
     await ask('/verdict', { id: event.id, allow: allow, reason: because.value.trim(),
                             always: always });
     if (always) refreshUnwatched();
@@ -669,6 +683,56 @@ function gate(event) {
   li.querySelector('.always').hidden = !said.always;
   li.querySelector('.always').addEventListener('click', () => answer(true, true));
   li.querySelector('.deny').addEventListener('click', () => answer(false));
+  return li;
+}
+
+// What an unattended run set aside, oldest first (ADR 0028, decision 3).
+// Redrawn only when the list changes, so a reason being typed is not wiped by
+// the clock that keeps it current.
+let approvalsShown = null;
+async function refreshApprovals() {
+  const said = await ask('/approvals').then(r => r.json()).catch(() => null);
+  if (!said) return;
+  const ids = said.approvals.map(a => a.id + a.next).join(' ');
+  if (ids === approvalsShown) return;
+  approvalsShown = ids;
+  document.getElementById('approvals').replaceChildren(...said.approvals.map(approval));
+  document.getElementById('waiting').hidden = !said.approvals.length;
+}
+
+const OUTCOME = { 'applied': 'done', 'vetoed': 'you said no',
+                  'no longer applies': 'no longer applies, so it was dropped',
+                  'refused': 'refused', 'failed': 'it failed' };
+
+// One approval: a gate, read later, with the agent's case for it, answered by
+// its own route. Only the next can be answered, because a save set aside after
+// a spec write must not be answered before it.
+function approval(a) {
+  const li = gate({ id: a.id, tool: a.tool, call: a.call, said: a }, async (allow, reason) => {
+    const said = await ask('/approval', { id: a.id, allow: allow, reason: reason })
+      .then(r => r.json()).catch(() => null);
+    const line = document.createElement('li');
+    line.className = 'verdict';
+    line.textContent = said && said.answered
+      ? a.act + ' — ' + OUTCOME[said.outcome] + (said.said ? ': ' + said.said : '')
+      : (said && said.why) || 'not answered';
+    document.getElementById('turns').append(line);
+    approvalsShown = null;
+    refreshApprovals();
+    refreshVetoes();
+  });
+  delete li.dataset.gate;
+  li.querySelector('.always').remove();
+  if (a.case) {
+    const why = document.createElement('p');
+    why.className = 'case';
+    why.textContent = a.case;
+    li.querySelector('.act').after(why);
+  }
+  if (!a.next) {
+    for (const b of li.querySelectorAll('button')) b.disabled = true;
+    li.title = 'answer the one above first';
+  }
   return li;
 }
 

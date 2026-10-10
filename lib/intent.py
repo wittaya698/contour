@@ -21,6 +21,11 @@ from lib import commands
 # ask-list compares two lists that do not move.
 CATEGORIES = ("spec-write", "ref-write", "build", "commit", "push")
 
+ROOT = "CLAUDE_PROJECT_DIR"
+"""Where a hook is told which space it is guarding, and so where the paths in a
+call are judged from: the guard reads it, and a console that makes a set-aside
+call later names the space in it, so an inherited one never points elsewhere."""
+
 
 # Signs that a shell call writes rather than reads. Blunt on purpose: a false
 # positive costs one click at a gate, a false negative is a rule that has

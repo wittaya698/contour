@@ -15,12 +15,12 @@ waiting.
 
 ## Acceptance criteria
 
-- [ ] A console opened after the run has ended shows its approvals, oldest first
-- [ ] Allowing a spec write applies the agent's edit as written, and `contour check`'s revision guard still applies to it
-- [ ] Allowing a save makes the commit, after the person has seen the diff and the panel
-- [ ] Denying records a veto with the call, the reason and the build, as a gate's deny does
-- [ ] A call that no longer applies is dropped, said so on the page, and is not a veto
-- [ ] An approval cannot be answered before the one set aside ahead of it
+- [x] A console opened after the run has ended shows its approvals, oldest first
+- [x] Allowing a spec write applies the agent's edit as written, and `contour check`'s revision guard still applies to it
+- [x] Allowing a save makes the commit, after the person has seen the diff and the panel
+- [x] Denying records a veto with the call, the reason and the build, as a gate's deny does
+- [x] A call that no longer applies is dropped, said so on the page, and is not a veto
+- [x] An approval cannot be answered before the one set aside ahead of it
 
 ## Blocked by
 

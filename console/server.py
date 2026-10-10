@@ -15,6 +15,7 @@ import time
 import webbrowser
 from pathlib import Path
 
+from console import approvals as approval_store
 from console import run as run_lib
 from console import vetoes as veto_store
 from console import launcher
@@ -164,6 +165,8 @@ class Console:
                     ("GET", "/events"): self.transcript,
                     ("POST", "/verdict"): self.verdict,
                     ("POST", "/answer"): self.answered,
+                    ("GET", "/approvals"): self.approvals,
+                    ("POST", "/approval"): self.approved,
                     ("GET", "/vetoes"): self.vetoes,
                     ("POST", "/promote"): self.promoted,
                     ("GET", "/asks"): self.asks,
@@ -179,6 +182,13 @@ class Console:
         `drive` is a capability and not a second page."""
         if self.run.live:
             return {"started": False, "why": "a run is already under way"}
+        waiting = len(approval_store.load(self.space))
+        if waiting:
+            # Shown before a new prompt is taken: a run started past them would
+            # build on a tree the person has not approved (ADR 0028, decision 7).
+            return {"started": False,
+                    "why": f"{waiting} approval{'s' if waiting > 1 else ''} waiting: "
+                           f"answer {'them' if waiting > 1 else 'it'} first"}
         self.run.start(body.get("prompt", ""), body.get("marks") or ())
         return {"started": True}
 
@@ -225,6 +235,22 @@ class Console:
         no connector tool has a spelling of this, because an answer becomes
         intent (ADR 0027, decision 12)."""
         return self.run.reply(body.get("id"), body.get("answers") or {})
+
+    def approvals(self, query):
+        """`GET /approvals`: what an unattended run set aside, oldest first,
+        each as its gate would have shown it (ADR 0028, decision 3). A console
+        route, as the store is the console's: only a console reads it."""
+        return {"approvals": approval_store.shown(self.space)}
+
+    def approved(self, body):
+        """`POST /approval`: allow, or deny with a reason, the oldest approval
+        waiting. Not while a run is going: it may still be changing the tree
+        the call is applied to."""
+        if self.run.live:
+            return {"answered": False,
+                    "why": "a run is under way; answer it when the run has ended"}
+        return approval_store.answer(self.space, body.get("id"), body.get("allow"),
+                                     body.get("reason"))
 
     def vetoes(self, query):
         """`GET /vetoes`: every veto in this space, as the page says it. A

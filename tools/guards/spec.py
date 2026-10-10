@@ -79,7 +79,7 @@ def main():
         category = "ref-write"
     if category != "ref-write":
         return 0
-    root = Path(os.environ.get("CLAUDE_PROJECT_DIR") or ev.get("cwd") or ".").resolve()
+    root = Path(os.environ.get(intent.ROOT) or ev.get("cwd") or ".").resolve()
     for named in intent.references(tool, payload):
         rel = inside(root, named)
         if rel is None or not tracked(root, rel):
