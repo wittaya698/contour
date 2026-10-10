@@ -12,10 +12,10 @@ answer it. A parked question, like a parked gate, holds the console alive.
 
 ## Acceptance criteria
 
-- [ ] A question in an unattended run parks it, and the record shows the question's text
-- [ ] An answer on the page resumes the same run, not a new one
-- [ ] No command or connector tool answers a question
-- [ ] An attended run's questions are unchanged
+- [x] A question in an unattended run parks it, and the record shows the question's text
+- [x] An answer on the page resumes the same run, not a new one
+- [x] No command or connector tool answers a question
+- [x] An attended run's questions are unchanged
 
 ## Blocked by
 

@@ -23,6 +23,9 @@ USAGE = """contour-console            drive a run from the browser, in this spac
   --begin variation --of <space>
                            the same, pointing at <space>'s spec and build for
                            reference; nothing of it is copied
+  --request <prose> [--requester <who>]
+                           an unattended run, as `contour request` starts one;
+                           it ends with its run unless a page is open
   $CONTOUR_CONSOLE_PYTHON  the interpreter to run under (default .venv/bin/python)
   $CONTOUR_CONSOLE_IDLE    seconds of nothing happening before the run ends
 """

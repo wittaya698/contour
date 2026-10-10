@@ -227,8 +227,11 @@ function row(s, can, environment) {
   name.append(...health(s, can.has('update') && (() => { under.hidden = false; updating(s, room); })));
   // A console already serving the space, from its presence. Entering again
   // would start a second one, and the lobby never sees the first one's URL.
-  const open = s.presence.some(p => p.kind === 'console');
+  // A console running a requester's run has no person's tab, so Open stays:
+  // the console shows its own page when asked (ADR 0027, decision 7).
+  const open = s.presence.some(p => p.kind === 'console') && !s.unattended;
   if (open) name.append(para('open in a console — its tab is the way in', 'ok'));
+  if (s.waiting) name.append(para('waiting for you: ' + s.waiting, 'warn'));
   const said = para('', 'warn');
   name.append(said);
   const actions = cell('', 'actions');

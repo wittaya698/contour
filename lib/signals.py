@@ -44,6 +44,13 @@ ENDING_RUN = signal.SIGUSR1
 a page open on the space stays open after its run is stopped."""
 
 
+SHOWING = signal.SIGUSR2
+"""What the lobby's enter and the connector's `open console` send a console
+running unattended: open your own page in this machine's browser (ADR 0027,
+decision 7). A signal because it carries nothing — the URL holds the secret
+behind every gate, and it goes from console to browser and nowhere else."""
+
+
 def raising(*numbers):
     """Have these signals raise `Arrived` in the main thread from now on."""
     def arrived(number, frame):

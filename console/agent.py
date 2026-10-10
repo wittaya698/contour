@@ -16,6 +16,8 @@ from claude_agent_sdk import (AssistantMessage, ClaudeAgentOptions,
                              ResultMessage, SystemMessage, TextBlock,
                              ToolUseBlock)
 
+from console.run import QUESTION
+
 
 def drive(prompt, options, gate, say):
     """One agent session, over the seam `console/run.py` defines.
@@ -34,12 +36,8 @@ async def session(prompt, options, gate, say):
         runs on a worker thread. On the event loop it would stop the SDK reading
         the very messages the transcript is showing the person who has to decide.
         """
-        allow, reason = await anyio.to_thread.run_sync(gate, tool, payload)
-        if allow:
-            return PermissionResultAllow()
-        # The reason goes back as the call's result, which is the only place the
-        # agent will read it. No `updated_input`: a gate cannot edit the call.
-        return PermissionResultDeny(message=reason or "the user denied this call")
+        allow, told = await anyio.to_thread.run_sync(gate, tool, payload)
+        return result(tool, payload, allow, told)
 
     async with ClaudeSDKClient(
             ClaudeAgentOptions(**options, can_use_tool=can_use_tool)) as client:
@@ -55,6 +53,22 @@ async def session(prompt, options, gate, say):
             usage = getattr(message, "usage", None)
             if isinstance(message, AssistantMessage) and usage:
                 say("usage", usage=dict(usage))
+
+
+def result(tool, payload, allow, told):
+    """The gate's answer, in the shape the SDK takes it.
+
+    The reason for a denial goes back as the call's result, which is the only
+    place the agent will read it. No `updated_input` on a call: a gate cannot
+    edit one. A question is the exception that is not one — what the person
+    answered is the question's input filled in, which is how the SDK hands an
+    answer to the session that asked (ADR 0027, decision 12).
+    """
+    if not allow:
+        return PermissionResultDeny(message=told or "the user denied this call")
+    if tool == QUESTION and told is not None:
+        return PermissionResultAllow(updated_input={**payload, "answers": told})
+    return PermissionResultAllow()
 
 
 def said(message):

@@ -47,7 +47,7 @@ def row(root, now):
     """One space as `spaces` reports it. The text form and the JSON form both
     print this, so they cannot disagree about which spaces exist or which are
     behind (slice 28)."""
-    from . import panel, refs, store, verdict
+    from . import last_run, panel, refs, store, verdict
     was = update.recorded(root)
     here = space_lib.layout(root)
     kept = store.load(here.dot / panel.NAME, None)
@@ -66,6 +66,11 @@ def row(root, now):
             "scaffold": copies(root),
             "rules": sees_rules(root),
             "presence": presence.live(root),
+            # What the lobby's row says while a run is parked, and whether the
+            # console there is a requester's, whose page Open brings up
+            # (ADR 0027, decision 7).
+            "waiting": last_run.parked(root),
+            "unattended": last_run.unattended(root),
             "renamed": renamed(root),
             "updated": update.uncommitted(root)}
 
@@ -154,9 +159,8 @@ def refusal(root, rec):
     from . import last_run
     run = last_run.read(root) or {}
     if run.get("run") == rec.get("run") and run.get("state") == "waiting for you":
-        name = Path(root).name
-        return (f"{name} is waiting for you: {run.get('act')}. Open it in its "
-                f"console, or stop the run with `contour stop {name}`.")
+        return (f"{last_run.waiting(root, run.get('act'))}. Open it in its "
+                f"console, or stop the run with `contour stop {Path(root).name}`.")
     return f"this space is held by {held_by(rec)}."
 
 

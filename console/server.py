@@ -75,23 +75,46 @@ and never a prompt's text: the launch line is the one way into a console that
 is not its own page, so it carries the choice of a flow the toolkit wrote, and
 nothing anybody could put words in. A variation's `--of` is a path, and only a
 model space's: the prompt is still the toolkit's words about it. The prompt is
-the run's first line in the transcript like any other."""
+the run's first line in the transcript like any other.
+
+The one launch line that does carry words is `--request`, and it carries them
+as what they are: a request, from somebody who is not watching, into a run
+whose floor always asks (ADR 0027, decisions 5 and 10)."""
+
+
+def value(argv, flag):
+    """The word after `flag` in `argv`, or None."""
+    at = argv.index(flag) + 1 if flag in argv else None
+    return argv[at] if at is not None and at < len(argv) else None
 
 
 def begun(argv):
     """The first prompt `argv` asks for, or None; and why it cannot be had."""
-    def value(flag):
-        at = argv.index(flag) + 1 if flag in argv else None
-        return argv[at] if at is not None and at < len(argv) else None
     if "--begin" not in argv:
         return None, None
-    flow = value("--begin")
+    flow = value(argv, "--begin")
     if flow not in BEGIN:
         return None, f"--begin takes one of: {', '.join(BEGIN)}"
-    of = value("--of")
+    of = value(argv, "--of")
     if flow == "variation" and not (of and (Path(of) / space_lib.MARKER).is_file()):
         return None, "--begin variation takes --of <the model space it varies>"
     return BEGIN[flow](of), None
+
+NO_CEILING = ("no ceiling set; an unattended run is refused until you set one "
+              "with `contour ceiling <n>`")
+
+
+def requested(argv):
+    """The unattended run `argv` asks for, or None: the prose, who asked, and
+    the ceiling it stops at — read here, from the person's own `~/.contour`,
+    and never carried by the request (ADR 0027, decision 13)."""
+    if "--request" not in argv:
+        return None
+    from lib import ceiling
+    return {"prose": value(argv, "--request") or "",
+            "requester": value(argv, "--requester") or "the command line",
+            "ceiling": ceiling.read()}
+
 
 CAN = canvas_lib.MARKS_ONLY + ("drive",)
 """What the page may offer when the console is the one serving it.
@@ -140,6 +163,7 @@ class Console:
             routes={("POST", "/run"): self.started,
                     ("GET", "/events"): self.transcript,
                     ("POST", "/verdict"): self.verdict,
+                    ("POST", "/answer"): self.answered,
                     ("GET", "/vetoes"): self.vetoes,
                     ("POST", "/promote"): self.promoted,
                     ("GET", "/asks"): self.asks,
@@ -175,6 +199,12 @@ class Console:
         agent session."""
         return self.run.end()
 
+    def showing(self):
+        """Open this console's own page, asked by somebody who never sees
+        where it is (ADR 0027, decision 7)."""
+        if getattr(self, "url", None):
+            webbrowser.open(self.url)
+
     def stopping(self):
         """`contour stop`, from outside: the page's own ending, said as whose
         it was. A console with no run going has nothing to end."""
@@ -188,6 +218,13 @@ class Console:
         ask-list entry (ADR 0025, decision 6)."""
         return self.run.answer(body.get("id"), body.get("allow"),
                                body.get("reason"), always=bool(body.get("always")))
+
+    def answered(self, body):
+        """`POST /answer`: the person's answers to the agent's question, one per
+        question it asked. The one way a question is answered: no command and
+        no connector tool has a spelling of this, because an answer becomes
+        intent (ADR 0027, decision 12)."""
+        return self.run.reply(body.get("id"), body.get("answers") or {})
 
     def vetoes(self, query):
         """`GET /vetoes`: every veto in this space, as the page says it. A
@@ -257,7 +294,7 @@ class Console:
         return {"revealed": done.returncode == 0}
 
     def start(self):
-        url = self.canvas.start()
+        url = self.url = self.canvas.start()
         threading.Thread(target=self.watch, daemon=True).start()
         return url
 
@@ -268,6 +305,14 @@ class Console:
         and ending then would make a slow browser look like a closed tab.
         """
         while not self.canvas.done:
+            if self.run.requester is not None and not self.run.over:
+                # An unattended console lives as long as its run, not its page
+                # (ADR 0027, decision 4): no tab closing, and no idle clock.
+                time.sleep(0.25)
+                continue
+            if self.run.requester is not None and self.canvas.last_beat is None:
+                self.ended = "the run ended and no page was open"
+                return self.canvas.finish()
             if self.launched_by > 1 and os.getppid() != self.launched_by:
                 # Before the gate suppression below, and deliberately: a console
                 # parked at a gate is exactly the one holding the space, so a
@@ -323,6 +368,10 @@ def main(argv, space):
     if refused:
         print(refused, file=sys.stderr)
         return 2
+    request = requested(argv)
+    if request and request["ceiling"] is None:
+        print(NO_CEILING, file=sys.stderr)
+        return 2
     console = Console(space, grace=seconds("CONTOUR_CONSOLE_GRACE", GRACE_S),
                       idle=seconds("CONTOUR_CONSOLE_IDLE", IDLE_S),
                       hidden_grace=seconds("CONTOUR_CONSOLE_HIDDEN_GRACE", HIDDEN_GRACE_S))
@@ -336,13 +385,21 @@ def main(argv, space):
     # anywhere, including inside the transcript's lock.
     signal.signal(signals.ENDING_RUN, lambda number, frame: threading.Thread(
         target=console.stopping, daemon=True).start())
+    signal.signal(signals.SHOWING, lambda number, frame: threading.Thread(
+        target=console.showing, daemon=True).start())
     # Before the URL is printed, so nothing can have opened the page while the
     # space still looked unattended (issue 30).
     with presence.present(space, "console"):
-        return serving(console, argv, begin)
+        return serving(console, argv, begin, request)
 
 
-def serving(console, argv, begin=None):
+def serving(console, argv, begin=None, request=None):
+    if request:
+        # Before the clock starts: the console lives as long as this run, and
+        # a clock that looked before it began would see none (ADR 0027,
+        # decision 4).
+        console.run.start(request["prose"], ceiling=request["ceiling"],
+                          requester=request["requester"])
     url = console.start()
     if begin:
         console.run.start(begin)

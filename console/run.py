@@ -13,7 +13,8 @@ import threading
 from pathlib import Path
 
 from console import last_run, launcher, seed, spend, vetoes
-from lib import activity, gate as gate_words, intent, lock, marks, policy
+from lib import activity, gate as gate_words, intent, lock, marks, notify, policy
+from lib import last_run as last_run_lib
 from lib.last_run import ENDED
 
 
@@ -31,8 +32,11 @@ class Stopped(Exception):
 HERE = Path(__file__).resolve().parent
 DEFAULT = f"{HERE / 'agent.py'}:drive"
 
-PASSING = ("act",)
+PASSING = ("act", "questions")
 """What the run record says only while the state that set it lasts."""
+
+QUESTION = "AskUserQuestion"
+"""The tool an agent asks the person a question with (ADR 0027, decision 12)."""
 
 
 def driver(spec=None):
@@ -108,10 +112,11 @@ class Run:
         self.prompt = ""                      # what this run was asked to do
         self.latest = None                    # what the space's run record says
         self.ceiling = None                   # the weighted spend it stops at
+        self.requester = None                 # who asked, if nobody is watching
         self._lock = threading.Lock()
         self._thread = None
 
-    def start(self, prompt, marks_selected=(), ceiling=None):
+    def start(self, prompt, marks_selected=(), ceiling=None, requester=None):
         """Begin. The prompt is the transcript's first line, because it is the
         first turn and the page is showing a conversation — so what is said there
         is the composed prompt and not the prose, because the composed one is
@@ -119,7 +124,11 @@ class Run:
 
         `ceiling` is what an unattended run may spend, in weighted tokens, before
         it is stopped (ADR 0027, decision 13). A run somebody is watching carries
-        none: the stop is the person (ADR 0019, decision 37)."""
+        none: the stop is the person (ADR 0019, decision 37).
+
+        `requester` is who asked for a run nobody is watching, as it described
+        itself; a run started with one is unattended to its end (ADR 0027,
+        decision 11)."""
         prompt, self.seeded = seed.compose(self.space, prompt, marks_selected)
         # Hold the space first: a run whose transcript had started and whose
         # hold had been refused would be a run the user was watching happen
@@ -128,14 +137,25 @@ class Run:
         self.gates = 0
         self.prompt = prompt
         self.ceiling = ceiling
+        self.requester = requester
         self.record = lock.take(self.space, "console run")
         self.latest = {"run": self.record["run"], "prompt": prompt,
-                       "requester": None, "vetoes": []}
+                       "requester": requester, "vetoes": []}
         self.now("running")
         self.say("prompt", text=prompt)
+        if requester is not None:
+            # On the page, in its first lines: who asked, and that opening it
+            # changes nothing about what still asks (ADR 0027, decision 11).
+            self.say("asked", text=f"this run was asked for by {requester}; "
+                                   f"some actions always ask you")
         self._thread = threading.Thread(target=self._go, args=(prompt,),
                                         daemon=True)
         self._thread.start()
+
+    @property
+    def over(self):
+        """Has a run begun here and ended, however it ended?"""
+        return (self.latest or {}).get("state") in ENDED
 
     @property
     def live(self):
@@ -229,7 +249,8 @@ class Run:
             last_run.write(self.space, self.latest)
 
     def gate(self, tool, payload):
-        """Stop, and wait for the user. Returns (allow, reason).
+        """Stop, and wait for the user. Returns (allow, reason) — or, for a
+        question in a run nobody is watching, (True, the person's answers).
 
         The launcher is asked what the call *means* and the answer is a category
         — a build, a spec write, a commit — because one intent has four
@@ -251,10 +272,16 @@ class Run:
                    "terminal; ask them instead")
             self.say("refused", text=why)
             return False, why
+        if tool == QUESTION and self.requester is not None:
+            return self.asked(payload)
         category = intent.classify(tool, payload)
         if category is None:
             return True, None
-        if not policy.gated(category, self.space):
+        # Unattended, the floor asks whatever the list says, and goes on asking
+        # with the page open: a tab is presence, not attention (ADR 0027,
+        # decisions 10 and 11).
+        if not policy.gated(category, self.space) and not (
+                self.requester is not None and category in policy.FLOOR):
             # The user allowed this in advance. Allowed, not unsupervised: it
             # leaves by the same door an answered gate leaves by, so what has to
             # happen before an approved call still happens.
@@ -279,7 +306,7 @@ class Run:
                  call=dict(payload), said=said)
         # The act and nothing under it: the call and what it would change are
         # the page's, where the argument for them is (rule 1).
-        self.now("waiting for you", act=said["act"])
+        self.parked(said["act"])
         waiting["answered"].wait()
         if self.stopped:
             raise Stopped()
@@ -289,6 +316,39 @@ class Run:
         # agent nothing to have made.
         self.gates += 1
         return self.approved(waiting["allow"], waiting["reason"], category)
+
+    def parked(self, act, **said):
+        """Wait for the person, and say so: in the record, and, when nobody was
+        watching, on this machine itself, so that reaching them never rests on
+        a requester relaying anything (ADR 0027, decisions 7 and 8)."""
+        self.now("waiting for you", act=act, **said)
+        if self.requester is not None:
+            notify.post(last_run_lib.waiting(self.space, act))
+
+    def asked(self, payload):
+        """Park on a question in a run nobody is watching, and return
+        (True, the person's answers) once they have given them on the page.
+
+        Parked and not ended: nothing resumes, so a run that ended on a question
+        would throw its working context away over a one-word answer. And only
+        the person answers it, because an answer becomes intent — *the anchor is
+        300 mm* from an agent reaches a spec write whose gate shows the diff and
+        not where the number came from (ADR 0027, decision 12).
+        """
+        questions = [dict(q) for q in payload.get("questions") or ()]
+        waiting = {"id": secrets.token_hex(8), "answered": threading.Event(),
+                   "answers": None, "question": True}
+        self.pending = waiting
+        self.say("question", id=waiting["id"], questions=questions)
+        # The text, so a requester can relay it; never an answer, which only
+        # the page takes.
+        self.parked("Claude has a question",
+                    questions=[q.get("question", "") for q in questions])
+        waiting["answered"].wait()
+        if self.stopped:
+            raise Stopped()
+        self.now("running")
+        return True, waiting["answers"]
 
     def proposal(self):
         """What the agent last said, which before a spec write is the case
@@ -347,8 +407,8 @@ class Run:
         two builds differ (ADR 0019, decision 13).
         """
         waiting = self.pending
-        if waiting is None or waiting["id"] != at:
-            return None
+        if waiting is None or waiting["id"] != at or waiting.get("question"):
+            return None                       # a question has no *allow*
         waiting["allow"], waiting["reason"] = bool(allow), reason
         self.pending = None
         if allow and always and waiting["category"] in policy.ALWAYS:
@@ -367,6 +427,19 @@ class Run:
             with self._lock:
                 self.latest["vetoes"].append({"act": act, "reason": reason})
         self.say("verdict", id=at, allowed=bool(allow), text=reason or "")
+        waiting["answered"].set()
+        return {"answered": True}
+
+    def reply(self, at, answers):
+        """The person's answers to the question that is waiting, or None if
+        none is. The page's alone: there is no command or connector spelling
+        of this, because an answer becomes intent (ADR 0027, decision 12)."""
+        waiting = self.pending
+        if waiting is None or waiting["id"] != at or not waiting.get("question"):
+            return None
+        waiting["answers"] = {str(q): str(a) for q, a in dict(answers).items()}
+        self.pending = None
+        self.say("answer", id=at, answers=waiting["answers"])
         waiting["answered"].set()
         return {"answered": True}
 

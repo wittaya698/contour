@@ -21,12 +21,12 @@ in which an unattended run exists without its floor or its ceiling.
 
 ## Acceptance criteria
 
-- [ ] A request on an idle space starts a run with no browser and says so in JSON
-- [ ] Refused, each in its own words: space held, console open, no ceiling
-- [ ] The run's process exits when the run ends and no page is open, and outlives an idle clock while a gate is parked
-- [ ] With an ask-list that lets everything through, a spec write, a reference write and saving a version still gate
-- [ ] Opening the page mid-run does not lift that floor
-- [ ] The record and the page both name who asked
+- [x] A request on an idle space starts a run with no browser and says so in JSON
+- [x] Refused, each in its own words: space held, console open, no ceiling
+- [x] The run's process exits when the run ends and no page is open, and outlives an idle clock while a gate is parked
+- [x] With an ask-list that lets everything through, a spec write, a reference write and saving a version still gate
+- [x] Opening the page mid-run does not lift that floor
+- [x] The record and the page both name who asked
 
 ## Blocked by
 

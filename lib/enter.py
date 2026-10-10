@@ -10,6 +10,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from lib import last_run, signals
+
 ROOT = Path(__file__).resolve().parent.parent
 CONSOLE = ROOT / "contour-console"
 CONTOUR = ROOT / "contour"
@@ -38,7 +40,27 @@ def into(space, presence):
     words the lobby and the connector both say (ADR 0024, decision 5).
     `presence` is the space's, as `contour spaces --json` lists it. A space a
     console already serves gets no second one: neither caller sees a console's
-    URL, which carries its secret, so neither can send anybody there."""
+    URL, which carries its secret, so neither can send anybody there — except
+    that a console running a requester's run, which has no person's tab, is
+    asked to open its own page (ADR 0027, decision 7)."""
+    consoles = [p for p in presence if p["kind"] == "console"]
+    if consoles and last_run.unattended(space):
+        # Not refused, and not a second console: the one there opens its own
+        # page, and nothing passes through the caller (ADR 0027, decision 7).
+        for p in consoles:
+            os.kill(p["pid"], signals.SHOWING)
+        return None
+    refused = unopenable(presence)
+    if refused:
+        return refused
+    console(space)
+    return None
+
+
+def unopenable(presence):
+    """Why no console can be started on a space with this presence, or None:
+    one is open already, or there is no environment to run one in. Said once,
+    for the lobby, the connector and a request (ADR 0027, decision 6)."""
     consoles = [p for p in presence if p["kind"] == "console"]
     if consoles:
         return ("already open in a console (pid "
@@ -46,8 +68,15 @@ def into(space, presence):
     missing = environment()
     if missing:
         return f"no console environment; make one, from {ROOT}: {missing}"
-    console(space)
     return None
+
+
+def requested(space, prose, requester):
+    """Start `contour-console` in `space` on a request, with no browser, and
+    return the process: the caller waits for its run to take the space (ADR
+    0027, decision 3). The prose is all a request carries."""
+    return detached(space, str(CONSOLE), "--no-browser", "--request", prose,
+                    "--requester", requester)
 
 
 def console(space, begin=None, of=None):
@@ -70,7 +99,7 @@ def page(where, command, *args):
 
 def detached(where, *argv):
     """In a session of its own, with nothing to say to its starter."""
-    subprocess.Popen(argv, cwd=str(where), start_new_session=True,
+    return subprocess.Popen(argv, cwd=str(where), start_new_session=True,
                      stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                      stderr=subprocess.DEVNULL)
 

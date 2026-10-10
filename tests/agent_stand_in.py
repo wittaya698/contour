@@ -70,6 +70,12 @@ def drive(prompt, options, gate, say):
             # line the page shows for it (issue 72).
             used = dict(step["use"])
             say("call", tool=used.pop("tool"), call=used)
+        if "ask" in step:
+            # A question, as the SDK puts one: a call to `AskUserQuestion`, and
+            # what comes back from the gate is the person's answers or nothing
+            # (ADR 0027, decision 12).
+            allow, answers = gate("AskUserQuestion", {"questions": step["ask"]})
+            say("result", allowed=allow, answers=answers)
         if "call" in step:
             # Asked for, then reported — the two halves an agent actually has.
             # What comes back from the gate is a verdict and a sentence, never an

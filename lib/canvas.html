@@ -164,6 +164,10 @@
   #turns .gate.answered { border-color: var(--line); }
   #turns .gate.answered .act { color: inherit; }
   #turns .gate .answer { margin: 4px 0 0; opacity: .6; }
+  /* A question: a gate's border, since it too is waiting for you. */
+  #turns .question .asked { margin: 0; padding-left: 18px; display: flex;
+                            flex-direction: column; gap: 6px; }
+  #turns .question .choices { display: flex; flex-wrap: wrap; gap: 4px; }
   #turns .changes { margin: 0; padding-left: 18px; }
   #turns .changes:empty, #turns .spans:empty { display: none; }
   #turns .raw summary { cursor: pointer; opacity: .6; font-size: 11px; }
@@ -284,6 +288,18 @@
           <button class="always" hidden>Always for this model</button>
           <button class="deny">Deny</button>
         </div>
+      </li>
+    </template>
+    <!-- The agent's question, in a run nobody was watching (ADR 0027,
+         decision 12). Answered here and nowhere else: an answer becomes intent,
+         and a requester relaying one would be an agent giving the anchor rule 1
+         says the user gives. Each question takes one of its options or the
+         person's own words. -->
+    <template id="question">
+      <li class="gate question">
+        <span class="act">Claude has a question</span>
+        <ol class="asked"></ol>
+        <div class="pair"><button class="send">Answer</button></div>
       </li>
     </template>
   </section>
@@ -581,6 +597,8 @@ function vetoed(veto) {
 function turn(event) {
   if (event.kind === 'gate') return gate(event);
   if (event.kind === 'verdict') return closeGate(event);
+  if (event.kind === 'question') return question(event);
+  if (event.kind === 'answer') return closeQuestion(event);
   if (event.kind === 'call') return activity(event);
   const li = document.createElement('li');
   li.className = event.kind;
@@ -652,6 +670,56 @@ function gate(event) {
   li.querySelector('.always').addEventListener('click', () => answer(true, true));
   li.querySelector('.deny').addEventListener('click', () => answer(false));
   return li;
+}
+
+// The agent's question, parked until the person answers it. An option fills in
+// its question's answer and the person's own words may replace it; one Answer
+// sends them all, since the agent asked them together.
+function question(event) {
+  const li = document.getElementById('question').content.firstElementChild.cloneNode(true);
+  li.dataset.question = event.id;
+  const fields = {};
+  for (const asked of event.questions) {
+    const item = document.createElement('li');
+    const text = document.createElement('p');
+    text.textContent = asked.question;
+    const own = document.createElement('input');
+    own.placeholder = 'your answer';
+    own.autocomplete = 'off';
+    const choices = document.createElement('div');
+    choices.className = 'choices';
+    for (const option of asked.options || []) {
+      const b = document.createElement('button');
+      b.textContent = option.label;
+      b.title = option.description || '';
+      b.addEventListener('click', () => { own.value = option.label; });
+      choices.append(b);
+    }
+    item.append(text, choices, own);
+    li.querySelector('.asked').append(item);
+    fields[asked.question] = own;
+  }
+  li.querySelector('.send').addEventListener('click', async () => {
+    const answers = {};
+    for (const [asked, own] of Object.entries(fields)) answers[asked] = own.value.trim();
+    for (const b of li.querySelectorAll('button')) b.disabled = true;
+    await ask('/answer', { id: event.id, answers: answers });
+  });
+  return li;
+}
+
+// A question, answered: closed by the answer on the transcript, as a gate is by
+// its verdict, so a reloaded tab ends on the same answered question.
+function closeQuestion(event) {
+  const li = document.getElementById('turns').querySelector(`li[data-question="${event.id}"]`);
+  const was = document.createElement(li ? 'p' : 'li');
+  was.className = 'answer';
+  was.textContent = Object.values(event.answers || {}).join('; ');
+  if (!li) return was;
+  li.classList.add('answered');
+  li.querySelectorAll('input, .choices, .pair').forEach(n => n.remove());
+  li.append(was);
+  return null;
 }
 
 // A gate, answered. Closed by the verdict on the transcript and not by the

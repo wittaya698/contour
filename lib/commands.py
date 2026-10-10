@@ -138,6 +138,10 @@ TABLE = (
                                      "for the page, not the agent"),
              ("asks --undo <category>", "ask about it again in this space; --json says "
                                         "it for a client")), "on_asks"),
+    Command("request", (2, 4), False, False, None,
+            (("request <name> <prose> [--as <who>]",
+              "start an unattended run in a space, on prose and nothing else; "
+              "prints JSON"),), "on_request"),
     Command("ceiling", (0, 1), False, False, None,
             (("ceiling", "what an unattended run may spend, in weighted tokens"),
              ("ceiling <n>", "stop unattended runs at n weighted tokens; for you, "

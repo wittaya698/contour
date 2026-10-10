@@ -552,6 +552,63 @@ def on_asks(cmd, rest, held):
     return emit({"ok": True, "lines": policy.report(PROJECT)})
 
 
+START_WAIT_S = 10
+"""How long a request waits for its console's run to take the space."""
+
+
+def on_request(cmd, rest, held):
+    """Start an unattended run in a named space (ADR 0027, decisions 3, 5 and
+    6), and say so as JSON: started, or why not. Refused while the space is
+    held, while a console is open on it, and while no ceiling is set."""
+    from lib import ceiling, enter, last_run, lock, presence
+    args = list(rest)
+    requester = "the command line"
+    if "--as" in args:
+        at = args.index("--as")
+        if at + 1 >= len(args):
+            print(usage(), file=sys.stderr)
+            return 2
+        requester = args.pop(at + 1)
+        args.pop(at)
+    if len(args) != 2:
+        print(usage(), file=sys.stderr)
+        return 2
+    name, prose = args
+
+    def answer(why=None, **said):
+        print(json.dumps({"started": why is None, **said,
+                          **({"why": why} if why else {})}, indent=2))
+        return 0 if why is None else 1
+    try:
+        root = space.named(name, ROOT)
+    except LookupError as e:
+        return answer(str(e))
+    rec = lock.holder(root)
+    if rec and lock.alive(rec):
+        return answer(survey.refusal(root, rec))
+    refused = enter.unopenable(presence.live(root))
+    if refused:
+        return answer(refused)
+    if ceiling.read() is None:
+        return answer("no ceiling set; an unattended run is refused until you "
+                      "set one with `contour ceiling <n>`")
+    before = (last_run.read(root) or {}).get("run")
+    console = enter.requested(root, prose, requester)
+    deadline = time.monotonic() + START_WAIT_S
+    while time.monotonic() < deadline:
+        # The record and not the hold: a run quick enough has given the space
+        # back before anybody looked, and its record outlives it.
+        now = (last_run.read(root) or {}).get("run")
+        if now and now != before:
+            return answer(space=root.name, run=now)
+        if console.poll() is not None:
+            return answer(f"the console in {root.name} ended before its run began; "
+                          f"run contour-console there to see why")
+        time.sleep(0.05)
+    return answer(f"the console in {root.name} did not take the space within "
+                  f"{START_WAIT_S:g}s")
+
+
 def on_ceiling(cmd, rest, held):
     """Show, set or remove the ceiling (ADR 0027, decision 13). The person's,
     beside the ask-list: a run that could raise its own limit would have none."""

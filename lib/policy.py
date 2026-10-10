@@ -150,6 +150,13 @@ nothing a later look cannot catch: a spec write, a reference write and saving a
 version always ask, and a push is never offered at all."""
 
 
+FLOOR = ("spec-write", "ref-write", "commit")
+"""What always asks in an unattended run, whatever the list says (ADR 0027,
+decision 10). Rules 1 and 5 rest on a person having seen the argument and the
+sheet, and in a run nobody was watching nobody has: no entry in a list can
+stand in for them."""
+
+
 def always(space, category, file=None):
     """Let `category` through for this space without asking, from now on.
 
