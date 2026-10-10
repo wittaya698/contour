@@ -21,10 +21,34 @@ makes that safe.
 
 ## Acceptance criteria
 
-- [ ] The tracer bullet run end to end, each step as written or the difference recorded
-- [ ] No console URL in the Desktop conversation
-- [ ] Rule 5's wording proposed and confirmed or declined
-- [ ] ADR 0027's status says accepted, amended or withdrawn, with the evidence
+- [x] The tracer bullet run end to end, each step as written or the difference recorded
+- [x] No console URL in the Desktop conversation
+- [ ] Rule 5's wording proposed and confirmed or declined — moved to
+  [100](100-accept-adr-0028.md): the words drafted here assumed a run that parks
+- [x] ADR 0027's status says accepted, amended or withdrawn, with the evidence
+
+## What happened
+
+Run on 2026-10-10 and 2026-10-11 in `project/beaky-0027`, a clone of beaky with
+its history, its remote removed and its push stub installed. The full account is
+in ADR 0027's acceptance block. In short:
+
+| Step | As written? |
+|---|---|
+| No ceiling: a request is refused | Yes |
+| The run edits and builds with no page open | Yes, once builds were on the space's ask-list. Before that the first build parked: decision 10 working, and the script's unstated assumption |
+| It parks at *save this version*, and the notification fires | Yes, and the user rejected both. Clicking the banner opens Script Editor |
+| `status` reads *waiting for you* with no diff | Not tried |
+| `open` brings the page up, no console URL in the chat | Yes |
+| Deny; the veto is recorded | No: the user allowed the save on the page (`cbe4c32`). The chat's request had said *"The user says: save"*, and the gate asked anyway |
+| A second request with the page open is refused in the lobby's words | Yes |
+| `stop` (not in the script) | Yes, from Desktop |
+
+**Verdict: accepted, amended.** The user chose how a gate should meet a run
+nobody watches: the act is set aside, the run goes on, and the chat asks
+whether to answer the approvals now or later. That is
+[ADR 0028](../adr/0028-approvals-wait-and-the-run-goes-on.md), sliced as
+issues 96–100.
 
 ## Blocked by
 

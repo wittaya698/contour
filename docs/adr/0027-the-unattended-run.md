@@ -1,15 +1,37 @@
 # 0027 — The unattended run: a request, a channel, and a gate nobody else can answer
 
-**Status:** Proposed · 2026-10-09 · **amends ADR 0019 decisions 11, 17 and 37, and ADR 0024 decisions 2, 3 and 4 and its first consequence** ([0019](0019-console-a-driven-agent-behind-a-gate.md), [0024](0024-the-connector-desktop-reads-and-opens.md))
+**Status:** Accepted, amended · 2026-10-11 (proposed 2026-10-09) · amended by [ADR 0028](0028-approvals-wait-and-the-run-goes-on.md) · **amends ADR 0019 decisions 11, 17 and 37, and ADR 0024 decisions 2, 3 and 4 and its first consequence** ([0019](0019-console-a-driven-agent-behind-a-gate.md), [0024](0024-the-connector-desktop-reads-and-opens.md))
 
-> **To be accepted on a tracer bullet**, in a throwaway space. With no ceiling
-> set, a request is refused. With one set, Claude Desktop requests *make the beak
-> 10% longer*. The run edits and builds with no page open and parks at *save this
-> version*, and the notification fires. Desktop's `status` reads *waiting for you:
-> save this version* and shows no diff. Desktop's `open` brings the page up, and
-> no console URL appears anywhere in the conversation. The user denies; the veto
-> is recorded and the run finishes. A second request, made while that page is
-> open, is refused in the lobby's words.
+> **Accepted on its tracer bullet, with how a run meets a gate amended by
+> [ADR 0028](0028-approvals-wait-and-the-run-goes-on.md)** (issue 93). Used by
+> hand on 2026-10-10 and 2026-10-11, from Claude Desktop, in a throwaway space,
+> `beaky-0027`, cloned from beaky with its history and no remote.
+>
+> - **The ceiling:** with none set, a request was refused. The user set one
+>   (150 000) and the next request started.
+> - **No page open:** a run edited and built with no page open, once the user had
+>   put builds on the space's ask-list. Before that, the first build parked, which
+>   is decision 10 working: an ask-list with nothing on it lets nothing through. The
+>   script above assumed builds were allowed.
+> - **The floor:** the chat's last request read *"The user says: save (commit) the
+>   current state now"*. The save still asked on the page, and the user answered it
+>   there. Relayed approval counted for nothing, which is what decisions 2 and 10 are
+>   for. The version was saved (`cbe4c32`, the beak 10% longer, spec revision 4), so
+>   the deny and its veto were not exercised.
+> - **The channel:** Desktop's `open` brought the page up, and no console URL
+>   appeared in the conversation.
+> - **A second request** made with the page open was refused in the lobby's words.
+> - **`stop`** from Desktop ended a parked run.
+> - **Not tried:** Desktop's `status` on a parked run.
+>
+> **The amendment.** The banner and the parking were the part the user rejected:
+> *"I really don't like when it showed notification and said waiting for me to
+> approve. I think it should show and move on, and let the connector ask if I want
+> to do those approvals now or later."* Clicking the banner also led nowhere: it is
+> posted through `osascript`, so macOS opens Script Editor. ADR 0028 replaces
+> decision 7's banner and the park in decisions 1, 4, 9 and 12. A gate the run
+> cannot pass sets its act aside, the run goes on, and the person answers what
+> waits when they choose.
 
 ## Context
 

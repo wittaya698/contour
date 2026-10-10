@@ -312,7 +312,7 @@ update* on the lobby's row forever, because the update rightly leaves it alone.
 
 ## Batch 9 — the unattended run
 
-From [ADR 0027](../adr/0027-the-unattended-run.md), which is Proposed and holds
+From [ADR 0027](../adr/0027-the-unattended-run.md), which is Accepted, amended by ADR 0028, and holds
 the reasoning and the rejected alternatives; the words are in CONTEXT.md
 (**unattended run**, **requester**, **request**, **channel**). Seven AFK and one
 HITL.
@@ -335,6 +335,25 @@ run carries one.
 **89 is the wide one, and stays whole,** for issue 08's reason: split, there is
 a merged state in which an unattended run exists without its floor or its
 ceiling, and with a hand-loosened ask-list that state saves versions overnight.
+
+## Batch 10 — approvals wait, and the run goes on
+
+From [ADR 0028](../adr/0028-approvals-wait-and-the-run-goes-on.md), which is
+Proposed. Issue 93's tracer bullet accepted ADR 0027, and the user rejected one
+part of it: a run that parks at its first gate and posts a banner. Four AFK and
+one HITL.
+
+| # | Slice | Type | Blocked by |
+|---|---|---|---|
+| [96](96-a-gate-sets-its-act-aside.md) | A gate sets its act aside, and the run goes on | AFK | — |
+| [97](97-approvals-answered-on-the-page.md) | Approvals answered on the page, later | AFK | 96 |
+| [98](98-a-question-is-set-aside.md) | A question is set aside too | AFK | 97 |
+| [99](99-the-space-says-approvals-are-waiting.md) | The space says approvals are waiting, and the chat asks now or later | AFK | 97 |
+| [100](100-accept-adr-0028.md) | Accept ADR 0028 | HITL | 98, 99 |
+
+**96 and 97 go in together, or 97 straight after.** Between them, a space can
+hold approvals that nothing can answer yet. That state is harmless, since nothing
+is applied, but it should not last beyond one merge.
 
 ## Found in flight
 
