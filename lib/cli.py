@@ -389,9 +389,9 @@ def on_mcp(cmd, rest, held):
         "open": lambda args: opened(args.get("page"), args.get("space"),
                                     create=bool(args.get("create")), name=args.get("name")),
         "create": lambda args: created(args.get("name"), args.get("references") or []),
-        "request": lambda args: requested(str(args.get("space") or ""), args.get("prose") or "",
-                                          args.get("as") or "a chat"),
-        "stop": lambda args: stopped(str(args.get("space") or ""))})
+        "request": lambda args: requested(connector.naming(args.get("space")),
+                                          args.get("prose") or "", args.get("as") or "a chat"),
+        "stop": lambda args: stopped(connector.naming(args.get("space")))})
     return 0
 
 

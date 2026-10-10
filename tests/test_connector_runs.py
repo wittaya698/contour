@@ -68,6 +68,21 @@ class StopTest(RunsCase):
         self.assertEqual(said, {"ok": False, "lines": ["FAIL no run to stop in alpha"]})
 
 
+class UnnamedTest(RunsCase):
+    """A chat stands in no directory, so a call that names no space is refused
+    as the reading tools refuse it, before any command is asked."""
+
+    def test_no_space_named_is_refused_in_the_connectors_words(self):
+        for name, arguments in (("request", {"prose": "make the beak longer"}),
+                                ("stop", {})):
+            r = self.contour("mcp", stdin=json.dumps(call(
+                1, "tools/call", name=name, arguments=arguments)) + "\n")
+            got = json.loads(r.stdout)["result"]
+            self.assertTrue(got["isError"], name)
+            self.assertIn("name a space: a chat stands in none", got["content"][0]["text"])
+        self.assertIsNone(last_run.read(self.space))
+
+
 class NoAnswerTest(RunsCase):
     """It asks and stops, and answers nothing: an answer to a gate or a
     question is intent, and only the person's is the person's (ADR 0027,

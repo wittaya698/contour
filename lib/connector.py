@@ -118,14 +118,20 @@ def image(png, reading):
                     {"type": "text", "text": json.dumps(reading)}])
 
 
-def named(name):
-    """The space a call names. A chat stands in no directory, so it must name
-    one (ADR 0024, decision 3), and a name that resolves to none or several is
-    refused in the words `contour spaces <name>` would print."""
+def naming(name):
+    """The name a call gives. A chat stands in no directory, so it must give
+    one (ADR 0024, decision 3); the acts take it from here to the command's own
+    resolving, so a chat that names nothing is refused before any is asked."""
     if not name:
         raise LookupError("name a space: a chat stands in none")
+    return str(name)
+
+
+def named(name):
+    """The space a call names, and a name that resolves to none or several
+    refused in the words `contour spaces <name>` would print."""
     try:
-        return space.named(name, survey.TOOLKIT)
+        return space.named(naming(name), survey.TOOLKIT)
     except LookupError as e:
         raise LookupError(f"FAIL {e}") from None
 
