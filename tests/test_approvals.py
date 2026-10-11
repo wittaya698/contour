@@ -16,11 +16,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from test_run_record import CASE, RecordCase    # noqa: E402
 
-from console.run import Run    # noqa: E402
+from console.run import SPEC_TOOL, Run    # noqa: E402
 from lib import last_run    # noqa: E402
 
-SPEC_WRITE = ("Edit", {"file_path": "spec.yaml", "old_string": "revision: 1\ndepth: 600",
-                       "new_string": "revision: 2\ndepth: 640"})
+SPEC_WRITE = (SPEC_TOOL, {"content": "revision: 2\ndepth: 640\n",
+                          "case": "Span m4 reads 640 mm, so the depth is 640."})
 
 
 class AsideCase(RecordCase):
@@ -95,7 +95,12 @@ class KeptTest(AsideCase):
 
     def test_the_call_as_written_the_act_the_diff_and_the_case(self):
         [kept] = self.kept()
-        self.assertEqual((kept["tool"], kept["call"]), SPEC_WRITE)
+        # An Edit of the whole spec as it read, which is what a later allow
+        # applies; its case is kept beside it (ADR 0029).
+        self.assertEqual((kept["tool"], kept["call"]),
+                         ("Edit", {"file_path": str(self.space / "spec.yaml"),
+                                   "old_string": "revision: 1\ndepth: 600\n",
+                                   "new_string": SPEC_WRITE[1]["content"]}))
         self.assertEqual(kept["said"]["act"], "Claude wants to change the spec")
         self.assertEqual(kept["said"]["changes"], ["depth 600 → 640"])
         self.assertEqual(kept["case"], "Span m4 reads 640 mm, so the depth is 640.")

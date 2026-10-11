@@ -20,10 +20,11 @@ from test_console import STAND_IN    # noqa: E402
 from test_lobby_enter import LobbyEnterCase    # noqa: E402
 from executables import executable    # noqa: E402
 
+from console.run import SPEC_TOOL    # noqa: E402
 from lib import last_run, presence    # noqa: E402
 
-SPEC_WRITE = {"tool": "Edit", "file_path": "spec.yaml",
-              "old_string": "a", "new_string": "b"}
+SPEC_WRITE = {"tool": SPEC_TOOL, "content": "revision: 2\ndepth: 640\n",
+              "case": "Span m4 reads 640 mm, so the depth is 640."}
 WORKING = {"busy": 30}
 """What keeps a run nobody is watching under way: nothing parks one any more,
 since a gate's act and a question are both set aside and the run goes on

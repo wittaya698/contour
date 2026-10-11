@@ -37,13 +37,17 @@ PASSING = ("act",)
 QUESTION = "AskUserQuestion"
 """The tool an agent asks the person a question with (ADR 0027, decision 12)."""
 
-DOCUMENTS = ("Edit", "Write")
-"""The tools a spec write may be made with: the ones whose diff `lib/gate.py`
-can read before the write happens (issue 101)."""
+SPEC_TOOL = "mcp__contour__spec_write"
+"""The console's own spec write, which carries its case: three runs argued
+theirs only in their thinking, where no gate or person reads it (ADR 0029)."""
 
-IN_THE_REPLY = "as text in your reply, before the tool call"
-"""Where a refused spec write is told its case goes: told *in your text just
-before it*, an agent retried with no text at all (issue 107)."""
+MADE_WITH = "made with spec_write: the whole new spec.yaml as its content"
+"""How a refused spec write is told to make it, in the tool's own words."""
+
+THE_CASE = ("your case for it as its case, naming each number it sets, and the "
+            "span if you measured one")
+"""What a refused spec write is told its case is: an argument, since what was
+said before it never reached anyone (ADR 0029)."""
 
 
 
@@ -98,6 +102,43 @@ def options(space, record):
             "env": dict(os.environ,
                         PATH=os.pathsep.join([toolkit, os.environ.get("PATH", "")]),
                         CONTOUR_RUN=record["run"])}
+
+
+SPEC_WRITER = {
+    "name": "spec_write",
+    "description": ("Change this model's spec: the whole new spec.yaml as content, "
+                    "revision bumped, and your case for the change as case. The "
+                    "case is the only place the person reads your case: what you "
+                    "think is not shown to them, and they answer this write with "
+                    "its diff and its case in front of them. Name each number it "
+                    "sets, why, and the span if you measured one."),
+    "schema": {"type": "object", "required": ["content", "case"],
+               "properties": {"content": {"type": "string"},
+                              "case": {"type": "string"}}},
+}
+"""The console's spec write, as the driver hands it to the agent: the one way
+a spec changes under a console, so that its case cannot be left in thinking
+(ADR 0029). `console/agent.py` puts it in the SDK's shape and nothing more."""
+
+
+def spec_written(space, payload):
+    """What an allowed `spec_write` does: write the spec as the gate showed it,
+    and say so to the agent. The gate has already answered; the guard has
+    nothing to say to it, as it is never a reference."""
+    (Path(space) / "spec.yaml").write_text(payload.get("content") or "", encoding="utf-8")
+    return "spec.yaml written"
+
+
+def spec_edit(space, content):
+    """A `spec_write` as the call the gate, the approvals and the guard read:
+    an `Edit` of the whole spec as it reads now, so one answered after the spec
+    moved no longer applies rather than undoing what moved it (ADR 0029). A
+    `Write` where there is no spec yet, as there is nothing it could undo."""
+    spec = Path(space) / "spec.yaml"
+    was = spec.read_text(encoding="utf-8") if spec.is_file() else ""
+    if not was:
+        return "Write", {"file_path": str(spec), "content": content}
+    return "Edit", {"file_path": str(spec), "old_string": was, "new_string": content}
 
 
 class Run:
@@ -287,49 +328,42 @@ class Run:
             return False, why
         if tool == QUESTION and self.requester is not None:
             return self.asked(payload)
+        case = None
+        if tool == SPEC_TOOL:
+            # The case comes with it rather than from what was said (ADR 0029).
+            case = payload.get("case") or ""
+            tool, payload = spec_edit(self.space, payload.get("content") or "")
         category = intent.classify(tool, payload)
         if category is None:
             return True, None
-        if category == "spec-write" and tool not in DOCUMENTS:
-            # A script can be read only by running it, so its gate could show
-            # neither the diff nor what else it does (issue 101). Refused,
-            # watched or not, before the ask-list: one allowed in advance is
-            # still a write nobody could have read.
-            why = ("a spec write is made as an Edit of spec.yaml, so the person "
-                   "can read what it changes before it happens; make it as one, "
-                   f"with your case for it {IN_THE_REPLY}, naming the span if you "
-                   "measured one")
+        if category == "spec-write" and case is None:
+            # Made any other way, its case is whatever was said before it, and
+            # three runs said it only in their thinking, which no gate and no
+            # person reads (ADR 0029). A script could not be read before it ran
+            # anyway (issue 101). Refused, watched or not, before the ask-list:
+            # one allowed in advance would still come with no case.
+            why = (f"under this console a spec write is {MADE_WITH}, with "
+                   f"{THE_CASE}; make it with that")
             self.say("refused", text=why)
             return False, why
         if category == "spec-write" and gate_words.partial(self.space / "spec.yaml",
                                                            tool, payload):
             # Part of a change: the revision alone moves nothing a page could
-            # show, and a field alone turns the check red. Set aside, the rest
-            # never follows, since the agent is told not to try it another way
-            # (issue 104).
-            why = ("a spec write is the whole change, revision bump included, as "
-                   "one Edit of spec.yaml or a Write of all of it, so the person "
-                   "can read all it changes at once; make it as one, with your "
-                   f"case for it {IN_THE_REPLY}, naming the span if you measured "
-                   "one")
+            # show, and a field alone turns the check red (issue 104).
+            why = ("a spec write is the whole change, revision bump included, so "
+                   "the person can read all it changes at once; make it again "
+                   f"{MADE_WITH}, with {THE_CASE}")
             self.say("refused", text=why)
             return False, why
-        case = self.proposal() if category == "spec-write" else ""
         unargued = (gate_words.unargued(self.space / "spec.yaml", tool, payload,
                                         case)
                     if category == "spec-write" else [])
         if unargued:
-            # What the page would show as the case is the agent's last text,
-            # and narration passed for one (issue 106). The numbers are what a
-            # gate can check; whether they are argued well is the person's.
+            # A case that does not name what the write sets is narration, which
+            # passed for one before (issue 106). The numbers are what a gate can
+            # check; whether they are argued well is the person's.
             why = (f"your case names what it sets: {', '.join(unargued)}; say "
-                   f"why, with them, {IN_THE_REPLY}, then make the spec write "
-                   f"again")
-            if not case:
-                # An agent that argued only in its thinking took that for its
-                # reply, and retried with nothing said (issue 108).
-                why = ("you have written no text in this run, and your thinking "
-                       "is not shown to the person; " + why)
+                   f"why, with them, in its case, and make it again {MADE_WITH}")
             self.say("refused", text=why)
             return False, why
         # Unattended, the floor asks whatever the list says, and goes on asking
@@ -344,7 +378,7 @@ class Run:
         if self.requester is not None:
             # Nobody to wait for: the act waits instead, and the run goes on
             # (ADR 0028, decision 1).
-            return self.aside(category, tool, payload)
+            return self.aside(category, tool, payload, case)
         # The gate carries its own id rather than its place in the transcript.
         # The page can only learn it from the event, so a verdict cannot arrive
         # before there is something to receive it, and a stale one from a
@@ -360,6 +394,10 @@ class Run:
         # and answered from it, and the agent is holding this dict: shared, it
         # would be a route from a verdict back into the call, which is the one
         # thing a gate must not be able to do.
+        if case:
+            # Watched, the case is read where rule 1 puts it, as Claude's words
+            # just before the gate: carried, it was not said (ADR 0029).
+            self.say("text", text=case)
         said = gate_words.say(category, self.space, tool, payload, self.proposal())
         self.say("gate", id=waiting["id"], category=category, tool=tool,
                  call=dict(payload), said=said)
@@ -376,7 +414,7 @@ class Run:
         self.gates += 1
         return self.approved(waiting["allow"], waiting["reason"], category)
 
-    def aside(self, category, tool, payload):
+    def aside(self, category, tool, payload, case=None):
         """Set a call aside for the person, in a run nobody is watching, and
         tell the agent so (ADR 0028, decision 1). Returns (False, why).
 
@@ -385,7 +423,7 @@ class Run:
         either, because nobody refused it; the agent is told it waits, so that
         it does not read a no and try the same thing another way.
         """
-        case = self.proposal()
+        case = self.proposal() if case is None else case
         said = gate_words.say(category, self.space, tool, payload, case)
         kept = approvals.set_aside(self.space, self.record["run"], category, tool,
                                    payload, said, case)

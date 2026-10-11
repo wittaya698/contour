@@ -13,6 +13,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+from console.run import SPEC_TOOL    # noqa: E402
 from lib import gate, marks    # noqa: E402
 from lib.canvas import PAGE    # noqa: E402
 from test_console import ConsoleCase    # noqa: E402
@@ -79,33 +80,32 @@ class SaysTest(ConsoleCase):
         bump every confirmed write carries is the bookkeeping, not the change."""
         space = self.space()
         (space / "spec.yaml").write_text(SPEC)
-        said = self.said({"say": "Seat depth reads 640 mm ±3 on span m2, against 600 ±20."},
-                         {"call": {"tool": "Edit", "file_path": str(space / "spec.yaml"),
-                                   "old_string": "revision: 2\ndimensions:\n"
-                                                 "  height: { value: 820, tol: 5 }\n"
-                                                 "  seat_depth: { value: 600, tol: 20 }",
-                                   "new_string": "revision: 3\ndimensions:\n"
-                                                 "  height: { value: 820, tol: 5 }\n"
-                                                 "  seat_depth: { value: 640, tol: 3 }"}},
+        said = self.said({"call": {"tool": SPEC_TOOL,
+                                   "content": SPEC.replace("value: 600, tol: 20",
+                                                           "value: 640, tol: 3")
+                                                  .replace("revision: 2", "revision: 3"),
+                                   "case": "Seat depth reads 640 mm ±3 on span m2, "
+                                           "against 600 ±20."}},
                          space=space)
         self.assertEqual(said["act"], "Claude wants to change the spec")
         self.assertEqual(said["changes"], ["seat depth 600 → 640 mm",
                                            "seat depth tolerance 20 → 3 mm"])
 
-    def test_a_spec_write_names_the_span_its_proposal_measured_on(self):
-        """The proposal is the agent's prose before the write (rule 1), so the
-        span is read from what it last said — and only a span this space holds
-        is named, so a plain mark the prose mentions is not taken for one."""
+    def test_a_spec_write_names_the_span_its_case_measured_on(self):
+        """The case is what the write carries (ADR 0029), so the span is read
+        from it — and only a span this space holds is named, so a plain mark
+        the case mentions is not taken for one."""
         space = self.space()
         (space / "spec.yaml").write_text(SPEC)
         held = space / marks.NAME
         marks.on_reference(held, "side.png", [10, 40], "where the back starts")
         marks.on_reference(held, "side.png", [10, 50], "seat depth", to=[300, 50])
-        said = self.said({"say": "Seat depth reads 640 mm ±3 on span m2, against "
-                                 "600 ±20; m1 is where the back starts. Shall I?"},
-                         {"call": {"tool": "Write", "file_path": str(space / "spec.yaml"),
+        said = self.said({"call": {"tool": SPEC_TOOL,
                                    "content": SPEC.replace("value: 600", "value: 640")
-                                                  .replace("revision: 2", "revision: 3")}},
+                                                  .replace("revision: 2", "revision: 3"),
+                                   "case": "Seat depth reads 640 mm ±3 on span m2, "
+                                           "against 600 ±20; m1 is where the back "
+                                           "starts."}},
                          space=space)
         self.assertEqual(said["spans"], ["m2"])
         self.assertEqual(said["changes"], ["seat depth 600 → 640 mm"])

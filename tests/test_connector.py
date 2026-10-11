@@ -71,6 +71,11 @@ class ProtocolTest(unittest.TestCase):
             self.assertIn(word, said[0])
         self.assertIn("span", said[1])
         self.assertIn("canvas", said[1])
+        # A chat sent the user to the canvas for a change they had asked for,
+        # and wrote its own numbers into a request (issue 108).
+        self.assertIn("a number read off a reference", said[1])
+        self.assertIn("a change the user asked for needs no span", said[1])
+        self.assertIn("never by numbers a chat names", said[1])
         self.assertIn("console", said[2])
         self.assertIn("request a run in it, even one that needs a spec change", said[2])
         self.assertIn("the run sets that aside for the user to answer on the page", said[2])
@@ -137,6 +142,15 @@ class ToolsTest(unittest.TestCase):
         [tool] = got["result"]["tools"]
         self.assertNotIn("console", tool["description"])
         self.assertIn("nothing to open", tool["description"])
+
+    def test_the_request_tool_says_a_chat_names_no_spec_numbers(self):
+        """Two requests set the spec's new depth so a check would stay green,
+        and one got the beak's number wrong: a third party's arithmetic, as the
+        user's goalposts (issue 108)."""
+        [got] = talk(call(1, "tools/list"), tools={"request": lambda args: {}})
+        [tool] = got["result"]["tools"]
+        self.assertIn("never name a spec's new numbers", tool["description"])
+        self.assertIn("the run argues them", tool["description"])
 
     def test_calling_a_tool_returns_its_reading_as_text(self):
         [got] = talk(call(1, "tools/call", name="spaces", arguments={}),

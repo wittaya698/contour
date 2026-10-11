@@ -7,16 +7,17 @@ with nothing installed. What is left here is translation — the SDK's messages
 into the transcript's vocabulary, and the console's gate into the SDK's
 permission callback — and translation is all it is allowed to be. There is
 nothing here to configure: `run.options` hands over what the agent is told, and
-this passes it through rather than adding to it.
+this passes it through rather than adding to it. The console's spec write is the
+one tool it adds, and it too is `run.py`'s, put in the SDK's shape (ADR 0029).
 """
 import anyio
 from claude_agent_sdk import (AssistantMessage, ClaudeAgentOptions,
                              ClaudeSDKClient, ConversationResetMessage,
                              PermissionResultAllow, PermissionResultDeny,
                              ResultMessage, SystemMessage, TextBlock,
-                             ToolUseBlock)
+                             ToolUseBlock, create_sdk_mcp_server, tool)
 
-from console.run import QUESTION
+from console.run import QUESTION, SPEC_WRITER, spec_written
 
 
 def drive(prompt, options, gate, say):
@@ -40,7 +41,9 @@ async def session(prompt, options, gate, say):
         return result(tool, payload, allow, told)
 
     async with ClaudeSDKClient(
-            ClaudeAgentOptions(**options, can_use_tool=can_use_tool)) as client:
+            ClaudeAgentOptions(**options, can_use_tool=can_use_tool,
+                               mcp_servers={"contour": spec_server(options["cwd"])})
+            ) as client:
         await client.query(prompt)
         async for message in client.receive_response():
             for kind, fields in said(message):
@@ -53,6 +56,15 @@ async def session(prompt, options, gate, say):
             usage = getattr(message, "usage", None)
             if isinstance(message, AssistantMessage) and usage:
                 say("usage", usage=dict(usage))
+
+
+def spec_server(space):
+    """The console's spec write, as an SDK tool: what it says and does are
+    `run.py`'s, and only reached once the gate has allowed it (ADR 0029)."""
+    @tool(SPEC_WRITER["name"], SPEC_WRITER["description"], SPEC_WRITER["schema"])
+    async def spec_write(args):
+        return {"content": [{"type": "text", "text": spec_written(space, args)}]}
+    return create_sdk_mcp_server("contour", tools=[spec_write])
 
 
 def result(tool, payload, allow, told):

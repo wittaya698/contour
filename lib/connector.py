@@ -32,7 +32,9 @@ INSTRUCTIONS = "\n".join((
     "and asks for a run nobody watches (request) and ends one (stop); it never answers "
     "a gate or a question: the user answers those on the console's page, which open "
     "brings up when they ask for it.",
-    "A spec changes only inside its space, argued from a span the user can see on the canvas.",
+    "A spec changes only in a run inside its space, never by numbers a chat names: a number "
+    "read off a reference is argued from a span the user can see on the canvas, and a change "
+    "the user asked for needs no span.",
     "To change a model, request a run in it, even one that needs a spec change: the run "
     "sets that aside for the user to answer on the page. Open its console only when "
     "the user asks to watch, or says now to approvals waiting.",
@@ -97,7 +99,10 @@ TOOLS = (
                                                    "items": {"type": "string"}}}}},
     {"name": "request",
      "description": "Ask for a run in a space nobody is watching: the prose is the "
-                    "whole of what it is asked. Says started and its run, or why not. "
+                    "whole of what it is asked, what the user wants of the model in "
+                    "their words. It may change the spec, but never name a spec's new "
+                    "numbers: the run argues them, and the user confirms them on the "
+                    "page. Says started and its run, or why not. "
                     "Once started there is nothing to open: what needs the user is "
                     "set aside, and status says when something waits.",
      "inputSchema": {"type": "object", "required": ["space", "prose"],

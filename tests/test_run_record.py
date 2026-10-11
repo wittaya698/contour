@@ -16,7 +16,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from console.run import Run, Stopped    # noqa: E402
+from console.run import SPEC_TOOL, Run, Stopped    # noqa: E402
 from lib import last_run       # noqa: E402
 
 WAIT_S = 5
@@ -69,15 +69,15 @@ class RunningTest(RecordCase):
 
 class WaitingTest(RecordCase):
 
-    WRITE = {"file_path": "spec.yaml", "old_string": "revision: 1\ndepth: 600",
-             "new_string": "revision: 2\ndepth: 640"}
+    WRITE = {"content": "revision: 2\ndepth: 640\n",
+             "case": "Span m4 reads 640 mm, so the depth is 640."}
 
     def parked(self):
         """A run stopped at a spec write, and the record while it waits."""
         (self.space / "spec.yaml").write_text("revision: 1\ndepth: 600\n")
         answered = []
         run = self.started(lambda prompt, options, gate, say:
-                           answered.append(gate("Edit", dict(self.WRITE))))
+                           answered.append(gate(SPEC_TOOL, dict(self.WRITE))))
         return run, self.until("waiting for you"), answered
 
     def test_a_parked_gate_names_the_act_in_the_gates_words(self):
@@ -98,7 +98,7 @@ class WaitingTest(RecordCase):
         self.addCleanup(after.set)
 
         def drive(prompt, options, gate, say):
-            gate("Edit", dict(self.WRITE))
+            gate(SPEC_TOOL, dict(self.WRITE))
             after.wait(WAIT_S)
         run = self.started(drive)
         self.until("waiting for you")
@@ -115,7 +115,7 @@ class FinishedTest(RecordCase):
             json.dumps({"ok": True, "built": True, "results": []}))
 
         def drive(prompt, options, gate, say):
-            gate("Edit", dict(WaitingTest.WRITE))
+            gate(SPEC_TOOL, dict(WaitingTest.WRITE))
             say("usage", usage={"input_tokens": 10, "output_tokens": 2})
             say("text", text="The beak is 10% longer.")
         run = self.started(drive)
@@ -141,7 +141,7 @@ class StoppedTest(RecordCase):
     def test_a_run_ended_from_the_page_is_stopped_and_says_so(self):
         (self.space / "spec.yaml").write_text("revision: 1\ndepth: 600\n")
         run = self.started(lambda prompt, options, gate, say:
-                           gate("Edit", dict(WaitingTest.WRITE)))
+                           gate(SPEC_TOOL, dict(WaitingTest.WRITE)))
         self.until("waiting for you")
         run.end()
         said = self.until("stopped")
@@ -157,7 +157,7 @@ class StoppedTest(RecordCase):
 
         def drive(prompt, options, gate, say):
             try:
-                told.append(gate("Edit", dict(WaitingTest.WRITE)))
+                told.append(gate(SPEC_TOOL, dict(WaitingTest.WRITE)))
             except Stopped:
                 told.append("stopped")
                 raise
@@ -184,7 +184,7 @@ class ReplacedTest(RecordCase):
         """The newest run only: a status, not a history."""
         (self.space / "spec.yaml").write_text("revision: 1\ndepth: 600\n")
         first = self.started(lambda prompt, options, gate, say:
-                             gate("Edit", dict(WaitingTest.WRITE)))
+                             gate(SPEC_TOOL, dict(WaitingTest.WRITE)))
         self.until("waiting for you")
         first.answer(gated(first), allow=False, reason="no")
         self.until("finished")

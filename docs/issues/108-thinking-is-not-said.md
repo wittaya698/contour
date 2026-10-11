@@ -41,7 +41,34 @@ issue 107's change to the request tool held.
   that a request asks for a change to the model, and a spec change is argued
   in the run and confirmed by the user.
 
+## What the next runs did
+
+- **Run `8af4cd7e`, requested as *make the beak 10% longer and save the model*,
+  with no numbers:** the agent lengthened the beak, its build was set aside, and
+  with nothing measured it asked in its closing rather than trying the write.
+  The build, allowed on the page, read depth 648.5 against 615 ±20.
+- **The chat then opened the canvas** when the user said yes: the connector told
+  it every spec change is *argued from a span the user can see on the canvas*.
+- **Run `2c982b0d`, requested with the chat's numbers** (648, and the beak note
+  at ~187 proud, which the agent found wrong: 191.5): the agent tried the write
+  as one `Write`, and this issue's refusal met it twice. Both times it retried
+  with no text at all, its case, naming 648.5 and the user's request, in its
+  thinking. It closed saying *my reason was written just before each attempt*.
+
+So a refusal's wording does not reach it, three wordings in. Filed as
+[issue 109](109-a-spec-write-carries-its-case.md) and
+[ADR 0029](../adr/0029-a-spec-write-carries-its-case.md): the case becomes an
+argument of the write, and this refusal goes with the text it pointed at.
+
+## Decided (the user's)
+
+**A request names no spec numbers.** The request tool says a request is what the
+user wants of the model, in their words, and may change the spec, but never
+names its new numbers: the run argues them, and the user confirms them on the
+page. And the connector's line on spec changes says a span is needed for a
+number read off a reference, and a change the user asked for needs none.
+
 ## Acceptance criteria
 
 - [x] A spec write refused when no text was written in the run says the thinking is not shown, and to write the case as a reply
-- [ ] The user has decided whether a request may name a spec's new numbers
+- [x] The user has decided whether a request may name a spec's new numbers

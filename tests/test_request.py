@@ -22,14 +22,13 @@ from test_console import ROOT, STAND_IN, ConsoleCase    # noqa: E402
 
 sys.path.insert(0, str(ROOT))
 
-from console.run import Run    # noqa: E402
+from console.run import SPEC_TOOL, Run    # noqa: E402
 from lib import intent, last_run, lock, policy, presence    # noqa: E402
 from test_run_record import RecordCase    # noqa: E402
 
 CONTOUR = ROOT / "contour"
-SPEC_WRITE = {"tool": "Edit", "file_path": "spec.yaml",
-              "old_string": "revision: 1\ndepth: 600",
-              "new_string": "revision: 2\ndepth: 640"}
+SPEC_WRITE = {"tool": SPEC_TOOL, "content": "revision: 2\ndepth: 640\n",
+              "case": "Span m4 reads 640 mm, so the depth is 640."}
 CASE = "Span m4 reads 640 mm, so the depth is 640."
 WAIT_S = 15
 
@@ -127,7 +126,8 @@ class StartsTest(RequestCase):
         self.assertEqual(self.until("finished")["closing"], "done")
 
 
-FLOOR = (("Edit", {"file_path": "spec.yaml", "old_string": "a", "new_string": "b"}),
+FLOOR = ((SPEC_TOOL, {"content": "revision: 2\ndepth: 640\n",
+                      "case": "Span m4 reads 640 mm, so the depth is 640."}),
          ("Write", {"file_path": "refs/side.png", "content": "x"}),
          ("Bash", {"command": "git commit -m 'longer beak'"}))
 """A spec write, a reference write and saving a version (ADR 0027, decision 10)."""

@@ -34,3 +34,4 @@ works — the alternative you are about to suggest is probably here with a reaso
 | [0026](0026-update-brings-a-space-in-step.md) | Update: a space's copies brought in step, where nobody edited them — *Accepted, amended*; extends [0015](0015-model-spaces.md), [0021](0021-the-lobby.md) |
 | [0027](0027-the-unattended-run.md) | The unattended run: a request, a channel, and a gate nobody else can answer — *Accepted, amended*; amends [0019](0019-console-a-driven-agent-behind-a-gate.md), [0024](0024-the-connector-desktop-reads-and-opens.md) |
 | [0028](0028-approvals-wait-and-the-run-goes-on.md) | Approvals wait, and the run goes on — *Proposed*; amends [0027](0027-the-unattended-run.md) |
+| [0029](0029-a-spec-write-carries-its-case.md) | Under a console, a spec write carries its case — *Accepted*; amends [0028](0028-approvals-wait-and-the-run-goes-on.md) |

@@ -20,11 +20,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from test_console import STAND_IN, ConsoleCase    # noqa: E402
 
-from console.run import Run    # noqa: E402
+from console.run import SPEC_TOOL, Run    # noqa: E402
 from lib import last_run    # noqa: E402
 
-SPEC_WRITE = ("Edit", {"file_path": "spec.yaml", "old_string": "revision: 1\ndepth: 600",
-                       "new_string": "revision: 2\ndepth: 640"})
+SPEC_WRITE = (SPEC_TOOL, {"content": "revision: 2\ndepth: 640\n",
+                          "case": "Span m4 reads 640 mm, so the depth is 640."})
 SAVE = ("Bash", {"command": "git add -A && git commit -q -m 'a longer beak'"})
 ASKED = ("AskUserQuestion", {"questions": [{"question": "How long should the beak be?",
                                             "options": [{"label": "300 mm"},
@@ -182,7 +182,10 @@ class DenyTest(AnsweredCase):
         self.assertEqual(self.answer(url, allow=False, reason="not the depth")["outcome"],
                          "vetoed")
         [veto] = vetoes.load(self.beaky)
-        self.assertEqual((veto["tool"], veto["call"]), SPEC_WRITE)
+        # The write as it was kept and shown: the whole spec as it read, and
+        # what it would have read (ADR 0029).
+        self.assertEqual((veto["tool"], veto["call"]["new_string"]),
+                         ("Edit", SPEC_WRITE[1]["content"]))
         self.assertEqual(veto["reason"], "not the depth")
         self.assertIn("build", veto)
         self.assertEqual((self.beaky / "spec.yaml").read_text(), "revision: 1\ndepth: 600\n")

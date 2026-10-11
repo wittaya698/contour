@@ -18,6 +18,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+from console.run import SPEC_TOOL    # noqa: E402
 from lib import policy    # noqa: E402
 from test_console import ConsoleCase    # noqa: E402
 
@@ -99,8 +100,8 @@ class GateTest(ConsoleCase):
         _, build = self.gated("contour check", home)
         self.assertTrue(build["said"]["always"])
         for command in ("git commit -m seat", "git push",
-                        {"tool": "Edit", "file_path": "spec.yaml",
-                         "old_string": "1", "new_string": "2"}):
+                        {"tool": SPEC_TOOL, "content": "revision: 2\ndepth: 640\n",
+                         "case": "Span m4 reads 640 mm, so the depth is 640."}):
             _, other = self.gated(command, home)
             self.assertFalse(other["said"]["always"], command)
 

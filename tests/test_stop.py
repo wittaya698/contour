@@ -19,12 +19,12 @@ from test_console import ROOT, ConsoleCase    # noqa: E402
 
 sys.path.insert(0, str(ROOT))
 
+from console.run import SPEC_TOOL    # noqa: E402
 from lib import last_run, lock    # noqa: E402
 
 CONTOUR = ROOT / "contour"
-SPEC_WRITE = {"tool": "Edit", "file_path": "spec.yaml",
-              "old_string": "revision: 1\ndepth: 600",
-              "new_string": "revision: 2\ndepth: 640"}
+SPEC_WRITE = {"tool": SPEC_TOOL, "content": "revision: 2\ndepth: 640\n",
+              "case": "Span m4 reads 640 mm, so the depth is 640."}
 CASE = "Span m4 reads 640 mm, so the depth is 640."
 WAIT_S = 10
 

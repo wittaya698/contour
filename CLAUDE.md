@@ -24,23 +24,25 @@ Full Blender output goes to `.contour/last-build.log`. Read it **only on failure
 
 1. **Never change anything under `refs/`** — the user's intent in pictures.
    Measure them; never rewrite one. **A `spec.yaml` changes only as: propose →
-   user confirms → write, bumping `revision:` in that same write.** The proposal
-   is the argument — the measurement that shows the contract is wrong, *depth
-   reads 640 mm ±3 on span m4, against a tolerance of 600 ±20* — and it comes
-   before the write wherever the confirm lands: prose in a terminal, a gate
-   under a console. Under a console the proposal is your text just before the
-   write, and the write is tried, as an `Edit` of `spec.yaml`: run unwatched,
-   its gate keeps both for the person, and a proposal left in a closing reaches
-   no one. A gate is a confirm and never a proposal; it can stop a
-   write, it cannot make the case for one. A measurement read off a reference
-   is a **span** — the user's, or an agent span — and the proposal names it. A
-   number from a reference with no span behind it is not an argument, and a
-   by-eye agent span argues nothing until the user has answered it. Never
-   propose one while a check is red; fix `build.py` or report the failure.
-   `contour check` fails if the spec moved and `revision:` did not (ADR 0016).
-   A *new* spec may be drafted when the user asks — scale needs an anchor they
-   give you, every number you chose flagged as yours, tolerances loudest, since
-   a loose one at birth moves the goalposts just as surely.
+   user confirms → write, bumping `revision:` in that same write.** The
+   proposal is the argument — the measurement that shows the contract is wrong,
+   *depth reads 640 mm ±3 on span m4, against a tolerance of 600 ±20* — and it
+   comes before the write wherever the confirm lands: prose in a terminal, a
+   gate under a console. Under a console the proposal is the write's own
+   `case`: the write is tried with `spec_write`, the whole new spec and your
+   case for it, naming each number it sets and the span if you measured one.
+   Your thinking reaches no one: run unwatched, its gate keeps the diff and the
+   case for the person, and a proposal left in a closing reaches no one. A gate
+   is a confirm and never a proposal; it can stop a write, it cannot make the
+   case for one. A measurement read off a reference is a **span** — the user's,
+   or an agent span — and the proposal names it. A number from a reference with
+   no span behind it is not an argument, and a by-eye agent span argues nothing
+   until the user has answered it. Never propose one while a check is red; fix
+   `build.py` or report the failure. `contour check` fails if the spec moved
+   and `revision:` did not (ADR 0016). A *new* spec may be drafted when the
+   user asks — scale needs an anchor they give you, every number you chose
+   flagged as yours, tolerances loudest, since a loose one at birth moves the
+   goalposts just as surely.
 2. **Never weaken a check to make it pass.** A red check is a finding. Report it.
 3. **Never hand-edit a generated `.blend`.** All change goes through
    `build.py`. `out/` is regenerated from zero every build.

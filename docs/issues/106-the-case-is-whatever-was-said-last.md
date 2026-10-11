@@ -46,4 +46,4 @@ case for this* (issue 101).
 ## Acceptance criteria
 
 - [x] What the page shows as a spec write's case argues for that change, or the page says plainly that there is none
-- [ ] Issue 102's two criteria are met by a real unattended run
+- [x] Issue 102's two criteria are met by a real unattended run — `d1ce99f5`, once the case was carried by the write ([ADR 0029](../adr/0029-a-spec-write-carries-its-case.md))

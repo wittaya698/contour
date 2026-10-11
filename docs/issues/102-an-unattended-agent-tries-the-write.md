@@ -63,8 +63,8 @@ what the page shows as the case is whatever the agent last said.
 
 ## Acceptance criteria
 
-- [ ] An unattended run that finds a spec change warranted tries the write, with its case just before it — tried, yes; the case before it, no
-- [ ] Its closing names what it set aside, and argues nothing that is not on the page — no: it argued the change
+- [x] An unattended run that finds a spec change warranted tries the write, with its case — run `d1ce99f5`, its case carried by the write (ADR 0029)
+- [x] Its closing names what it set aside, and argues nothing that is not on the page — run `d1ce99f5`
 
 ## Blocked by
 

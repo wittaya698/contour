@@ -28,6 +28,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from console import spend
+from console.run import SPEC_TOOL
 from lib import marks as marks_store, panel, views, vetoes as vetoes_reading
 
 from test_launcher import stages, stub_blender
@@ -903,8 +904,8 @@ class RunTest(ConsoleCase):
         """
         space = self.marked(self.space())
         _, url = self.driven({"say": "The neck reads 280 on span m1, so the neck is 280."},
-                             {"call": {"tool": "Write", "file_path": "spec.yaml",
-                                       "content": "revision: 2\nneck: 280\n"}},
+                             {"call": {"tool": SPEC_TOOL, "content": "revision: 2\nneck: 280\n",
+                                       "case": "The neck reads 280 on span m1."}},
                              space=space, BLENDER=str(stub_blender(space)))
         self.ask(url, "/run", {"prompt": "the neck should be 280"})
         gate, _ = self.gate(url)
