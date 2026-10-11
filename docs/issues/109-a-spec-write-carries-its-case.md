@@ -19,9 +19,22 @@ already 10% longer and `CLAUDE.md` still on rule 1's old wording: it made one `s
 case: the user's request, no span, the arithmetic to 648.5, and that the beak
 stands about 191.5 proud, not 187. The user denied it with *~191*.
 
-Still untested: the connector's new words. That chat started before Desktop was
-restarted, so its request named the numbers. And the page shows a moved `notes`
-entry as the whole list, before and after.
+Then run `d625e6e9`, from a new chat after Desktop was restarted, asked *make the
+longer beak the model's new target*:
+
+- **The chat's request named no numbers:** *update the spec so its depth target
+  and beak note describe the longer beak, keeping the existing depth
+  tolerance*. Nor did it open the canvas. The connector's new words held
+  (issue 108).
+- **The agent tried an `Edit` first,** as the space's `CLAUDE.md` was still on
+  rule 1's old wording; refused, it used `spec_write` on the next call.
+- **Its case argued the change and its cost:** depth 615 → 648 from `build.py`'s
+  numbers, the beak note at ~191 from the reason the user gave the last veto,
+  no span measured, and that the references read 597 mm deep, so the spec would
+  follow the user's beak and not the pictures.
+
+The page shows a moved `notes` entry as the whole list, before and after
+([issue 111](111-a-moved-note-is-shown-as-itself.md)).
 
 ## Acceptance criteria
 
