@@ -20,6 +20,7 @@ from test_run_record import ROOT, RecordCase    # noqa: E402
 
 from console import approvals    # noqa: E402
 from console.run import Run    # noqa: E402
+from lib import last_run    # noqa: E402
 
 ASKED = {"questions": [{"question": "How long should the beak be?",
                         "header": "Beak", "multiSelect": False,
@@ -45,7 +46,7 @@ class AsideTest(RecordCase):
     def test_a_question_in_an_unattended_run_is_set_aside_and_the_run_goes_on(self):
         _, given = self.asking()
         said = self.until("finished")
-        self.assertEqual(said["closing"], "Then the beak it is.")
+        self.assertEqual(said["closing"], last_run.WITHHELD)
         self.assertEqual(said["approvals"], ["How long should the beak be?"])
         [(allow, why)] = given
         self.assertFalse(allow)

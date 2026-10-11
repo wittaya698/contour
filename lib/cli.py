@@ -389,8 +389,9 @@ def on_mcp(cmd, rest, held):
         "open": lambda args: opened(args.get("page"), args.get("space"),
                                     create=bool(args.get("create")), name=args.get("name")),
         "create": lambda args: created(args.get("name"), args.get("references") or []),
-        "request": lambda args: requested(connector.naming(args.get("space")),
-                                          args.get("prose") or "", args.get("as") or "a chat"),
+        "request": lambda args: connector.asking(requested(
+            connector.naming(args.get("space")), args.get("prose") or "",
+            args.get("as") or "a chat")),
         "stop": lambda args: stopped(connector.naming(args.get("space")))})
     return 0
 
@@ -608,7 +609,8 @@ def requested(name, prose, requester):
         # A run past them would build on a tree the person has not approved,
         # and the edits waiting would go stale under it (ADR 0028, decision 7).
         return answer(f"{root.name} has {waits} approval{'s' if waits > 1 else ''} "
-                      f"waiting; open its console to answer {'them' if waits > 1 else 'it'}.")
+                      f"waiting; open its console to answer {'them' if waits > 1 else 'it'}.",
+                      approvals=last_run.approvals(root))
     if ceiling.read() is None:
         return answer("no ceiling set; an unattended run is refused until you "
                       "set one with `contour ceiling <n>`")

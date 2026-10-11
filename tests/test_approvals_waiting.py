@@ -38,6 +38,36 @@ class StatusTest(AnsweredCase):
         for leaked in ("640", "depth", "spec.yaml", "m4", "git add"):
             self.assertNotIn(leaked, json.dumps(said))
 
+    def test_the_closing_of_a_run_that_set_something_aside_never_reaches_status(self):
+        """Its closing is the agent's account, and with something set aside that
+        account is the case for it: *depth 600 to 640*. Withheld for good, not
+        only while it waits, since answered it would also be stale (found in
+        issue 100's tracer bullet)."""
+        def drive(prompt, options, gate, say):
+            gate(*SPEC_WRITE)
+            say("text", text="I'd like the depth to go from 600 to 640, after span m4.")
+        run = Run(self.beaky, drive=drive)
+        run.start("make the beak longer", ceiling=10**6, requester="the nightly agent")
+        self.until("finished")
+        self.assertWithheld()
+        self.answer(self.opened(), allow=False, reason="not yet")
+        self.assertWithheld()
+
+    def assertWithheld(self):
+        said = json.dumps(survey.status(self.beaky))
+        for leaked in ("640", "m4"):
+            self.assertNotIn(leaked, said)
+        self.assertIn("on its console's page", said)
+
+    def test_a_run_that_set_nothing_aside_keeps_its_closing(self):
+        def drive(prompt, options, gate, say):
+            say("text", text="The beak is 10% longer and the check is green.")
+        run = Run(self.beaky, drive=drive)
+        run.start("make the beak longer", ceiling=10**6, requester="the nightly agent")
+        self.until("finished")
+        self.assertEqual(survey.status(self.beaky)["run"]["closing"],
+                         "The beak is 10% longer and the check is green.")
+
     def test_until_none_are_left(self):
         self.set_aside(SPEC_WRITE, SAVE)
         url = self.opened()
@@ -158,7 +188,7 @@ class InstructionsTest(unittest.TestCase):
         said = connector.INSTRUCTIONS
         self.assertIn("approvals waiting", said)
         self.assertIn("now or later", said)
-        self.assertIn("now is open", said)
+        self.assertIn("Call open (the console) only if they say now", said)
 
     def test_a_chat_never_answers_relays_a_case_or_says_yes_for_the_user(self):
         said = connector.INSTRUCTIONS

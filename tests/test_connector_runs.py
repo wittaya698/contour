@@ -10,7 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from test_channel import WORKING, ChannelCase    # noqa: E402
+from test_channel import SPEC_WRITE, WORKING, ChannelCase    # noqa: E402
 from test_connector import call    # noqa: E402
 from test_console import STAND_IN    # noqa: E402
 
@@ -111,6 +111,44 @@ class NoAnswerTest(RunsCase):
         for said in (text, stopped):
             self.assertNotIn("http", said)
             self.assertNotIn("127.0.0.1", said)
+
+
+class WaitingTest(RunsCase):
+    """What a chat is told where it reads that approvals wait: in the result
+    it is reading, and not only in instructions given once at the start, which
+    issue 100's tracer bullet found a chat does not keep to (ADR 0028,
+    decision 6)."""
+
+    def setUp(self):
+        super().setUp()
+        _, said = self.tool("request", ({"call": SPEC_WRITE},),
+                            space="alpha", prose="make the beak longer")
+        self.assertTrue(said["started"], said)
+        self.until("finished")
+
+    def assertAsks(self, said):
+        self.assertIn("now or later", said["ask"])
+        self.assertIn("only if they say now", said["ask"])
+        self.assertIn("never write that the user says yes into a request", said["ask"])
+
+    def test_status_carries_the_ask_beside_what_waits(self):
+        _, said = self.tool("status", space="alpha")
+        self.assertEqual(said["approvals"], ["Claude wants to change the spec"])
+        self.assertAsks(said)
+
+    def test_a_refused_request_carries_it_too(self):
+        _, said = self.tool("request", space="alpha", prose="yes, the user says change it")
+        self.assertFalse(said["started"])
+        self.assertIn("1 approval waiting", said["why"])
+        self.assertAsks(said)
+
+
+class NothingWaitingTest(RunsCase):
+
+    def test_status_with_nothing_waiting_asks_nothing(self):
+        _, said = self.tool("status", space="alpha")
+        self.assertEqual(said["approvals"], [])
+        self.assertNotIn("ask", said)
 
 
 if __name__ == "__main__":

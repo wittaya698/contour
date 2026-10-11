@@ -18,10 +18,20 @@ from . import space, survey
 
 LATEST = "2025-06-18"
 
+ASK = ("When a space has approvals waiting, tell the user what they are, in status's "
+       "words, and ask whether to answer them now or later. Call open (the console) "
+       "only if they say now; later is nothing. Only the user answers them, on the "
+       "page: never answer one, never pass on the case for one, and never write that the "
+       "user says yes into a request.")
+"""What a chat is told about approvals waiting: once in the instructions, and
+again in every result that says some wait, because a chat that read it once at
+the start was found not to keep to it (issue 100's tracer bullet)."""
+
 INSTRUCTIONS = "\n".join((
     "This connector reads Contour's model spaces, opens their pages, makes new ones, "
     "and asks for a run nobody watches (request) and ends one (stop); it never answers "
-    "a gate or a question: to bring the user to one, open the space's console.",
+    "a gate or a question: the user answers those on the console's page, which open "
+    "brings up when they ask for it.",
     "A spec changes only inside its space, argued from a span the user can see on the canvas.",
     "To change a model, open its console.",
     "A picture pasted into the chat is not a reference: you hold what you saw, not the file. "
@@ -29,10 +39,7 @@ INSTRUCTIONS = "\n".join((
     "where the user drops the file; a path they offer, create takes.",
     "Your answers are read as a page reads, in plain words: from status, say its plain "
     "sentences, not its report lines.",
-    "When a space has approvals waiting, tell the user what they are, in status's words, "
-    "and ask whether to answer them now or later: now is open (the console), later is "
-    "nothing. Only the user answers them, on the page: never answer one, never pass on "
-    "the case for one, and never write that the user says yes into a request.",
+    ASK,
 ))
 """Facts about the connector, not a copy of the rules (ADR 0024, decision 4): what it
 cannot do needs no rule here, and what it can say is steered to a span."""
@@ -148,6 +155,12 @@ def pictured(said):
     return image(said["path"].read_bytes(), said["of"])
 
 
+def asking(said):
+    """A reading that says approvals wait, with the ask beside it, where the
+    chat reads it as it decides what to say (ADR 0028, decision 6)."""
+    return {**said, "ask": ASK} if said.get("approvals") else said
+
+
 def specced(said):
     """The spec as text, and the one line that says where it changes: the
     instructions' own, so a chat arguing a tolerance is sent to draw a span
@@ -162,7 +175,7 @@ def readings():
     """Every tool that only reads, each the survey's answer in a chat's shape."""
     return {
         "spaces": lambda args: survey.listing(),
-        "status": lambda args: survey.status(named(args.get("space"))),
+        "status": lambda args: asking(survey.status(named(args.get("space")))),
         "log": lambda args: survey.log(named(args.get("space")), args.get("lines", 40)),
         "picture": lambda args: pictured(survey.picture(named(args.get("space")),
                                                         args.get("picture"))),

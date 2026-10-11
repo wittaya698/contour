@@ -53,7 +53,9 @@ class AsideTest(AsideCase):
     def test_a_floor_gate_sets_its_act_aside_and_the_run_finishes(self):
         _, given = self.ran(SPEC_WRITE)
         said = self.until("finished")
-        self.assertEqual(said["closing"], "The beak is 10% longer.")
+        # Its account is withheld from a requester: with something set aside,
+        # it is the case for it (issue 100's tracer bullet).
+        self.assertEqual(said["closing"], last_run.WITHHELD)
         self.assertEqual(said["approvals"], ["Claude wants to change the spec"])
         [(allow, _)] = given
         self.assertFalse(allow)

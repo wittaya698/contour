@@ -15,6 +15,10 @@ NAME = "last-run.json"
 marker: run state is this machine's, and never part of a version."""
 
 
+WITHHELD = ("this run set something aside for you, so what it did is told on its "
+            "console's page and not here")
+
+
 def waiting(space, act):
     """A parked run, in the sentence the hold's refusal says: the space, and
     what it is waiting for you to do."""
@@ -62,11 +66,17 @@ def path(space):
 def read(space):
     """The latest run as a requester reads it, or None if nothing has run.
 
+    A run that set something aside has its closing withheld, said as such.
     An ended run also says what the last check found and what the run cost,
     both read here from the files that hold them and never copied into the
     record, so there is one verdict and one price wherever they are read.
     """
     said = store.load(path(space), None)
+    if said is not None and said.get("set_aside"):
+        # The closing of a run that set something aside is the case for it,
+        # which only the page shows (ADR 0028, decision 5), and once answered
+        # it would be stale besides: withheld for good.
+        said = {**said, "closing": WITHHELD if said.get("closing") else None}
     if said is None or said.get("state") not in ENDED:
         return said
     from . import panel

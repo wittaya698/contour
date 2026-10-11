@@ -343,6 +343,7 @@ class Run:
         # the case are the page's (rule 1).
         with self._lock:
             self.latest["approvals"] = approvals.acts(self.space)
+            self.latest["set_aside"] = True
         self.say("aside", id=kept["id"], category=category, act=said["act"],
                  text=f"set aside for you to answer later: {said['act']}")
         return False, (f"set aside for the user, who will answer it later on the "
@@ -374,6 +375,7 @@ class Run:
         # requester relays is that one waits, never an answer to it.
         with self._lock:
             self.latest["approvals"] = approvals.acts(self.space)
+            self.latest["set_aside"] = True
         self.say("aside", id=kept["id"], category=approvals.QUESTION, act=asking,
                  text=f"set aside for you to answer later: {asking}")
         return False, ("set aside: the user will answer it later on the page, "
