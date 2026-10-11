@@ -98,7 +98,8 @@ TOOLS = (
     {"name": "request",
      "description": "Ask for a run in a space nobody is watching: the prose is the "
                     "whole of what it is asked. Says started and its run, or why not. "
-                    "Where it stops for the user, its console has the page.",
+                    "Once started there is nothing to open: what needs the user is "
+                    "set aside, and status says when something waits.",
      "inputSchema": {"type": "object", "required": ["space", "prose"],
                      "properties": {"space": {"type": "string"},
                                     "prose": {"type": "string"},

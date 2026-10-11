@@ -47,6 +47,11 @@ FIELD_ONLY = ("Edit", {"file_path": "spec.yaml", "old_string": "depth: 600",
                        "new_string": "depth: 640"})
 
 
+IN_THE_REPLY = "as text in your reply, before the tool call"
+"""Where every spec-write refusal says the case goes: an agent told *in your
+text just before it* retried with no text at all (issue 107)."""
+
+
 class RefusedTest(MadeCase):
 
     def test_a_spec_write_by_shell_is_refused_and_told_to_be_an_edit(self):
@@ -55,7 +60,8 @@ class RefusedTest(MadeCase):
                 (allow, why), run = self.made(BY_SHELL, requester)
                 self.assertFalse(allow)
                 self.assertIn("as an Edit of spec.yaml", why)
-                self.assertIn("just before it", why)
+                self.assertIn(IN_THE_REPLY, why)
+                self.assertIn("naming the span if you measured one", why)
                 self.assertEqual(approvals.load(self.beaky), [])
                 self.assertIn(why, [e.get("text") for e in run.events
                                     if e["kind"] == "refused"])
@@ -79,7 +85,8 @@ class RefusedTest(MadeCase):
                     (allow, why), run = self.made(call, requester)
                     self.assertFalse(allow)
                     self.assertIn("the whole change, revision bump included, as one Edit", why)
-                    self.assertIn("just before it", why)
+                    self.assertIn(IN_THE_REPLY, why)
+                    self.assertIn("naming the span if you measured one", why)
                     self.assertEqual(approvals.load(self.beaky), [])
                     self.assertEqual((self.beaky / "spec.yaml").read_text(),
                                      "revision: 1\ndepth: 600\n")
@@ -100,7 +107,8 @@ class UnarguedTest(MadeCase):
                     SPEC_WRITE, requester,
                     said="While that waits, I'll read the last recorded check result.")
                 self.assertFalse(allow)
-                self.assertIn("your case just before it names what it sets: 640", why)
+                self.assertIn("your case names what it sets: 640", why)
+                self.assertIn(IN_THE_REPLY, why)
                 self.assertEqual(approvals.load(self.beaky), [])
                 self.assertIn(why, [e.get("text") for e in run.events
                                     if e["kind"] == "refused"])

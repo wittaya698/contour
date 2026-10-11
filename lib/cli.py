@@ -584,6 +584,12 @@ def on_request(cmd, rest, held):
     return 0 if said["started"] else 1
 
 
+STARTED = ("nothing to open: what needs the user is set aside, and status says "
+           "when something waits")
+"""What a started request says comes next. Told nothing, a chat opened the
+console two seconds after asking (issues 104 and 107; ADR 0028, decision 6)."""
+
+
 def requested(name, prose, requester):
     """Start an unattended run in a named space (ADR 0027, decisions 3, 5 and
     6): its run and space, or why not. Refused while the space is held, while a
@@ -622,7 +628,7 @@ def requested(name, prose, requester):
         # back before anybody looked, and its record outlives it.
         now = (last_run.read(root) or {}).get("run")
         if now and now != before:
-            return answer(space=root.name, run=now)
+            return answer(space=root.name, run=now, next=STARTED)
         if console.poll() is not None:
             return answer(f"the console in {root.name} ended before its run began; "
                           f"run contour-console there to see why")

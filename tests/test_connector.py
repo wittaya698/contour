@@ -129,6 +129,15 @@ class ToolsTest(unittest.TestCase):
         self.assertTrue(tool["description"])
         self.assertEqual(tool["inputSchema"], {"type": "object", "properties": {}})
 
+    def test_the_request_tool_sends_nobody_to_the_console(self):
+        """A chat told a run's console has the page opened it two seconds
+        after asking (issue 107): what needs the user waits until they say now
+        (ADR 0028, decision 6)."""
+        [got] = talk(call(1, "tools/list"), tools={"request": lambda args: {}})
+        [tool] = got["result"]["tools"]
+        self.assertNotIn("console", tool["description"])
+        self.assertIn("nothing to open", tool["description"])
+
     def test_calling_a_tool_returns_its_reading_as_text(self):
         [got] = talk(call(1, "tools/call", name="spaces", arguments={}),
                      tools=self.TOOLS)

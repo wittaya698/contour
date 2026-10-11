@@ -97,6 +97,7 @@ class StartsTest(RequestCase):
                                script=({"say": "The beak is longer."},))
         self.assertEqual(r.returncode, 0, said)
         self.assertTrue(said["started"], said)
+        self.assertIn("nothing to open", said["next"])
         record = self.until("finished")
         self.assertEqual(record["run"], said["run"])
         self.assertEqual(record["prompt"], "make the beak longer")

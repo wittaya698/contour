@@ -41,6 +41,10 @@ DOCUMENTS = ("Edit", "Write")
 """The tools a spec write may be made with: the ones whose diff `lib/gate.py`
 can read before the write happens (issue 101)."""
 
+IN_THE_REPLY = "as text in your reply, before the tool call"
+"""Where a refused spec write is told its case goes: told *in your text just
+before it*, an agent retried with no text at all (issue 107)."""
+
 
 
 def driver(spec=None):
@@ -293,8 +297,8 @@ class Run:
             # still a write nobody could have read.
             why = ("a spec write is made as an Edit of spec.yaml, so the person "
                    "can read what it changes before it happens; make it as one, "
-                   "with your case for it, naming the span, in your text just "
-                   "before it")
+                   f"with your case for it {IN_THE_REPLY}, naming the span if you "
+                   "measured one")
             self.say("refused", text=why)
             return False, why
         if category == "spec-write" and gate_words.partial(self.space / "spec.yaml",
@@ -306,7 +310,8 @@ class Run:
             why = ("a spec write is the whole change, revision bump included, as "
                    "one Edit of spec.yaml or a Write of all of it, so the person "
                    "can read all it changes at once; make it as one, with your "
-                   "case for it, naming the span, in your text just before it")
+                   f"case for it {IN_THE_REPLY}, naming the span if you measured "
+                   "one")
             self.say("refused", text=why)
             return False, why
         unargued = (gate_words.unargued(self.space / "spec.yaml", tool, payload,
@@ -316,9 +321,9 @@ class Run:
             # What the page would show as the case is the agent's last text,
             # and narration passed for one (issue 106). The numbers are what a
             # gate can check; whether they are argued well is the person's.
-            why = (f"your case just before it names what it sets: "
-                   f"{', '.join(unargued)}; say why, with them, in your text just "
-                   f"before the spec write, then make it again")
+            why = (f"your case names what it sets: {', '.join(unargued)}; say "
+                   f"why, with them, {IN_THE_REPLY}, then make the spec write "
+                   f"again")
             self.say("refused", text=why)
             return False, why
         # Unattended, the floor asks whatever the list says, and goes on asking
