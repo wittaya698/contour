@@ -23,7 +23,8 @@ from lib import last_run, lock    # noqa: E402
 
 CONTOUR = ROOT / "contour"
 SPEC_WRITE = {"tool": "Edit", "file_path": "spec.yaml",
-              "old_string": "depth: 600", "new_string": "depth: 640"}
+              "old_string": "revision: 1\ndepth: 600",
+              "new_string": "revision: 2\ndepth: 640"}
 WAIT_S = 10
 
 

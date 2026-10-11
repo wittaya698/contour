@@ -41,6 +41,11 @@ class MadeCase(AnsweredCase):
             time.sleep(0.02)
         return said[0], run
 
+REVISION_ONLY = ("Edit", {"file_path": "spec.yaml", "old_string": "revision: 1",
+                          "new_string": "revision: 2"})
+FIELD_ONLY = ("Edit", {"file_path": "spec.yaml", "old_string": "depth: 600",
+                       "new_string": "depth: 640"})
+
 
 class RefusedTest(MadeCase):
 
@@ -61,7 +66,23 @@ class RefusedTest(MadeCase):
         (allow, why), _ = self.made(SPEC_WRITE, "the nightly agent")
         self.assertFalse(allow)
         self.assertIn("set aside", why)
-        self.assertEqual(len(approvals.load(self.beaky)), 1)
+        [kept] = approvals.load(self.beaky)
+        self.assertEqual(kept["said"]["changes"], ["depth 600 → 640"])
+
+    def test_a_spec_write_of_part_of_the_change_is_refused(self):
+        """The revision alone, or a field without it: rule 1 bumps it in the
+        same write, and a page could show nothing of the first and a check
+        would go red on the second (issue 104)."""
+        for call in (REVISION_ONLY, FIELD_ONLY):
+            for requester in ("the nightly agent", None):
+                with self.subTest(call=call[1]["new_string"], requester=requester):
+                    (allow, why), run = self.made(call, requester)
+                    self.assertFalse(allow)
+                    self.assertIn("the whole change, revision bump included, as one Edit", why)
+                    self.assertIn("just before it", why)
+                    self.assertEqual(approvals.load(self.beaky), [])
+                    self.assertEqual((self.beaky / "spec.yaml").read_text(),
+                                     "revision: 1\ndepth: 600\n")
 
 
 class ClosingTest(MadeCase):

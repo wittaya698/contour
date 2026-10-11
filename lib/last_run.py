@@ -18,6 +18,11 @@ marker: run state is this machine's, and never part of a version."""
 WITHHELD = ("this run set something aside for you, so what it did is told on its "
             "console's page and not here")
 
+ANSWERED = ("this run set something aside, and all of it has been answered on "
+            "its console's page; nothing waits")
+"""The withheld closing once nothing it set aside is left waiting: the first
+read as something still waiting, over an empty list (issue 105)."""
+
 
 def waiting(space, act):
     """A parked run, in the sentence the hold's refusal says: the space, and
@@ -76,7 +81,8 @@ def read(space):
         # The closing of a run that set something aside is the case for it,
         # which only the page shows (ADR 0028, decision 5), and once answered
         # it would be stale besides: withheld for good.
-        said = {**said, "closing": WITHHELD if said.get("closing") else None}
+        withheld = WITHHELD if said.get("approvals") else ANSWERED
+        said = {**said, "closing": withheld if said.get("closing") else None}
     if said is None or said.get("state") not in ENDED:
         return said
     from . import panel

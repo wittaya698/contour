@@ -19,8 +19,8 @@ from test_run_record import RecordCase    # noqa: E402
 from console.run import Run    # noqa: E402
 from lib import last_run    # noqa: E402
 
-SPEC_WRITE = ("Edit", {"file_path": "spec.yaml", "old_string": "depth: 600",
-                       "new_string": "depth: 640"})
+SPEC_WRITE = ("Edit", {"file_path": "spec.yaml", "old_string": "revision: 1\ndepth: 600",
+                       "new_string": "revision: 2\ndepth: 640"})
 
 
 class AsideCase(RecordCase):

@@ -297,6 +297,18 @@ class Run:
                    "before it")
             self.say("refused", text=why)
             return False, why
+        if category == "spec-write" and gate_words.partial(self.space / "spec.yaml",
+                                                           tool, payload):
+            # Part of a change: the revision alone moves nothing a page could
+            # show, and a field alone turns the check red. Set aside, the rest
+            # never follows, since the agent is told not to try it another way
+            # (issue 104).
+            why = ("a spec write is the whole change, revision bump included, as "
+                   "one Edit of spec.yaml or a Write of all of it, so the person "
+                   "can read all it changes at once; make it as one, with your "
+                   "case for it, naming the span, in your text just before it")
+            self.say("refused", text=why)
+            return False, why
         # Unattended, the floor asks whatever the list says, and goes on asking
         # with the page open: a tab is presence, not attention (ADR 0027,
         # decisions 10 and 11).

@@ -26,6 +26,9 @@ WORDS = {
 """Category -> the act, and the two answers to it. Every category `contour
 intents` prints is here (`tests/test_gate.py`)."""
 
+REVISION = ("revision",)
+"""The field a spec write bumps, and the one its diff does not show."""
+
 UNWATCHED = {
     "spec-write": "Changing the spec",
     "ref-write": "Changing your reference pictures",
@@ -79,6 +82,15 @@ def changes(spec, tool, call):
     640 mm*, in the order the spec will read. Empty when the write cannot be
     read ahead of running it — a shell call is a program, not a document — and
     the raw call is what is left to read, as it was before."""
+    return [field(path, was, will)
+            for path, (was, will) in (moved(spec, tool, call) or {}).items()
+            if path != REVISION]
+
+
+def moved(spec, tool, call):
+    """Every field a spec write moves, `revision` too, as {path: (was, will)}
+    in the order the spec will read; None when the write cannot be read ahead
+    of running it."""
     was = spec.read_text(encoding="utf-8") if spec.is_file() else ""
     if tool == "Write":
         will = call.get("content", "")
@@ -86,14 +98,25 @@ def changes(spec, tool, call):
         count = -1 if call.get("replace_all") else 1
         will = was.replace(call["old_string"], call.get("new_string", ""), count)
     else:
-        return []
+        return None
     try:
         before, after = flat(miniyaml.loads(was) or {}), flat(miniyaml.loads(will) or {})
     except miniyaml.YamlError:
-        return []
-    return [field(path, before.get(path), after.get(path))
+        return None
+    return {path: (before.get(path), after.get(path))
             for path in dict.fromkeys([*after, *before])
-            if path != ("revision",) and before.get(path) != after.get(path)]
+            if before.get(path) != after.get(path)}
+
+
+def partial(spec, tool, call):
+    """Whether a spec write is part of a change and not the whole of one: the
+    revision alone, or a field without the revision, which rule 1 bumps in
+    the same write (issue 104). A write that cannot be read, or moves nothing
+    a person could name, is not said to be either."""
+    fields = moved(spec, tool, call)
+    if not fields:
+        return False
+    return REVISION not in fields or set(fields) == {REVISION}
 
 
 def flat(doc, at=()):

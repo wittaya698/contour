@@ -33,7 +33,9 @@ INSTRUCTIONS = "\n".join((
     "a gate or a question: the user answers those on the console's page, which open "
     "brings up when they ask for it.",
     "A spec changes only inside its space, argued from a span the user can see on the canvas.",
-    "To change a model, open its console.",
+    "To change a model, request a run in it, even one that needs a spec change: the run "
+    "sets that aside for the user to answer on the page. Open its console only when "
+    "the user asks to watch, or says now to approvals waiting.",
     "A picture pasted into the chat is not a reference: you hold what you saw, not the file. "
     "Open the lobby on its create form (open, with create, and the name if one was given), "
     "where the user drops the file; a path they offer, create takes.",

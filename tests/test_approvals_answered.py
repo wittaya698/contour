@@ -142,17 +142,14 @@ class AllowTest(AnsweredCase):
         self.assertEqual((self.beaky / "spec.yaml").read_text(), "revision: 2\ndepth: 640\n")
         self.assertEqual(self.waiting(url), [])
 
-    def test_the_revision_guard_still_applies_to_it(self):
-        """The person allowed the change, not the missing bump: `contour
-        check` still refuses a spec that moved with its revision where it was."""
+    def test_a_write_missing_its_revision_bump_never_reaches_the_page(self):
+        """It used to, and `contour check` refused it after the person had
+        allowed it. Now the gate refuses it, and the agent is told to make the
+        whole change as one write (issue 104)."""
         self.set_aside(("Edit", {"file_path": "spec.yaml", "old_string": "depth: 600",
                                  "new_string": "depth: 640"}))
-        self.answer(self.opened())
-        r = subprocess.run([str(Path(__file__).resolve().parent.parent / "contour"), "check"],
-                           cwd=str(self.beaky), capture_output=True, text=True, timeout=60,
-                           env=dict(os.environ, BLENDER="/nowhere/blender"))
-        self.assertNotEqual(r.returncode, 0)
-        self.assertIn("FAIL revision", r.stdout + r.stderr)
+        self.assertEqual(self.waiting(self.opened()), [])
+        self.assertEqual((self.beaky / "spec.yaml").read_text(), "revision: 1\ndepth: 600\n")
 
     def test_allowing_a_save_after_the_spec_write_saves_it(self):
         self.set_aside(SPEC_WRITE, SAVE)

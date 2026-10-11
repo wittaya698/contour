@@ -61,8 +61,8 @@ class RunningTest(RecordCase):
 
 class WaitingTest(RecordCase):
 
-    WRITE = {"file_path": "spec.yaml", "old_string": "depth: 600",
-             "new_string": "depth: 640"}
+    WRITE = {"file_path": "spec.yaml", "old_string": "revision: 1\ndepth: 600",
+             "new_string": "revision: 2\ndepth: 640"}
 
     def parked(self):
         """A run stopped at a spec write, and the record while it waits."""

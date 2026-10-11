@@ -57,8 +57,8 @@ class ProtocolTest(unittest.TestCase):
         """ADR 0024, decision 4, as ADR 0027 decision 5 left it: it reads, opens,
         makes, and asks for runs and stops them, and never answers a gate or a
         question, bringing the person to one with open; a spec changes
-        inside its space, from a span on the canvas; the console is where the
-        model changes. ADR 0025, decision 11: a pasted picture is answered with
+        inside its space, from a span on the canvas; a model is changed by a
+        request, and its console opened only when asked (issue 104). ADR 0025, decision 11: a pasted picture is answered with
         the lobby's create form, where the file can be dropped, and never by
         asking for a path; and what the connector says is read as a page reads.
         ADR 0028, decision 6: approvals waiting are asked about, now or later,
@@ -72,6 +72,11 @@ class ProtocolTest(unittest.TestCase):
         self.assertIn("span", said[1])
         self.assertIn("canvas", said[1])
         self.assertIn("console", said[2])
+        self.assertIn("request a run in it, even one that needs a spec change", said[2])
+        self.assertIn("the run sets that aside for the user to answer on the page", said[2])
+        self.assertIn("Open its console only when the user asks to watch, or says "
+                      "now to approvals waiting", said[2])
+        self.assertNotIn("To change a model, open its console", said[2])
         self.assertIn("pasted", said[3])
         self.assertIn("create form", said[3])
         self.assertNotIn("ask for the file's path", said[3])

@@ -53,6 +53,20 @@ class StatusTest(AnsweredCase):
         self.answer(self.opened(), allow=False, reason="not yet")
         self.assertWithheld()
 
+    def test_once_all_are_answered_the_closing_says_nothing_waits(self):
+        """And while one waits it still points at the page: a chat read the
+        unchanged sentence as something still waiting, over an empty list, and
+        sent the person to the console (issue 105)."""
+        self.set_aside(SPEC_WRITE, SAVE)
+        self.assertEqual(survey.status(self.beaky)["run"]["closing"], last_run.WITHHELD)
+        url = self.opened()
+        self.answer(url)
+        self.assertEqual(survey.status(self.beaky)["run"]["closing"], last_run.WITHHELD)
+        self.answer(url, allow=False, reason="not yet")
+        self.assertEqual(survey.status(self.beaky)["run"]["closing"],
+                         "this run set something aside, and all of it has been "
+                         "answered on its console's page; nothing waits")
+
     def assertWithheld(self):
         said = json.dumps(survey.status(self.beaky))
         for leaked in ("640", "m4"):

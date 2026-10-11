@@ -103,7 +103,8 @@ class SaysTest(ConsoleCase):
         said = self.said({"say": "Seat depth reads 640 mm ±3 on span m2, against "
                                  "600 ±20; m1 is where the back starts. Shall I?"},
                          {"call": {"tool": "Write", "file_path": str(space / "spec.yaml"),
-                                   "content": SPEC.replace("value: 600", "value: 640")}},
+                                   "content": SPEC.replace("value: 600", "value: 640")
+                                                  .replace("revision: 2", "revision: 3")}},
                          space=space)
         self.assertEqual(said["spans"], ["m2"])
         self.assertEqual(said["changes"], ["seat depth 600 → 640 mm"])
