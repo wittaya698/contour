@@ -4,19 +4,26 @@ These talk to the running server over HTTP, the way the page does. Nothing
 here reaches inside the handler: a mark is real when it is on disk, and the
 canvas is done when the port is free.
 """
+import contextlib
+import inspect
+import io
 import json
 import re
 import sys
 import tempfile
+import threading
+import time
+import types
 import unittest
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from lib import marks as marks_store
-from lib.canvas import Canvas
+from lib.canvas import Canvas, serve
 from client import get, open_url, post
 
 
@@ -114,11 +121,8 @@ class CanvasTest(unittest.TestCase):
         self.assertIn("setInterval", page)
 
     def test_a_beat_leaves_the_canvas_serving(self):
-        """The page beats so the console can tell a closed tab from a quiet one,
-        and the same page is served to both. The canvas records the beat and acts
-        on nothing: its session ends when the user presses Done (ADR 0018), and a
-        lifetime rule that moved in here would end one because a browser was
-        slow to say anything."""
+        """The page beats so a closed tab can be told from a quiet one, and a
+        beat is the tab still open: it ends nothing (issue 110)."""
         status, _ = post(self.canvas, "/beat", {})
         self.assertEqual(status, 200)
         self.assertFalse(self.canvas.done)
@@ -410,6 +414,94 @@ class CanvasTest(unittest.TestCase):
         self.assertIn("body:not(.asked) [data-needs]", page)
         self.assertIn("body:not(.asked) [data-unless]", page)
         self.assertIn("classList.add('asked')", page)
+
+
+class TabTest(unittest.TestCase):
+    """A canvas ends when its tab goes, as well as on Done (issue 110).
+
+    A chat that opened one for the user left it holding the space after its tab
+    closed, because nobody told them there was a Done to press. Nothing is lost
+    by ending it: each mark was written as it arrived."""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+        self.sheet = self.tmp / "sheet.png"
+        self.sheet.write_bytes(b"\x89PNG\r\n\x1a\nnot really a png")
+        self.marks = self.tmp / "marks.json"
+
+    def canvas(self, grace=60, hidden_grace=60, reload_grace=0.5):
+        canvas = Canvas(sheet=self.sheet, marks=self.marks, grace=grace,
+                        hidden_grace=hidden_grace, reload_grace=reload_grace)
+        self.addCleanup(canvas.stop)
+        canvas.start()
+        return canvas
+
+    def ended(self, canvas, within=5):
+        deadline = time.monotonic() + within
+        while not canvas.done:
+            self.assertLess(time.monotonic(), deadline, "the canvas never ended")
+            time.sleep(0.05)
+
+    def test_a_tab_that_says_it_is_going_ends_it_and_keeps_its_marks(self):
+        canvas = self.canvas()
+        post(canvas, "/beat", {"hidden": False})
+        post(canvas, "/marks", {"view": "top", "pixel": [10, 20], "text": "legs"})
+        post(canvas, "/going", {})
+        self.ended(canvas)
+        report = canvas.wait()
+        self.assertTrue(report["ok"])
+        self.assertIn("the tab closed, 1 mark kept", " ".join(report["lines"]))
+        self.assertEqual(len(marks_store.load(self.marks)), 1)
+
+    def test_a_reload_is_not_a_closed_tab(self):
+        """A reload says going and then beats again: the canvas waits a moment
+        for that beat rather than ending under the page that sent it."""
+        canvas = self.canvas(reload_grace=1.0)
+        post(canvas, "/beat", {"hidden": False})
+        post(canvas, "/going", {})
+        post(canvas, "/beat", {"hidden": False})
+        time.sleep(1.5)
+        self.assertFalse(canvas.done)
+
+    def test_a_tab_on_screen_gone_silent_ends_it(self):
+        """A browser that quit sends no word of it."""
+        canvas = self.canvas(grace=0.3)
+        post(canvas, "/beat", {"hidden": False})
+        self.ended(canvas)
+        self.assertIn("the tab closed", " ".join(canvas.wait()["lines"]))
+
+    def test_done_still_reports_as_done(self):
+        canvas = self.canvas()
+        post(canvas, "/beat", {"hidden": False})
+        post(canvas, "/done", {})
+        self.assertIn("no marks captured", " ".join(canvas.wait()["lines"]))
+
+    def test_contour_canvas_ends_with_its_tab(self):
+        """The command itself, as a chat's `open` or a terminal starts it."""
+        out, said = io.StringIO(), []
+        with contextlib.redirect_stdout(out):
+            thread = threading.Thread(target=lambda: said.append(serve(
+                self.sheet, self.marks, open_browser=False,
+                grace=60, hidden_grace=60, reload_grace=0.2)))
+            thread.start()
+            deadline = time.monotonic() + 5
+            while "canvas at " not in out.getvalue():
+                self.assertLess(time.monotonic(), deadline, "the canvas never said where")
+                time.sleep(0.02)
+        address = urllib.parse.urlparse(out.getvalue().split()[2])
+        page = types.SimpleNamespace(
+            origin=f"{address.scheme}://{address.netloc}",
+            token=urllib.parse.parse_qs(address.query)["t"][0])
+        post(page, "/beat", {"hidden": False})
+        post(page, "/going", {})
+        thread.join(timeout=5)
+        self.assertFalse(thread.is_alive(), "contour canvas outlived its tab")
+        self.assertIn("the tab closed", " ".join(said[0]["lines"]))
+
+    def test_it_closes_on_a_closed_tab_by_default(self):
+        defaults = inspect.signature(serve).parameters
+        for name in ("grace", "hidden_grace", "reload_grace"):
+            self.assertIsNotNone(defaults[name].default, name)
 
 
 if __name__ == "__main__":

@@ -182,21 +182,24 @@ class Page:
     a page that stopped beating is a tab that closed. None leaves the lifetime
     to whoever owns it. `hidden_grace` is the longer silence allowed a tab
     that said it is hidden, whose timers the browser may slow or stop
-    (issue 39).
+    (issue 39). `reload_grace` is how long after the tab says it is going a
+    beat may still take that back: a reload says going, then beats again.
     """
 
     max_body = 4 * 2**20
     """The largest POST body a page reads; a host whose page sends files says
     how much more it takes."""
 
-    def __init__(self, html, can=(), routes=None, grace=None, hidden_grace=None):
+    def __init__(self, html, can=(), routes=None, grace=None, hidden_grace=None,
+                 reload_grace=0):
         self.html = html
         self.can = tuple(can)
         self.routes = dict(routes or {})
         self.grace = grace
         self.hidden_grace = hidden_grace
+        self.reload_grace = reload_grace
         self.hidden = False                   # the tab's last word on being seen
-        self.gone = False                     # the tab said it is closing
+        self.gone = None                      # when the tab said it is closing
         self.ended = None                     # why it ended, for the last line
         self.token = secrets.token_urlsafe(32)
         self.last_beat = None                 # nothing has said it is watching
@@ -258,14 +261,14 @@ class Page:
             time.sleep(min(0.25, self.grace / 4))
 
     def closed(self, grace, hidden_grace=None):
-        """Has the tab closed? Yes once it said it is going; otherwise judged
-        by its silence: `grace` for a tab on
-        screen; `hidden_grace` for one that said it is hidden, because a
+        """Has the tab closed? Yes once it said it is going, and no beat took
+        that back within `reload_grace`; otherwise judged by its silence:
+        `grace` for a tab on screen; `hidden_grace` for one that said it is hidden, because a
         browser slows or stops a background tab's timers and its silence is
         not a closed tab's. None for that leaves a hidden tab never closed by
         silence. Never before a first beat."""
-        if self.gone:
-            return True
+        if self.gone is not None:
+            return time.monotonic() - self.gone >= self.reload_grace
         beat = self.last_beat
         if beat is None:
             return False
@@ -290,13 +293,13 @@ class Page:
         asking `closed`."""
         self.last_beat = time.monotonic()
         self.hidden = hidden
+        self.gone = None                      # a reload, and not a closed tab
         return {"beat": True}
 
     def going(self):
         """The tab saying it is closing — `pagehide`, sent so it outlives the
-        page. Recorded, like a beat; acted on by whoever owns the lifetime,
-        so the canvas, whose lifetime is its Done button, ignores it."""
-        self.gone = True
+        page. Recorded, like a beat; acted on by whoever owns the lifetime."""
+        self.gone = time.monotonic()
         return {"going": True}
 
     def finish(self):

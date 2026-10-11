@@ -1301,9 +1301,9 @@ entry.addEventListener('submit', async e => {
 });
 
 // Proof this tab is still open. The console ends a run when the beats stop,
-// because `beforeunload` cannot be relied on to arrive at all. The canvas
-// records the beat, and the word that the tab is going, and acts on neither, so
-// this costs it a request every few seconds and changes none of its behaviour.
+// because `beforeunload` cannot be relied on to arrive at all, and the canvas
+// ends with its tab too (issue 110): a reload says going, then beats again,
+// and the canvas waits a moment for that beat.
 // A hidden tab is not a closed one: a browser slows or stops the timers of a
 // tab nobody is looking at, so every beat says which it is, and hiding is said
 // at once, while the tab can still say it. Closing is said as the page goes,

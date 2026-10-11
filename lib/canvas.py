@@ -2,8 +2,8 @@
 
 Runs launcher-side, never inside Blender. Serves one page, the sheet and the
 identity mask from the standard library on localhost, takes marks from it, and
-stops when the page says done — the first Contour command that waits rather
-than shoots.
+stops when the page says done or its tab goes — the first Contour command that
+waits rather than shoots.
 
 The page keeps its own copy of the mask so hover costs no request, but what a
 mark *records* is resolved here, from the mask on disk. Hover is a convenience;
@@ -24,6 +24,11 @@ from lib.page import TOKEN_HEADER, TOKEN_PARAM, Blob, Page  # noqa: F401  (re-ex
 
 PAGE = Path(__file__).resolve().parent / "canvas.html"
 
+GRACE_S = 10          # beats are seconds apart; this is several missed ones
+HIDDEN_GRACE_S = 60 * 60   # a background tab's timers may stop; a quit browser
+                           # is caught here
+RELOAD_S = 5          # a reload says going, then beats again within this
+
 MARKS_ONLY = ("marks",)
 """What a host with no console can do, which is what a bare clone can do.
 
@@ -39,7 +44,8 @@ class Canvas(Page):
 
     def __init__(self, sheet, marks, mask=None, parts=None, resolve=None,
                  refs=None, can=MARKS_ONLY, routes=None, views=None,
-                 blend=None, verdict=None, name=None):
+                 blend=None, verdict=None, name=None, grace=None,
+                 hidden_grace=None, reload_grace=0):
         # What this host can do, for the page to ask about. The caller's to
         # declare and not the Canvas's to infer: the console's extra surface
         # is the console's, and a Canvas that guessed would guess wrong for
@@ -51,7 +57,10 @@ class Canvas(Page):
         # the console's extra views *beside* it, never by bundling them in
         # (ADR 0019). A capability the host declares comes with the endpoints
         # that capability implies, and they arrive together.
-        super().__init__(PAGE, can=can, routes=routes)
+        # The graces are the launcher's: under a console the console owns the
+        # page's lifetime, and gives none (issue 110).
+        super().__init__(PAGE, can=can, routes=routes, grace=grace,
+                         hidden_grace=hidden_grace, reload_grace=reload_grace)
         self.sheet = Path(sheet)
         self.marks = Path(marks)
         self.mask = Path(mask) if mask else None
@@ -188,10 +197,15 @@ class Canvas(Page):
         return marks_store.correct(marks, mark_id, a, b, said)
 
     def wait(self):
-        """Serve until the page says done, then stop, anchor, and report."""
+        """Serve until the page says done or its tab goes, then stop, anchor,
+        and report. A closed tab is said as one, so whoever started the canvas
+        never takes it for the user saying they were finished."""
         self._done.wait()
         self.stop()
         n = len(self.captured)
+        if self.ended:
+            return self.report(f"the tab closed, {marks_store.phrase(n)} kept",
+                               self.anchor())
         return self.report(f"{marks_store.phrase(n)} captured" if n
                            else "no marks captured", self.anchor())
 
@@ -235,8 +249,11 @@ def png(blob):
 
 
 def serve(sheet, marks, mask=None, parts=None, resolve=None, refs=None,
-          views=None, blend=None, verdict=None, name=None, open_browser=True):
-    """One canvas session, start to report. Blocks until the page says done.
+          views=None, blend=None, verdict=None, name=None, open_browser=True,
+          grace=GRACE_S, hidden_grace=HIDDEN_GRACE_S, reload_grace=RELOAD_S):
+    """One canvas session, start to report. Blocks until the page says done,
+    or its tab goes: a chat that opened it for the user told them of no Done to
+    press, and each mark was written as it arrived (issue 110).
 
     The first Contour command that waits rather than shoots, so it is also the
     first that can be interrupted: Ctrl-C closes the port and keeps whatever
@@ -251,7 +268,8 @@ def serve(sheet, marks, mask=None, parts=None, resolve=None, refs=None,
     # the build has moved past just as easily, and resolution already refuses one
     # (ADR 0018). Said while the user is looking rather than when they press Done.
     canvas = Canvas(sheet, marks, mask, parts, resolve, refs,
-                    views=views, blend=blend, verdict=verdict, name=name)
+                    views=views, blend=blend, verdict=verdict, name=name,
+                    grace=grace, hidden_grace=hidden_grace, reload_grace=reload_grace)
     url = canvas.start()
     print(f"canvas at {url}  —  click the sheet, then press Done", flush=True)
     if open_browser:

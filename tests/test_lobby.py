@@ -565,7 +565,7 @@ class LobbyProtectionTest(unittest.TestCase):
                 self.refused(403, path, body, Origin="https://example.com")
                 self.refused(403, path, body, **{"Sec-Fetch-Site": "cross-site"})
         self.assertEqual((self.lobby.gone, self.lobby.hidden, self.lobby.last_beat),
-                         (False, False, None))
+                         (None, False, None))
 
     def test_a_post_that_is_not_json_ends_nothing(self):
         self.refused(415, "/done", {}, **{"Content-Type": "text/plain;charset=UTF-8"})
