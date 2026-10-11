@@ -57,6 +57,66 @@ SHELLS = ("sh", "bash", "zsh", "dash", "ksh")
 GIT = {"commit": "commit", "push": "push"}
 
 
+# A heredoc's opening: `<<EOF`, `<<-EOF`, `<<'EOF'` or `<<"EOF"`.
+HEREDOC = re.compile(r"<<(-?)\s*(['\"]?)([A-Za-z_]\w*)\2")
+
+
+def unmessaged(call):
+    """The call with `git commit`'s own message taken out, where a heredoc
+    feeds it one (issue 103).
+
+    A message is text about a change, and it names what it is about: a save
+    whose message said `spec.yaml` read as a spec write, and said so on the
+    page and in the veto. Only `git commit -F -` is let off. An interpreter fed
+    a heredoc is how an agent edits a file, and `git apply` fed one changes
+    files, so every other heredoc is left to be read as a write.
+    """
+    at = 0
+    while True:
+        found = HEREDOC.search(call, at)
+        if found is None:
+            return call
+        start = call.rfind("\n", 0, found.start()) + 1
+        command = re.split(r"&&|\|\||;|\|", call[start:found.start()])[-1]
+        body = call.find("\n", found.end())
+        end = closing(call, body, found.group(3), found.group(1)) if body != -1 else None
+        if end is None or not messages(command):
+            at = found.end()
+            continue
+        call = call[:found.start()] + call[found.end():body] + call[end:]
+        at = found.start()
+
+
+def closing(call, body, delimiter, indented):
+    """Where the line after a heredoc's closing delimiter starts, or None if it
+    is never closed: an unclosed one is left whole, to be read as written."""
+    at = body + 1
+    while at <= len(call):
+        stop = call.find("\n", at)
+        line = call[at:] if stop == -1 else call[at:stop]
+        if (line.lstrip("\t") if indented else line) == delimiter:
+            return len(call) if stop == -1 else stop
+        if stop == -1:
+            return None
+        at = stop + 1
+    return None
+
+
+def messages(command):
+    """Whether this command is `git commit` taking its message from stdin."""
+    try:
+        words = shlex.split(command)
+    except ValueError:
+        return False
+    for at, word in enumerate(words):
+        if word.rsplit("/", 1)[-1] == "git":
+            rest = words[at + 1:]
+            return (subcommand(rest) == "commit"
+                    and (after("-F", rest) == "-" or after("--file", rest) == "-"
+                         or "--file=-" in rest))
+    return False
+
+
 def categories():
     """The categories a call can be classified as, for printing and auditing.
 
@@ -189,7 +249,7 @@ def classify(tool, payload):
         return path_intent(Path(payload.get("file_path", "")))
     if tool != "Bash":
         return None
-    call = payload.get("command", "")
+    call = unmessaged(payload.get("command", ""))
     try:
         words = shlex.split(call)
     except ValueError as e:

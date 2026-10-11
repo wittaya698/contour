@@ -36,9 +36,10 @@ OLD = toolkit_git("rev-parse", "--short", toolkit_git(
 """A toolkit commit whose template `CLAUDE.md` is not today's."""
 
 
-def then(rel, name):
-    """What the template wrote at `rel` for `name` at the old commit."""
-    return toolkit_git("show", f"{OLD}:templates/space/{rel}").replace("<NAME>", name)
+def then(rel, name, commit=OLD):
+    """What the template wrote at `rel` for `name` at `commit`, the old one
+    unless another is named."""
+    return toolkit_git("show", f"{commit}:templates/space/{rel}").replace("<NAME>", name)
 
 
 class UpdateCase(unittest.TestCase):
@@ -62,12 +63,17 @@ class UpdateCase(unittest.TestCase):
         self.git("commit", "-qm", "alpha")
 
     def behind(self, space, commit):
-        """Make `space` one made from `commit`: its marker and its copies."""
+        """Make `space` one made from `commit`: its marker, and its copies as
+        they were written then. A commit this history lacks has no copies to
+        give, so those are the old commit's: different from today's, and from
+        nothing the space can name."""
         marker = space / ".contour" / "project"
         marker.write_text("".join(f"toolkit: {commit}\n" if l.startswith("toolkit:") else l
                                   for l in marker.read_text().splitlines(keepends=True)))
+        known = subprocess.run(["git", "-C", str(ROOT), "cat-file", "-e", f"{commit}^{{commit}}"],
+                               capture_output=True).returncode == 0
         for rel in space_lib.SCAFFOLD:
-            (space / rel).write_text(then(rel, space.name))
+            (space / rel).write_text(then(rel, space.name, commit if known else OLD))
 
     def contour(self, *args, cwd=None):
         return subprocess.run([sys.executable, str(CONTOUR), *args],

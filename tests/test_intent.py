@@ -149,6 +149,63 @@ class ClassifyTest(unittest.TestCase):
         self.assertEqual(said, "spec-write")
 
 
+class CommitMessageTest(unittest.TestCase):
+    """A heredoc that feeds `git commit` its message is text, not a write (issue
+    103). Found in issue 100's tracer bullet: a save whose message mentioned
+    `spec.yaml` was read as a spec write, and said so on the page, in the record
+    and in the veto. Only `git commit`'s own message is let off: an interpreter
+    fed a heredoc is how an agent edits a file, and a patch fed one changes
+    files, so both still write."""
+
+    SAVE = ("git add build.py spec.yaml sheet.png && git commit -q -F - <<'EOF'\n"
+            "beaky-0028: beak 10% longer (187 proud), spec revision 6\n"
+            "\n"
+            "spec.yaml (revision 5 -> 6, user-approved): depth 615 -> 644\n"
+            "EOF\n"
+            "git log --oneline -2 && git status --short")
+
+    def classify(self, call):
+        return intent.classify("Bash", {"command": call})
+
+    def test_the_tracer_bullets_save_reads_as_a_save(self):
+        self.assertEqual(self.classify(self.SAVE), "commit")
+
+    def test_a_message_naming_a_reference_is_not_a_reference_write(self):
+        call = ("git commit --file=- <<EOF\nmeasured refs/side.png again, "
+                "python3 found nothing\nEOF")
+        self.assertEqual(self.classify(call), "commit")
+
+    def test_a_message_naming_a_build_is_not_a_build(self):
+        self.assertEqual(self.classify("git commit -F - <<'EOF'\nafter contour check\nEOF"),
+                         "commit")
+
+    def test_an_interpreter_fed_a_heredoc_still_writes_the_spec(self):
+        call = ("python3 - <<'EOF'\nopen('spec.yaml', 'w').write(x)\nEOF\n"
+                "git commit -q -m 'spec'")
+        self.assertEqual(self.classify(call), "spec-write")
+
+    def test_a_redirect_chained_onto_a_commit_still_writes_the_spec(self):
+        call = "cat > spec.yaml <<'EOF'\ndepth: 640\nEOF\ngit commit -q -am 'spec'"
+        self.assertEqual(self.classify(call), "spec-write")
+
+    def test_a_patch_fed_a_heredoc_still_writes_the_spec(self):
+        call = ("git apply <<'EOF'\n--- a/spec.yaml\n+++ b/spec.yaml\n"
+                "@@ -1 +1 @@\n-depth: 600\n+depth: 640\nEOF")
+        self.assertEqual(self.classify(call), "spec-write")
+
+    def test_a_message_never_closed_is_left_to_be_read_as_written(self):
+        """No closing line, so no telling where the message ends: unread, it
+        would be a hole, so it is read whole."""
+        self.assertEqual(self.classify("git commit -F - <<'EOF'\nspec.yaml\n"
+                                       "python3 -c \"open('spec.yaml','w')\""),
+                         "spec-write")
+
+    def test_a_second_heredoc_after_the_message_is_still_read(self):
+        call = ("git commit -F - <<'MSG'\na message\nMSG\n"
+                "python3 - <<'EOF'\nopen('spec.yaml', 'w').write(x)\nEOF")
+        self.assertEqual(self.classify(call), "spec-write")
+
+
 class ReferencesTest(unittest.TestCase):
     """Which references a call names, beside what the call means.
 

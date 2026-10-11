@@ -45,8 +45,19 @@ decision and not a fix:
   every category the call carries (*save this version, which includes a spec
   change*), so the words are never wrong even when the ranking is cautious.
 
+## Decided
+
+Narrower than any of the three: **a heredoc that feeds `git commit` its message
+(`-F -`, `--file -`, `--file=-`) is text, and is taken out of the call before it
+is read.** Nothing else is let off. `python3 - <<EOF` still writes, `cat >
+spec.yaml <<EOF` still writes, `git apply <<EOF` still writes, and a message
+heredoc that is never closed is left whole. The first two options above both
+needed a judgement no reading of a call can make (*does this program write?*),
+and the third left the ranking wrong, which would make issue 101's refusal
+refuse every save that names the spec.
+
 ## Acceptance criteria
 
-- [ ] A save whose message or staged files mention `spec.yaml` is shown, recorded and vetoed as a save
-- [ ] A shell call that does write `spec.yaml`, by heredoc or otherwise, is still a spec write
-- [ ] Nothing the floor holds today is let through
+- [x] A save whose message or staged files mention `spec.yaml` is shown, recorded and vetoed as a save
+- [x] A shell call that does write `spec.yaml`, by heredoc or otherwise, is still a spec write
+- [x] Nothing the floor holds today is let through

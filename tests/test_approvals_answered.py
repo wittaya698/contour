@@ -114,6 +114,15 @@ class ShownTest(AnsweredCase):
         self.answer(url)
         self.assertEqual(self.waiting(url)[0]["changes"], ["M spec.yaml"])
 
+    def test_a_save_whose_message_names_the_spec_is_shown_as_a_save(self):
+        """Issue 103, as issue 100's tracer bullet met it."""
+        (self.beaky / "spec.yaml").write_text("revision: 2\ndepth: 640\n")
+        self.set_aside(("Bash", {"command": "git add spec.yaml && git commit -q -F - <<'EOF'\n"
+                                            "spec.yaml: depth 600 -> 640\nEOF"}))
+        [shown] = self.waiting(self.opened())
+        self.assertEqual((shown["category"], shown["act"]), ("commit", "Save this version?"))
+        self.assertEqual(shown["changes"], ["M spec.yaml"])
+
     def test_no_new_run_starts_until_they_are_answered(self):
         self.set_aside(SPEC_WRITE)
         url = self.opened()
