@@ -22,5 +22,5 @@ numbers is unchanged: a number inside a note is prose.
 
 ## Acceptance criteria
 
-- [ ] A spec write that changes one note shows that note, before and after, and no other
-- [ ] One that adds or removes a note says which
+- [x] A spec write that changes one note shows that note, before and after, and no other
+- [x] One that adds or removes a note says which

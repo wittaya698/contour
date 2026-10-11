@@ -54,6 +54,22 @@ class ChangesTest(unittest.TestCase):
                           "topology tri budget 2000 → 2400",
                           "topology doubles tolerance none → 0.1 mm"])
 
+    def test_a_moved_note_is_shown_as_itself_and_no_other(self):
+        """A list's items have no names, so it moved as one value and was shown
+        whole, nine notes before and nine after (issue 111)."""
+        self.spec.write_text(SPEC + NOTES)
+        will = SPEC + NOTES.replace("~170 proud", "~191 proud")
+        self.assertEqual(gate.changes(self.spec, "Write", {"content": will}),
+                         ["notes 2: … diameter, ~170 → ~191 proud …"])
+
+    def test_a_note_added_or_removed_says_which(self):
+        self.spec.write_text(SPEC + NOTES)
+        removed = NOTES.replace('  - "Faces -Y (Blender front)."\n', "")
+        added = removed + '  - "Seams are not modelled."\n'
+        self.assertEqual(gate.changes(self.spec, "Write", {"content": SPEC + added}),
+                         ["notes 1 removed: Faces -Y (Blender front).",
+                          "notes 3 added: Seams are not modelled."])
+
     def test_a_shell_call_cannot_be_read_ahead_and_lists_nothing(self):
         """The raw call is what is left to read, as it was before."""
         self.assertEqual(gate.changes(self.spec, "Bash",
@@ -160,6 +176,12 @@ dimensions:
   seat_depth: { value: 600, tol: 20 }
 topology:
   tri_budget: 2000
+"""
+
+NOTES = """notes:
+  - "Faces -Y (Blender front)."
+  - "Beak: cylinder with hemispherical tip, ~100 diameter, ~170 proud of the head."
+  - "Matte flat colours."
 """
 
 

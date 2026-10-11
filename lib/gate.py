@@ -11,6 +11,8 @@ One table, keyed by the categories `lib/intent.py` declares, for the reason
 
 Stdlib, and Blender-free: the console imports this to draw a gate.
 """
+import difflib
+import json
 import re
 from pathlib import Path
 
@@ -82,9 +84,52 @@ def changes(spec, tool, call):
     640 mm*, in the order the spec will read. Empty when the write cannot be
     read ahead of running it — a shell call is a program, not a document — and
     the raw call is what is left to read, as it was before."""
-    return [field(path, was, will)
-            for path, (was, will) in (moved(spec, tool, call) or {}).items()
-            if path != REVISION]
+    out = []
+    for path, (was, will) in (moved(spec, tool, call) or {}).items():
+        if path == REVISION:
+            continue
+        if isinstance(was, list) and isinstance(will, list):
+            out += items(path, was, will)
+        else:
+            out.append(field(path, was, will))
+    return out
+
+
+def items(path, was, will):
+    """A list that moved, as the items that moved in it: *notes 6: … diameter,
+    ~170 → ~191 proud …*, and the rest not at all, so nobody hunts for the one
+    changed word in two copies of the list (issue 111). One added or removed
+    is said as that. An item is named by where it stands, counting from 1 — in
+    the old list if it went, in the new one otherwise — since it has no name
+    of its own."""
+    name = " ".join(path).replace("_", " ")
+    key = [json.dumps(item, sort_keys=True, default=str) for item in (*was, *will)]
+    out = []
+    for op, i1, i2, j1, j2 in difflib.SequenceMatcher(
+            None, key[:len(was)], key[len(was):], autojunk=False).get_opcodes():
+        if op == "equal":
+            continue
+        paired = min(i2 - i1, j2 - j1) if op == "replace" else 0
+        out += [f"{name} {j1 + k + 1}: {reworded(number(was[i1 + k]), number(will[j1 + k]))}"
+                for k in range(paired)]
+        out += [f"{name} {i + 1} removed: {number(was[i])}" for i in range(i1 + paired, i2)]
+        out += [f"{name} {j + 1} added: {number(will[j])}" for j in range(j1 + paired, j2)]
+    return out
+
+
+def reworded(was, will):
+    """Only the words that changed, and one either side to find them by."""
+    a, b = was.split(), will.split()
+    head = 0
+    while head < min(len(a), len(b)) and a[head] == b[head]:
+        head += 1
+    tail = 0
+    while tail < min(len(a), len(b)) - head and a[-1 - tail] == b[-1 - tail]:
+        tail += 1
+    before = (["…"] if head > 1 else []) + a[max(head - 1, 0):head]
+    after = a[len(a) - tail:][:1] + (["…"] if tail > 1 else [])
+    return " ".join([*before, *a[head:len(a) - tail], "→",
+                     *b[head:len(b) - tail], *after])
 
 
 def moved(spec, tool, call):
