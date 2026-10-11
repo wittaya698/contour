@@ -224,9 +224,11 @@ class Console:
         """`POST /verdict`: allow, or deny with a reason. Nothing else is read
         off the body — a gate has two answers and a sentence, and the call is
         not among them. *Always* is an allow that also writes this space's
-        ask-list entry (ADR 0025, decision 6)."""
+        ask-list entry (ADR 0025, decision 6). A topic proposal's allow names
+        the `words` kept, which are its answer as a question's are (ADR 0030)."""
         return self.run.answer(body.get("id"), body.get("allow"),
-                               body.get("reason"), always=bool(body.get("always")))
+                               body.get("reason"), always=bool(body.get("always")),
+                               kept=body.get("words"))
 
     def approvals(self, query):
         """`GET /approvals`: what an unattended run set aside, oldest first,
@@ -242,7 +244,8 @@ class Console:
             return {"answered": False,
                     "why": "a run is under way; answer it when the run has ended"}
         said = approval_store.answer(self.space, body.get("id"), body.get("allow"),
-                                     body.get("reason"), body.get("answers"))
+                                     body.get("reason"), body.get("answers"),
+                                     body.get("words"))
         if said and "prompt" in said:
             # An answered question starts its own run, here, with the person
             # watching: the run that asked it is over (ADR 0028, decision 2).

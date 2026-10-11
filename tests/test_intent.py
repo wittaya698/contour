@@ -298,6 +298,10 @@ INTENTLESS = {
                "refuses any path or name already taken, so it overwrites nothing",
     "intents": "prints this very vocabulary",
     "asks": "prints the ask-list; gating the audit would gate reading the gate",
+    "topics": "lists a model's topics; its add and strike are the user's own "
+              "hand, and the console refuses them to its agent outright rather "
+              "than gating them, since a reflex Allow would put back a word the "
+              "person struck (ADR 0030)",
     "request": "starts a run in a space, whose every call is gated by that run "
                "itself; asking for work is never approving it (ADR 0027, "
                "decision 5)",

@@ -1,6 +1,6 @@
 # 118 — The lobby labels the unlabelled
 
-**Type:** AFK · **Source:** [ADR 0030](../adr/0030-topics-label-a-model-for-finding.md), decision 7
+**Type:** AFK · **Source:** ADR 0030, decision 7 — [topics label a model for finding](../adr/0030-topics-label-a-model-for-finding.md)
 
 ## What to build
 

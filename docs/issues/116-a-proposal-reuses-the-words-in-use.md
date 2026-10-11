@@ -1,6 +1,6 @@
 # 116 — A proposal reuses the words in use
 
-**Type:** AFK · **Source:** [ADR 0030](../adr/0030-topics-label-a-model-for-finding.md), decision 3
+**Type:** AFK · **Source:** ADR 0030, decision 3 — [topics label a model for finding](../adr/0030-topics-label-a-model-for-finding.md)
 
 ## What to build
 
@@ -13,7 +13,7 @@ being made.
 
 - [ ] With `creature` on beaky, a proposal for a second animal offers `creature`, not a variant of it, on a real run
 - [ ] A word on no model is shown as *new*; a word on another model is not
-- [ ] What the agent is given holds names and topics only (decision 8)
+- [ ] What the agent is given holds names and topics only (ADR 0030, decision 8)
 
 ## Blocked by
 

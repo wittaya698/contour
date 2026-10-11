@@ -12,7 +12,7 @@ the answer applied. Ask for topics again and check the struck word is not
 offered. Release one model and read its topics out of the `.glb`.
 
 **Accept, amend or withdraw** ADR 0030 on what that shows — in particular
-whether a topic proposal blocking a space (decision 6) is a wait the user is
+whether a topic proposal blocking a space (ADR 0030, decision 6) is a wait the user is
 glad of.
 
 ## Acceptance criteria

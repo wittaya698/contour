@@ -17,7 +17,7 @@ import time
 from pathlib import Path
 
 from console import last_run, launcher, vetoes
-from lib import intent, lock, marks, space as space_lib, store
+from lib import intent, lock, marks, space as space_lib, store, topics
 
 TOOLKIT = Path(__file__).resolve().parent.parent
 
@@ -107,7 +107,7 @@ def unsaved(space):
     return [" ".join(line.split()) for line in said.splitlines() if line.strip()]
 
 
-def answer(space, at, allow, reason=None, answers=None):
+def answer(space, at, allow, reason=None, answers=None, words=None):
     """The person's answer to the approval `at`, or None if none waits by that
     id. Only the oldest may be answered (ADR 0028, decision 3).
 
@@ -119,7 +119,8 @@ def answer(space, at, allow, reason=None, answers=None):
 
     A question has no allow: its `answers` are what answer it, and what comes
     back carries the `prompt` a new run starts on, because nothing resumes
-    (ADR 0028, decision 2).
+    (ADR 0028, decision 2). A topic proposal's `words` are the ones the person
+    kept; the rest are struck, and no veto is kept either way (ADR 0030).
     """
     kept = load(space)
     found = next((a for a in kept if a["id"] == at), None)
@@ -133,7 +134,15 @@ def answer(space, at, allow, reason=None, answers=None):
         dropped(space, at)
         return {"answered": True, "id": at, "outcome": "answered", "said": "",
                 "prompt": asked(found["call"], answers)}
-    if allow:
+    if found["category"] == topics.CATEGORY:
+        # Word by word, and no veto either way: a struck word refuses a word,
+        # not a call (ADR 0030, decision 5).
+        proposed = found["call"].get("words") or []
+        chosen = [w for w in proposed if w in (words or [])] if allow else []
+        topics.answered(space, proposed, chosen)
+        outcome, said = ("applied", ", ".join(chosen)) if allow else \
+            ("struck", ", ".join(proposed))
+    elif allow:
         try:
             outcome, said = applied(space, found)
         except lock.Held as e:

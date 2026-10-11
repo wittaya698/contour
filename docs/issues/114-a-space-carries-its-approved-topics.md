@@ -1,6 +1,6 @@
 # 114 — A space carries the topics its user approved
 
-**Type:** AFK · **Source:** [ADR 0030](../adr/0030-topics-label-a-model-for-finding.md), decisions 1, 2, 5 and 6
+**Type:** AFK · **Source:** ADR 0030, decisions 1, 2, 5 and 6 — [topics label a model for finding](../adr/0030-topics-label-a-model-for-finding.md)
 
 ## What to build
 
@@ -16,12 +16,12 @@ on, and the space refuses a new request until it is answered.
 
 ## Acceptance criteria
 
-- [ ] A proposal of three words, one struck, leaves two topics in the space's record
-- [ ] A later proposal containing the struck word is refused for that word, and says so to the agent
-- [ ] The user adds a word the agent never proposed, and strikes an approved one, with no gate
-- [ ] Unattended, a proposal waits as an approval; a request to the space is refused while it does; answered later on the page, it applies
-- [ ] `spec.yaml` and its `revision:` are untouched by any of the above
-- [ ] A topic is not counted, shown or recorded as a veto
+- [x] A proposal of three words, one struck, leaves two topics in the space's record
+- [x] A later proposal containing the struck word is refused for that word, and says so to the agent
+- [x] The user adds a word the agent never proposed, and strikes an approved one, with no gate
+- [x] Unattended, a proposal waits as an approval; a request to the space is refused while it does; answered later on the page, it applies
+- [x] `spec.yaml` and its `revision:` are untouched by any of the above
+- [x] A topic is not counted, shown or recorded as a veto
 
 ## Blocked by
 

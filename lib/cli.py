@@ -531,6 +531,28 @@ def on_intents(cmd, rest, held):
     return 0
 
 
+def on_topics(cmd, rest, held):
+    """This model's topics, or with `add` / `strike` one word changed by the
+    user's own hand (ADR 0030, decision 2). The console refuses its agent this
+    command: the agent proposes, and only the person decides."""
+    from lib import topics
+    if not rest:
+        held_now = topics.load(PROJECT)
+        print(", ".join(held_now["topics"]) or "no topics yet")
+        if held_now["struck"]:
+            print(f"struck: {', '.join(held_now['struck'])}")
+        return 0
+    acts = {"add": topics.add, "strike": topics.strike}
+    if len(rest) != 2 or rest[0] not in acts:
+        print(usage(), file=sys.stderr)
+        return 2
+    try:
+        acts[rest[0]](PROJECT, rest[1])
+    except ValueError as e:
+        return emit({"ok": False, "lines": [f"FAIL topics  {e}"]})
+    return emit({"ok": True, "lines": [f"ok   topics  {rest[0]} {topics.word(rest[1])}"]})
+
+
 def on_asks(cmd, rest, held):
     """The resolved policy, or with `--always <c>` / `--undo <c>` this space's
     entry rewritten (ADR 0025, decision 6). The page is the writer's one client

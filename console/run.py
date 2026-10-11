@@ -13,7 +13,7 @@ import threading
 from pathlib import Path
 
 from console import approvals, last_run, launcher, seed, spend, vetoes
-from lib import activity, gate as gate_words, intent, lock, marks, policy
+from lib import activity, gate as gate_words, intent, lock, marks, policy, topics
 from lib.last_run import ENDED
 
 
@@ -40,6 +40,12 @@ QUESTION = "AskUserQuestion"
 SPEC_TOOL = "mcp__contour__spec_write"
 """The console's own spec write, which carries its case: three runs argued
 theirs only in their thinking, where no gate or person reads it (ADR 0029)."""
+
+TOPICS_TOOL = "mcp__contour__topics_propose"
+"""The console's topic proposal: words for the person to keep or strike one by
+one (ADR 0030, decision 2)."""
+
+TOPICS = topics.CATEGORY
 
 MADE_WITH = "made with spec_write: the whole new spec.yaml as its content"
 """How a refused spec write is told to make it, in the tool's own words."""
@@ -119,6 +125,33 @@ SPEC_WRITER = {
 """The console's spec write, as the driver hands it to the agent: the one way
 a spec changes under a console, so that its case cannot be left in thinking
 (ADR 0029). `console/agent.py` puts it in the SDK's shape and nothing more."""
+
+
+TOPICS_PROPOSER = {
+    "name": "topics_propose",
+    "description": ("Suggest topics for this model: free words to find this model "
+                    "by, such as creature or low-poly, as words, and why as case. "
+                    "The person keeps or strikes each word. "
+                    "A topic labels the model and nothing else: it decides "
+                    "nothing about the build and argues for no spec change."),
+    "schema": {"type": "object", "required": ["words", "case"],
+               "properties": {"words": {"type": "array", "items": {"type": "string"}},
+                              "case": {"type": "string"}}},
+}
+"""The console's topic proposal, as the driver hands it to the agent: the one
+way an agent labels a model under a console (ADR 0030, decision 2)."""
+
+
+def topics_proposed(answer):
+    """What the agent is told once the person has answered its proposal: the
+    words kept, the words struck, and any held back because they were struck
+    before. The console wrote them already; this only says so."""
+    lines = [f"kept: {', '.join(answer.get('kept') or []) or 'none'}",
+             f"struck: {', '.join(answer.get('struck') or []) or 'none'}"]
+    if answer.get("struck_before"):
+        lines.append(f"not offered, struck for this model before: "
+                     f"{', '.join(answer['struck_before'])}")
+    return "\n".join(lines)
 
 
 def spec_written(space, payload):
@@ -326,6 +359,10 @@ class Run:
                    "terminal; ask them instead")
             self.say("refused", text=why)
             return False, why
+        why = self.unlabelled(tool, payload)
+        if why:
+            self.say("refused", text=why)
+            return False, why
         if tool == QUESTION and self.requester is not None:
             return self.asked(payload)
         case = None
@@ -333,7 +370,13 @@ class Run:
             # The case comes with it rather than from what was said (ADR 0029).
             case = payload.get("case") or ""
             tool, payload = spec_edit(self.space, payload.get("content") or "")
-        category = intent.classify(tool, payload)
+        if tool == TOPICS_TOOL:
+            case = payload.get("case") or ""
+            # A copy, as the gate keeps one: what the user is shown is the
+            # words they have not already struck for this model.
+            words, before = topics.offered(self.space, payload.get("words") or [])
+            payload = {**payload, "words": words, "struck_before": before}
+        category = TOPICS if tool == TOPICS_TOOL else intent.classify(tool, payload)
         if category is None:
             return True, None
         if category == "spec-write" and case is None:
@@ -369,7 +412,7 @@ class Run:
         # Unattended, the floor asks whatever the list says, and goes on asking
         # with the page open: a tab is presence, not attention (ADR 0027,
         # decisions 10 and 11).
-        if not policy.gated(category, self.space) and not (
+        if category != TOPICS and not policy.gated(category, self.space) and not (
                 self.requester is not None and category in policy.FLOOR):
             # The user allowed this in advance. Allowed, not unsupervised: it
             # leaves by the same door an answered gate leaves by, so what has to
@@ -413,6 +456,23 @@ class Run:
         # agent nothing to have made.
         self.gates += 1
         return self.approved(waiting["allow"], waiting["reason"], category)
+
+    def unlabelled(self, tool, payload):
+        """Why this call may not label the model, or None. Refused before any
+        gate, watched or not (ADR 0030, decision 2)."""
+        if topics.by_hand(tool, payload):
+            # Not a gate, for the ask-list's reason: an Allow by reflex would
+            # put back a word the person struck, and no word would be answered.
+            return ("a model's topics are the person's to set: suggest them with "
+                    "topics_propose, and they keep or strike each word")
+        if tool != TOPICS_TOOL:
+            return None
+        words, before = topics.offered(self.space, payload.get("words") or [])
+        if words:
+            return None
+        # Nothing left to put to the person, so nobody is asked.
+        return (f"the user struck {', '.join(before) or 'every word'} for this "
+                f"model before; it is not offered again")
 
     def aside(self, category, tool, payload, case=None):
         """Set a call aside for the person, in a run nobody is watching, and
@@ -518,7 +578,7 @@ class Run:
         for line in lines:
             self.say("resolved", text=line)
 
-    def answer(self, at, allow, reason=None, always=False):
+    def answer(self, at, allow, reason=None, always=False, kept=None):
         """The user's verdict on the gate that is waiting, or None if none is.
 
         On the transcript, because the decision is as much a part of the run as
@@ -533,6 +593,20 @@ class Run:
             return None
         waiting["allow"], waiting["reason"] = bool(allow), reason
         self.pending = None
+        if waiting["category"] == TOPICS:
+            # Answered word by word, and no veto either way: a struck word
+            # refuses a word, not a call (ADR 0030, decision 5). What was kept
+            # is what the agent is told, as a question's answers are.
+            words = waiting["call"].get("words") or []
+            kept = [w for w in words if w in (kept or [])] if allow else []
+            topics.answered(self.space, words, kept)
+            # Denied, the SDK hands the agent a sentence and not a record.
+            waiting["reason"] = topics.told(
+                words, kept, waiting["call"].get("struck_before", [])) if allow else \
+                f"the user struck every word: {', '.join(words)}"
+            self.say("verdict", id=at, allowed=bool(allow), text=", ".join(kept))
+            waiting["answered"].set()
+            return {"answered": True}
         if allow and always and waiting["category"] in policy.ALWAYS:
             # The user's own act, by the page's door to the command that writes
             # the list: the next build in this space runs without asking. Done

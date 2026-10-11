@@ -55,7 +55,7 @@ class SpaceTest(unittest.TestCase):
                          ["check", "render", "export", "filmstrip", "measure",
                           "worksheet", "canvas",
                           "resolve", "mark", "run", "doctor", "update", "migrate-marks",
-                          "rename", "delete"])
+                          "topics", "rename", "delete"])
 
 
 class ArityTest(unittest.TestCase):

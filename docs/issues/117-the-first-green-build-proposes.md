@@ -1,6 +1,6 @@
 # 117 — The first green build proposes
 
-**Type:** AFK · **Source:** [ADR 0030](../adr/0030-topics-label-a-model-for-finding.md), decision 4
+**Type:** AFK · **Source:** ADR 0030, decision 4 — [topics label a model for finding](../adr/0030-topics-label-a-model-for-finding.md)
 
 ## What to build
 

@@ -24,6 +24,7 @@ WORDS = {
     "build": ("Claude wants to build the model to check its work", "Allow", "Deny"),
     "commit": ("Save this version?", "Save", "Not yet"),
     "push": ("Claude wants to send this model off this computer", "Allow", "Deny"),
+    "topics": ("Claude suggests words to find this model by", "Keep these", "None of them"),
 }
 """Category -> the act, and the two answers to it. Every category `contour
 intents` prints is here (`tests/test_gate.py`)."""
@@ -67,6 +68,10 @@ def say(category, space, tool, call, proposal=""):
     if category == "spec-write":
         said["changes"] = changes(Path(space) / "spec.yaml", tool, call)
         said["spans"] = spans(Path(space) / marks.NAME, proposal)
+    if category == "topics":
+        # Each its own toggle: the person keeps or strikes word by word
+        # (ADR 0030, decision 2).
+        said["words"] = list(call.get("words") or [])
     return said
 
 

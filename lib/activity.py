@@ -44,6 +44,7 @@ CONTOUR = {
     "purge": "Removed a deleted model for good",
     "intents": "Listed what Claude asks before doing",
     "asks": "Looked at what runs without asking",
+    "topics": "Looked at the words this model is found by",
     "request": "Asked for a run in a model",
     "ceiling": "Looked at what a run left alone may spend",
     "hook": "Ran a safety check",

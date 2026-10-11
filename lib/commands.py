@@ -95,6 +95,11 @@ TABLE = (
     Command("migrate-marks", NONE, True, False, None,
             (("migrate-marks", "rewrite this space's marks into one spelling"),),
             "on_migrate_marks"),
+    Command("topics", (0, 2), True, False, None,
+            (("topics", "this model's topics: the words it is found by"),
+             ("topics add <word>", "label this model with a word yourself"),
+             ("topics strike <word>", "take a word off, and never be offered it "
+                                      "for this model again")), "on_topics"),
     Command("spaces", (0, 1), False, False, None,
             (("spaces [name]", "list model spaces, or print one's path"),
              ("spaces --json", "the same list and its health, for a client to read")),

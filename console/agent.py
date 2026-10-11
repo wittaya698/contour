@@ -17,7 +17,8 @@ from claude_agent_sdk import (AssistantMessage, ClaudeAgentOptions,
                              ResultMessage, SystemMessage, TextBlock,
                              ToolUseBlock, create_sdk_mcp_server, tool)
 
-from console.run import QUESTION, SPEC_WRITER, spec_written
+from console.run import (QUESTION, SPEC_WRITER, TOPICS_PROPOSER, TOPICS_TOOL,
+                         spec_written, topics_proposed)
 
 
 def drive(prompt, options, gate, say):
@@ -42,7 +43,7 @@ async def session(prompt, options, gate, say):
 
     async with ClaudeSDKClient(
             ClaudeAgentOptions(**options, can_use_tool=can_use_tool,
-                               mcp_servers={"contour": spec_server(options["cwd"])})
+                               mcp_servers={"contour": server(options["cwd"])})
             ) as client:
         await client.query(prompt)
         async for message in client.receive_response():
@@ -58,13 +59,24 @@ async def session(prompt, options, gate, say):
                 say("usage", usage=dict(usage))
 
 
-def spec_server(space):
-    """The console's spec write, as an SDK tool: what it says and does are
-    `run.py`'s, and only reached once the gate has allowed it (ADR 0029)."""
+def server(space):
+    """The console's own tools, served to the agent as `mcp__contour__*`."""
+    return create_sdk_mcp_server("contour", tools=tools(space))
+
+
+def tools(space):
+    """The console's spec write and topic proposal, as SDK tools: what they say
+    and do are `run.py`'s, and only reached once the gate has answered (ADR
+    0029, ADR 0030)."""
     @tool(SPEC_WRITER["name"], SPEC_WRITER["description"], SPEC_WRITER["schema"])
     async def spec_write(args):
         return {"content": [{"type": "text", "text": spec_written(space, args)}]}
-    return create_sdk_mcp_server("contour", tools=[spec_write])
+
+    @tool(TOPICS_PROPOSER["name"], TOPICS_PROPOSER["description"],
+          TOPICS_PROPOSER["schema"])
+    async def topics_propose(args):
+        return {"content": [{"type": "text", "text": topics_proposed(args)}]}
+    return [spec_write, topics_propose]
 
 
 def result(tool, payload, allow, told):
@@ -80,6 +92,10 @@ def result(tool, payload, allow, told):
         return PermissionResultDeny(message=told or "the user denied this call")
     if tool == QUESTION and told is not None:
         return PermissionResultAllow(updated_input={**payload, "answers": told})
+    if tool == TOPICS_TOOL and told is not None:
+        # The same exception, a second time: what the person kept is the
+        # answer, and the tool can only say it if it arrives on the call.
+        return PermissionResultAllow(updated_input={**payload, **told})
     return PermissionResultAllow()
 
 

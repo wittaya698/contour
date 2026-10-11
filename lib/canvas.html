@@ -663,6 +663,22 @@ function gate(event, send) {
     item.textContent = change;
     li.querySelector('.changes').append(item);
   }
+  // A topic proposal: each word its own toggle, all kept until unticked, and
+  // what is ticked is the answer (ADR 0030, decision 2).
+  const boxes = [];
+  for (const w of said.words || []) {
+    const item = document.createElement('li');
+    const label = document.createElement('label');
+    const box = document.createElement('input');
+    box.type = 'checkbox';
+    box.checked = true;
+    box.value = w;
+    boxes.push(box);
+    label.append(box, ' ' + w);
+    item.append(label);
+    li.querySelector('.changes').append(item);
+  }
+  const kept = () => boxes.filter(b => b.checked).map(b => b.value);
   if (said.spans.length) {
     li.querySelector('.spans').textContent = 'measured on '
       + (said.spans.length === 1 ? 'span ' : 'spans ') + said.spans.join(', ');
@@ -673,9 +689,9 @@ function gate(event, send) {
   const because = li.querySelector('.because');
   const answer = async (allow, always) => {
     for (const b of li.querySelectorAll('button')) b.disabled = true;
-    if (send) return send(allow, because.value.trim());
+    if (send) return send(allow, because.value.trim(), kept());
     await ask('/verdict', { id: event.id, allow: allow, reason: because.value.trim(),
-                            always: always });
+                            always: always, words: kept() });
     if (always) refreshUnwatched();
   };
   li.querySelector('.allow').addEventListener('click', () => answer(true, false));
@@ -704,7 +720,8 @@ async function refreshApprovals() {
 const OUTCOME = { 'applied': 'done', 'vetoed': 'you said no',
                   'no longer applies': 'no longer applies, so it was dropped',
                   'refused': 'refused', 'failed': 'it failed',
-                  'answered': 'answered, and a run starts on it' };
+                  'answered': 'answered, and a run starts on it',
+                  'struck': 'you kept none of them' };
 
 // One approval: a gate, read later, with the agent's case for it, answered by
 // its own route. Only the next can be answered, because a save set aside after
@@ -729,8 +746,8 @@ function approval(a) {
     if (!a.next) for (const b of li.querySelectorAll('button')) b.disabled = true;
     return li;
   }
-  const li = gate({ id: a.id, tool: a.tool, call: a.call, said: a }, async (allow, reason) =>
-    answered(await ask('/approval', { id: a.id, allow: allow, reason: reason })
+  const li = gate({ id: a.id, tool: a.tool, call: a.call, said: a }, async (allow, reason, words) =>
+    answered(await ask('/approval', { id: a.id, allow: allow, reason: reason, words: words })
       .then(r => r.json()).catch(() => null)));
   delete li.dataset.gate;
   li.querySelector('.always').remove();

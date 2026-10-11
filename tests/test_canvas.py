@@ -319,9 +319,13 @@ class CanvasTest(unittest.TestCase):
         body = re.search(r"ask\('/verdict', \{([^}]*)\}", script)
         self.assertIsNotNone(script and body, "the page never answers a gate")
         # `always` is an answer and not a piece of the call: a build gate's third
-        # one, allow-and-write-the-ask-list (ADR 0025, decision 6).
+        # one, allow-and-write-the-ask-list (ADR 0025, decision 6). `words` is
+        # one too: which of a topic proposal's own words the person kept. It can
+        # only narrow the agent's list, never add to it, so nothing the person
+        # wrote is attributed to the agent (ADR 0030, decision 2; the console
+        # drops any word the agent did not propose, `tests/test_topics.py`).
         self.assertEqual(set(re.findall(r"(\w+):", body.group(1))),
-                         {"id", "allow", "reason", "always"})
+                         {"id", "allow", "reason", "always", "words"})
 
     def test_one_rule_applies_every_declaration(self):
         """The page asks its host once and enforces the answer in one place.
