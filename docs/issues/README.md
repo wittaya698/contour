@@ -355,6 +355,29 @@ one HITL.
 hold approvals that nothing can answer yet. That state is harmless, since nothing
 is applied, but it should not last beyond one merge.
 
+## Batch 11 — topics, and what a release tag is
+
+From [ADR 0030](../adr/0030-topics-label-a-model-for-finding.md), which is Proposed, and ADR 0013's amendment of the
+release tag to `v<N>`. Seven AFK and one HITL.
+
+| # | Slice | Type | Blocked by |
+|---|---|---|---|
+| [113](113-a-release-tag-is-v-n.md) | A release tag is `v<N>` and nothing else | AFK | — |
+| [114](114-a-space-carries-its-approved-topics.md) | A space carries the topics its user approved | AFK | — |
+| [115](115-spaces-are-found-by-topic.md) | Spaces are found by topic | AFK | 114 |
+| [116](116-a-proposal-reuses-the-words-in-use.md) | A proposal reuses the words in use | AFK | 114, 115 |
+| [117](117-the-first-green-build-proposes.md) | The first green build proposes | AFK | 114 |
+| [118](118-the-lobby-labels-the-unlabelled.md) | The lobby labels the unlabelled | AFK | 116 |
+| [119](119-a-release-carries-its-topics.md) | A release carries its topics | AFK | 113, 114 |
+| [120](120-accept-adr-0030.md) | Accept ADR 0030 | HITL | 115–119 |
+
+**113 stands alone.** It fixes shipped behaviour — a bookmark tag in a space
+is read as a release, and closed marks are pruned to be kept by a tag nobody
+promised to keep — and is worth landing if topics never ship.
+
+**114 stays whole.** A topic that can be proposed and not approved is not
+verifiable, so proposal, gate, page and record go in together.
+
 ## Found in flight
 
 Not from either review — a defect the work turned up, filed where the rest of the
