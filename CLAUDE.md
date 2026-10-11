@@ -28,7 +28,10 @@ Full Blender output goes to `.contour/last-build.log`. Read it **only on failure
    is the argument — the measurement that shows the contract is wrong, *depth
    reads 640 mm ±3 on span m4, against a tolerance of 600 ±20* — and it comes
    before the write wherever the confirm lands: prose in a terminal, a gate
-   under a console. A gate is a confirm and never a proposal; it can stop a
+   under a console. Under a console the proposal is your text just before the
+   write, and the write is tried, as an `Edit` of `spec.yaml`: run unwatched,
+   its gate keeps both for the person, and a proposal left in a closing reaches
+   no one. A gate is a confirm and never a proposal; it can stop a
    write, it cannot make the case for one. A measurement read off a reference
    is a **span** — the user's, or an agent span — and the proposal names it. A
    number from a reference with no span behind it is not an argument, and a

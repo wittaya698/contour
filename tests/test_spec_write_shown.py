@@ -23,7 +23,7 @@ BY_SHELL = ("Bash", {"command": "python3 - <<'EOF'\nfrom pathlib import Path\n"
                                 "p.write_text(p.read_text().replace('600', '640'))\nEOF"})
 
 
-class RefusedTest(AnsweredCase):
+class MadeCase(AnsweredCase):
 
     def made(self, call, requester):
         """What the gate said to `call`, in a run with or without a requester."""
@@ -40,6 +40,9 @@ class RefusedTest(AnsweredCase):
             self.assertLess(time.monotonic(), deadline, "the gate never answered")
             time.sleep(0.02)
         return said[0], run
+
+
+class RefusedTest(MadeCase):
 
     def test_a_spec_write_by_shell_is_refused_and_told_to_be_an_edit(self):
         for requester in ("the nightly agent", None):
@@ -59,6 +62,16 @@ class RefusedTest(AnsweredCase):
         self.assertFalse(allow)
         self.assertIn("set aside", why)
         self.assertEqual(len(approvals.load(self.beaky)), 1)
+
+
+class ClosingTest(MadeCase):
+    """What a set-aside call tells the agent to say of it in its closing: that
+    it waits, and not why, since the case is on the page with it (issue 102)."""
+
+    def test_the_closing_names_what_waits_and_does_not_argue_it(self):
+        (_, why), _ = self.made(SPEC_WRITE, "the nightly agent")
+        self.assertIn("say in your closing what waits on it, and not why", why)
+        self.assertIn("its case is on the page with it", why)
 
 
 class NoCaseTest(AnsweredCase):

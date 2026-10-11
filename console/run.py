@@ -364,7 +364,8 @@ class Run:
         return False, (f"set aside for the user, who will answer it later on the "
                        f"page ({said['act']}): carry on with what does not depend "
                        f"on it, do not try it another way, and say in your closing "
-                       f"what waits on it")
+                       f"what waits on it, and not why: its case is on the page "
+                       f"with it")
 
     def parked(self, act, **said):
         """Wait for the person, and say so in the record (ADR 0027, decision

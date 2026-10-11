@@ -25,6 +25,21 @@ rather than made, but that relay is the cost of a run that asked in prose.
   write and the write is tried, so its gate keeps both.
 - Or say it in what the console tells an unattended run's agent at the start.
 
+## Decided
+
+**Rule 1's wording**, in both `CLAUDE.md` files: *under a console the proposal is
+your text just before the write, and the write is tried, as an `Edit` of
+`spec.yaml`: run unwatched, its gate keeps both for the person, and a proposal
+left in a closing reaches no one.* Not a prompt of the console's own, which
+ADR 0019, decision 19 rules out: the agent reads its rules from the space, and
+a second copy would drift.
+
+**And the closing:** what a set-aside call tells the agent now says to name what
+waits *and not why: its case is on the page with it*.
+
+Both criteria are about what a real agent does, so they are ticked when a real
+unattended run is seen to do it, as issue 100's tracer bullet was.
+
 ## Acceptance criteria
 
 - [ ] An unattended run that finds a spec change warranted tries the write, with its case just before it
