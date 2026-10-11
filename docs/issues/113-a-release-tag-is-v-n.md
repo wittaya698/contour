@@ -23,11 +23,11 @@ others, and the newest is the one with the highest N. `release-model` tags
 
 ## Acceptance criteria
 
-- [ ] A space whose only tag is `before-rig-rewrite` prunes no marks
-- [ ] With `v1`, `v2` and a later bookmark tag, pruning reads `v2`
-- [ ] `v10` is newer than `v9`
-- [ ] `release-model` (template and its copy instructions) tags `v<N>` and reads N from `v<N>` tags only
-- [ ] The tests that tagged `v0.10.0` say what they now prove, or move to `v<N>`
+- [x] A space whose only tag is `before-rig-rewrite` prunes no marks
+- [x] With `v1`, `v2` and a later bookmark tag, pruning reads `v2`
+- [x] `v10` is newer than `v9`
+- [x] `release-model` (template and its copy instructions) tags `v<N>` and reads N from `v<N>` tags only
+- [x] The tests that tagged `v0.10.0` say what they now prove, or move to `v<N>`
 
 ## Blocked by
 
