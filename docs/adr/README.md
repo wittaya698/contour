@@ -35,3 +35,4 @@ works — the alternative you are about to suggest is probably here with a reaso
 | [0027](0027-the-unattended-run.md) | The unattended run: a request, a channel, and a gate nobody else can answer — *Accepted, amended*; amends [0019](0019-console-a-driven-agent-behind-a-gate.md), [0024](0024-the-connector-desktop-reads-and-opens.md) |
 | [0028](0028-approvals-wait-and-the-run-goes-on.md) | Approvals wait, and the run goes on — *Proposed*; amends [0027](0027-the-unattended-run.md) |
 | [0029](0029-a-spec-write-carries-its-case.md) | Under a console, a spec write carries its case — *Accepted*; amends [0028](0028-approvals-wait-and-the-run-goes-on.md) |
+| [0030](0030-topics-label-a-model-for-finding.md) | Topics label a model for finding, and leave only in a release — *Proposed*; adds to [0028](0028-approvals-wait-and-the-run-goes-on.md), [0013](0013-releases-are-versioned-folders.md) |

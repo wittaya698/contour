@@ -19,6 +19,13 @@
 > that ADR 0016 does not touch — those are readable from backup media with no
 > git at all, which a field inside a tracked file can never be.
 
+> **Tag form amended 2026-10-11.** A release tag is `v<N>`, not
+> `<variant>-v<N>`: each space is its own repository, so the name added nothing,
+> and the lobby can rename a space, which would leave its releases unseen and
+> the next N colliding with an existing folder. Only a tag of exactly that form
+> is a release; any other tag in a space is the user's and Contour does not read
+> it. Nothing had been released, so no tag needed migrating.
+
 ## Context
 
 Nothing has ever been released. `git tag -l` is empty, and the scheme in
