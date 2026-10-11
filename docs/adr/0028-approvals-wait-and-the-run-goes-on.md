@@ -1,16 +1,43 @@
 # 0028 — Approvals wait, and the run goes on
 
-**Status:** Proposed · 2026-10-11 · **amends ADR 0027 decisions 1, 4, 7, 8, 9 and 12, and its fifth consequence** ([0027](0027-the-unattended-run.md))
+**Status:** Accepted, amended · 2026-10-11 · **amends ADR 0027 decisions 1, 4, 7, 8, 9 and 12, and its fifth consequence** ([0027](0027-the-unattended-run.md))
 
-> **To be accepted on a tracer bullet**, in a throwaway space with builds on its
-> ask-list. Claude Desktop requests *make the beak 10% longer and save it*. The run
-> edits, builds and argues a spec change with no page open, sets the spec write and
-> the save aside, and finishes. No banner appears. Desktop's `status` reads
-> *finished: 2 approvals waiting*, names the two acts, and shows no diff, and the
-> chat asks whether to answer them now or later. A second request is refused while
-> they wait. *Later*, then `open`: the console shows both, in order, with the
-> argument and the diff. Allowing the spec write applies it; denying the save
-> records the veto. Nothing is left waiting, and the lobby's row says so.
+> **Accepted on its tracer bullet, with decisions 5 and 6 amended** (issue 100).
+> Used by hand on 2026-10-11, from Claude Desktop, in a throwaway space,
+> `beaky-0028`, made from beaky-0027's last commit with builds on its ask-list.
+>
+> - **The run goes on:** asked to make the beak 10% longer, a run edited, built
+>   and finished with no page open and no banner. The chat dropped *and save it*
+>   from the request, and the agent argued the spec change in its closing rather
+>   than trying the write, so nothing was set aside (issue 102).
+> - **The floor held against a relayed yes:** the chat's next request read *Yes to
+>   the spec change you proposed in the last run, from the user*, against its
+>   instructions. The write was set aside, not made. `spec.yaml` stayed at
+>   revision 5 until the user allowed it on the page.
+> - **Allow applies it later:** allowed on the page at 07:07, the spec went to
+>   revision 6, depth 644 ±20, and the check the call ended with passed. Nothing
+>   was left waiting.
+> - **A save was set aside and denied:** asked to save the version, the run set
+>   the commit aside, the chat asked *now or later* and opened nothing, and the
+>   user denied it on the page. The veto is recorded. But the save was read as a
+>   spec write, because its message mentions `spec.yaml`, so its act, the record
+>   and the veto all said so (issue 103).
+> - **No console URL** entered the conversation at any point.
+>
+> **Amended.** The chat broke decision 6's instruction three times: it relayed
+> the yes, opened the console twice uninvited, and did not ask *now or later*
+> until the ask was carried in the results it reads. Decision 6 now puts the ask
+> in `status` and in a refused `request` whenever approvals wait, as well as in
+> the instructions, and the instructions no longer invite `open`. Wording does
+> not bind a chat, though: what holds is the floor. And the record's closing
+> carried the agent's case to the chat, through a field ADR 0027 decision 8
+> allowed, so decision 5 now withholds the closing of any run that set something
+> aside. The spec write made through the shell showed the page no diff and no
+> case (issue 101).
+>
+> **Not reported:** `status` on a space with nothing waiting, and the lobby's row
+> once nothing waits. Both are covered by the suite. Rule 5's new wording,
+> proposed in issue 100, was confirmed and is in both `CLAUDE.md` files.
 
 ## Context
 
@@ -86,14 +113,21 @@ acts waiting, in ADR 0025 decision 6's plain words (*Claude wants to change the
 spec*, *Claude wants to save this version*), and the text of any question. It never
 holds a diff or an argument, for ADR 0027 decision 8's reason. *Waiting for you*
 stops being a state a run is in and becomes something a space has: the lobby's row
-and Desktop's `status` say *2 approvals waiting* until none are.
+and Desktop's `status` say *2 approvals waiting* until none are. *Amended
+(issue 100):* the closing of a run that set anything aside is withheld from a
+requester for good, because it is the case for what waits, and stale once that is
+answered. `status` says the account is on the console's page.
 
 **6. The connector's instructions tell a chat to ask, never to answer.** When a
 space has approvals waiting, the chat tells the person what they are, in the
 record's words, and asks whether to answer them now or later. *Now* is `open`.
 *Later* is nothing at all. The chat never answers one, never relays the case for
 one, and never puts *the user says yes* into a request. ADR 0027's floor already
-makes that last worthless, as the tracer bullet showed.
+makes that last worthless, as the tracer bullet showed. *Amended (issue 100):* the ask
+is also carried in every result that says approvals wait, `status` and a refused
+`request`, because a chat told once at the start did not keep to it. And
+`open` is called only on the person's *now*: the instructions no longer tell a chat
+to bring the person to a gate.
 
 **7. A request is refused while approvals wait.** A second run would build on a
 tree the person has not approved, and the waiting edits would go stale under it.

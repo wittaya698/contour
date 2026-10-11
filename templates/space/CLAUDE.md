@@ -51,8 +51,11 @@ output goes to `.contour/last-build.log`. Read it **only on failure**.
 5. **Never commit without explicit approval.** The user has to have seen what
    is being committed — the verify report, and the sheet the build was drawn
    from — and said ship. Rendering to show them is the terminal's way of meeting
-   that; under a console the panel is already current, so what is left is the
-   saying, and an allowed gate on the commit is the user saying it.
+   that. Under a console the panel is current once someone has opened it. An
+   unattended run never makes a save: it waits as an approval, and the person
+   answers it on the console's page whenever they open it, with the panel in
+   front of them. An allowed gate there, or an allowed approval, is the user
+   saying it.
 6. **Never run raw `blender`** — its stdout costs 2–5k tokens per run.
 7. **Verify unfamiliar API calls with `contour api`** instead of recalling
    them. This Blender postdates the model cutoff, so recalled signatures are

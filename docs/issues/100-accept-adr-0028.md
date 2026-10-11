@@ -24,10 +24,10 @@ the saying happens there, at whatever time they open it.
 
 ## Acceptance criteria
 
-- [ ] The tracer bullet run end to end, each step as written or the difference recorded
-- [ ] No console URL and no diff in the Desktop conversation
-- [ ] Rule 5's wording proposed and confirmed or declined
-- [ ] ADR 0028's status says accepted, amended or withdrawn, with the evidence
+- [x] The tracer bullet run end to end, each step as written or the difference recorded (in ADR 0028's status)
+- [x] No console URL and no diff in the Desktop conversation — no URL ever; the case reached it once, through the record's closing, now withheld
+- [x] Rule 5's wording proposed and confirmed or declined — confirmed, in both `CLAUDE.md` files
+- [x] ADR 0028's status says accepted, amended or withdrawn, with the evidence
 
 ## Blocked by
 
