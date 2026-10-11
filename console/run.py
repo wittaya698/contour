@@ -314,8 +314,9 @@ class Run:
                    "one")
             self.say("refused", text=why)
             return False, why
+        case = self.proposal() if category == "spec-write" else ""
         unargued = (gate_words.unargued(self.space / "spec.yaml", tool, payload,
-                                        self.proposal())
+                                        case)
                     if category == "spec-write" else [])
         if unargued:
             # What the page would show as the case is the agent's last text,
@@ -324,6 +325,11 @@ class Run:
             why = (f"your case names what it sets: {', '.join(unargued)}; say "
                    f"why, with them, {IN_THE_REPLY}, then make the spec write "
                    f"again")
+            if not case:
+                # An agent that argued only in its thinking took that for its
+                # reply, and retried with nothing said (issue 108).
+                why = ("you have written no text in this run, and your thinking "
+                       "is not shown to the person; " + why)
             self.say("refused", text=why)
             return False, why
         # Unattended, the floor asks whatever the list says, and goes on asking

@@ -30,7 +30,9 @@ class MadeCase(AnsweredCase):
         said = []
 
         def drive(prompt, options, gate, say):
-            say("text", text=getattr(self, "said", "Span m4 reads 640 mm, so the depth is 640."))
+            text = getattr(self, "said", "Span m4 reads 640 mm, so the depth is 640.")
+            if text:
+                say("text", text=text)
             said.append(gate(*call))
         run = Run(self.beaky, drive=drive)
         self.addCleanup(lambda: run.live and run.end())
@@ -112,6 +114,16 @@ class UnarguedTest(MadeCase):
                 self.assertEqual(approvals.load(self.beaky), [])
                 self.assertIn(why, [e.get("text") for e in run.events
                                     if e["kind"] == "refused"])
+
+    def test_a_spec_write_with_nothing_said_is_told_thinking_is_not_shown(self):
+        """An agent that argued only in its thinking took that for its reply,
+        and was refused twice the same way (issue 108)."""
+        (allow, why), _ = self.made(SPEC_WRITE, "the nightly agent", said="")
+        self.assertFalse(allow)
+        self.assertIn("you have written no text in this run", why)
+        self.assertIn("your thinking is not shown to the person", why)
+        self.assertIn("names what it sets: 640", why)
+        self.assertEqual(approvals.load(self.beaky), [])
 
     def test_a_number_inside_another_does_not_count(self):
         (allow, why), _ = self.made(SPEC_WRITE, "the nightly agent",
