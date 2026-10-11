@@ -5,6 +5,7 @@ the rule is about what the tag contains, not about a timestamp we wrote
 ourselves. Nothing is deleted that `git show <tag>:marks.json` cannot print.
 """
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -17,8 +18,13 @@ from lib import marks
 from lib.canvas import Canvas
 
 
-def git(space, *args):
-    subprocess.run(("git",) + args, cwd=space, check=True,
+def git(space, *args, when=None):
+    env = None
+    if when:
+        # Tags cut in one second tie on date and fall back to their names, so a
+        # test that says one came later has to date it.
+        env = dict(os.environ, GIT_COMMITTER_DATE=when, GIT_AUTHOR_DATE=when)
+    subprocess.run(("git",) + args, cwd=space, check=True, env=env,
                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
@@ -30,18 +36,18 @@ class PruneTest(unittest.TestCase):
         git(self.space, "config", "user.email", "t@example.com")
         git(self.space, "config", "user.name", "t")
 
-    def release(self, tag, contents):
+    def release(self, tag, contents, when=None):
         """Commit these marks and tag them, the way release-model does."""
         marks.save(self.path, contents)
         git(self.space, "add", marks.NAME)
-        git(self.space, "commit", "-qm", tag, "--allow-empty")
-        git(self.space, "tag", "-a", tag, "-m", tag)
+        git(self.space, "commit", "-qm", tag, "--allow-empty", when=when)
+        git(self.space, "tag", "-a", tag, "-m", tag, when=when)
 
     def ids(self):
         return [m["id"] for m in marks.load(self.path)]
 
     def test_a_closed_mark_the_last_release_holds_is_dropped(self):
-        self.release("beaky-v1", [
+        self.release("v1", [
             {"id": "m1", "status": "closed", "text": "beak short"},
             {"id": "m2", "status": "open", "text": "legs too close"}])
         marks.save(self.path, marks.load(self.path) + [
@@ -51,8 +57,8 @@ class PruneTest(unittest.TestCase):
 
     def test_an_open_mark_survives_every_release(self):
         """Age is not a reason to drop a finding; only the user closing it is."""
-        self.release("beaky-v1", [{"id": "m1", "status": "open", "text": "gap"}])
-        self.release("beaky-v2", marks.load(self.path))
+        self.release("v1", [{"id": "m1", "status": "open", "text": "gap"}])
+        self.release("v2", marks.load(self.path))
         marks.prune(self.path)
         self.assertEqual(self.ids(), ["m1"])
 
@@ -64,10 +70,32 @@ class PruneTest(unittest.TestCase):
         self.assertIsNone(marks.prune(self.path))
         self.assertEqual(self.ids(), ["m1"])
 
+    def test_a_bookmark_tag_is_not_a_release(self):
+        """A tag the user cut for themselves archives nothing Contour may rely
+        on: `git tag -d` on a finished experiment is an ordinary thing to do,
+        and the closed marks it held would then be kept under no name. Only
+        `v<N>` is a release (ADR 0013, amended)."""
+        self.release("before-rig-rewrite", [
+            {"id": "m1", "status": "closed", "text": "beak short"}])
+        self.assertIsNone(marks.prune(self.path))
+        self.assertEqual(self.ids(), ["m1"])
+
+    def test_a_bookmark_cut_after_a_release_does_not_stand_in_for_it(self):
+        """The newest tag is not the last release when it is not a release.
+        m3 was closed after v2 and is held only by the bookmark, so it stays."""
+        self.release("v1", [{"id": "m1", "status": "closed", "text": "a"}])
+        self.release("v2", marks.load(self.path) + [
+            {"id": "m2", "status": "closed", "text": "b"}])
+        self.release("before-rig-rewrite", marks.load(self.path) + [
+            {"id": "m3", "status": "closed", "text": "c"}],
+            when="2099-01-01T09:00:00")
+        self.assertEqual(marks.prune(self.path), "2 marks pruned, closed at v2")
+        self.assertEqual(self.ids(), ["m3"])
+
     def test_the_canvas_prunes_when_it_starts(self):
         """Pruning is the canvas's job, so the page never lists a mark that
         git has already filed away."""
-        self.release("beaky-v1", [
+        self.release("v1", [
             {"id": "m1", "status": "closed", "text": "beak short"},
             {"id": "m2", "status": "open", "text": "legs too close"}])
         sheet = self.space / "sheet.png"
@@ -80,7 +108,7 @@ class PruneTest(unittest.TestCase):
     def test_the_report_says_what_it_pruned(self):
         """Deleting lines from a tracked file silently is worse than not
         deleting them: the report names what went, and where it still is."""
-        self.release("beaky-v1", [{"id": "m1", "status": "closed", "text": "x"}])
+        self.release("v1", [{"id": "m1", "status": "closed", "text": "x"}])
         sheet = self.space / "sheet.png"
         sheet.write_bytes(b"\x89PNG\r\n\x1a\nnot really a png")
         canvas = Canvas(sheet=sheet, marks=self.path)
@@ -89,7 +117,7 @@ class PruneTest(unittest.TestCase):
         canvas.finish()
         line = " ".join(canvas.wait()["lines"])
         self.assertIn("1 mark", line)
-        self.assertIn("beaky-v1", line)
+        self.assertIn("v1", line)
 
 
 if __name__ == "__main__":

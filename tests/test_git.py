@@ -89,39 +89,41 @@ class ShowTest(GitCase):
         self.assertIsNone(git.show(self.bare_ground(), "HEAD", "spec.yaml"))
 
 
-class TagsTest(GitCase):
+class ReleasesTest(GitCase):
 
-    def test_the_newest_tag_comes_first(self):
-        """The mark store archives into the last release tag, so *last* has to
-        mean last. Two keys, because a version number and a date disagree in
-        different ways: `v0.10.0` sorts under `v0.9.0` as text, and two tags cut
-        in the same second have no order by date at all."""
-        where = self.repo(**{"spec.yaml": "revision: 1\n"})
-        for tag in ("v0.9.0", "v0.10.0"):
-            subprocess.run(["git", "-C", str(where), "tag", tag], check=True)
-        self.assertEqual(git.tags(where)[0], "v0.10.0")
+    def tag(self, where, *names):
+        for name in names:
+            subprocess.run(["git", "-C", str(where), "tag", name], check=True)
 
-    def test_last_means_last_cut_and_not_highest_numbered(self):
-        """The two keys are not interchangeable and a same-second tie cannot
-        tell them apart, so they disagree here on purpose: `v2.0.0` was cut
-        first and `v1.0.0` after it, off a later commit. The mark store
-        archives into *the last release*, which is the one that happened last
-        — a patch cut on an old line is still the newest tag there is."""
+    def test_the_last_release_is_the_highest_n(self):
+        """N is one past the highest when a release is cut (ADR 0013), so the
+        highest is the last. `v9` cut after `v10` is drift, and drift is
+        refused at the next release rather than resolved by a date here. Also
+        why it is a number and not text: `v10` sorts under `v9` as text."""
         where = self.repo(**{"spec.yaml": "revision: 1\n"})
-        subprocess.run(["git", "-C", str(where), "tag", "v2.0.0"], check=True)
+        self.tag(where, "v10")
         (where / "spec.yaml").write_text("revision: 2\n")
         self.commit(where, "second", when="2026-06-01T09:00:00")
-        subprocess.run(["git", "-C", str(where), "tag", "v1.0.0"], check=True)
-        self.assertEqual(git.tags(where)[0], "v1.0.0")
+        self.tag(where, "v9")
+        self.assertEqual(git.releases(where), ["v10", "v9"])
 
-    def test_a_repo_with_no_tags_has_nothing_to_archive_into(self):
+    def test_only_v_and_a_number_is_a_release(self):
+        """The name is what makes a tag a release, so the near-misses are the
+        point: the old `<space>-v<N>` form a rename would orphan, a semver tag,
+        and spellings of N a release never makes. Each is the user's own."""
+        where = self.repo(**{"spec.yaml": "revision: 1\n"})
+        self.tag(where, "v1", "beaky-v2", "v3.0.0", "v0", "v04", "V5",
+                 "before-rig-rewrite")
+        self.assertEqual(git.releases(where), ["v1"])
+
+    def test_a_space_nobody_has_released_has_nothing_to_archive_into(self):
         """Empty, not None: there is no such thing as a failed question here.
         A space nobody has released is a space with no archive, and the mark
-        store prunes nothing — which is the same as having no tags."""
-        self.assertEqual(git.tags(self.repo(**{"spec.yaml": "x\n"})), [])
+        store prunes nothing."""
+        self.assertEqual(git.releases(self.repo(**{"spec.yaml": "x\n"})), [])
 
-    def test_no_repository_has_no_tags_rather_than_an_error(self):
-        self.assertEqual(git.tags(self.bare_ground()), [])
+    def test_no_repository_has_no_releases_rather_than_an_error(self):
+        self.assertEqual(git.releases(self.bare_ground()), [])
 
 
 class HeadTest(GitCase):
