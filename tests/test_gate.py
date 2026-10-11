@@ -79,7 +79,8 @@ class SaysTest(ConsoleCase):
         bump every confirmed write carries is the bookkeeping, not the change."""
         space = self.space()
         (space / "spec.yaml").write_text(SPEC)
-        said = self.said({"call": {"tool": "Edit", "file_path": str(space / "spec.yaml"),
+        said = self.said({"say": "Seat depth reads 640 mm ±3 on span m2, against 600 ±20."},
+                         {"call": {"tool": "Edit", "file_path": str(space / "spec.yaml"),
                                    "old_string": "revision: 2\ndimensions:\n"
                                                  "  height: { value: 820, tol: 5 }\n"
                                                  "  seat_depth: { value: 600, tol: 20 }",

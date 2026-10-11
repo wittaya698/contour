@@ -30,6 +30,7 @@ CONTOUR = ROOT / "contour"
 SPEC_WRITE = {"tool": "Edit", "file_path": "spec.yaml",
               "old_string": "revision: 1\ndepth: 600",
               "new_string": "revision: 2\ndepth: 640"}
+CASE = "Span m4 reads 640 mm, so the depth is 640."
 WAIT_S = 15
 
 
@@ -190,7 +191,7 @@ class PageTest(RequestCase):
                            CONTOUR_AGENT_SCRIPT=json.dumps(list(script)))
 
     def test_opening_the_page_mid_run_does_not_lift_the_floor(self):
-        proc, url = self.opened({"busy": 1}, {"call": SPEC_WRITE})
+        proc, url = self.opened({"busy": 1}, {"say": CASE}, {"call": SPEC_WRITE})
         self.keep_beating(url, proc)
         said = self.transcript(url, lambda ev: any(e["kind"] == "aside" for e in ev))
         [aside] = [e for e in said if e["kind"] == "aside"]
@@ -222,7 +223,7 @@ class RefusedTest(RequestCase):
     def test_a_held_space_is_refused_in_the_holds_words(self):
         """A parked gate says what it is waiting for, as `contour check` would
         be told (ADR 0027, decisions 3 and 9)."""
-        _, url = self.driven({"call": SPEC_WRITE}, space=self.beaky)
+        _, url = self.driven({"say": CASE}, {"call": SPEC_WRITE}, space=self.beaky)
         self.ask(url, "/run", {"prompt": "paint it blue"})
         self.gate(url)
         self.assertIn("beaky is waiting for you: Claude wants to change the spec",

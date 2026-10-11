@@ -44,8 +44,9 @@ class StatusTest(AnsweredCase):
         only while it waits, since answered it would also be stale (found in
         issue 100's tracer bullet)."""
         def drive(prompt, options, gate, say):
-            gate(*SPEC_WRITE)
             say("text", text="I'd like the depth to go from 600 to 640, after span m4.")
+            gate(*SPEC_WRITE)
+            say("text", text="The depth waits for you: 600 to 640, after span m4.")
         run = Run(self.beaky, drive=drive)
         run.start("make the beak longer", ceiling=10**6, requester="the nightly agent")
         self.until("finished")
@@ -165,6 +166,7 @@ class EndedTest(AnsweredCase):
 
     def test_the_ceiling_ends_a_run_and_leaves_what_it_set_aside_waiting(self):
         def drive(prompt, options, gate, say):
+            say("text", text="Span m4 reads 640 mm, so the depth is 640.")
             gate(*SPEC_WRITE)
             for _ in range(5):
                 say("usage", usage={"input_tokens": 100, "output_tokens": 0})
@@ -180,6 +182,7 @@ class EndedTest(AnsweredCase):
         set_aside = threading.Event()
 
         def drive(prompt, options, gate, say):
+            say("text", text="Span m4 reads 640 mm, so the depth is 640.")
             gate(*SPEC_WRITE)
             set_aside.set()
             threading.Event().wait(WAIT_S)    # working on, till stopped

@@ -309,6 +309,18 @@ class Run:
                    "case for it, naming the span, in your text just before it")
             self.say("refused", text=why)
             return False, why
+        unargued = (gate_words.unargued(self.space / "spec.yaml", tool, payload,
+                                        self.proposal())
+                    if category == "spec-write" else [])
+        if unargued:
+            # What the page would show as the case is the agent's last text,
+            # and narration passed for one (issue 106). The numbers are what a
+            # gate can check; whether they are argued well is the person's.
+            why = (f"your case just before it names what it sets: "
+                   f"{', '.join(unargued)}; say why, with them, in your text just "
+                   f"before the spec write, then make it again")
+            self.say("refused", text=why)
+            return False, why
         # Unattended, the floor asks whatever the list says, and goes on asking
         # with the page open: a tab is presence, not attention (ADR 0027,
         # decisions 10 and 11).

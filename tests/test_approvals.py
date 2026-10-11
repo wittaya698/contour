@@ -14,7 +14,7 @@ from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from test_run_record import RecordCase    # noqa: E402
+from test_run_record import CASE, RecordCase    # noqa: E402
 
 from console.run import Run    # noqa: E402
 from lib import last_run    # noqa: E402
@@ -39,6 +39,7 @@ class AsideCase(RecordCase):
         given = []
 
         def drive(prompt, options, gate, say):
+            say("text", text=CASE)
             for tool, call in calls:
                 given.append(gate(tool, dict(call)))
             say("text", text="The beak is 10% longer.")

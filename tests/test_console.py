@@ -902,7 +902,8 @@ class RunTest(ConsoleCase):
         let them be cast again later.
         """
         space = self.marked(self.space())
-        _, url = self.driven({"call": {"tool": "Write", "file_path": "spec.yaml",
+        _, url = self.driven({"say": "The neck reads 280 on span m1, so the neck is 280."},
+                             {"call": {"tool": "Write", "file_path": "spec.yaml",
                                        "content": "revision: 2\nneck: 280\n"}},
                              space=space, BLENDER=str(stub_blender(space)))
         self.ask(url, "/run", {"prompt": "the neck should be 280"})

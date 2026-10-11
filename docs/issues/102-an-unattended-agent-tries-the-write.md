@@ -40,7 +40,32 @@ waits *and not why: its case is on the page with it*.
 Both criteria are about what a real agent does, so they are ticked when a real
 unattended run is seen to do it, as issue 100's tracer bullet was.
 
+## What a real run did
+
+Run `3008d980` in `beaky-0028`, requested from Desktop: *make the beak 10%
+longer*, with builds on the space's ask-list. After issues
+[104](104-a-spec-write-is-the-whole-change.md) and
+[105](105-an-answered-run-sends-no-one-to-its-page.md):
+
+- **It tried the write,** as one `Edit` bumping revision 5 → 6, and the page
+  showed *depth 615 → 644 mm*. It had not, in the two runs before 104.
+- **Its text just before the write was narration, not the case:** *The build
+  was set aside for the user to answer on the page. While that waits, I'll read
+  the last recorded check result.* That is what the page showed as the case.
+- **Its closing argued the change:** depth 615 → 644 because the user asked, and
+  that the side reference reads about 597 mm deep, so the change takes the model
+  further from the pictures. The page showed none of that beside the approval;
+  only the transcript had it.
+
+So the write is tried, and the case still lands in the closing rather than
+before the write. Both remaining halves are one finding, filed as issue 106:
+what the page shows as the case is whatever the agent last said.
+
 ## Acceptance criteria
 
-- [ ] An unattended run that finds a spec change warranted tries the write, with its case just before it
-- [ ] Its closing names what it set aside, and argues nothing that is not on the page
+- [ ] An unattended run that finds a spec change warranted tries the write, with its case just before it — tried, yes; the case before it, no
+- [ ] Its closing names what it set aside, and argues nothing that is not on the page — no: it argued the change
+
+## Blocked by
+
+- [106](106-the-case-is-whatever-was-said-last.md)

@@ -25,6 +25,7 @@ CONTOUR = ROOT / "contour"
 SPEC_WRITE = {"tool": "Edit", "file_path": "spec.yaml",
               "old_string": "revision: 1\ndepth: 600",
               "new_string": "revision: 2\ndepth: 640"}
+CASE = "Span m4 reads 640 mm, so the depth is 640."
 WAIT_S = 10
 
 
@@ -46,7 +47,7 @@ class StopCase(ConsoleCase):
 
     def parked(self):
         """A console in `beaky`, its run stopped at a spec write."""
-        proc, url = self.driven({"call": SPEC_WRITE}, space=self.beaky)
+        proc, url = self.driven({"say": CASE}, {"call": SPEC_WRITE}, space=self.beaky)
         self.ask(url, "/run", {"prompt": "make the beak longer"})
         self.gate(url)
         return proc, url

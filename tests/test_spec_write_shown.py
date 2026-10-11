@@ -30,7 +30,7 @@ class MadeCase(AnsweredCase):
         said = []
 
         def drive(prompt, options, gate, say):
-            say("text", text="Span m4 reads 640 mm, so the depth is 640.")
+            say("text", text=getattr(self, "said", "Span m4 reads 640 mm, so the depth is 640."))
             said.append(gate(*call))
         run = Run(self.beaky, drive=drive)
         self.addCleanup(lambda: run.live and run.end())
@@ -85,6 +85,41 @@ class RefusedTest(MadeCase):
                                      "revision: 1\ndepth: 600\n")
 
 
+class UnarguedTest(MadeCase):
+    """The case names the numbers the write sets, or it is not one: narration
+    before a spec write was shown as its case (issue 106)."""
+
+    def made(self, call, requester, said="Span m4 reads 640 mm, so the depth is 640."):
+        self.said = said
+        return super().made(call, requester)
+
+    def test_a_spec_write_after_narration_is_refused_naming_what_to_say(self):
+        for requester in ("the nightly agent", None):
+            with self.subTest(requester=requester):
+                (allow, why), run = self.made(
+                    SPEC_WRITE, requester,
+                    said="While that waits, I'll read the last recorded check result.")
+                self.assertFalse(allow)
+                self.assertIn("your case just before it names what it sets: 640", why)
+                self.assertEqual(approvals.load(self.beaky), [])
+                self.assertIn(why, [e.get("text") for e in run.events
+                                    if e["kind"] == "refused"])
+
+    def test_a_number_inside_another_does_not_count(self):
+        (allow, why), _ = self.made(SPEC_WRITE, "the nightly agent",
+                                    said="The tip moves to y = -6400, so depth goes up.")
+        self.assertIn("names what it sets: 640", why)
+
+    def test_a_case_naming_the_number_is_set_aside_with_it(self):
+        (allow, why), _ = self.made(SPEC_WRITE, "the nightly agent",
+                                    said="You asked for a longer beak, which makes depth "
+                                         "640 mm, past 600 ±20.")
+        self.assertIn("set aside", why)
+        [kept] = approvals.load(self.beaky)
+        self.assertEqual(kept["case"], "You asked for a longer beak, which makes depth "
+                                       "640 mm, past 600 ±20.")
+
+
 class ClosingTest(MadeCase):
     """What a set-aside call tells the agent to say of it in its closing: that
     it waits, and not why, since the case is on the page with it (issue 102)."""
@@ -98,7 +133,11 @@ class ClosingTest(MadeCase):
 class NoCaseTest(AnsweredCase):
 
     def test_a_spec_write_with_no_case_says_so(self):
-        self.set_aside(SPEC_WRITE, case="")
+        """One that sets no number, since one that does is refused without it
+        (issue 106): here, depth taken out."""
+        self.set_aside(("Edit", {"file_path": "spec.yaml",
+                                 "old_string": "revision: 1\ndepth: 600",
+                                 "new_string": "revision: 2"}), case="")
         [shown] = self.waiting(self.opened())
         self.assertEqual(shown["case"], "Claude gave no case for this.")
 

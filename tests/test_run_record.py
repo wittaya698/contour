@@ -22,6 +22,10 @@ from lib import last_run       # noqa: E402
 WAIT_S = 5
 
 
+CASE = "Span m4 reads 640 mm, so the depth is 640."
+"""What an agent says before a spec write: the numbers it sets (issue 106)."""
+
+
 class RecordCase(unittest.TestCase):
 
     def setUp(self):
@@ -31,8 +35,12 @@ class RecordCase(unittest.TestCase):
         (self.space / ".contour" / "project").write_text("# Contour model space\n")
 
     def started(self, drive, prompt="make the beak longer"):
-        """A run, begun, and stopped however the test leaves it."""
-        run = Run(self.space, drive=drive)
+        """A run, begun, and stopped however the test leaves it. Its agent
+        makes its case first, as one does before a spec write (issue 106)."""
+        def argued(prompt, options, gate, say):
+            say("text", text=CASE)
+            return drive(prompt, options, gate, say)
+        run = Run(self.space, drive=argued)
         run.start(prompt)
         self.addCleanup(lambda: run.live and run.end())
         return run

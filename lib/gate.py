@@ -119,6 +119,19 @@ def partial(spec, tool, call):
     return REVISION not in fields or set(fields) == {REVISION}
 
 
+def unargued(spec, tool, call, proposal):
+    """The numbers a spec write sets that `proposal`, the agent's text just
+    before it, never names, as a person would write them: *644*, not *644.0*.
+    Only numbers, since prose is not quoted back as a case; and a number inside
+    another (*6440*, *1.644*) is not that number (issue 106)."""
+    # By size, so *640.0* is 640, and a sign is left to the prose: a minus is
+    # as often typed `−` as `-`.
+    named = {float(n) for n in re.findall(r"\d+(?:\.\d+)?", proposal or "")}
+    return [number(will) for path, (_, will) in (moved(spec, tool, call) or {}).items()
+            if path != REVISION and isinstance(will, (int, float))
+            and not isinstance(will, bool) and abs(will) not in named]
+
+
 def flat(doc, at=()):
     """A spec as {path: value}, one entry per scalar a person could name; a
     list is one value, since its items have no names of their own."""
