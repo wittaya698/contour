@@ -584,6 +584,9 @@ function vetoed(veto) {
     li.append(said);
     return li;
   }
+  // A build, a save or a push refused is about when, not a part, and a veto
+  // with no reason has no sentence to pin (issue 112). The console says which.
+  if (!veto.pinnable) return li;
   const pick = document.createElement('select');
   for (const name of [...new Set(Object.values(parts))].sort()) {
     const option = document.createElement('option');

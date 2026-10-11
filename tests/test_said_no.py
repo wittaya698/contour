@@ -36,6 +36,14 @@ class PageTest(unittest.TestCase):
         self.assertIn("'/promote'", self.script, "the same mark promotion made")
         self.assertNotIn("promote to a mark", self.page)
 
+    def test_pinning_is_offered_only_where_the_veto_says_it_can_be(self):
+        """A build refused is not about a part, nor a veto with no reason
+        (issue 112): the console says which with `pinnable`, and the page asks
+        nothing of its own."""
+        self.assertIn("if (!veto.pinnable) return li;", self.script)
+        self.assertLess(self.script.index("if (!veto.pinnable) return li;"),
+                        self.script.index("'Pin this to a part'"))
+
     def test_no_count_of_uncommitted_vetoes_is_shown(self):
         self.assertNotIn("uncommitted", self.page.split("<script>", 1)[1])
         self.assertNotIn('id="exposure"', self.page)

@@ -23,5 +23,5 @@ not about a part.
 
 ## Acceptance criteria
 
-- [ ] A build, save or push veto is neither offered for promotion on the page nor promoted
-- [ ] A veto with no reason is not promoted
+- [x] A build, save or push veto is neither offered for promotion on the page nor promoted
+- [x] A veto with no reason is not promoted

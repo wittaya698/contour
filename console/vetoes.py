@@ -87,7 +87,7 @@ def promote(space, veto_id, part):
     """
     kept = load(space)
     found = next((v for v in kept if v.get("id") == veto_id), None)
-    if found is None or found.get("promoted"):
+    if found is None or found.get("promoted") or not pinnable(found):
         # Nothing, and nothing said: a moment that happened once becomes one
         # question, and a veto nobody recorded has no sentence to carry.
         return None
@@ -105,6 +105,19 @@ def promote(space, veto_id, part):
     found["promoted"] = mark["id"]
     save(space, kept)
     return mark
+
+
+ABOUT_A_PART = ("spec-write", "ref-write")
+"""The gated calls whose refusal can be about what the model is. A build, a save
+or a push refused is a decision about when, and pinned to a part it is a claim
+about that part the user never made (issue 112)."""
+
+
+def pinnable(veto):
+    """Whether a veto may become a mark on a part: one of `ABOUT_A_PART`, with
+    a reason, since the reason is the mark's text and a veto nobody explained
+    has no sentence to carry."""
+    return veto.get("category") in ABOUT_A_PART and bool((veto.get("reason") or "").strip())
 
 
 def shown(space):
@@ -132,4 +145,5 @@ def said(veto, parts):
     pruner has since taken (ADR 0018) leaves its id, which is still true."""
     act = gate.WORDS.get(veto.get("category"), (veto.get("category"),))[0]
     pinned = veto.get("promoted")
-    return {**veto, "act": act, "pinned": parts.get(pinned) or pinned}
+    return {**veto, "act": act, "pinned": parts.get(pinned) or pinned,
+            "pinnable": pinnable(veto)}

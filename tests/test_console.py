@@ -38,6 +38,11 @@ from budget import slow
 CONSOLE = ROOT / "contour-console"
 STAND_IN = Path(__file__).resolve().parent / "agent_stand_in.py"
 
+ABOUT_A_PART = {"tool": SPEC_TOOL, "content": "model: cap\nrevision: 1\n",
+                "case": "Its first spec, named for the cap."}
+"""A spec write, whose refusal can be about a part as a build's cannot
+(issue 112)."""
+
 
 class EnvironmentTest(unittest.TestCase):
     """The console needs an interpreter the launcher does not, which makes a
@@ -1339,7 +1344,7 @@ class VetoTest(ConsoleCase):
         space = self.space()
         self.built(space)
         (space / "out" / "parts.json").write_text(json.dumps({"1": "cap"}))
-        url = self.vetoed(space)
+        url = self.vetoed(space, ABOUT_A_PART)
         _, got = self.ask(url, "/promote", {"id": "v1", "part": "cap"})
         self.assertEqual(got["part"], "cap")
         self.assertNotIn("anchor", got)
@@ -1362,7 +1367,7 @@ class VetoTest(ConsoleCase):
         space = self.space()
         self.built(space)
         (space / "out" / "parts.json").write_text(json.dumps({"1": "cap"}))
-        url = self.vetoed(space)
+        url = self.vetoed(space, ABOUT_A_PART)
         said, = self.ask(url, "/vetoes")[1]["vetoes"]
         self.assertIsNone(said["pinned"])
         self.ask(url, "/promote", {"id": "v1", "part": "cap"})
@@ -1391,13 +1396,39 @@ class VetoTest(ConsoleCase):
         space = self.space()
         self.built(space)
         (space / "out" / "parts.json").write_text(json.dumps({"1": "cap"}))
-        url = self.vetoed(space)
+        url = self.vetoed(space, ABOUT_A_PART)
         self.refused(url, {"id": "v9", "part": "cap"})
         self.refused(url, {"id": "v1", "part": "beak"})
         self.ask(url, "/promote", {"id": "v1", "part": "cap"})
         self.refused(url, {"id": "v1", "part": "cap"})
         self.assertEqual(len(marks_store.load(space / marks_store.NAME)), 1,
                          "a refused promotion still wrote a mark")
+
+    def test_a_veto_about_when_is_not_pinned_to_a_part(self):
+        """A build, a save or a push refused is a decision about when, not
+        about what the model is: beaky-0028's two build vetoes became marks on
+        an arm they never mentioned (issue 112). So none is offered a part on
+        the page, and none is promoted if asked."""
+        space = self.space()
+        self.built(space)
+        (space / "out" / "parts.json").write_text(json.dumps({"1": "cap"}))
+        url = self.vetoed(space)
+        said, = self.ask(url, "/vetoes")[1]["vetoes"]
+        self.assertFalse(said["pinnable"])
+        self.refused(url, {"id": "v1", "part": "cap"})
+        self.assertEqual(marks_store.load(space / marks_store.NAME), [])
+
+    def test_a_veto_with_no_reason_is_not_pinned_to_a_part(self):
+        """It has no sentence to carry: beaky-0028's *v1* became a mark with no
+        text (issue 112)."""
+        space = self.space()
+        self.built(space)
+        (space / "out" / "parts.json").write_text(json.dumps({"1": "cap"}))
+        url = self.vetoed(space, ABOUT_A_PART, reason="")
+        said, = self.ask(url, "/vetoes")[1]["vetoes"]
+        self.assertFalse(said["pinnable"])
+        self.refused(url, {"id": "v1", "part": "cap"})
+        self.assertEqual(marks_store.load(space / marks_store.NAME), [])
 
     def test_pruning_the_marks_leaves_the_vetoes_untouched(self):
         """The reason a veto is not a second collection inside `marks.json`.
