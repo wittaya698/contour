@@ -37,6 +37,10 @@ PASSING = ("act",)
 QUESTION = "AskUserQuestion"
 """The tool an agent asks the person a question with (ADR 0027, decision 12)."""
 
+DOCUMENTS = ("Edit", "Write")
+"""The tools a spec write may be made with: the ones whose diff `lib/gate.py`
+can read before the write happens (issue 101)."""
+
 
 
 def driver(spec=None):
@@ -282,6 +286,17 @@ class Run:
         category = intent.classify(tool, payload)
         if category is None:
             return True, None
+        if category == "spec-write" and tool not in DOCUMENTS:
+            # A script can be read only by running it, so its gate could show
+            # neither the diff nor what else it does (issue 101). Refused,
+            # watched or not, before the ask-list: one allowed in advance is
+            # still a write nobody could have read.
+            why = ("a spec write is made as an Edit of spec.yaml, so the person "
+                   "can read what it changes before it happens; make it as one, "
+                   "with your case for it, naming the span, in your text just "
+                   "before it")
+            self.say("refused", text=why)
+            return False, why
         # Unattended, the floor asks whatever the list says, and goes on asking
         # with the page open: a tab is presence, not attention (ADR 0027,
         # decisions 10 and 11).

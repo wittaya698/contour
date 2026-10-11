@@ -28,7 +28,21 @@ Allowing it runs the whole script, `contour check` included.
   or tell the agent, when a spec write is set aside, to put its case in the text
   before the call.
 
+## Decided
+
+**A spec write that is not an `Edit` or a `Write` is refused, in every console
+run, watched or not,** and the agent is told to make it as an `Edit` of
+`spec.yaml` with its case, naming the span, in the text just before it. A
+script can be read only by running it, and running it on a copy still runs
+whatever else it does; the one tool that is a document is the one a person can
+read ahead. Nothing is set aside, since there would be nothing to show.
+
+**A spec write set aside with no case says so:** *Claude gave no case for this.*
+Not the closing in its place, which comes after the act and is withheld for
+good (issue 100); and not on other approvals, since rule 1 asks a case only of a
+spec write.
+
 ## Acceptance criteria
 
-- [ ] An approved spec write shows the person what it changes, whatever tool made it
-- [ ] It shows the case for it, or says plainly that the agent gave none
+- [x] An approved spec write shows the person what it changes, whatever tool made it — by being made only as an `Edit` or a `Write`
+- [x] It shows the case for it, or says plainly that the agent gave none

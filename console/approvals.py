@@ -31,6 +31,9 @@ QUESTION = "question"
 """The category a question is kept under, beside the gates' (ADR 0028,
 decision 2)."""
 
+NO_CASE = "Claude gave no case for this."
+"""What the page says under a spec write the agent made no case for."""
+
 
 def path(space):
     return space_lib.layout(space).dot / NAME
@@ -81,9 +84,18 @@ def shown(space):
     oldest is, because a save set aside after a spec write must not be answered
     before it (ADR 0028, decision 3)."""
     return [{"id": a["id"], "category": a["category"], "tool": a["tool"],
-             "call": a["call"], **a["said"], "case": a["case"], "next": n == 0,
+             "call": a["call"], **a["said"], "case": case(a), "next": n == 0,
              **({"changes": unsaved(space)} if a["category"] == "commit" else {})}
             for n, a in enumerate(load(space))]
+
+
+def case(approval):
+    """The agent's case for an approval, or, for a spec write, plainly that it
+    gave none: rule 1 asks one of a spec write and of nothing else (issue
+    101)."""
+    if approval["case"] or approval["category"] != "spec-write":
+        return approval["case"]
+    return NO_CASE
 
 
 def unsaved(space):

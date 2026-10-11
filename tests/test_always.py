@@ -88,7 +88,8 @@ class GateTest(ConsoleCase):
     agent raises the gate as `test_console.RunTest` raises one."""
 
     def gated(self, command, home, space=None):
-        _, url = self.driven({"call": {"tool": "Bash", "command": command}},
+        call = command if isinstance(command, dict) else {"tool": "Bash", "command": command}
+        _, url = self.driven({"call": call},
                              space=space or self.space(), CONTOUR_HOME=str(home))
         self.ask(url, "/run", {"prompt": "go on"})
         return url, self.gate(url)[0]
@@ -97,7 +98,9 @@ class GateTest(ConsoleCase):
         home = Path(tempfile.mkdtemp())
         _, build = self.gated("contour check", home)
         self.assertTrue(build["said"]["always"])
-        for command in ("git commit -m seat", "git push", "sed -i s/1/2/ spec.yaml"):
+        for command in ("git commit -m seat", "git push",
+                        {"tool": "Edit", "file_path": "spec.yaml",
+                         "old_string": "1", "new_string": "2"}):
             _, other = self.gated(command, home)
             self.assertFalse(other["said"]["always"], command)
 
