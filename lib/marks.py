@@ -459,7 +459,7 @@ def _released(path):
     contains rather than a stamp of our own being trusted about it.
     """
     path = Path(path)
-    released = git.tags(path.parent)
+    released = git.releases(path.parent)
     if not released:
         return None, []
     tag = released[0]

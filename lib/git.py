@@ -21,6 +21,7 @@ hand it to everyone.
 Blender-free, because everything that asks these is: the launcher before it
 starts anything, the mark store, the console.
 """
+import re
 import subprocess
 from pathlib import Path
 
@@ -57,20 +58,26 @@ def show(repo, ref, path):
     return out if ok else None
 
 
-def tags(repo):
-    """Every tag, newest first, or `[]` when there are none.
+_RELEASE = re.compile(r"v([1-9][0-9]*)")
+
+
+def releases(repo):
+    """Every release tag, newest first, or `[]` when there are none.
 
     No failed question here: a space nobody has released has no tags, and so
     does a directory that is not a repository. Both mean *there is no archive*,
     which is what the mark store does something about either way.
 
-    Two sort keys, and the last one given is git's primary, so this is newest
-    first with the version number breaking a same-second tie. Both are needed:
-    `v0.10.0` sorts under `v0.9.0` as text, and two tags cut in one second have
-    no order by date at all.
+    A release tag is `v<N>` and nothing else (ADR 0013, amended): any other tag
+    in a space is the user's own, and Contour does not see it. Newest is the
+    highest N, compared as a number, because N is one past the highest when a
+    release is cut; a lower N cut later is drift, which the next release
+    refuses rather than this choosing by date.
     """
-    ok, out = _ask(repo, "tag", "--sort=-v:refname", "--sort=-creatordate")
-    return out.split() if ok else []
+    ok, out = _ask(repo, "tag", "--list")
+    found = [(int(m.group(1)), t) for t in (out.split() if ok else [])
+             if (m := _RELEASE.fullmatch(t))]
+    return [t for _, t in sorted(found, reverse=True)]
 
 
 def head(repo):

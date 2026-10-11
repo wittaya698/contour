@@ -48,8 +48,10 @@ version?* — ask once, not twice.
 ## 4. Assemble the release package
 
 On approval only. A release is a folder, and it accumulates — v1 is never
-overwritten by v2 (ADR 0013). N is one past the highest existing tag *and*
-folder; if those two disagree, stop and say so rather than picking one.
+overwritten by v2 (ADR 0013). N is one past the highest `v<N>` tag *and*
+folder; if those two disagree, stop and say so rather than picking one. Only a
+tag named exactly `v<N>` is a release — any other tag in the space is the
+user's own, and neither counts nor is touched.
 
 ```sh
 mkdir -p release/v<N>
@@ -60,7 +62,7 @@ git add release/v<N> sheet.png
 git commit -m "<NAME>: release v<N>
 
 verify 8/8 | tris 4,210 | glb round-trip ok | toolkit <commit>"
-git tag -a <NAME>-v<N> -m "<NAME> v<N>"
+git tag -a v<N> -m "<NAME> v<N>"
 ```
 
 `release/` is tracked although `out/` and `exports/` beside it are not: the
