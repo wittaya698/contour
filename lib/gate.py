@@ -72,6 +72,7 @@ def say(category, space, tool, call, proposal=""):
         # Each its own toggle: the person keeps or strikes word by word
         # (ADR 0030, decision 2).
         said["words"] = list(call.get("words") or [])
+        said["new"] = list(call.get("new") or [])
     return said
 
 

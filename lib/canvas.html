@@ -675,6 +675,14 @@ function gate(event, send) {
     box.value = w;
     boxes.push(box);
     label.append(box, ' ' + w);
+    // A word no model carries yet: growing the vocabulary is the person's
+    // choice to see (ADR 0030, decision 3).
+    if ((said.new || []).includes(w)) {
+      const fresh = document.createElement('span');
+      fresh.className = 'muted';
+      fresh.textContent = 'new';
+      label.append(' ', fresh);
+    }
     item.append(label);
     li.querySelector('.changes').append(item);
   }

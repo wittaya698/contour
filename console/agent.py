@@ -17,8 +17,9 @@ from claude_agent_sdk import (AssistantMessage, ClaudeAgentOptions,
                              ResultMessage, SystemMessage, TextBlock,
                              ToolUseBlock, create_sdk_mcp_server, tool)
 
-from console.run import (QUESTION, SPEC_WRITER, TOPICS_PROPOSER, TOPICS_TOOL,
+from console.run import (QUESTION, SPEC_WRITER, TOPICS_TOOL, topics_proposer,
                          spec_written, topics_proposed)
+from lib import survey
 
 
 def drive(prompt, options, gate, say):
@@ -72,8 +73,9 @@ def tools(space):
     async def spec_write(args):
         return {"content": [{"type": "text", "text": spec_written(space, args)}]}
 
-    @tool(TOPICS_PROPOSER["name"], TOPICS_PROPOSER["description"],
-          TOPICS_PROPOSER["schema"])
+    proposer = topics_proposer(survey.vocabulary())
+
+    @tool(proposer["name"], proposer["description"], proposer["schema"])
     async def topics_propose(args):
         return {"content": [{"type": "text", "text": topics_proposed(args)}]}
     return [spec_write, topics_propose]

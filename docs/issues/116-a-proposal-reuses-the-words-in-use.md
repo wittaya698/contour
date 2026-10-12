@@ -11,9 +11,9 @@ being made.
 
 ## Acceptance criteria
 
-- [ ] With `creature` on beaky, a proposal for a second animal offers `creature`, not a variant of it, on a real run
-- [ ] A word on no model is shown as *new*; a word on another model is not
-- [ ] What the agent is given holds names and topics only (ADR 0030, decision 8)
+- [x] With `creature` on beaky, a proposal for a second animal offers `creature`, not a variant of it, on a real run
+- [x] A word on no model is shown as *new*; a word on another model is not
+- [x] What the agent is given holds names and topics only (ADR 0030, decision 8)
 
 ## Blocked by
 

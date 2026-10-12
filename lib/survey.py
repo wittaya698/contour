@@ -53,6 +53,16 @@ def found(topic):
             if asked in (held := topics.load(root)["topics"])]
 
 
+def vocabulary():
+    """Every approved topic across the spaces and the names carrying it, as a
+    proposal is given it so it can reuse one (ADR 0030, decisions 3 and 8)."""
+    held = {}
+    for root in space_lib.spaces(space_lib.roots(TOOLKIT)):
+        for w in topics.load(root)["topics"]:
+            held.setdefault(w, []).append(root.name)
+    return held
+
+
 def row(root, now):
     """One space as `spaces` reports it. The text form and the JSON form both
     print this, so they cannot disagree about which spaces exist or which are

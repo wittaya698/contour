@@ -22,6 +22,7 @@ from console import approvals    # noqa: E402
 from console import run as console_run    # noqa: E402
 from console.run import TOPICS_TOOL, Run    # noqa: E402
 from lib import cli, topics, vetoes    # noqa: E402
+from lib import gate as gate_words    # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -98,6 +99,22 @@ class WatchedTest(AnsweredCase):
         self.assertEqual(told["kept"], ["creature"])
         self.assertNotIn("dragon", topics.load(self.beaky)["topics"])
 
+    def test_a_word_no_model_carries_is_put_to_the_person_as_new(self):
+        """Growing the vocabulary is a choice the person sees being made
+        (ADR 0030, decision 3; issue 116). A word on another model is not new."""
+        wolf = self.beaky.parent / "wolf"
+        (wolf / ".contour").mkdir(parents=True)
+        (wolf / ".contour" / "project").write_text("")
+        topics.add(wolf, "creature")
+        with mock.patch.dict(os.environ, {"CONTOUR_SPACES": str(self.beaky.parent)}):
+            run, said = self.proposed((TOPICS_TOOL, {"words": ["creature", "quadruped"],
+                                                     "case": CASE}))
+        self.assertEqual(run.pending["call"]["new"], ["quadruped"])
+        self.assertEqual(gate_words.say("topics", self.beaky, TOPICS_TOOL,
+                                        run.pending["call"])["new"], ["quadruped"])
+        run.answer(run.pending["id"], False)
+        self.settled(run, said)
+
     def test_a_proposal_is_kept_in_the_spelling_a_filter_finds(self):
         run, said = self.proposed((TOPICS_TOOL, {"words": ["Creature", " low  poly ",
                                                            "creature", ""],
@@ -159,6 +176,14 @@ class UnattendedTest(AnsweredCase):
         self.assertEqual(approvals.load(self.beaky), [])
         self.assertEqual((self.beaky / "spec.yaml").read_text(), "revision: 1\ndepth: 600\n")
 
+    def test_later_the_page_still_marks_the_words_no_model_carries(self):
+        topics.add(self.beaky, "creature")
+        with mock.patch.dict(os.environ, {"CONTOUR_SPACES": str(self.beaky.parent)}):
+            self.set_aside((TOPICS_TOOL, {"words": ["creature", "quadruped"],
+                                          "case": CASE}))
+        [shown] = approvals.shown(self.beaky)
+        self.assertEqual(shown["new"], ["quadruped"])
+
     def test_later_too_the_answer_only_narrows_the_agents_words(self):
         self.set_aside(PROPOSED)
         [waiting] = approvals.load(self.beaky)
@@ -205,6 +230,13 @@ class PageTest(unittest.TestCase):
         self.assertIn("words: kept()", page)
         self.assertIn("'struck': 'you kept none of them'", page)
 
+    def test_a_word_no_model_carries_is_marked_new_beside_its_toggle(self):
+        """Issue 116: the page says *new*, the console decides which."""
+        page = (ROOT / "lib" / "canvas.html").read_text()
+        words = page.split("for (const w of said.words || [])")[1].split("const kept")[0]
+        self.assertIn("(said.new || []).includes(w)", words)
+        self.assertIn("'new'", words)
+
 
 class ByHandTest(unittest.TestCase):
     """The user's own path: `contour topics`, ungated, in their terminal."""
@@ -235,13 +267,26 @@ class ToolTest(unittest.TestCase):
     """The proposal as the agent is given it, and what it is told back."""
 
     def test_it_is_the_consoles_own_tool_and_says_what_it_is_for(self):
-        said = console_run.TOPICS_PROPOSER["description"]
+        said = console_run.topics_proposer({})["description"]
         self.assertIn("words to find this model by", said)
         self.assertIn("keeps or strikes each word", said)
-        self.assertEqual(set(console_run.TOPICS_PROPOSER["schema"]["required"]),
+        self.assertEqual(set(console_run.topics_proposer({})["schema"]["required"]),
                          {"words", "case"})
         self.assertEqual(TOPICS_TOOL,
-                         f"mcp__contour__{console_run.TOPICS_PROPOSER['name']}")
+                         f"mcp__contour__{console_run.topics_proposer({})['name']}")
+
+    def test_it_is_given_the_words_in_use_and_asked_to_reuse_them(self):
+        """Names and topics only (ADR 0030, decisions 3 and 8; issue 116)."""
+        said = console_run.topics_proposer(
+            {"creature": ["beaky", "wolf"], "prop": ["crate"]})["description"]
+        self.assertIn("creature (beaky, wolf)", said)
+        self.assertIn("prop (crate)", said)
+        self.assertIn("Reuse", said)
+        self.assertIn("new", said)
+
+    def test_with_no_words_in_use_it_says_so(self):
+        self.assertIn("No model carries a topic yet",
+                      console_run.topics_proposer({})["description"])
 
     def test_answered_it_says_what_was_kept_struck_and_held_back(self):
         said = console_run.topics_proposed({"kept": ["creature"], "struck": ["bird"],
@@ -264,6 +309,24 @@ class ToolTest(unittest.TestCase):
             cwd=str(ROOT), capture_output=True, text=True)
         self.assertEqual(done.stdout.split("\n")[:2],
                          ["True", "['spec_write', 'topics_propose']"], done.stderr)
+
+    def test_the_consoles_tool_carries_the_words_in_use_on_this_machine(self):
+        """Read when the run's tools are made, from every space found."""
+        python = ROOT / ".venv" / "bin" / "python"
+        if not python.exists():
+            self.skipTest("no console environment")
+        spaces = Path(tempfile.mkdtemp()).resolve()
+        beaky = spaces / "beaky"
+        (beaky / ".contour").mkdir(parents=True)
+        (beaky / ".contour" / "project").write_text("")
+        topics.add(beaky, "creature")
+        done = subprocess.run([str(python), "-c", (
+            "from console import agent\n"
+            "[t] = [t for t in agent.tools('.') if t.name == 'topics_propose']\n"
+            "print(t.description)\n")],
+            cwd=str(ROOT), capture_output=True, text=True,
+            env=dict(os.environ, CONTOUR_SPACES=str(spaces)))
+        self.assertIn("Words in use: creature (beaky).", done.stdout, done.stderr)
 
 
 if __name__ == "__main__":

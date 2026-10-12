@@ -74,6 +74,19 @@ class FoundTest(Spaces):
         self.assertEqual(survey.found("creature"), [])
 
 
+class VocabularyTest(Spaces):
+    """Every word in use and who carries it, as a proposal is given it
+    (ADR 0030, decision 3; issue 116)."""
+
+    def test_each_word_in_use_names_the_spaces_carrying_it(self):
+        self.made("beaky", "creature", "bird")
+        self.made("wolf", "creature")
+        root = self.made("crate")
+        (root / "spec.yaml").write_text("name: crate\ntopics: [prop]\n")
+        self.assertEqual(survey.vocabulary(),
+                         {"creature": ["beaky", "wolf"], "bird": ["beaky"]})
+
+
 class SpacesCommandTest(Spaces):
     """`contour spaces` as a person or an agent in another space runs it."""
 

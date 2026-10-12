@@ -13,7 +13,7 @@ import threading
 from pathlib import Path
 
 from console import approvals, last_run, launcher, seed, spend, vetoes
-from lib import activity, gate as gate_words, intent, lock, marks, policy, topics
+from lib import activity, gate as gate_words, intent, lock, marks, policy, survey, topics
 from lib.last_run import ENDED
 
 
@@ -127,19 +127,27 @@ a spec changes under a console, so that its case cannot be left in thinking
 (ADR 0029). `console/agent.py` puts it in the SDK's shape and nothing more."""
 
 
-TOPICS_PROPOSER = {
-    "name": "topics_propose",
-    "description": ("Suggest topics for this model: free words to find this model "
-                    "by, such as creature or low-poly, as words, and why as case. "
-                    "The person keeps or strikes each word. "
-                    "A topic labels the model and nothing else: it decides "
-                    "nothing about the build and argues for no spec change."),
-    "schema": {"type": "object", "required": ["words", "case"],
-               "properties": {"words": {"type": "array", "items": {"type": "string"}},
-                              "case": {"type": "string"}}},
-}
-"""The console's topic proposal, as the driver hands it to the agent: the one
-way an agent labels a model under a console (ADR 0030, decision 2)."""
+def topics_proposer(vocabulary):
+    """The console's topic proposal, as the driver hands it to the agent: the
+    one way an agent labels a model under a console (ADR 0030, decision 2).
+    It carries every word in use and the names carrying it, and nothing else
+    of another model, so a word that fits is reused (ADR 0030, decisions 3, 8)."""
+    in_use = "; ".join(f"{w} ({', '.join(names)})" for w, names in vocabulary.items())
+    return {
+        "name": "topics_propose",
+        "description": (
+            "Suggest topics for this model: free words to find this model "
+            "by, such as creature or low-poly, as words, and why as case. "
+            "The person keeps or strikes each word. "
+            "A topic labels the model and nothing else: it decides "
+            "nothing about the build and argues for no spec change. "
+            + (f"Words in use: {in_use}. Reuse one wherever it fits; a word "
+               f"no model carries is shown to the person as new."
+               if in_use else "No model carries a topic yet: every word is new.")),
+        "schema": {"type": "object", "required": ["words", "case"],
+                   "properties": {"words": {"type": "array", "items": {"type": "string"}},
+                                  "case": {"type": "string"}}},
+    }
 
 
 def topics_proposed(answer):
@@ -375,7 +383,11 @@ class Run:
             # A copy, as the gate keeps one: what the user is shown is the
             # words they have not already struck for this model.
             words, before = topics.offered(self.space, payload.get("words") or [])
-            payload = {**payload, "words": words, "struck_before": before}
+            # And which of them no model carries yet, so growing the vocabulary
+            # is a choice the user sees being made (ADR 0030, decision 3).
+            in_use = survey.vocabulary()
+            payload = {**payload, "words": words, "struck_before": before,
+                       "new": [w for w in words if w not in in_use]}
         category = TOPICS if tool == TOPICS_TOOL else intent.classify(tool, payload)
         if category is None:
             return True, None
