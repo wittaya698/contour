@@ -52,6 +52,19 @@ says. Then propose the change, wait for the user to confirm it, and write it
 with `revision:` bumped in the same edit. `contour check` goes red if the spec
 moved and the number did not (ADR 0016).
 
+## Topics
+
+A topic is a word to find this model by — *creature*, *low-poly*. When
+`contour check` says *first green: propose topics to find this model by*,
+propose some, once: it is the model's first green build, the first moment you
+know what it is. After that, propose only when asked.
+
+Under a console, propose with `topics_propose`: the words and why. It lists the
+words other models already carry; reuse one wherever it fits. The user keeps or
+strikes each word. In a terminal, say the words and why, and the user adds the
+ones they keep with `contour topics add <word>`. A topic decides nothing about
+the build and argues for no spec change.
+
 ## Writing geometry
 
 - `bmesh` and the data API. `bpy.ops` only from the toolkit's

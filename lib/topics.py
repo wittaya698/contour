@@ -86,6 +86,28 @@ def strike(space, text):
     return held
 
 
+FIRST_GREEN = "next first green: propose topics to find this model by"
+"""What `contour check` says once in a model's life (ADR 0030, decision 4)."""
+
+
+STAMP = "first-green"
+"""Beside the check's own record in `.contour/`: that it has been said."""
+
+
+def first_green(dot, was, now):
+    """The line a check adds at the model's first green build, or None.
+    Stamped at every green, so it is said once and never after; `was`, the
+    check's last verdict, says a space green before stamps existed is past it."""
+    if not now.get("ok"):
+        return None
+    stamp = Path(dot) / STAMP
+    if stamp.is_file():
+        return None
+    stamp.write_text("")
+    # Green before there was a stamp to keep: past its first green already.
+    return None if (was or {}).get("ok") else FIRST_GREEN
+
+
 def by_hand(tool, payload):
     """Whether this call labels the model other than by proposing: the user's
     own command, or the file itself. The console refuses it from its agent, as

@@ -198,6 +198,9 @@ class LauncherTest(unittest.TestCase):
         the one thing a terse report cannot afford.
         """
         self.mark()
+        # Past the first green build, which is said once (issue 117): the two
+        # compared below differ by the vetoes and nothing else.
+        self.run_contour("check")
         before = self.run_contour("check")
         (self.space / "vetoes.json").write_text(json.dumps(
             [{"id": "v1", "category": "spec-write", "tool": "Edit",

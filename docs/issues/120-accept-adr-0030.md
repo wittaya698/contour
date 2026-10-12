@@ -18,6 +18,7 @@ glad of.
 ## Acceptance criteria
 
 - [ ] The tracer bullet run end to end, each step as written or the difference recorded (in ADR 0030's status)
+- [ ] A new space's first green build, on a real build under a console, leads to one proposal (issue 117)
 - [ ] The vocabulary after the lobby pass has no two spellings of one word
 - [ ] ADR 0030's status says accepted, amended or withdrawn, with the evidence
 

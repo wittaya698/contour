@@ -234,9 +234,14 @@ def on_build(cmd, rest, held):
         return emit(drifted)
     if cmd == "check":
         rep = stage(["build"])
-        from lib import panel
+        from lib import panel, store, topics
+        was = store.load(OUT / panel.NAME, None)
         panel.record(OUT / panel.NAME, rep, HERE.blend)
-        return say_marks(emit(draw(rep)))
+        rep = draw(rep)
+        said = topics.first_green(OUT, was, rep)
+        if said:
+            rep = {**rep, "lines": [*rep["lines"], said]}
+        return say_marks(emit(rep))
     if cmd != "export":
         return emit(stage([cmd]))
     from lib import exported
