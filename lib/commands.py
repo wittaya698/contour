@@ -100,8 +100,9 @@ TABLE = (
              ("topics add <word>", "label this model with a word yourself"),
              ("topics strike <word>", "take a word off, and never be offered it "
                                       "for this model again")), "on_topics"),
-    Command("spaces", (0, 1), False, False, None,
+    Command("spaces", (0, 2), False, False, None,
             (("spaces [name]", "list model spaces, or print one's path"),
+             ("spaces --topic <word>", "the spaces labelled with a topic, and their topics"),
              ("spaces --json", "the same list and its health, for a client to read")),
             "on_spaces"),
     Command("stop", (1, 1), False, False, None,

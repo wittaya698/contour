@@ -60,6 +60,11 @@
     <!-- Every row's verdict is said against its spec (ADR 0025, decision 1;
          issue 77), so the word is taught once, above them. -->
     <div id="taught-spec"></div>
+    <!-- Found by topic (ADR 0030, decision 8): only the words in use are
+         offered, so a filter never finds nothing by a misspelling. -->
+    <label id="topics" hidden>Topic
+      <select id="topic"><option value="">all</option></select>
+    </label>
     <table>
       <tbody id="rows"></tbody>
     </table>
@@ -204,6 +209,17 @@ function thumbnail(s) {
 // One model's row — a picture and a verdict (ADR 0025, decision 10) — and
 // under it the room a rename or a delete lays itself out in. `environment` is
 // the host's answer to whether a console can run here.
+// Every approved topic across the rows, once each, for the picker.
+function inUse(spaces) {
+  return [...new Set(spaces.flatMap(s => s.topics))].sort();
+}
+
+// The rows a topic finds; no topic is every row, and a row without topics is
+// found by none (ADR 0030, decision 8).
+function labelled(spaces, topic) {
+  return topic ? spaces.filter(s => s.topics.includes(topic)) : spaces;
+}
+
 function row(s, can, environment) {
   const tr = document.createElement('tr');
   const name = cell('');
@@ -211,6 +227,7 @@ function row(s, can, environment) {
   strong.textContent = s.name;
   strong.title = s.path;
   name.append(strong, verdict(s.verdict), para(ago(s.worked), 'muted'));
+  if (s.topics.length) name.append(para(s.topics.join(', '), 'muted'));
   // The room under the row a rename, an update or a delete lays itself out in.
   const under = document.createElement('tr');
   under.hidden = true;
@@ -643,7 +660,20 @@ function render({ roots, spaces, deleted }, can, environment) {
   }
   document.getElementById('list').hidden = spaces.length === 0;
   document.getElementById('onboarding').hidden = spaces.length !== 0;
-  document.getElementById('rows').replaceChildren(...spaces.flatMap(s => row(s, can, environment)));
+  const picker = document.getElementById('topic');
+  const words = inUse(spaces);
+  const picked = words.includes(picker.value) ? picker.value : '';
+  picker.replaceChildren(...['', ...words].map(w => {
+    const o = document.createElement('option');
+    o.value = w;
+    o.textContent = w || 'all';
+    return o;
+  }));
+  picker.value = picked;
+  picker.onchange = () => render({ roots, spaces, deleted }, can, environment);
+  document.getElementById('topics').hidden = words.length === 0;
+  document.getElementById('rows').replaceChildren(
+    ...labelled(spaces, picked).flatMap(s => row(s, can, environment)));
   document.getElementById('trash').hidden = deleted.length === 0;
   document.getElementById('gone').replaceChildren(...deleted.flatMap(d => gone(d, can)));
 }

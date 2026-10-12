@@ -11,11 +11,11 @@ space can read the vocabulary without reading another model.
 
 ## Acceptance criteria
 
-- [ ] `contour spaces` shows each space's topics and filters on one
-- [ ] The connector answers *which models are `creature`?* with names and topics only
-- [ ] The lobby filters its rows by a topic
-- [ ] A space with no topics is listed unfiltered and missed by every filter
-- [ ] Nothing in the answer comes from a space's spec, refs or sheet
+- [x] `contour spaces` shows each space's topics and filters on one
+- [x] The connector answers *which models are `creature`?* with names and topics only
+- [x] The lobby filters its rows by a topic
+- [x] A space with no topics is listed unfiltered and missed by every filter
+- [x] Nothing in the answer comes from a space's spec, refs or sheet
 
 ## Blocked by
 

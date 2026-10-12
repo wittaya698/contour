@@ -15,7 +15,7 @@ import re
 from datetime import datetime
 from pathlib import Path
 
-from . import git, policy, presence, revision, update
+from . import git, policy, presence, revision, topics, update
 from . import space as space_lib
 
 TOOLKIT = Path(__file__).resolve().parent.parent
@@ -43,6 +43,16 @@ def listing():
             "deleted": deleted()}
 
 
+def found(topic):
+    """The spaces carrying `topic`, each as its name and approved topics and
+    nothing else (ADR 0030, decision 8): another model's spec, references and
+    sheet are not what a filter answers with."""
+    asked = topics.word(topic)
+    return [{"name": root.name, "topics": held}
+            for root in space_lib.spaces(space_lib.roots(TOOLKIT))
+            if asked in (held := topics.load(root)["topics"])]
+
+
 def row(root, now):
     """One space as `spaces` reports it. The text form and the JSON form both
     print this, so they cannot disagree about which spaces exist or which are
@@ -52,6 +62,7 @@ def row(root, now):
     here = space_lib.layout(root)
     kept = store.load(here.dot / panel.NAME, None)
     return {"name": root.name, "path": str(root),
+            "topics": topics.load(root)["topics"],
             "verdict": verdict.say(kept) if kept else None,
             # What a lobby row shows of it: the last sheet, or before there is
             # one, what it is to be built from (ADR 0025, decision 10).

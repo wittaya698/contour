@@ -52,8 +52,11 @@ cannot do needs no rule here, and what it can say is steered to a span."""
 TOOLS = (
     {"name": "spaces",
      "description": "Every Contour model space on this machine and its health: "
-                    "toolkit drift, scaffold, remotes, who is in it, and the trash.",
-     "inputSchema": {"type": "object", "properties": {}}},
+                    "toolkit drift, scaffold, remotes, who is in it, its topics, "
+                    "and the trash. Given a topic, only the spaces labelled with "
+                    "it, by name and topics.",
+     "inputSchema": {"type": "object",
+                     "properties": {"topic": {"type": "string"}}}},
     {"name": "status",
      "description": "Is a space green, and if not why: its last check's verdict, "
                     "open marks, uncommitted vetoes, toolkit drift, and its latest run.",
@@ -182,7 +185,8 @@ def specced(said):
 def readings():
     """Every tool that only reads, each the survey's answer in a chat's shape."""
     return {
-        "spaces": lambda args: survey.listing(),
+        "spaces": lambda args: ({"spaces": survey.found(args["topic"])}
+                                if args.get("topic") else survey.listing()),
         "status": lambda args: asking(survey.status(named(args.get("space")))),
         "log": lambda args: survey.log(named(args.get("space")), args.get("lines", 40)),
         "picture": lambda args: pictured(survey.picture(named(args.get("space")),

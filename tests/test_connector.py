@@ -127,12 +127,14 @@ class ToolsTest(unittest.TestCase):
     READING = {"roots": ["/r"], "spaces": [{"name": "beaky"}], "deleted": []}
     TOOLS = {"spaces": lambda args: ToolsTest.READING}
 
-    def test_spaces_is_listed_with_a_schema_that_takes_nothing(self):
+    def test_spaces_is_listed_with_a_schema_that_takes_a_topic_at_most(self):
+        """Optional: unfiltered it is the listing (issue 115)."""
         [got] = talk(call(1, "tools/list"), tools=self.TOOLS)
         [tool] = got["result"]["tools"]
         self.assertEqual(tool["name"], "spaces")
         self.assertTrue(tool["description"])
-        self.assertEqual(tool["inputSchema"], {"type": "object", "properties": {}})
+        self.assertEqual(tool["inputSchema"], {"type": "object", "properties": {
+            "topic": {"type": "string"}}})
 
     def test_the_request_tool_sends_nobody_to_the_console(self):
         """A chat told a run's console has the page opened it two seconds

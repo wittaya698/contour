@@ -456,6 +456,11 @@ def on_status(cmd, rest, held):
 def on_spaces(cmd, rest, held):
     if rest == ["--json"]:
         return emit(spaces(as_json=True))
+    if rest[:1] == ["--topic"] and len(rest) == 2:
+        return emit(labelled(rest[1]))
+    if len(rest) > 1:
+        print(usage(), file=sys.stderr)
+        return 2
     return emit(spaces(rest[0] if rest else None))
 
 
@@ -995,10 +1000,22 @@ def spaces(name=None, as_json=False):
         state = f"({tk['state']})"
         lines.append(f"  {s['name']:<12} {home:<34} toolkit {tk['commit'] or '?'} "
                      f"{state:<10} {s['commits']:>4} commits")
+        if s["topics"]:
+            lines.append(f"  {'':<12} topics {', '.join(s['topics'])}")
         for r in s["remotes"]:
             lines.append(f"  WARN {s['name']} has a remote ({r}) — a model space is never pushed")
             ok = False
     return {"ok": ok, "lines": lines + deleted_lines(said["deleted"])}
+
+
+def labelled(topic):
+    """The spaces a topic finds, by name and topics only (ADR 0030, decision 8)."""
+    from lib import topics
+    found = survey.found(topic)
+    if not found:
+        return {"ok": True, "lines": [f"no model is labelled {topics.word(topic) or 'with nothing'}"]}
+    return {"ok": True, "lines": [f"  {s['name']:<12} {', '.join(s['topics'])}"
+                                  for s in found]}
 
 
 def deleted_lines(gone):

@@ -48,6 +48,14 @@ class WritesNothingTest(unittest.TestCase):
                  and isinstance(n.value, ast.Name) and n.value.id == "update"}
         self.assertEqual(asked, {"standing", "recorded", "uncommitted"})
 
+    def test_the_survey_asks_topics_only_what_they_are(self):
+        """`add` and `strike` are the user's writes; the survey reads the
+        words and spells the one asked for (issue 115)."""
+        tree = ast.parse((ROOT / "lib" / "survey.py").read_text())
+        asked = {n.attr for n in ast.walk(tree) if isinstance(n, ast.Attribute)
+                 and isinstance(n.value, ast.Name) and n.value.id == "topics"}
+        self.assertEqual(asked, {"load", "word"})
+
     def test_the_connector_reaches_no_module_that_writes_a_space(self):
         """It imports the survey, and through it nothing that writes: its two
         acts, open and create, are handed it by the launcher (ADR 0024)."""
