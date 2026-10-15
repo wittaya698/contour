@@ -154,6 +154,20 @@ def answer(space, at, allow, reason=None, answers=None, words=None):
     return {"answered": True, "id": at, "outcome": outcome, "said": said}
 
 
+def labelled(space, at, words):
+    """A topic proposal answered from the lobby's page, which answers nothing
+    else: `words` are kept and the rest struck (ADR 0030, decision 7). Any
+    other approval is answered on its console's page, with the panel in front
+    of the person (ADR 0028)."""
+    found = next((a for a in load(space) if a["id"] == at), None)
+    if found is None:
+        return None
+    if found["category"] != topics.CATEGORY:
+        return {"answered": False, "why": "only a topic proposal is answered here; "
+                                          "open the model's console for the rest"}
+    return answer(space, at, bool(words), words=list(words))
+
+
 def dropped(space, at):
     """No longer waiting, here and in the run record, which is where the lobby,
     `status` and a request learn what waits: they never read this store."""

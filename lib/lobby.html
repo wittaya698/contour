@@ -69,6 +69,14 @@
       <tbody id="rows"></tbody>
     </table>
   </div>
+  <!-- Topics for the models made before there were any: proposed for all of
+       them together, and answered here, one card each (ADR 0030, decision 7). -->
+  <section id="labelling" hidden>
+    <h2>Topics</h2>
+    <div id="label-start"></div>
+    <p class="muted" id="label-said"></p>
+    <div id="proposals"></div>
+  </section>
   <section id="trash" hidden>
     <h2>Deleted</h2>
     <p class="muted">Each is a bundle of the space's whole history, in the trash on
@@ -644,6 +652,72 @@ function ready(room) {
   name.focus();
 }
 
+// The models the labelling act would propose for: no topics, and nothing
+// already waiting in them (ADR 0030, decision 7).
+function unlabelled(spaces) {
+  return spaces.filter(s => !s.topics.length && !(s.approvals || []).length);
+}
+
+// One model's proposal: each word a box, ticked, and one no model carries yet
+// marked new (ADR 0030, decision 3); Claude's case; and the ticked words sent
+// back as the ones kept, the rest struck.
+function proposed(p) {
+  const card = document.createElement('div');
+  card.className = 'proposal';
+  const name = document.createElement('h3');
+  name.textContent = p.name;
+  const boxes = p.words.map(w => {
+    const label = document.createElement('label');
+    const box = document.createElement('input');
+    box.type = 'checkbox';
+    box.checked = true;
+    box.value = w;
+    label.append(box, ' ' + w);
+    if (p.new.includes(w)) {
+      const fresh = document.createElement('span');
+      fresh.className = 'muted';
+      fresh.textContent = 'new';
+      label.append(' ', fresh);
+    }
+    return label;
+  });
+  const said = para('');
+  card.append(name, ...boxes, para(p.case, 'muted'), button('Keep the ticked words', async () => {
+    const kept = boxes.map(l => l.querySelector('input')).filter(b => b.checked).map(b => b.value);
+    const answered = await ask('/labelled', { path: p.path, id: p.id, words: kept })
+      .then(r => r.json()).catch(() => null);
+    if (answered && answered.answered) { labels(); load(); }
+    else said.textContent = (answered && answered.why) || 'not answered; try again';
+  }), said);
+  return card;
+}
+
+// Every proposal waiting, read again every few seconds while the act is still
+// proposing, so each card appears as its model's proposal is made.
+let polling = null;
+let offered = false;
+function labels() {
+  ask('/labels').then(r => r.json()).then(({ labelling, proposals }) => {
+    document.getElementById('proposals').replaceChildren(...proposals.map(proposed));
+    if (labelling) document.getElementById('label-said').textContent =
+      'Claude is looking at each sheet and suggesting topics…';
+    document.getElementById('labelling').hidden = !offered && !proposals.length && !labelling;
+    clearTimeout(polling);
+    if (labelling) polling = setTimeout(labels, 2000);
+  });
+}
+
+async function labelling() {
+  const said = await ask('/label', {}).then(r => r.json());
+  const told = document.getElementById('label-said');
+  if (said.refused) { told.textContent = said.refused; return; }
+  const skipped = Object.entries(said.skipped).map(([name, why]) => `${name}: ${why}`);
+  told.textContent = said.proposing.length
+    ? `Suggesting topics for ${said.proposing.join(', ')}.` : 'No model to suggest topics for now.';
+  if (skipped.length) told.textContent += ' Not now: ' + skipped.join('; ') + '.';
+  labels();
+}
+
 // Empty is onboarding, not an empty table: someone with no spaces is standing
 // where someone with ten is (ADR 0021, decision 1). The trash is its own list,
 // so a deleted space never reads as a live one.
@@ -674,6 +748,14 @@ function render({ roots, spaces, deleted }, can, environment) {
   document.getElementById('topics').hidden = words.length === 0;
   document.getElementById('rows').replaceChildren(
     ...labelled(spaces, picked).flatMap(s => row(s, can, environment)));
+  const bare = can.has('label') ? unlabelled(spaces) : [];
+  offered = bare.length > 0;
+  document.getElementById('label-start').replaceChildren(...(offered ? [
+    para(`${bare.length} model${bare.length > 1 ? 's carry' : ' carries'} no topics yet: ` +
+         'words to find a model by. Claude can look at each sheet and suggest some ' +
+         'for all of them at once, for you to keep or strike.', 'muted'),
+    button('Suggest topics', labelling)] : []));
+  if (can.has('label')) labels();
   document.getElementById('trash').hidden = deleted.length === 0;
   document.getElementById('gone').replaceChildren(...deleted.flatMap(d => gone(d, can)));
 }

@@ -31,7 +31,15 @@ def drive(prompt, options, gate, say):
     anyio.run(session, prompt, options, gate, say)
 
 
-async def session(prompt, options, gate, say):
+def label(prompt, options, gate, say):
+    """The lobby's labelling act: the same session, serving the act's own
+    proposal in place of the console's tools (ADR 0030, decision 7)."""
+    from console import labelling
+    anyio.run(session, prompt, options, gate, say,
+              labelling.tools(survey.vocabulary()))
+
+
+async def session(prompt, options, gate, say, served=None):
     async def can_use_tool(tool, payload, context):
         """The console's gate, in the shape the SDK asks for.
 
@@ -44,7 +52,8 @@ async def session(prompt, options, gate, say):
 
     async with ClaudeSDKClient(
             ClaudeAgentOptions(**options, can_use_tool=can_use_tool,
-                               mcp_servers={"contour": server(options["cwd"])})
+                               mcp_servers={"contour": create_sdk_mcp_server(
+                                   "contour", tools=served or tools(options["cwd"]))})
             ) as client:
         await client.query(prompt)
         async for message in client.receive_response():
@@ -58,11 +67,6 @@ async def session(prompt, options, gate, say):
             usage = getattr(message, "usage", None)
             if isinstance(message, AssistantMessage) and usage:
                 say("usage", usage=dict(usage))
-
-
-def server(space):
-    """The console's own tools, served to the agent as `mcp__contour__*`."""
-    return create_sdk_mcp_server("contour", tools=tools(space))
 
 
 def tools(space):

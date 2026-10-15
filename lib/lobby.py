@@ -77,10 +77,10 @@ bundle it is given. `restore` proposes nothing and acts on its id."""
 
 
 def granted():
-    """What this host can do: everything in `CAN`; `enter` only where the
-    console's environment exists (ADR 0021, decision 2); and `reveal`, open in
-    Finder, only where there is a Finder."""
-    return (CAN + (() if enter.environment() else ("enter",))
+    """What this host can do: everything in `CAN`; `enter`, and `label`, only
+    where the console's environment exists (ADR 0021, decision 2; ADR 0030,
+    decision 7); and `reveal`, open in Finder, only where there is a Finder."""
+    return (CAN + (() if enter.environment() else ("enter", "label"))
             + (("reveal",) if sys.platform == "darwin" else ()))
 
 
@@ -94,6 +94,7 @@ class Lobby(Page):
         super().__init__(PAGE, can=granted() if can is None else can, grace=grace,
                          hidden_grace=hidden_grace)
         self.listing = listing
+        self.labelling = None        # the act, while it proposes
 
     def served(self):
         return {("GET", "/spaces"): lambda q: self.listing(),
@@ -104,7 +105,49 @@ class Lobby(Page):
                 ("GET", "/environment"): lambda q: {"console": enter.environment()},
                 ("POST", "/enter"): self.enter,
                 ("POST", "/reveal"): self.reveal,
-                ("GET", "/picture"): self.picture}
+                ("GET", "/picture"): self.picture,
+                ("POST", "/label"): self.label,
+                ("GET", "/labels"): self.labels,
+                ("POST", "/labelled"): self.labelled}
+
+    def label(self, asked):
+        """Start the labelling act: topics proposed for every space with none,
+        together (ADR 0030, decision 7). Under the console's interpreter, since
+        an approval and the agent are the console's; answered with which spaces
+        it proposes for and why the others are skipped, while it goes on."""
+        if "label" not in self.can:
+            return {"refused": f"no console environment; make one, from {enter.ROOT}: "
+                               f"{enter.environment()}"}
+        if self.labelling is not None and self.labelling.poll() is None:
+            return {"refused": "it is already proposing; answer what it proposes"}
+        self.labelling = subprocess.Popen(
+            labelling("label"), cwd=str(CONTOUR.parent), env=labelling_env(),
+            stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, text=True,
+            start_new_session=True)
+        # Its plan is the one line it prints; nothing else is read from it.
+        with self.labelling.stdout:
+            line = self.labelling.stdout.readline()
+        return dict(json.loads(line), refused=None) if line else \
+            {"refused": "the act ended before it said what it proposes for"}
+
+    def labels(self, asked):
+        """Every topic proposal waiting next in a space, and whether the act is
+        still proposing."""
+        said = subprocess.run(labelling("shown"), cwd=str(CONTOUR.parent),
+                              env=labelling_env(), capture_output=True, text=True,
+                              timeout=60)
+        return {"labelling": self.labelling is not None and self.labelling.poll() is None,
+                "proposals": json.loads(said.stdout or "[]")}
+
+    def labelled(self, asked):
+        """One space's proposal answered: the words ticked are kept, the rest
+        struck. None for a space or proposal that is not waiting."""
+        said = subprocess.run(labelling("answer"), cwd=str(CONTOUR.parent),
+                              env=labelling_env(), capture_output=True, text=True,
+                              timeout=60, input=json.dumps(
+                                  {"path": asked.get("path"), "id": asked.get("id"),
+                                   "words": list(asked.get("words") or [])}))
+        return json.loads(said.stdout or "null")
 
     def location(self):
         return location(self.listing()["roots"])
@@ -209,6 +252,15 @@ class Lobby(Page):
         if "reveal" not in self.can:
             return {"path": asked["path"], "refused": "no Finder on this machine to open it in"}
         return {"path": asked["path"], "refused": enter.reveal(asked["path"])}
+
+
+def labelling(*argv):
+    """The labelling act's command line, under the console's interpreter."""
+    return [str(enter.interpreter()), "-m", "console.labelling", *argv]
+
+
+def labelling_env():
+    return dict(os.environ, PYTHONPATH=str(CONTOUR.parent), PYTHONDONTWRITEBYTECODE="1")
 
 
 def location(roots):

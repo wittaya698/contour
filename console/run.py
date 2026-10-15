@@ -150,6 +150,17 @@ def topics_proposer(vocabulary):
     }
 
 
+def topics_shown(space, payload):
+    """A proposal as the person is shown it, copied as the gate keeps one: the
+    words they have not already struck for this model, and which of those no
+    model carries yet, so growing the vocabulary is a choice the user sees
+    being made (ADR 0030, decision 3)."""
+    words, before = topics.offered(space, payload.get("words") or [])
+    in_use = survey.vocabulary()
+    return {**payload, "words": words, "struck_before": before,
+            "new": [w for w in words if w not in in_use]}
+
+
 def topics_proposed(answer):
     """What the agent is told once the person has answered its proposal: the
     words kept, the words struck, and any held back because they were struck
@@ -380,14 +391,7 @@ class Run:
             tool, payload = spec_edit(self.space, payload.get("content") or "")
         if tool == TOPICS_TOOL:
             case = payload.get("case") or ""
-            # A copy, as the gate keeps one: what the user is shown is the
-            # words they have not already struck for this model.
-            words, before = topics.offered(self.space, payload.get("words") or [])
-            # And which of them no model carries yet, so growing the vocabulary
-            # is a choice the user sees being made (ADR 0030, decision 3).
-            in_use = survey.vocabulary()
-            payload = {**payload, "words": words, "struck_before": before,
-                       "new": [w for w in words if w not in in_use]}
+            payload = topics_shown(self.space, payload)
         category = TOPICS if tool == TOPICS_TOOL else intent.classify(tool, payload)
         if category is None:
             return True, None

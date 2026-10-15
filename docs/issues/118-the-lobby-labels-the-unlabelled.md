@@ -11,12 +11,12 @@ space. Each space's proposal is an approval waiting there until answered.
 
 ## Acceptance criteria
 
-- [ ] Started on the seven spaces under `project/` (or copies), one page shows a proposal per unlabelled space
-- [ ] One word is proposed in one spelling across all of them
-- [ ] Approving or striking a word is per space; the user can strike `creature` for trail-cube and keep it for beaky
-- [ ] A space already labelled is skipped
-- [ ] While a proposal waits, its space refuses a request; once answered, it takes one
-- [ ] No space's files change before its proposal is answered
+- [ ] Started on the seven spaces under `project/` (or copies), one page shows a proposal per unlabelled space — one card per space is tested with a scripted agent; the real agent on the real spaces is issue 120's
+- [ ] One word is proposed in one spelling across all of them — one session from one vocabulary, words kept in one spelling (tested); what the real agent proposes is issue 120's
+- [x] Approving or striking a word is per space; the user can strike `creature` for trail-cube and keep it for beaky
+- [x] A space already labelled is skipped
+- [x] While a proposal waits, its space refuses a request; once answered, it takes one
+- [x] No space's files change before its proposal is answered
 
 ## Blocked by
 
