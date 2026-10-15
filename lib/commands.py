@@ -100,6 +100,9 @@ TABLE = (
              ("topics add <word>", "label this model with a word yourself"),
              ("topics strike <word>", "take a word off, and never be offered it "
                                       "for this model again")), "on_topics"),
+    Command("release-glb", (1, 1), True, True, None,
+            (("release-glb v<N>", "the export into release/v<N>/, carrying this "
+                                  "model's topics"),), "on_release_glb"),
     Command("spaces", (0, 2), False, False, None,
             (("spaces [name]", "list model spaces, or print one's path"),
              ("spaces --topic <word>", "the spaces labelled with a topic, and their topics"),

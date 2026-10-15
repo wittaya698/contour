@@ -45,6 +45,7 @@ CONTOUR = {
     "intents": "Listed what Claude asks before doing",
     "asks": "Looked at what runs without asking",
     "topics": "Looked at the words this model is found by",
+    "release-glb": "Put the model's file into a release, with its topics",
     "request": "Asked for a run in a model",
     "ceiling": "Looked at what a run left alone may spend",
     "hook": "Ran a safety check",

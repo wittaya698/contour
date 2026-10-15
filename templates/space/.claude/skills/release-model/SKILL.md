@@ -54,9 +54,8 @@ tag named exactly `v<N>` is a release — any other tag in the space is the
 user's own, and neither counts nor is touched.
 
 ```sh
-mkdir -p release/v<N>
+contour release-glb v<N>     # the export, carrying this model's topics
 cp out/<NAME>.blend      release/v<N>/
-cp exports/<NAME>.glb    release/v<N>/
 cp sheet.png             release/v<N>/
 git add release/v<N> sheet.png
 git commit -m "<NAME>: release v<N>
@@ -64,6 +63,11 @@ git commit -m "<NAME>: release v<N>
 verify 8/8 | tris 4,210 | glb round-trip ok | toolkit <commit>"
 git tag -a v<N> -m "<NAME> v<N>"
 ```
+
+The release's `.glb` is not a plain copy of the export: `release-glb` writes
+the model's topics into it, as they stand now, and a working export carries
+none (ADR 0030, decision 9). It refuses a `v<N>` already released, so a topic
+approved later never reaches a shipped file.
 
 `release/` is tracked although `out/` and `exports/` beside it are not: the
 package is the one deliberate copy of a derivable file (ADR 0013). Record the

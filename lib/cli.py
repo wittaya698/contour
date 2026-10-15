@@ -563,6 +563,27 @@ def on_topics(cmd, rest, held):
     return emit({"ok": True, "lines": [f"ok   topics  {rest[0]} {topics.word(rest[1])}"]})
 
 
+def on_release_glb(cmd, rest, held):
+    """The export copied into a release, with the topics the model carries now
+    as the file's root `extras` (ADR 0030, decision 9). The working export
+    beside it carries none; release-model's steps run this in place of copying
+    the export, until `contour release` does it."""
+    from lib import glb, topics
+    tag = rest[0]
+    if not git.is_release(tag):
+        return emit({"ok": False, "lines": [f"FAIL release  {tag} is not a release tag: v<N>"]})
+    if not HERE.glb.exists():
+        return emit({"ok": False, "lines": ["FAIL release  nothing exported yet: "
+                                            "run contour export first"]})
+    dst = HERE.release / tag / HERE.glb.name
+    if dst.exists():
+        return emit({"ok": False, "lines": [f"FAIL release  {tag} is released: it keeps "
+                                            f"the topics it shipped with (ADR 0013)"]})
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    glb.labelled(HERE.glb, dst, topics.load(PROJECT)["topics"])
+    return emit({"ok": True, "lines": [f"ok   release  {dst.relative_to(PROJECT)}"]})
+
+
 def on_asks(cmd, rest, held):
     """The resolved policy, or with `--always <c>` / `--undo <c>` this space's
     entry rewritten (ADR 0025, decision 6). The page is the writer's one client

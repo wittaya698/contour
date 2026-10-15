@@ -61,6 +61,11 @@ def show(repo, ref, path):
 _RELEASE = re.compile(r"v([1-9][0-9]*)")
 
 
+def is_release(tag):
+    """Whether `tag` names a release: `v<N>` and nothing else (ADR 0013, amended)."""
+    return bool(_RELEASE.fullmatch(tag))
+
+
 def releases(repo):
     """Every release tag, newest first, or `[]` when there are none.
 

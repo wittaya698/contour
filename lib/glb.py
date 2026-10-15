@@ -167,6 +167,15 @@ def wrapped(doc, **trs):
     return d
 
 
+def labelled(src, dst, topics):
+    """Copy the .glb at `src` to `dst` with `topics` as `extras` on the glTF's
+    root, beside whatever extras it already had; nothing else is touched. Only a
+    release carries them (ADR 0030, decision 9)."""
+    doc, blob = load(src)
+    doc["extras"] = {**doc.get("extras", {}), "topics": list(topics)}
+    write(dst, doc, blob)
+
+
 def write(path, doc, blob):
     """Pack doc + blob back into a .glb (JSON chunk space-padded, BIN zero-padded)."""
     js = json.dumps(doc, separators=(",", ":")).encode()

@@ -286,6 +286,9 @@ INTENTLESS = {
     "migrate-marks": "rewrites the user\'s own marks into one spelling, and only "
                      "when they ask for it by name; the diff it makes is theirs "
                      "to read and reaches a remote only past the commit gate",
+    "release-glb": "writes a new release folder's .glb from the export and refuses "
+                   "one already there, so it overwrites nothing shipped; a release "
+                   "reaches git only past the commit gate (ADR 0030, decision 9)",
     "spaces": "lists spaces on this machine",
     "status": "reads a space's verdict and latest run and writes nothing",
     "stop": "ends a run and answers none of its gates, so it approves nothing; "

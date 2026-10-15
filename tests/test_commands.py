@@ -29,9 +29,11 @@ class HoldTest(unittest.TestCase):
     def test_the_commands_that_write_out_or_read_the_build_hold_the_space(self):
         """Open question 11: a second run may not join a build, and `resolve`
         casts rays into the build another terminal may be replacing. `run` is
-        the unit the hold is scoped to, so it takes it too."""
+        the unit the hold is scoped to, so it takes it too. `release-glb` reads the
+        export another terminal's `export` may be rewriting."""
         self.assertEqual(names(holds=True),
-                         ["check", "render", "export", "filmstrip", "resolve", "run"])
+                         ["check", "render", "export", "filmstrip", "resolve", "run",
+                          "release-glb"])
 
     def test_the_canvas_and_the_agents_mark_deliberately_take_nothing(self):
         """Both only append to `marks.json`, and a canvas session is a person
@@ -55,7 +57,7 @@ class SpaceTest(unittest.TestCase):
                          ["check", "render", "export", "filmstrip", "measure",
                           "worksheet", "canvas",
                           "resolve", "mark", "run", "doctor", "update", "migrate-marks",
-                          "topics", "rename", "delete"])
+                          "topics", "release-glb", "rename", "delete"])
 
 
 class ArityTest(unittest.TestCase):

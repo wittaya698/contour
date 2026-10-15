@@ -11,10 +11,10 @@ export` carries none. `contour release` is not built, so this extends
 
 ## Acceptance criteria
 
-- [ ] A release made with topics `creature`, `bird` has both in its `.glb`, read back after round-trip
-- [ ] A working export of the same model has no topics in it
-- [ ] Approving `forest` afterwards changes nothing in `release/v1/`
-- [ ] Changing a topic turns no check red and asks for no release
+- [x] A release made with topics `creature`, `bird` has both in its `.glb`, read back after round-trip
+- [x] A working export of the same model has no topics in it
+- [x] Approving `forest` afterwards changes nothing in `release/v1/`
+- [x] Changing a topic turns no check red and asks for no release
 
 ## Blocked by
 
