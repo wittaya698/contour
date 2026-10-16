@@ -11,7 +11,7 @@ not prompted by this; issue 118 covers those.
 
 ## Acceptance criteria
 
-- [ ] A new space's first green build leads to one proposal — `check` says so once (tested); the proposal on a real build is issue 120's
+- [ ] A new space's first green build leads to one proposal — `check` says so once (tested); the proposal on a real build is issue 120's, which found an approved check's first green proposes nothing (issue 121)
 - [x] A later green build, or a red then green, leads to none
 - [x] Asked *suggest topics*, the agent proposes at any time
 - [x] An existing space that is already green is not prompted

@@ -1,6 +1,38 @@
 # 0030 — Topics label a model for finding, and leave only in a release
 
-**Status:** Proposed · 2026-10-11 · **adds to the acts [ADR 0028](0028-approvals-wait-and-the-run-goes-on.md) sets aside, and to what a [ADR 0013](0013-releases-are-versioned-folders.md) release contains**
+**Status:** Accepted, amended · 2026-10-16 · **adds to the acts [ADR 0028](0028-approvals-wait-and-the-run-goes-on.md) sets aside, and to what a [ADR 0013](0013-releases-are-versioned-folders.md) release contains**
+
+> **Accepted on its tracer bullet, with decisions 4 and 6 amended** (issue 120).
+> Used by hand on 2026-10-16, in throwaway copies of the seven spaces in
+> `project/` and a new space, `crate`, with the user's own ask-list.
+>
+> - **The lobby pass:** four cards — beaky, beaky-fable, beaky-lite,
+>   beaky-solo — and three skipped with their reasons: beaky-0028 because
+>   approvals already waited in it, beaky-test-2 and trail-cube for having no
+>   sheet. Answered on the page, `colored` struck on beaky. The first click's
+>   act died having set nothing aside, and the page said nothing; the second
+>   worked. The cause was not seen.
+> - **One spelling:** thirteen words after the pass, none a variant of
+>   another, five carried by all four. A later proposal for `crate` reused four
+>   of them and kept away from *character* and *toy* on purpose.
+> - **The filter:** asked *which models are creatures?*, Desktop answered from
+>   topics — none labelled *creature*, four by *bird* and *character*, the
+>   struck word left out — and *low poly* with beaky-lite alone. Against
+>   spaces with no topics it had read six specs instead.
+> - **The first green did not propose.** The ask-list asks before builds, so
+>   the unattended run set its build aside. Allowed on the page, the check went
+>   green with no agent to read *propose topics*, and stamped the first green
+>   anyway: no proposal, and none would ever come unprompted. Decision 4 is
+>   amended for it.
+> - **A waiting proposal blocked a request,** with its reason, and the request
+>   started once it was answered. The user's verdict: *just in the way.*
+>   Decision 6 is amended for it.
+> - **A struck word stayed struck:** asked again, the agent proposed *box,
+>   cube, storage, web*, and not *bevelled*. It never tried it, so the
+>   backstop was not exercised. *web* is the spec's export target: a proposal
+>   can borrow a field that describes nothing.
+> - **The release** `crate` v1 carries its twelve topics as root `extras`; the
+>   working export beside it carries none, and the geometry is the same.
 
 ## Context
 
@@ -38,11 +70,19 @@ Three things a topic could have been, and is not:
    on different days drifts into *creature* / *creatures* / *fauna* unless
    reuse is the default and growth is visible.
 4. **When.** The agent proposes once unprompted, at the model's first green
-   build, and after that only when asked.
+   build, and after that only when asked. *Amended (issue 121):* a first green
+   that comes from an approved check, with no agent there to read it, sets the
+   proposal's ask aside in the space for the next run to make, rather than
+   telling it to nobody. Under an ask-list that asks before builds, every
+   unattended first green comes that way.
 5. **A struck word is remembered against that model** and never proposed for it
    again. It is not a **veto**: it refuses a word, not a call, and asks no why.
 6. **An unanswered proposal is an approval waiting** (ADR 0028), and blocks a
-   new request to its space until answered, like a spec write.
+   new request to its space until answered, like a spec write. *Amended (issue
+   122):* it waits, and blocks nothing. A request starts with a proposal
+   waiting, and the person answers it whenever they open the space. Tried on
+   `crate`, the block held up *make the slats thicker* for a label that had
+   nothing to do with it, and the user found it in the way.
 7. **Spaces made before topics are labelled by one lobby act**, which reads each
    unlabelled model's last sheet and proposes for all of them together. It is not
    a **run** — it edits and builds nothing — so ADR 0027's *one request, one run,
@@ -60,11 +100,16 @@ Three things a topic could have been, and is not:
 
 - Words written into a released `.glb` cannot be recalled from whoever was
   handed it. Decision 9 limits that to moments the user already approved.
-- Starting the lobby pass blocks every unlabelled space for requests until its
-  proposal is answered. They are answered on one page, so the wait is short, but
-  an unattended request in the meantime is refused.
-- A topic proposal pending in a space holds up modelling work it has nothing to
-  do with. Chosen over a non-blocking queue for one rule about what waits.
+- ~~Starting the lobby pass blocks every unlabelled space for requests until its
+  proposal is answered.~~ *Amended (issue 122):* it blocks nothing; a request
+  runs beside a proposal waiting.
+- ~~A topic proposal pending in a space holds up modelling work it has nothing to
+  do with.~~ *Amended (issue 122):* the cost taken instead is the one this ADR
+  first rejected — two kinds of waiting, an approval that blocks and a proposal
+  that does not — chosen on the tracer bullet's evidence.
+- A space with approvals waiting is skipped by the lobby pass (decision 7), and
+  stays unlabelled until they are answered and the pass is started again:
+  beaky-0028 did.
 - No hierarchy and no fixed list. If filtering needs *bird* to find under
   *animal*, that is a later decision, made from the words actually in use.
 
@@ -81,6 +126,7 @@ Three things a topic could have been, and is not:
   them, and a release is already the moment the user approves what leaves.
 - **A topic proposal never blocks.** Kept a label from stalling work, at the
   cost of a second kind of waiting beside approvals. The user chose one.
+  *Reversed on acceptance (issue 122):* tried, the block was in the way.
 - **One run per space for the backfill.** Keeps ADR 0027's rule literal and
   defeats decision 3.
 - **A struck topic as a veto, with a reason.** Treats a label like a spec

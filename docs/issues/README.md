@@ -357,8 +357,8 @@ is applied, but it should not last beyond one merge.
 
 ## Batch 11 — topics, and what a release tag is
 
-From [ADR 0030](../adr/0030-topics-label-a-model-for-finding.md), which is Proposed, and ADR 0013's amendment of the
-release tag to `v<N>`. Seven AFK and one HITL.
+From [ADR 0030](../adr/0030-topics-label-a-model-for-finding.md), accepted with two decisions amended (issue 120),
+and ADR 0013's amendment of the release tag to `v<N>`. Nine AFK and one HITL.
 
 | # | Slice | Type | Blocked by |
 |---|---|---|---|
@@ -370,6 +370,8 @@ release tag to `v<N>`. Seven AFK and one HITL.
 | [118](118-the-lobby-labels-the-unlabelled.md) | The lobby labels the unlabelled | AFK | 116 |
 | [119](119-a-release-carries-its-topics.md) | A release carries its topics | AFK | 113, 114 |
 | [120](120-accept-adr-0030.md) | Accept ADR 0030 | HITL | 115–119 |
+| [121](121-an-approved-first-green-still-proposes.md) | An approved first green still proposes | AFK | — |
+| [122](122-a-topic-proposal-blocks-nothing.md) | A topic proposal blocks nothing | AFK | — |
 
 **113 stands alone.** It fixes shipped behaviour — a bookmark tag in a space
 is read as a release, and closed marks are pruned to be kept by a tag nobody
@@ -389,6 +391,10 @@ sliced work is.
 | [39](39-a-background-tab-is-not-a-closed-one.md) | A background tab is not a closed one | AFK | — |
 | [94](94-the-signal-tests-red-in-the-full-suite.md) | The signal tests go red in the full suite | AFK | — |
 | [95](95-the-suite-waits-on-itself.md) | The suite waits on itself | AFK | — |
+| [123](123-a-refresh-does-not-end-the-lobby.md) | A refresh does not end the lobby | AFK | — |
+| [124](124-a-console-nobody-can-reach-lets-go.md) | A console nobody can reach lets go | HITL | — |
+| [125](125-the-labelling-act-says-how-it-ended.md) | The labelling act says how it ended | AFK | — |
+| [126](126-a-spec-gate-shows-all-it-changes.md) | A spec gate shows all it changes | AFK | — |
 
 **27 came out of slice 17's own suite runs.** `contour-console` forwards `SIGINT`
 and not `SIGTERM`, so every console a test terminates leaves its server running —

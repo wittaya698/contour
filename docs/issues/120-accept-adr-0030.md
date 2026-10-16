@@ -17,11 +17,11 @@ glad of.
 
 ## Acceptance criteria
 
-- [ ] The tracer bullet run end to end, each step as written or the difference recorded (in ADR 0030's status)
-- [ ] A new space's first green build, on a real build under a console, leads to one proposal (issue 117)
-- [ ] The lobby pass, on the page with the real agent, shows one card per unlabelled space and is answered there (issue 118)
-- [ ] The vocabulary after the lobby pass has no two spellings of one word
-- [ ] ADR 0030's status says accepted, amended or withdrawn, with the evidence
+- [x] The tracer bullet run end to end, each step as written or the difference recorded (in ADR 0030's status)
+- [ ] A new space's first green build, on a real build under a console, leads to one proposal (issue 117) — **not met:** `crate`'s first green came from an approved check and proposed nothing; ADR 0030, decision 4 amended, issue 121
+- [x] The lobby pass, on the page with the real agent, shows one card per unlabelled space and is answered there (issue 118)
+- [x] The vocabulary after the lobby pass has no two spellings of one word
+- [x] ADR 0030's status says accepted, amended or withdrawn, with the evidence
 
 ## Blocked by
 
