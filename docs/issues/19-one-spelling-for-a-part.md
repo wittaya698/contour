@@ -43,7 +43,7 @@ since both currently produce a mark naming a part.
 - [x] A space left unmigrated still reads, renders, seeds and prunes correctly
 - [x] A migrated `marks.json` diffs readably, one record per line as before
 - [x] `tests/test_marks.py` covers a mixed file, a migrated file, and migrating twice
-- [ ] The four spaces on this machine are migrated only with the user watching, in a commit of their own
+- [x] The four spaces on this machine are migrated only with the user watching, in a commit of their own
 
 ## What it came to
 
@@ -64,7 +64,7 @@ criterion 6 rests on, so widening it to two would have been widening the thing a
 space that is never migrated depends on.
 
 **The real file had records carrying both spellings at once, and that changed
-the migration.** Three of beaky-solo's seven name the same part twice, top level
+the migration.** Four of beaky-solo's seven name the same part twice, top level
 and under the anchor. They agree there — but nothing made them agree, and
 `part()` has always answered with the top-level one, so a rewrite that took the
 anchor's copy would change which part a finding is about in a file git tracks, in
@@ -98,8 +98,10 @@ is what slice 18 was for.
 
 **One space on this machine has marks at all.** beaky-solo, seven of ten in the
 old spelling; beaky, beaky-fable and beaky-lite hold none. That migration is
-criterion 9 and has not been run: it is the user's data, their call and their
-commit (rule 5).
+criterion 9, and it was run on 2026-10-16 with the user watching: seven marks
+moved, every part and pin read back the same, and a second run found nothing.
+`marks.json` had never been committed in that space, so the migrated file is its
+first commit there, by itself (beaky-solo 8c38e08).
 
 ## Blocked by
 
