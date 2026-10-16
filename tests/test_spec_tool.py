@@ -34,7 +34,7 @@ class CarriedTest(MadeCase):
         self.assertIn("set aside", why)
         [kept] = approvals.load(self.beaky)
         self.assertEqual(kept["case"], CASE)
-        self.assertEqual(kept["said"]["changes"], ["depth 600 → 640"])
+        self.assertEqual(kept["said"]["changes"], ["revision 1 → 2", "depth 600 → 640"])
 
 
 class OtherwiseTest(MadeCase):

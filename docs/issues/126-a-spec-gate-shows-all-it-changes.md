@@ -14,9 +14,9 @@ it replaces and the text it writes.
 
 ## Acceptance criteria
 
-- [ ] A spec write's gate lists *revision 1 → 2* with the fields it moves
-- [ ] An `Edit`'s exact call shows its old and new text
-- [ ] A write that moves the revision alone is still refused, as issue 104 has it
+- [x] A spec write's gate lists *revision 1 → 2* with the fields it moves
+- [x] An `Edit`'s exact call shows its old and new text
+- [x] A write that moves the revision alone is still refused, as issue 104 has it
 
 ## Blocked by
 

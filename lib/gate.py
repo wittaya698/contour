@@ -30,7 +30,7 @@ WORDS = {
 intents` prints is here (`tests/test_gate.py`)."""
 
 REVISION = ("revision",)
-"""The field a spec write bumps, and the one its diff does not show."""
+"""The field a spec write bumps, which no write may move alone (issue 104)."""
 
 UNWATCHED = {
     "spec-write": "Changing the spec",
@@ -87,13 +87,13 @@ def spans(held, proposal):
 
 def changes(spec, tool, call):
     """Each field a spec write moves, as a person reads it: *seat depth 600 →
-    640 mm*, in the order the spec will read. Empty when the write cannot be
+    640 mm*, in the order the spec will read. The revision too: left out, a
+    write that bumps it read as one that did not, and was denied for it
+    (issue 126). Empty when the write cannot be
     read ahead of running it — a shell call is a program, not a document — and
     the raw call is what is left to read, as it was before."""
     out = []
     for path, (was, will) in (moved(spec, tool, call) or {}).items():
-        if path == REVISION:
-            continue
         if isinstance(was, list) and isinstance(will, list):
             out += items(path, was, will)
         else:

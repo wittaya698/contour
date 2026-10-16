@@ -179,9 +179,9 @@
   #turns .did { display: flex; flex-wrap: wrap; gap: 0 10px; align-items: baseline; }
   #turns .did .raw { flex-basis: auto; }
   #turns .did .raw[open] { flex-basis: 100%; }
-  #turns .call { display: block; margin-top: 4px;
+  #turns .call, #approvals .call { display: block; margin-top: 4px;
                  font-family: ui-monospace, SFMono-Regular, monospace;
-                 font-size: 11px; word-break: break-all; }
+                 font-size: 11px; word-break: break-all; white-space: pre-wrap; }
   .why { opacity: .6; font-size: 11px; }
   /* Until the host has answered, nothing that depends on the answer is on
      screen. `/can` is a request, and a page painted before it lands offers the
@@ -836,6 +836,12 @@ function closeGate(event) {
 // verdict and the sentence, never this.
 function called(event) {
   const call = event.call || {};
+  // An Edit is its path and the two texts: the path alone hid what it wrote, a
+  // revision bump with it (issue 126).
+  if (call.old_string != null) {
+    return event.tool + '  ' + call.file_path + '\nreplaces:\n' + call.old_string
+      + '\nwith:\n' + (call.new_string || '');
+  }
   return event.tool + '  ' + (call.command || call.file_path || JSON.stringify(call));
 }
 

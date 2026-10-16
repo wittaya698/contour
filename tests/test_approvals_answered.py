@@ -100,7 +100,7 @@ class ShownTest(AnsweredCase):
         shown = self.waiting(self.opened())
         self.assertEqual([a["act"] for a in shown],
                          ["Claude wants to change the spec", "Save this version?"])
-        self.assertEqual(shown[0]["changes"], ["depth 600 → 640"])
+        self.assertEqual(shown[0]["changes"], ["revision 1 → 2", "depth 600 → 640"])
         self.assertEqual(shown[0]["case"], "Span m4 reads 640 mm, so the depth is 640.")
         self.assertEqual([a["next"] for a in shown], [True, False])
 

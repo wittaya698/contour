@@ -102,7 +102,7 @@ class KeptTest(AsideCase):
                                    "old_string": "revision: 1\ndepth: 600\n",
                                    "new_string": SPEC_WRITE[1]["content"]}))
         self.assertEqual(kept["said"]["act"], "Claude wants to change the spec")
-        self.assertEqual(kept["said"]["changes"], ["depth 600 → 640"])
+        self.assertEqual(kept["said"]["changes"], ["revision 1 → 2", "depth 600 → 640"])
         self.assertEqual(kept["case"], "Span m4 reads 640 mm, so the depth is 640.")
 
     def test_the_record_holds_the_act_and_nothing_under_it(self):

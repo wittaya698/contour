@@ -5,6 +5,8 @@ heredoc. These hold what it says instead — what Claude wants to do, in plain
 words from one table keyed by category, and for a spec write each field that
 moves — with the raw call kept, one click away.
 """
+import json
+import shutil
 import subprocess
 import sys
 import unittest
@@ -17,6 +19,7 @@ from console.run import SPEC_TOOL    # noqa: E402
 from lib import gate, marks    # noqa: E402
 from lib.canvas import PAGE    # noqa: E402
 from test_console import ConsoleCase    # noqa: E402
+from test_found import function    # noqa: E402
 
 
 class WordsTest(unittest.TestCase):
@@ -70,6 +73,20 @@ class ChangesTest(unittest.TestCase):
                          ["notes 1 removed: Faces -Y (Blender front).",
                           "notes 3 added: Seams are not modelled."])
 
+    def test_the_revision_it_moves_is_listed_with_the_fields(self):
+        """Left out, a bumped write read as an unbumped one, and was denied for
+        it (issue 126)."""
+        will = SPEC.replace("revision: 2", "revision: 3").replace("value: 600", "value: 640")
+        self.assertEqual(gate.changes(self.spec, "Write", {"content": will}),
+                         ["revision 2 → 3", "seat depth 600 → 640 mm"])
+
+    def test_the_revision_alone_is_listed_and_still_part_of_a_change(self):
+        """Listing it changes what a gate shows, not what reaches one: a write
+        of the bump alone is refused before any gate (issue 104)."""
+        call = {"content": SPEC.replace("revision: 2", "revision: 3")}
+        self.assertEqual(gate.changes(self.spec, "Write", call), ["revision 2 → 3"])
+        self.assertTrue(gate.partial(self.spec, "Write", call))
+
     def test_a_shell_call_cannot_be_read_ahead_and_lists_nothing(self):
         """The raw call is what is left to read, as it was before."""
         self.assertEqual(gate.changes(self.spec, "Bash",
@@ -93,7 +110,8 @@ class SaysTest(ConsoleCase):
 
     def test_a_spec_write_lists_each_field_that_moves_old_to_new(self):
         """In millimetres where it is one, and only what moves: the revision
-        bump every confirmed write carries is the bookkeeping, not the change."""
+        bump among them, since a gate that hid it showed a bumped write as an
+        unbumped one (issue 126)."""
         space = self.space()
         (space / "spec.yaml").write_text(SPEC)
         said = self.said({"call": {"tool": SPEC_TOOL,
@@ -104,7 +122,8 @@ class SaysTest(ConsoleCase):
                                            "against 600 ±20."}},
                          space=space)
         self.assertEqual(said["act"], "Claude wants to change the spec")
-        self.assertEqual(said["changes"], ["seat depth 600 → 640 mm",
+        self.assertEqual(said["changes"], ["revision 2 → 3",
+                                           "seat depth 600 → 640 mm",
                                            "seat depth tolerance 20 → 3 mm"])
 
     def test_a_spec_write_names_the_span_its_case_measured_on(self):
@@ -124,7 +143,7 @@ class SaysTest(ConsoleCase):
                                            "starts."}},
                          space=space)
         self.assertEqual(said["spans"], ["m2"])
-        self.assertEqual(said["changes"], ["seat depth 600 → 640 mm"])
+        self.assertEqual(said["changes"], ["revision 2 → 3", "seat depth 600 → 640 mm"])
 
 
 class GatePageTest(unittest.TestCase):
@@ -167,6 +186,32 @@ class GatePageTest(unittest.TestCase):
         self.assertIn('[data-gate="${event.id}"]', answered)
         self.assertIn("said.allow", answered)
         self.assertIn("said.deny", answered)
+
+
+@unittest.skipUnless(shutil.which("node"), "no node to run the page's script")
+class ExactCallTest(unittest.TestCase):
+    """The raw call as the page writes it, run under node as the browser gets it."""
+
+    def called(self, tool, call):
+        js = (function(PAGE.read_text(encoding="utf-8"), "called")
+              + f"console.log(JSON.stringify(called({json.dumps({'tool': tool, 'call': call})})));")
+        out = subprocess.run(["node", "-e", js], capture_output=True, text=True, timeout=30)
+        return json.loads(out.stdout or "null") or self.fail(out.stderr)
+
+    def test_an_edit_shows_the_text_it_replaces_and_the_text_it_writes(self):
+        """`Edit <path>` alone hid what the write did, so a bump it carried
+        could not be read off it (issue 126)."""
+        shown = self.called("Edit", {"file_path": "/s/spec.yaml",
+                                     "old_string": "revision: 1\ndepth: 600",
+                                     "new_string": "revision: 2\ndepth: 640"})
+        self.assertIn("/s/spec.yaml", shown)
+        self.assertIn("revision: 1\ndepth: 600", shown)
+        self.assertIn("revision: 2\ndepth: 640", shown)
+        self.assertLess(shown.index("depth: 600"), shown.index("depth: 640"))
+
+    def test_a_shell_call_is_still_its_command(self):
+        self.assertEqual(self.called("Bash", {"command": "contour check"}),
+                         "Bash  contour check")
 
 
 SPEC = """model: chair
