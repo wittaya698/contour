@@ -236,10 +236,13 @@ class Run:
         # somewhere they had been told it would not.
         self.stopped = False
         self.gates = 0
-        self.prompt = prompt
         self.ceiling = ceiling
         self.requester = requester
         self.record = lock.take(self.space, "console run")
+        # A first green said to nobody is said to this run, and spent only
+        # once the run has the space (issue 121).
+        prompt = topics.reminded(self.space, prompt)
+        self.prompt = prompt
         self.latest = {"run": self.record["run"], "prompt": prompt,
                        "requester": requester, "vetoes": []}
         # What waits in the space is the space's, not the run's that set it

@@ -12,7 +12,7 @@ import re
 import shlex
 from pathlib import Path
 
-from . import intent, store
+from . import intent, space as space_lib, store
 
 _BY_HAND = re.compile(r"\bcontour\s+topics\s+(add|strike)\b")
 
@@ -106,6 +106,39 @@ def first_green(dot, was, now):
     stamp.write_text("")
     # Green before there was a stamp to keep: past its first green already.
     return None if (was or {}).get("ok") else FIRST_GREEN
+
+
+OWED = "topics-owed"
+"""Beside the stamp: that the first green was said to nobody, so the next run
+here is told instead (ADR 0030, decision 4 as amended; issue 121)."""
+
+OWED_SAID = "first green: the next run here proposes topics"
+"""What an approved check's outcome says when it is the one that went green."""
+
+
+OWED_ASKED = ("This model reached its first green build in a check no agent was "
+              "there for, so nobody has proposed topics for it yet: propose topics "
+              "to find this model by, as the build-model skill says.")
+"""What the next run is told, before what it was asked to do."""
+
+
+def owe(space):
+    """The first green was said with no agent there to read it: an approved
+    check, which runs after its run has ended."""
+    (space_lib.layout(space).dot / OWED).write_text("")
+
+
+def reminded(space, prompt):
+    """The prompt a run in `space` starts from: told to propose, once, if the
+    space is owed it. Spent here, as the agent is told, or as it is found
+    labelled meanwhile: by the lobby's pass, or by the person's own words."""
+    owed = space_lib.layout(space).dot / OWED
+    if not owed.is_file():
+        return prompt
+    owed.unlink()
+    if load(space)["topics"]:
+        return prompt
+    return f"{OWED_ASKED}\n\n{prompt}"
 
 
 def by_hand(tool, payload):

@@ -57,7 +57,9 @@ moved and the number did not (ADR 0016).
 A topic is a word to find this model by — *creature*, *low-poly*. When
 `contour check` says *first green: propose topics to find this model by*,
 propose some, once: it is the model's first green build, the first moment you
-know what it is. After that, propose only when asked.
+know what it is. A first green from a check you were not there for is said to
+the next run instead, in its first message; propose then. After that, propose
+only when asked.
 
 Under a console, propose with `topics_propose`: the words and why. It lists the
 words other models already carry; reuse one wherever it fits. The user keeps or

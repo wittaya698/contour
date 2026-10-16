@@ -254,4 +254,8 @@ def ran(space, category, command, run):
     if done.returncode != 0:
         said = (done.stdout + done.stderr).strip().splitlines()
         return "failed", "\n".join(said[-5:])
+    if category == "build" and topics.FIRST_GREEN in done.stdout:
+        # Said to nobody: this check ran after its run had ended (issue 121).
+        topics.owe(space)
+        return "applied", topics.OWED_SAID
     return "applied", ""
