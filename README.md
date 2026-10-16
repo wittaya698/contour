@@ -235,8 +235,9 @@ more capability: a transcript on one side, the current sheet on the other, and
 every call that means something — a build, a spec write, a commit, a push —
 stopping to ask you first. A gate says the act in plain words, *Claude wants to
 build the model to check its work* or *Claude wants to change the spec*, and
-under it what would change: *seat depth 600 → 640 mm*, and the span the number
-came from. The raw call is a click away. What you answer is a verdict and a
+under it what would change: *revision 2 → 3*, *seat depth 600 → 640 mm*, and
+the span the number came from. The raw call is a click away; for an edit it
+shows the text replaced and the text written. What you answer is a verdict and a
 sentence, never an edited call: the agent writes the code, you say what you
 think of it. A commit asks *Save this version?*. A denial is kept as a **veto**
 in the space, because it is why two builds differ, and the page lists them under
@@ -305,8 +306,10 @@ to the spaces what you would otherwise do in a terminal:
   variation's spec is agreed as its own. It takes dropped references as create
   does; a space that already exists takes none, since adding a reference is a
   change its console gates.
-- **enter** opens a space's console in a tab of its own. Closing the lobby
-  ends none of them.
+- **Open** starts a space's console in a tab of its own. Closing the lobby
+  ends none of them. On a space already open in a console on this machine,
+  Open brings that console's page back, for the tab you switched away from
+  (ADR 0031).
 - **rename** shows everything it will change before it changes anything, and
   never commits; the space lists as renamed until you do.
 - **update** sits beside a row's *needs an update*. It shows what
@@ -324,8 +327,42 @@ cannot be renamed, updated or deleted from under it. Only enter and create's
 handover need the console's environment; without one, the lobby shows the line
 that makes it.
 
+A row shows the space's topics, and a *Topic* picker above the list narrows it
+to the spaces labelled with one (below). Refreshing the lobby's page, or a
+console's, carries on in the same session; closing the tab ends it.
+
 The lobby looks where `contour spaces` does: the directory holding the toolkit,
 or the folders in `$CONTOUR_SPACES`, separated by `:`.
+
+## Topics: finding a model by a word
+
+A topic is a free word to find a model by — *creature*, *low-poly* (ADR 0030).
+It steers no build and argues for no spec change: it lives in `topics.json` in
+the space, not in `spec.yaml`, and reaches git with the next save.
+
+The agent proposes and you keep or strike word by word. It proposes once on its
+own, at the model's first green build, and after that only when asked. A
+proposal reuses the words other models already carry wherever one fits, and
+marks a word no model has yet as *new*, so the vocabulary grows only where you
+see it grow. A struck word is remembered and never offered for that model
+again. A proposal waits like any approval, and blocks nothing while it does.
+
+```sh
+contour topics                     # this model's topics
+contour topics add <word>          # yours, with no gate
+contour topics strike <word>       # off, and never offered for this model again
+contour spaces --topic creature    # the spaces labelled with it, and their topics
+```
+
+Spaces made before topics are labelled together from the lobby: **Suggest
+topics** has Claude read each unlabelled model's last sheet and propose for all
+of them at once, from one vocabulary, each proposal waiting on the lobby's page.
+If it proposes nothing, the page says why. Across spaces, a topic search answers
+with names and topics only — never a spec, a reference or a sheet.
+
+Topics leave Contour only inside a release: the `.glb` in `release/v<N>/`
+carries them as glTF `extras`, as they stood when it was released. A working
+`contour export` carries none.
 
 ## Asking from Claude Desktop
 
@@ -340,7 +377,8 @@ from Install, not the checkout, so moving the toolkit is still only a relink. If
 there is no link on `PATH`, the command says so and exits 1.
 
 Today the connector answers ten tools. `spaces` is the same reading as
-`contour spaces --json`. `status` takes a space and gives its last check's
+`contour spaces --json`; given a topic, it answers only the spaces labelled with
+it, by name and topics. `status` takes a space and gives its last check's
 verdict, in the console's plain sentences beside the report lines, and its open
 marks, uncommitted vetoes and toolkit drift. `log` gives the tail
 of a space's last Blender log and says which stage wrote it. `picture` shows a
@@ -361,7 +399,8 @@ create form instead, the name filled in if you gave one, for the file to be
 dropped there. `request` and `stop` are `contour request` and `contour stop`,
 with the same arguments and the same refusals: a chat can ask for a run nobody
 watches and end one, and that is all it can start in a space. It never answers
-a gate or a question. A run it asked for does not stop at a gate: the act is
+a gate or a question. `stop` on a space whose console has no run going closes
+that console, and gives the space back. A run it asked for does not stop at a gate: the act is
 set aside for you, and the run carries on. Its console shows what waits, oldest
 first, with the diff and Claude's case, whenever you open it: allow makes the
 call then, and deny is a veto. A question is set aside the same way, in its
@@ -386,8 +425,11 @@ the choice to allow that, and Desktop asks before each call.
 | `contour selftest` | the fixture through every stage, plus 37 mutants |
 | `contour init <name> [--to <dir>]` | create a model space here, or in `<dir>` |
 | `contour doctor` | is this space still in step with the toolkit |
+| `contour migrate-marks` | rewrite this space's marks into one spelling, when `doctor` says some are old |
 | `contour update` | propose bringing this space's rules in step, where nobody edited them; `--yes` does it |
-| `contour spaces [name]` | list model spaces, or print one's path |
+| `contour spaces [name]` | list model spaces, or print one's path; `--topic <word>` finds them by topic |
+| `contour topics` | this model's topics; `add <word>` and `strike <word>` are yours, ungated |
+| `contour release-glb v<N>` | the export into `release/v<N>/`, carrying this model's topics |
 | `contour lobby [--create [name]]` | every space on this machine, on one page; or opened on its create form |
 | `contour mcp` | the connector, for Claude Desktop; `--config` prints its block |
 | `contour rename <name>` | propose renaming this space; `--yes` does it |
@@ -404,6 +446,9 @@ the choice to allow that, and Desktop asks before each call.
 | `contour run <cmd>...` | hold this space for one run, then release it |
 | `contour asks` | what this space lets through, and what asks; `--always build` and `--undo <c>` are the page's |
 | `contour intents` | the call categories a gate can ask about |
+| `contour request <name> <prose>` | start an unattended run in a space; its gates wait as approvals |
+| `contour stop <name>` | end the run in that space, a waiting gate set aside; with no run, close its console |
+| `contour ceiling [<n>]` | what an unattended run may spend; for you, not the agent |
 | `contour-console` | drive a run from the browser, behind a gate |
 | `contour-console --begin <flow>` | the same, its run begun on `new-space` or `variation --of <space>` |
 
@@ -438,6 +483,7 @@ A model space, anywhere on disk, its own git repository:
     worksheet.png the spans drawn onto the references          (ADR 0022)
     marks.json    located comments and spans, from both sides   (ADR 0018)
     vetoes.json   calls you refused at a gate, and why            (ADR 0019)
+    topics.json   the words this model is found by, and those struck (ADR 0030)
     NOTES.md      what is deferred, and what is undecided
     CLAUDE.md     the agent's rules          (copied from the toolkit; `contour doctor` says which are behind or edited, `contour update` brings the behind ones in step)
     .claude/      the spec guard's settings, and the build and release skills
@@ -469,7 +515,9 @@ ADR 0015 for why it changed.
 Source, specs, reference images, and the render sheet (1024², ~170 KB) per
 accepted commit — so `git log` doubles as a visual timeline. The `.blend` is
 derivable and stays ignored, except in a release package where it is committed
-once alongside the `.glb` and the approved sheet (ADR 0013).
+once alongside the `.glb` and the approved sheet (ADR 0013). A release is a tag
+named exactly `v<N>`, beside `release/v<N>/`; any other tag in a space is not
+one.
 
 **Model content is never pushed.** Only `master`, the toolkit, reaches a
 remote; the `pre-push` hook refuses everything else and refuses any push
