@@ -343,12 +343,27 @@ class ServesTest(ConsoleCase):
 
     def test_a_tab_that_says_it_is_going_ends_it_promptly(self):
         """Closing the tab still ends the console within seconds: the page says
-        so as it goes, and no grace is waited out."""
-        proc, url = self.launch(CONTOUR_CONSOLE_GRACE="60")
+        so as it goes, and no beat takes it back, so only the reload grace is
+        waited out and not the silence's (issue 127)."""
+        proc, url = self.launch(CONTOUR_CONSOLE_GRACE="60",
+                                CONTOUR_CONSOLE_RELOAD_GRACE="0.5")
         self.ask(url, "/beat", {"hidden": True})
         self.ask(url, "/going", {})
         self.assertEqual(proc.wait(timeout=5), 0)
         self.assertIn("the page closed", proc.stdout.read())
+
+    def test_a_reload_is_not_a_closed_tab(self):
+        """A reload says going and then beats again: the console waits a moment
+        for that beat, as the lobby does, and the reloaded page carries on in
+        the same session (issue 127)."""
+        proc, url = self.launch(CONTOUR_CONSOLE_RELOAD_GRACE="1.5")
+        self.beat(url)
+        self.ask(url, "/going", {})
+        time.sleep(0.6)                       # the page loading again
+        self.beat(url)
+        with self.assertRaises(subprocess.TimeoutExpired):
+            proc.wait(timeout=1.5)
+        self.assertEqual(self.beat(url), 200)
 
     def test_a_space_that_has_never_built_opens_on_an_empty_panel(self):
         """The console starts where a space starts: nothing built, nothing drawn.
@@ -756,7 +771,8 @@ class RunTest(ConsoleCase):
         decide the gate by silence (issue 39). Closing the tab still ends it."""
         proc, url = self.driven({"call": {"tool": "Bash", "command": "./contour check"}},
                                 CONTOUR_CONSOLE_GRACE="0.3",
-                                CONTOUR_CONSOLE_HIDDEN_GRACE="1")
+                                CONTOUR_CONSOLE_HIDDEN_GRACE="1",
+                                CONTOUR_CONSOLE_RELOAD_GRACE="0.5")
         self.ask(url, "/beat", {"hidden": True})
         self.ask(url, "/run", {"prompt": "check the build"})
         self.gate(url)
@@ -767,6 +783,26 @@ class RunTest(ConsoleCase):
                          "the call happened without anybody answering for it")
         self.ask(url, "/going", {})
         self.assertEqual(proc.wait(timeout=10), 0)
+
+    def test_a_reload_at_a_gate_finds_the_same_gate_waiting(self):
+        """A reload is not an answer: the run goes on, and the reloaded page
+        reads back the gate it left, unanswered (issue 127; ADR 0019,
+        decision 17)."""
+        proc, url = self.driven({"call": {"tool": "Bash", "command": "./contour check"}},
+                                CONTOUR_CONSOLE_RELOAD_GRACE="1.5")
+        self.beat(url)
+        self.ask(url, "/run", {"prompt": "check the build"})
+        waiting, _ = self.gate(url)
+        self.ask(url, "/going", {})
+        time.sleep(0.6)                       # the page loading again
+        self.beat(url)
+        with self.assertRaises(subprocess.TimeoutExpired):
+            proc.wait(timeout=1.5)
+        _, said = self.ask(url, "/events?since=0")
+        kinds = [e["kind"] for e in said["events"]]
+        self.assertIn(waiting, said["events"])
+        self.assertNotIn("verdict", kinds)
+        self.assertNotIn("result", kinds, "the call happened without anybody answering for it")
 
     def test_begun_on_the_new_space_flow_the_run_opens_with_its_prompt(self):
         """A console the lobby opens on a space it just made starts the run

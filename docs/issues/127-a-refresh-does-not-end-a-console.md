@@ -16,9 +16,9 @@ was (ADR 0019, decision 17).
 
 ## Acceptance criteria
 
-- [ ] A console page that says it is going and beats again within the grace leaves the console and its run going
-- [ ] A page that says it is going and does not beat again ends the console, as closing its tab does today
-- [ ] A page reloaded while a gate waits shows the same gate, still waiting
+- [x] A console page that says it is going and beats again within the grace leaves the console and its run going
+- [x] A page that says it is going and does not beat again ends the console, as closing its tab does today
+- [x] A page reloaded while a gate waits shows the same gate, still waiting
 
 ## Blocked by
 

@@ -37,6 +37,7 @@ GRACE_S = 10          # beats are seconds apart; this is several missed ones
 IDLE_S = 60 * 60      # the tab left open on Friday, ended before Monday
 HIDDEN_GRACE_S = IDLE_S   # a background tab's timers may stop; no longer than
                           # an idle console already lives (issue 39)
+RELOAD_S = canvas_lib.RELOAD_S   # a reload says going, then beats again (issue 127)
 
 TOOLKIT = Path(__file__).resolve().parent.parent
 
@@ -134,7 +135,8 @@ class Console:
     server records the beat, and this decides what a silence means.
     """
 
-    def __init__(self, space, grace=GRACE_S, idle=IDLE_S, hidden_grace=HIDDEN_GRACE_S):
+    def __init__(self, space, grace=GRACE_S, idle=IDLE_S, hidden_grace=HIDDEN_GRACE_S,
+                 reload_grace=RELOAD_S):
         self.space = Path(space)
         self.grace = grace
         self.hidden_grace = hidden_grace
@@ -161,6 +163,7 @@ class Console:
             # (ADR 0019, decision 13).
             views=here.views, blend=here.blend,
             verdict=here.dot / panel_state.NAME, name=self.space.resolve().name,
+            reload_grace=reload_grace,
             routes={("POST", "/run"): self.started,
                     ("GET", "/events"): self.transcript,
                     ("POST", "/verdict"): self.verdict,
@@ -404,7 +407,8 @@ def main(argv, space):
         return 2
     console = Console(space, grace=seconds("CONTOUR_CONSOLE_GRACE", GRACE_S),
                       idle=seconds("CONTOUR_CONSOLE_IDLE", IDLE_S),
-                      hidden_grace=seconds("CONTOUR_CONSOLE_HIDDEN_GRACE", HIDDEN_GRACE_S))
+                      hidden_grace=seconds("CONTOUR_CONSOLE_HIDDEN_GRACE", HIDDEN_GRACE_S),
+                      reload_grace=seconds("CONTOUR_CONSOLE_RELOAD_GRACE", RELOAD_S))
     # All three, and not only the SIGINT the interpreter raises for: a console
     # is stopped by a closed terminal and by anything tidying up as often as by
     # a person, and the port, the hold and the presence below are given back
