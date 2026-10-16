@@ -250,12 +250,13 @@ function row(s, can, environment) {
   // decision 4).
   if (s.updated) name.append(para('updated, not saved yet', 'warn'));
   name.append(...health(s, can.has('update') && (() => { under.hidden = false; updating(s, room); })));
-  // A console already serving the space, from its presence. Entering again
-  // would start a second one, and the lobby never sees the first one's URL.
-  // A console running a requester's run has no person's tab, so Open stays:
-  // the console shows its own page when asked (ADR 0027, decision 7).
+  // A console already serving the space, from its presence. The lobby never
+  // sees its URL, and its person may have lost the tab, so Open stays: the
+  // console shows its own page when asked (ADR 0027, decision 7; ADR 0031,
+  // decision 1). The command that closes it is named for when even that fails.
   const open = s.presence.some(p => p.kind === 'console') && !s.unattended;
-  if (open) name.append(para('open in a console — its tab is the way in', 'ok'));
+  if (open) name.append(para('open in a console — Open brings its page back, and contour stop '
+                             + s.name + ' closes it', 'ok'));
   if (s.waiting) name.append(para('waiting for you: ' + s.waiting, 'warn'));
   // What a run set aside, until it is answered on the console's page: Open
   // is the way in (ADR 0028, decision 5).
@@ -265,7 +266,7 @@ function row(s, can, environment) {
   const actions = cell('', 'actions');
   // Open is the row's one button. The rest sit behind one control, and each
   // lays itself out in the room under the row (ADR 0025, decision 10).
-  if (can.has('enter') && !open) {
+  if (can.has('enter')) {
     actions.append(entering(s, said));
   } else if (!can.has('enter') && environment.console) {
     // Opening needs the console's environment; where there is none, the line

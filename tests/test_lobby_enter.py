@@ -81,12 +81,12 @@ class EnterTest(LobbyEnterCase):
         from lib import presence
         self.assertEqual(presence.live(self.space), [console])
 
-    def test_a_space_open_in_a_console_is_refused_a_second_one(self):
+    def test_a_space_open_in_a_console_shows_its_page_and_starts_no_second(self):
+        """Its person may have lost the tab: entering again asks the console to
+        open its own page (ADR 0031, decision 1)."""
         self.enter()
         [console] = self.wait_for_console()
-        said = self.enter()
-        self.assertIn("already open in a console", said["refused"])
-        self.assertIn(str(console["pid"]), said["refused"])
+        self.assertIsNone(self.enter()["refused"])
         time.sleep(1)                         # long enough for one started anyway to show
         self.assertEqual(self.consoles(), [console])
 

@@ -427,11 +427,15 @@ class LobbyPageTest(unittest.TestCase):
         self.assertIn("environment.console", row)
         self.assertNotIn(".venv", self.page)
 
-    def test_a_space_open_in_a_console_says_so_and_offers_no_second_one(self):
+    def test_a_space_open_in_a_console_says_so_and_how_to_reach_or_close_it(self):
+        """Never *its tab is the way in*: its person may have lost the tab.
+        Open asks the console to show its page again, and the command that
+        closes it is named (ADR 0031, decisions 1 and 2)."""
         row = self.function("row")
         self.assertIn("p.kind === 'console'", row)
-        self.assertIn("open in a console", row)
-        self.assertIn("!open", row)
+        self.assertIn("open in a console — Open brings its page back, and contour stop ", row)
+        self.assertNotIn("its tab is the way in", row)
+        self.assertIn("if (can.has('enter')) {", row)
 
     def test_an_enter_refusal_is_shown_as_the_host_worded_it(self):
         self.assertIn("'Not opened: ' + done.refused", self.function("entering"))

@@ -216,9 +216,13 @@ class Console:
 
     def stopping(self):
         """`contour stop`, from outside: the page's own ending, said as whose
-        it was. A console with no run going has nothing to end."""
+        it was. A console with no run going is ended itself, as if its tab had
+        closed: its person may have lost the way in (ADR 0031, decision 2)."""
         if self.run.live:
-            self.run.end("stopped with contour stop")
+            self.run.end("stopped with contour stop", aside=True)
+        else:
+            self.ended = "stopped with contour stop"
+            self.canvas.finish()
 
     def verdict(self, body):
         """`POST /verdict`: allow, or deny with a reason. Nothing else is read

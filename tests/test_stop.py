@@ -19,6 +19,7 @@ from test_console import ROOT, ConsoleCase    # noqa: E402
 
 sys.path.insert(0, str(ROOT))
 
+from console import approvals    # noqa: E402
 from console.run import SPEC_TOOL    # noqa: E402
 from lib import last_run, lock    # noqa: E402
 
@@ -133,6 +134,39 @@ class RefusedTest(StopCase):
         self.assertNotEqual(r.returncode, 0)
         self.assertIn("cannot stop itself", r.stdout)
         self.assertEqual(last_run.read(self.beaky)["state"], "waiting for you")
+
+
+class UnreachableTest(StopCase):
+    """A console whose tab its person has lost, with no run going, holds the
+    space and no lock: `stop` ends it (ADR 0031, decision 2)."""
+
+    def test_stop_ends_a_console_with_no_run_going(self):
+        proc, url = self.launch(self.beaky)
+        self.ask(url, "/beat", {"hidden": True})      # a tab left in the background
+        r = self.contour("stop", "beaky")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("ok   closed the console on beaky; nothing was running", r.stdout)
+        self.assertEqual(proc.wait(timeout=WAIT_S), 0)
+
+    def test_a_gate_waiting_when_stop_lands_is_set_aside_not_dropped(self):
+        """Nobody who saw it answered it, so it waits for the person on the
+        console's page, as an unattended run's would (ADR 0031, decision 3)."""
+        self.parked()
+        r = self.contour("stop", "beaky")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        said = self.until("stopped")
+        kept = approvals.load(self.beaky)
+        self.assertEqual([(a["category"], a["tool"], a["case"]) for a in kept],
+                         [("spec-write", "Edit", CASE)])
+        self.assertEqual(said["approvals"], ["Claude wants to change the spec"])
+        self.assertEqual((self.beaky / "spec.yaml").read_text(), "revision: 1\ndepth: 600\n")
+
+    def test_a_run_ended_from_its_own_page_keeps_nothing(self):
+        """The person was looking at the gate when they ended the run."""
+        _, url = self.parked()
+        self.ask(url, "/end", {})
+        self.until("stopped")
+        self.assertEqual(approvals.load(self.beaky), [])
 
 
 if __name__ == "__main__":

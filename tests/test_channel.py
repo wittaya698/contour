@@ -96,19 +96,20 @@ class ShowTest(ChannelCase):
         self.assertEqual(first, second)
         self.assertEqual(len(presence.live(self.space)), 1)
 
-    def test_a_console_somebody_is_watching_is_still_its_tabs(self):
-        """An attended run's console: a person's workspace, whose tab is the
-        way in, and not a page to throw up on their screen (ADR 0027,
-        decision 6)."""
-        # And so is one whose unattended run is over: the page's rule has it,
-        # like any (ADR 0027, decision 4). This process stands for its console.
-        self.requested({"say": "done"})
-        self.until("finished")
-        with presence.present(self.space, "console"):
-            _, said = self.open()
-        self.assertIn("its tab is the way in", said["refused"])
-        time.sleep(1)                         # long enough for a page to show
-        self.assertFalse(self.opened.exists(), "a page was opened anyway")
+    def test_any_console_on_this_machine_shows_its_page_again(self):
+        """Not only an unattended one: a person whose tab is lost is given the
+        way back in before anything is ended, and it is still the console that
+        opens its own page (ADR 0031, decision 1)."""
+        self.assertIsNone(self.open()[1]["refused"])     # a console, with its tab
+        [url] = self.urls()
+        text, said = self.open()
+        self.assertIsNone(said["refused"], said)
+        deadline = time.monotonic() + WAIT_S
+        while len(self.urls()) < 2 and time.monotonic() < deadline:
+            time.sleep(0.1)
+        self.assertEqual(self.urls(), [url, url])
+        self.assertSecretless(text, url)
+        self.assertEqual(len(presence.live(self.space)), 1)
 
 
 class RowTest(ChannelCase):

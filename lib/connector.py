@@ -115,7 +115,8 @@ TOOLS = (
                                            "description": "who is asking, for the record"}}}},
     {"name": "stop",
      "description": "End the run in a space, as `contour stop` does: answers no gate, "
-                    "and leaves its edits as they were.",
+                    "sets aside one it waits at, and leaves its edits as they were. "
+                    "With no run, closes the space's console.",
      "inputSchema": {"type": "object", "required": ["space"],
                      "properties": {"space": {"type": "string"}}}},
 )

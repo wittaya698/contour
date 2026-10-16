@@ -137,7 +137,11 @@ approve on an agent's summary. The case for a change is made on the page.
 run.** This is ADR 0019 decision 17 kept: silence is not a verdict. *Stop* is
 available from the page, from `contour stop <space>`, and to the requester for its
 own request. It answers no gate: the call never happens, the run ends, and the
-edits made so far stay uncommitted in the space for the person to look at. The
+edits made so far stay uncommitted in the space for the person to look at.
+*Amended by [ADR 0031](0031-a-console-nobody-can-reach-lets-go.md):* a gate
+waiting when the run is stopped from outside its page is set aside as an
+approval, not dropped; and `stop` on a console with no run going ends the
+console. The
 hold's refusal to anyone else names the reason and the way in: *beaky is waiting
 for you: Claude wants to change the spec.*
 

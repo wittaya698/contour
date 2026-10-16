@@ -16,12 +16,18 @@ Decide, with the user, how a person ends a console they cannot reach — from th
 lobby, from `contour stop`, or both — and what that does to a gate it is waiting
 at (ADR 0019 rules out answering one by silence). Then build it.
 
+**Decided:** [ADR 0031](../adr/0031-a-console-nobody-can-reach-lets-go.md). Open in the
+lobby brings any console's page back, `contour stop` closes a console with no
+run, and a gate waiting when a run is stopped from outside is set aside. The
+fourth criterion already held, and was tested: the console seen outliving its
+request had been opened, then hidden.
+
 ## Acceptance criteria
 
-- [ ] The way to end an unreachable console is decided and recorded
-- [ ] A person can end a console from where they are told it holds the space
-- [ ] A gate pending in it is not answered by ending it
-- [ ] A finished unattended run's console, never opened, does not outlive its run
+- [x] The way to end an unreachable console is decided and recorded
+- [x] A person can end a console from where they are told it holds the space
+- [x] A gate pending in it is not answered by ending it
+- [x] A finished unattended run's console, never opened, does not outlive its run
 
 ## Blocked by
 

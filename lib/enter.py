@@ -6,11 +6,12 @@ for that environment is `contour-console`'s own rule, kept here so the lobby and
 the console cannot disagree about whether there is one.
 """
 import os
+import socket
 import subprocess
 import sys
 from pathlib import Path
 
-from lib import last_run, signals
+from lib import signals
 
 ROOT = Path(__file__).resolve().parent.parent
 CONSOLE = ROOT / "contour-console"
@@ -43,28 +44,38 @@ def into(space, presence):
     URL, which carries its secret, so neither can send anybody there — except
     that a console running a requester's run, which has no person's tab, is
     asked to open its own page (ADR 0027, decision 7)."""
-    consoles = [p for p in presence if p["kind"] == "console"]
-    if consoles and last_run.unattended(space):
+    here = socket.gethostname()
+    consoles = [p for p in presence if p["kind"] == "console" and p.get("host") == here]
+    if consoles:
         # Not refused, and not a second console: the one there opens its own
         # page, and nothing passes through the caller (ADR 0027, decision 7).
+        # Any console, and not only an unattended one: a person whose tab is
+        # lost is given the way back in (ADR 0031, decision 1).
         for p in consoles:
             os.kill(p["pid"], signals.SHOWING)
         return None
-    refused = unopenable(presence)
+    refused = unopenable(presence, Path(space).name)
     if refused:
         return refused
     console(space)
     return None
 
 
-def unopenable(presence):
+def unopenable(presence, name):
     """Why no console can be started on a space with this presence, or None:
     one is open already, or there is no environment to run one in. Said once,
-    for the lobby, the connector and a request (ADR 0027, decision 6)."""
+    for the lobby, the connector and a request (ADR 0027, decision 6), with
+    the ways back to one whose tab may be lost (ADR 0031, decisions 1 and 2).
+    One on another machine is named there: this one cannot reach it."""
     consoles = [p for p in presence if p["kind"] == "console"]
+    pids = ", ".join(str(p["pid"]) for p in consoles)
+    away = sorted({p.get("host") for p in consoles} - {socket.gethostname()})
+    if away:
+        return (f"already open in a console on {', '.join(away)} (pid {pids}); "
+                f"its page is there")
     if consoles:
-        return ("already open in a console (pid "
-                + ", ".join(str(p["pid"]) for p in consoles) + "); its tab is the way in")
+        return (f"already open in a console (pid {pids}); Open in the lobby brings "
+                f"its page back, and contour stop {name} closes it")
     missing = environment()
     if missing:
         return f"no console environment; make one, from {ROOT}: {missing}"

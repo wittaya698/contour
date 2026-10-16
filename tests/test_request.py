@@ -233,10 +233,13 @@ class RefusedTest(RequestCase):
 
     def test_a_space_with_a_console_open_is_the_persons_and_refused(self):
         """In the lobby's words (ADR 0027, decision 6): the person types the
-        request into that page themselves."""
+        request into that page themselves, and is told the ways back to it,
+        since they may have lost its tab (ADR 0031, decisions 1 and 2)."""
         self.launch(self.beaky)
-        self.assertIn("already open in a console", self.refused())
-        self.assertIn("its tab is the way in", self.refused())
+        [console] = presence.live(self.beaky)
+        self.assertEqual(self.refused(), (
+            f"already open in a console (pid {console['pid']}); Open in the lobby brings "
+            f"its page back, and contour stop beaky closes it"))
         self.assertIsNone(last_run.read(self.beaky))
 
     def test_with_no_ceiling_set_a_request_is_refused(self):

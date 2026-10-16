@@ -36,3 +36,4 @@ works — the alternative you are about to suggest is probably here with a reaso
 | [0028](0028-approvals-wait-and-the-run-goes-on.md) | Approvals wait, and the run goes on — *Proposed*; amends [0027](0027-the-unattended-run.md) |
 | [0029](0029-a-spec-write-carries-its-case.md) | Under a console, a spec write carries its case — *Accepted*; amends [0028](0028-approvals-wait-and-the-run-goes-on.md) |
 | [0030](0030-topics-label-a-model-for-finding.md) | Topics label a model for finding, and leave only in a release — *Proposed*; adds to [0028](0028-approvals-wait-and-the-run-goes-on.md), [0013](0013-releases-are-versioned-folders.md) |
+| [0031](0031-a-console-nobody-can-reach-lets-go.md) | A console nobody can reach lets go — *Proposed*; amends [0027](0027-the-unattended-run.md), [0021](0021-the-lobby.md) |

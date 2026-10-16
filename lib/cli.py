@@ -421,7 +421,7 @@ def stopped(name):
         return {"ok": False, "lines": [f"FAIL {e}"]}
     rec = lock.holder(root)
     if not rec or not lock.alive(rec):
-        return {"ok": False, "lines": [f"FAIL no run to stop in {name}"]}
+        return closed(root, name)
     if rec.get("command") != "console run" or rec.get("host") != socket.gethostname():
         return {"ok": False, "lines": [
             f"FAIL {name} is held by {survey.held_by(rec)}, which is not a console's "
@@ -441,6 +441,28 @@ def stopped(name):
     return {"ok": False, "lines": [
         f"FAIL asked the run in {name} to stop; it still holds the space "
         f"after {STOP_WAIT_S:g}s ({survey.held_by(rec)})"]}
+
+
+def closed(root, name):
+    """`stop` where no run is going: the console on this machine still open on
+    the space, ended as if its tab had closed (ADR 0031, decision 2). Edits
+    and approvals stay where they are."""
+    here = socket.gethostname()
+    consoles = [p for p in presence.live(root)
+                if p["kind"] == "console" and p.get("host") == here]
+    if not consoles:
+        return {"ok": False, "lines": [f"FAIL no run to stop in {name}"]}
+    for p in consoles:
+        os.kill(p["pid"], signals.ENDING_RUN)
+    deadline = time.monotonic() + STOP_WAIT_S
+    while time.monotonic() < deadline:
+        if not any(p["kind"] == "console" for p in presence.live(root)):
+            return {"ok": True, "lines": [f"ok   closed the console on {name}; "
+                                         f"nothing was running"]}
+        time.sleep(0.05)
+    return {"ok": False, "lines": [
+        f"FAIL asked the console on {name} to close; it is still open after "
+        f"{STOP_WAIT_S:g}s"]}
 
 
 def on_status(cmd, rest, held):
@@ -661,7 +683,7 @@ def requested(name, prose, requester):
     rec = lock.holder(root)
     if rec and lock.alive(rec):
         return answer(survey.refusal(root, rec))
-    refused = enter.unopenable(presence.live(root))
+    refused = enter.unopenable(presence.live(root), name)
     if refused:
         return answer(refused)
     # A topic proposal waits and blocks nothing: it changes no file a run

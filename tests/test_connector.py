@@ -690,14 +690,18 @@ class OpenTest(PagesCase):
         self.assertSecretless(text, url)
 
     def test_open_console_refuses_as_the_lobby_does(self):
-        """The same two refusals, word for word as `test_lobby_enter` reads
-        them: a console already here (this process stands for it), and no
-        environment to start one in."""
+        """The same two refusals, word for word as the lobby says them: a
+        console on another machine, which this one cannot ask to show its page
+        (ADR 0031, decision 1), and no environment to start one in."""
         from lib import presence
-        with presence.present(self.space, "console"):
-            _, said = self.open("console", space="alpha")
-        self.assertIn("already open in a console", said["refused"])
-        self.assertIn(str(os.getpid()), said["refused"])
+        where = presence.where(self.space)
+        where.mkdir(parents=True, exist_ok=True)
+        (where / "elsewhere.json").write_text(json.dumps(
+            {"kind": "console", "pid": 4127, "host": "another-mac"}))
+        _, said = self.open("console", space="alpha")
+        self.assertEqual(said["refused"], "already open in a console on another-mac "
+                                          "(pid 4127); its page is there")
+        (where / "elsewhere.json").unlink()
         self.env["CONTOUR_CONSOLE_PYTHON"] = str(self.tmp / "no-python")
         _, said = self.open("console", space="alpha")
         self.assertIn("no console environment; make one", said["refused"])
