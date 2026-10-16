@@ -2,14 +2,13 @@
 
 **Status:** Accepted · 2026-09-20
 
-> **Amended 2026-10-16 — a bottom view, and persp as a strip.** The sheet is
-> now front / right / top / bottom across the top row, with persp as one strip
-> as wide as all four beneath them, at 1448 x 724 for a `sheet_resolution` of
-> 1024: the pixels of a 1024² square, so the look costs what it did. Each
-> orthographic tile is 362 px rather than 512. The persp lens is fitted to the
-> strip's height, so the model is framed as it was in a square tile. The
-> reasons below stand; the bottom view adds the underside, which none of the
-> four views showed.
+> **Amended 2026-10-16 — a bottom view, and persp off the sheet.** The sheet
+> is now front / right / top / bottom, still 1024² with 512 px tiles, so the
+> look costs what it did. Persp is drawn beside it as `out/persp.png`, the
+> picture a lobby row shows, and is not marked on. This gives up what persp on
+> the sheet was for — how the parts read together — for the underside, which
+> none of the four views showed. The reasons below for orthographic views
+> stand, and are now the whole of what the sheet shows.
 
 ## Context
 

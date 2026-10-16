@@ -177,7 +177,9 @@ class Lobby(Page):
 
     def picture(self, asked):
         """A row's picture: the space's last sheet, or its first reference
-        before there is one (ADR 0025, decision 10). Read, never drawn or
+        before there is one (ADR 0025, decision 10). Of a sheet, its
+        perspective where the render drew one beside it, since the sheet no
+        longer holds one (ADR 0005, amended 2026-10-16). Read, never drawn or
         resized, and only for a space the listing holds. Anything else, or a
         space with neither, is None: not found."""
         listed = {s["path"]: s["picture"] for s in self.listing()["spaces"]}
@@ -185,7 +187,8 @@ class Lobby(Page):
             return None
         here = space.layout(asked["path"])
         if listed[asked["path"]] == "sheet" and here.sheet.is_file():
-            return Blob((here.sheet.read_bytes(), "image/png"))
+            shown = here.persp if here.persp.is_file() else here.sheet
+            return Blob((shown.read_bytes(), "image/png"))
         named = refs.listing(here.refs)
         return Blob(refs.blob(here.refs, named[0])) if named else None
 

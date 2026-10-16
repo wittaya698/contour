@@ -46,7 +46,7 @@ def append(path, mark, author="user"):
 
 
 def on_sheet(path, view, pixel, text, part=None):
-    """A click on one of our five views. Returns the stored mark.
+    """A click on one of our four views. Returns the stored mark.
 
     The view is part of where it is: *too thin* about the front and *too thin*
     about the side are two findings, and a badge has to be drawn on the tile the

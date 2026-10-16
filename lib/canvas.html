@@ -850,6 +850,10 @@ const wrap = document.getElementById('wrap'), list = document.getElementById('li
 const entry = document.getElementById('entry'), text = document.getElementById('text');
 const where = document.getElementById('where'), hint = document.getElementById('hint');
 const strip = document.getElementById('strip');
+// Shown once a build has drawn a perspective, which a sheet older than the
+// bottom view has none of.
+const perspButton = document.createElement('button');
+perspButton.hidden = true;
 const taughtSheet = document.getElementById('taught-sheet');
 const taughtRef = document.getElementById('taught-ref');
 taughtSheet.append(teach('sheet'), teach('mark'));
@@ -864,8 +868,11 @@ const chosen = new Set();
 // two ends that mean one distance, which is the only way a picture can be
 // asked about a separation (ADR 0018).
 let down = null;
-// null means the sheet; otherwise the name of the reference on show. Only one
-// picture is ever displayed, so only its own marks are ever pinned to it.
+// null means the sheet, PERSP the perspective beside it; otherwise the name of
+// the reference on show. Only one picture is ever displayed, so only its own
+// marks are ever pinned to it — and the perspective has none: nothing kept
+// could pin a click on it (ADR 0005, amended 2026-10-16).
+const PERSP = {};
 let showing = null;
 // The agent span the user is redrawing, or null. The next drag on its
 // reference becomes its ends, and nothing else does.
@@ -905,8 +912,10 @@ async function labelled() {
   if (said.build !== drawn) {
     const first = drawn === null;
     drawn = said.build;
-    if (!first && !showing) show(null);
+    if (!first && (!showing || showing === PERSP)) show(showing);
   }
+  perspButton.hidden = !said.persp;
+  if (!said.persp && showing === PERSP) show(null);
 }
 
 // Models, in the header: back to the lobby (ADR 0025, decision 12). Asked of
@@ -945,17 +954,21 @@ function show(name) {
   showing = name;
   pending = null;
   entry.hidden = true;
-  for (const b of strip.children) b.classList.toggle('on', (b.dataset.ref || null) === name);
-  text.placeholder = name ? 'here is what I meant' : 'what is wrong here';
-  taughtSheet.hidden = !!name;
-  taughtRef.hidden = !name;
-  hint.textContent = name ? 'Click the reference, or drag across a distance.'
-                          : 'Click the sheet, then type one line.';
+  for (const b of strip.children)
+    b.classList.toggle('on', (b === perspButton ? PERSP : b.dataset.ref || null) === name);
+  const ref = typeof name === 'string';
+  text.placeholder = ref ? 'here is what I meant' : 'what is wrong here';
+  taughtSheet.hidden = name !== null;
+  taughtRef.hidden = !ref;
+  hint.textContent = name === PERSP ? 'The model in perspective, to look at. Marks go on the sheet.'
+                   : ref ? 'Click the reference, or drag across a distance.'
+                   : 'Click the sheet, then type one line.';
   // Keyed on the build and not on the clock: a new build is an address this
   // browser has never seen, and an unchanged one is the address it already
   // holds — so a panel that is current costs no request at all.
-  img.src = asset(name ? '/ref?name=' + encodeURIComponent(name)
-                       : '/sheet.png?b=' + (drawn || ''));
+  img.src = asset(name === PERSP ? '/persp.png?b=' + (drawn || '')
+                  : ref ? '/ref?name=' + encodeURIComponent(name)
+                  : '/sheet.png?b=' + (drawn || ''));
 }
 
 // Every build renders for the page (ADR 0019, decision 24), so the label and the
@@ -969,10 +982,10 @@ setInterval(labelled, 2000);
 // a cached picture from a previous session would answer the address that says
 // nothing about which build this is.
 labelled().then(() => ask('/refs.json').then(r => r.json()).then(names => {
-  for (const name of [null, ...names]) {
-    const b = document.createElement('button');
-    b.textContent = name || 'sheet';
-    if (name) b.dataset.ref = name;
+  for (const name of [null, PERSP, ...names]) {
+    const b = name === PERSP ? perspButton : document.createElement('button');
+    b.textContent = name === PERSP ? 'persp' : name || 'sheet';
+    if (typeof name === 'string') b.dataset.ref = name;
     b.addEventListener('click', () => show(name));
     strip.appendChild(b);
   }
@@ -982,10 +995,10 @@ labelled().then(() => ask('/refs.json').then(r => r.json()).then(names => {
 // Marks outlive the session that made them, so the page starts from the file.
 ask('/marks').then(r => r.json()).then(on => { marks = on; draw(); });
 
-// Sheet layout, from contour render: front | right over top | persp.
+// Sheet layout, from contour render: front | right over top | bottom.
 function viewAt(x, y) {
   const left = x < cv.width / 2, upper = y < cv.height / 2;
-  return upper ? (left ? 'front' : 'right') : (left ? 'top' : 'persp');
+  return upper ? (left ? 'front' : 'right') : (left ? 'top' : 'bottom');
 }
 
 // Index 0 is background, and background is not a part: a click on the gap is a
@@ -1289,7 +1302,7 @@ async function shutMark(mark) {
 }
 
 cv.addEventListener('mousemove', e => {
-  if (showing) return;           // a photograph has no parts to name
+  if (showing) return;           // a photograph or the perspective: no parts to name
   const [x, y] = at(e);
   const part = partAt(x, y);
   hint.textContent = part || 'Click the sheet, then type one line.';
@@ -1298,6 +1311,7 @@ cv.addEventListener('mousemove', e => {
 cv.addEventListener('mousedown', e => { down = showing ? at(e) : null; });
 
 cv.addEventListener('click', e => {
+  if (showing === PERSP) return;  // to look at, never to mark
   const [x, y] = at(e);
   const part = showing ? null : partAt(x, y);
   // Far enough to be meant. A hand is not steady on a click, and a span of

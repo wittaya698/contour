@@ -188,7 +188,7 @@ function thumbnail(s) {
   const td = cell('', 'thumb');
   const src = '/picture?path=' + encodeURIComponent(s.path) + '&t=' + TOKEN;
   if (s.picture === 'sheet' && s.view) {
-    // One view of the five, the perspective: the sheet as served, scaled so
+    // One view of the four, the perspective: the sheet as served, scaled so
     // that view covers the frame and centred in it, so no edge of a
     // neighbouring view shows (ADR 0025, decision 10, as amended by issue 70).
     const [x, y, w, h] = s.view.tile;

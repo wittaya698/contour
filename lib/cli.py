@@ -306,7 +306,7 @@ def on_canvas(cmd, rest, held):
         report = canvas.serve(HERE.sheet, HERE.marks, HERE.mask, HERE.parts,
                               resolve=lambda: stage(["resolve"]),
                               refs=HERE.refs, views=HERE.views,
-                              blend=HERE.blend,
+                              blend=HERE.blend, persp=HERE.persp,
                               verdict=HERE.dot / panel.NAME, name=PROJECT.name)
     return emit(report)
 

@@ -121,7 +121,7 @@ chair PASS  verify 17/17 | tris 4,210 | height 900mm
 Then look at it, and ship it when it is right:
 
 ```sh
-contour render                     # 5-view sheet -> sheet.png
+contour render                     # 4-view sheet -> sheet.png, + out/persp.png
 contour export                     # .glb, re-imported and re-measured to prove it
 git add -A && git commit
 ```
@@ -419,7 +419,7 @@ the choice to allow that, and Desktop asks before each call.
 | Command | Does |
 |---|---|
 | `contour check` | build from an empty scene, verify against the spec |
-| `contour render` | 5-view sheet (four orthographic and a perspective) with a 1 m grid and rulers |
+| `contour render` | 4-view orthographic sheet with a 1 m grid and rulers, and the perspective beside it |
 | `contour export` | `.glb`, re-imported into a clean Blender and re-measured |
 | `contour api <symbol>` | the real signature from the installed Blender |
 | `contour selftest` | the fixture through every stage, plus 37 mutants |
@@ -479,7 +479,7 @@ A model space, anywhere on disk, its own git repository:
     spec.yaml     your intent, in numbers    (the agent reads, never writes)
     refs/         your intent, in pictures   (the agent reads, never writes)
     build.py      the attempt                (rebuilt from an empty scene)
-    sheet.png     the 5-view render you approved
+    sheet.png     the 4-view render you approved
     worksheet.png the spans drawn onto the references          (ADR 0022)
     marks.json    located comments and spans, from both sides   (ADR 0018)
     vetoes.json   calls you refused at a gate, and why            (ADR 0019)

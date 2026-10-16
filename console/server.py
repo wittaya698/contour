@@ -161,7 +161,7 @@ class Console:
             # `views.json` beside the build says which build the cameras drew,
             # so the panel can be labelled rather than quietly authoritative
             # (ADR 0019, decision 13).
-            views=here.views, blend=here.blend,
+            views=here.views, blend=here.blend, persp=here.persp,
             verdict=here.dot / panel_state.NAME, name=self.space.resolve().name,
             reload_grace=reload_grace,
             routes={("POST", "/run"): self.started,

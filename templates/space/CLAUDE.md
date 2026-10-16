@@ -14,7 +14,7 @@ Run `contour doctor` to find out whether that copy has gone stale.
 |---|---|---|
 | `contour check` | build + verify, terse report; redraws the sheet for the page | ~60 tok |
 | `contour api <symbol>` | real signature from the installed Blender | ~15 tok |
-| `contour render` | 5-view sheet → `sheet.png` | ~1400 tok |
+| `contour render` | 4-view sheet → `sheet.png`, persp beside it | ~1400 tok |
 | `contour export` | `.glb` + round-trip re-measure | ~80 tok |
 | `contour filmstrip [clip]` | a clip as six side and six front frames → `out/filmstrip.png`, at a checkpoint | ~1400 tok |
 | `contour canvas` | the sheet in a browser, to mark on; waits for you | ~20 tok |
@@ -101,7 +101,7 @@ Exact stays exact wherever the user is not the reader: commit messages,
 spec.yaml       the user's intent, in numbers     (read, never write)
 refs/           the user's intent, in pictures    (read, never write)
 build.py        yours
-sheet.png       the 5-view render the user approved
+sheet.png       the 4-view render the user approved
 marks.json      located comments on that sheet, from both sides (ADR 0018)
 NOTES.md        deferred refinements, and open questions
 release/v<N>/   archived .blend + .glb + sheet, at a tag

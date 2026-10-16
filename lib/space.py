@@ -41,6 +41,7 @@ class Layout(NamedTuple):
     parts: Path
     views: Path
     filmstrip: Path
+    persp: Path
     release: Path
 
     @property
@@ -102,7 +103,7 @@ def _at(toolkit, root, name, sheet, marks, glb):
                   refs=root / "refs", release=root / "release",
                   blend=out / f"{name}.blend", mask=out / "mask.png",
                   parts=out / "parts.json", views=out / "views.json",
-                  filmstrip=out / "filmstrip.png",
+                  filmstrip=out / "filmstrip.png", persp=out / "persp.png",
                   sheet=sheet, marks=marks, glb=glb)
 
 

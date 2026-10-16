@@ -16,7 +16,7 @@ from lib import policy
 
 LINES = {
     "reference": "A picture you give of what you want. Claude measures it and never changes it.",
-    "sheet": "Claude's picture of what it built: five views, on a grid of one-metre squares.",
+    "sheet": "Claude's picture of what it built: four views, on a grid of one-metre squares.",
     "mark": "A note pinned to one spot on a picture: click the spot, then type one line.",
     "span": "A distance on a reference, end to end: drag across it, and Claude measures it.",
     "spec": "What the model has to be, written as numbers. A build matches it or it doesn't.",

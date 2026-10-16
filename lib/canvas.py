@@ -45,7 +45,7 @@ class Canvas(Page):
     def __init__(self, sheet, marks, mask=None, parts=None, resolve=None,
                  refs=None, can=MARKS_ONLY, routes=None, views=None,
                  blend=None, verdict=None, name=None, grace=None,
-                 hidden_grace=None, reload_grace=0):
+                 hidden_grace=None, reload_grace=0, persp=None):
         # What this host can do, for the page to ask about. The caller's to
         # declare and not the Canvas's to infer: the console's extra surface
         # is the console's, and a Canvas that guessed would guess wrong for
@@ -67,6 +67,10 @@ class Canvas(Page):
         self.parts = Path(parts) if parts else None
         self.resolve = resolve
         self.refs = Path(refs) if refs else None
+        # The perspective the render draws beside the sheet: to look at, and
+        # never to mark, because no camera is kept that could pin a click on
+        # it (ADR 0005, amended 2026-10-16).
+        self.persp = Path(persp) if persp else None
         # What the sheet is a picture of: the cameras that drew it and the build
         # they drew. Both paths and not a fingerprint, because the build on disk
         # moves while the page is open and the label has to move with it.
@@ -91,7 +95,8 @@ class Canvas(Page):
                 ("GET", "/ref"): lambda q: self.ref(q.get("name", "")),
                 ("GET", "/refs.json"): lambda q: refs_store.listing(self.refs),
                 ("GET", "/sheet.json"): lambda q: dict(panel_state.state(
-                    self.views, self.blend, self.verdict, self.marks), model=self.name),
+                    self.views, self.blend, self.verdict, self.marks), model=self.name,
+                    persp=bool(self.persp and self.persp.exists())),
                 ("GET", "/parts.json"): lambda q: self.parts_table(),
                 # Absent is an answer: a space that has never built has no
                 # picture yet, and a panel with nothing in it is the truth about
@@ -99,6 +104,9 @@ class Canvas(Page):
                 # run belongs.
                 ("GET", "/sheet.png"): lambda q: png(
                     self.sheet.read_bytes() if self.sheet.exists() else None),
+                ("GET", "/persp.png"): lambda q: png(
+                    self.persp.read_bytes() if self.persp and self.persp.exists()
+                    else None),
                 ("POST", "/marks"): self.record,
                 ("POST", "/close"): lambda b: self.close(b.get("id")) or None,
                 # The user's three answers to an agent span (ADR 0022,
@@ -127,7 +135,7 @@ class Canvas(Page):
         """Store one mark as it arrives, not at the end: an interrupted
         session then still leaves behind everything the user had said.
 
-        Two kinds land here. A **sheet mark** names one of our five views, and
+        Two kinds land here. A **sheet mark** names one of our four views, and
         the mask is asked what part its pixel fell on. A **ref mark** names one
         of the user's photographs, which knows nothing about parts and was not
         drawn by any view of ours, so it carries the image and the pixel alone
@@ -250,7 +258,8 @@ def png(blob):
 
 def serve(sheet, marks, mask=None, parts=None, resolve=None, refs=None,
           views=None, blend=None, verdict=None, name=None, open_browser=True,
-          grace=GRACE_S, hidden_grace=HIDDEN_GRACE_S, reload_grace=RELOAD_S):
+          grace=GRACE_S, hidden_grace=HIDDEN_GRACE_S, reload_grace=RELOAD_S,
+          persp=None):
     """One canvas session, start to report. Blocks until the page says done,
     or its tab goes: a chat that opened it for the user told them of no Done to
     press, and each mark was written as it arrived (issue 110).
@@ -269,7 +278,8 @@ def serve(sheet, marks, mask=None, parts=None, resolve=None, refs=None,
     # (ADR 0018). Said while the user is looking rather than when they press Done.
     canvas = Canvas(sheet, marks, mask, parts, resolve, refs,
                     views=views, blend=blend, verdict=verdict, name=name,
-                    grace=grace, hidden_grace=hidden_grace, reload_grace=reload_grace)
+                    grace=grace, hidden_grace=hidden_grace, reload_grace=reload_grace,
+                    persp=persp)
     url = canvas.start()
     print(f"canvas at {url}  —  click the sheet, then press Done", flush=True)
     if open_browser:
