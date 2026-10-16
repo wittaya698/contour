@@ -32,6 +32,10 @@ def drive(prompt, options, gate, say):
             # console's transcript can read it: a console the lobby started
             # never told anybody its URL.
             Path(step["keep_prompt"]).write_text(prompt)
+        if "fail" in step:
+            # The session dying under the act: what the SDK raises when the
+            # agent cannot be reached or gives up (issue 125).
+            raise RuntimeError(step["fail"])
         if "busy" in step:
             # A long turn: the agent working, at no gate, for this many seconds.
             # What a stop from outside has to be able to end (issue 87).

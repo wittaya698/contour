@@ -14,8 +14,10 @@ so is the agent that proposes.
 import json
 import os
 import secrets
+import shutil
 import sys
 import tempfile
+import traceback
 from pathlib import Path
 
 from console import approvals, last_run
@@ -86,11 +88,14 @@ def options():
 def label(drive=None, planned=None):
     """Propose for every unlabelled space, in one agent session. `planned` is
     told which spaces it proposes for and why the others are skipped, before
-    the agent starts."""
+    the agent starts. Answered with that plan and how it ended: None once it
+    has proposed, and otherwise the agent's last words."""
     spaces, skipped = taken(survey.listing())
     plan = {"proposing": list(spaces), "skipped": skipped}
     if planned:
         planned(plan)
+    if not spaces:
+        return dict(plan, ended=None)    # nothing to propose for, so no agent is asked to
     act = "label-" + secrets.token_hex(4)
 
     proposed = set()
@@ -104,10 +109,22 @@ def label(drive=None, planned=None):
         proposed.add(payload["model"])
         return aside(spaces[payload["model"]]["path"], act, payload)
 
-    (drive or run_lib.driver(os.environ.get("CONTOUR_CONSOLE_AGENT") or LABEL))(prompt(spaces, survey.vocabulary()),
-                                options(), gate,
-                                lambda kind, **said: None)
-    return plan
+    words = []
+
+    def say(kind, **said):
+        if kind == "text":
+            words.append(said["text"])
+
+    working = options()
+    try:
+        (drive or run_lib.driver(os.environ.get("CONTOUR_CONSOLE_AGENT") or LABEL))(
+            prompt(spaces, survey.vocabulary()), working, gate, say)
+    finally:
+        shutil.rmtree(working["cwd"], ignore_errors=True)
+    if proposed:
+        return dict(plan, ended=None)
+    return dict(plan, ended="Claude suggested nothing: "
+                + (words[-1] if words else "it said nothing either"))
 
 
 def allowed(spaces, proposed, tool, payload):
@@ -183,7 +200,14 @@ def main(argv):
     prints its plan as one line, then proposes; `shown` and `answer` are the
     page's reading and its answer, as JSON."""
     if argv[:1] == ["label"]:
-        label(planned=lambda plan: print(json.dumps(plan), flush=True))
+        # Its plan, then one last line saying how it ended, which the page
+        # shows: an act that dies must not leave it waiting with no word.
+        try:
+            ended = label(planned=lambda plan: print(json.dumps(plan), flush=True))["ended"]
+        except Exception as e:
+            traceback.print_exc()
+            ended = f"it stopped: {e}"
+        print(json.dumps({"ended": ended}), flush=True)
     elif argv[:1] == ["shown"]:
         print(json.dumps(shown()))
     elif argv[:1] == ["answer"]:

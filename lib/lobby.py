@@ -18,6 +18,7 @@ import signal
 import socket
 import subprocess
 import sys
+import threading
 import urllib.parse
 import webbrowser
 from pathlib import Path
@@ -97,6 +98,7 @@ class Lobby(Page):
                          hidden_grace=hidden_grace, reload_grace=reload_grace)
         self.listing = listing
         self.labelling = None        # the act, while it proposes
+        self.act_said = None         # its last line: how it ended
 
     def served(self):
         return {("GET", "/spaces"): lambda q: self.listing(),
@@ -126,11 +128,21 @@ class Lobby(Page):
             labelling("label"), cwd=str(CONTOUR.parent), env=labelling_env(),
             stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, text=True,
             start_new_session=True)
-        # Its plan is the one line it prints; nothing else is read from it.
-        with self.labelling.stdout:
-            line = self.labelling.stdout.readline()
+        # Its plan is the first line it prints and how it ended the last; both
+        # are read off it, and nothing else.
+        self.act_said = None
+        line = self.labelling.stdout.readline()
+        self.reading = threading.Thread(target=self.ending, args=(self.labelling,), daemon=True)
+        self.reading.start()
         return dict(json.loads(line), refused=None) if line else \
             {"refused": "the act ended before it said what it proposes for"}
+
+    def ending(self, act):
+        """Read the act's last line, how it ended, as it prints it."""
+        with act.stdout:
+            for line in act.stdout:
+                with contextlib.suppress(ValueError, KeyError, TypeError):
+                    self.act_said = json.loads(line)["ended"] or ""
 
     def labels(self, asked):
         """Every topic proposal waiting next in a space, and whether the act is
@@ -138,8 +150,17 @@ class Lobby(Page):
         said = subprocess.run(labelling("shown"), cwd=str(CONTOUR.parent),
                               env=labelling_env(), capture_output=True, text=True,
                               timeout=60)
-        return {"labelling": self.labelling is not None and self.labelling.poll() is None,
-                "proposals": json.loads(said.stdout or "[]")}
+        going = self.labelling is not None and self.labelling.poll() is None
+        return {"labelling": going, "proposals": json.loads(said.stdout or "[]"),
+                "ended": None if going or self.labelling is None else self.why()}
+
+    def why(self):
+        """How the act ended, as it said, or that it said nothing: None when it
+        ended having proposed."""
+        self.reading.join(timeout=2)       # its last line, once it has exited
+        if self.act_said is None:
+            return f"it ended without saying why (exit {self.labelling.returncode})"
+        return self.act_said or None
 
     def labelled(self, asked):
         """One space's proposal answered: the words ticked are kept, the rest

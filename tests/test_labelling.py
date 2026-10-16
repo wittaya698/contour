@@ -116,6 +116,27 @@ class LabelTest(LabellingCase):
         for name in ("blank", "held", "open", "waits"):
             self.assertNotIn(f"{name}:", kept.read_text())
 
+    def test_with_every_space_skipped_it_starts_no_agent_and_says_why(self):
+        """An agent given an empty list searches its empty directory for sheets
+        (issue 125): there is nothing to propose for, so nobody is asked."""
+        self.made("blank", sheet=False)
+        kept = self.spaces.parent / (self.spaces.name + "-prompt.txt")
+        said = self.label({"keep_prompt": str(kept)})
+        self.assertEqual(said["proposing"], [])
+        self.assertIn("no sheet", said["skipped"]["blank"])
+        self.assertFalse(kept.exists())
+
+    def test_no_act_leaves_its_working_directory_behind(self):
+        """About 130 were found, one per act (issue 125)."""
+        self.made("beaky")
+        scratch = Path(tempfile.mkdtemp()).resolve()
+        with mock.patch.object(tempfile, "tempdir", str(scratch)):
+            self.label(proposal("beaky", "bird"))
+            self.made("trail-cube")       # beaky waits now, so this one is proposed for
+            with self.assertRaises(RuntimeError):
+                self.label({"fail": "the agent could not be reached"})
+        self.assertEqual(list(scratch.iterdir()), [])
+
 
 class AnsweredTest(LabellingCase):
     """Every proposal on one page, each answered for its own space."""
@@ -247,6 +268,26 @@ class LobbyTest(LabellingCase):
         self.assertEqual(topics.load(self.cube)["struck"], ["creature"])
         self.assertEqual([p["name"] for p in self.lobby.labels({})["proposals"]], ["beaky"])
 
+    def started(self, *steps):
+        with mock.patch.dict(os.environ, {"CONTOUR_AGENT_SCRIPT": json.dumps(steps)}):
+            self.assertIsNone(self.lobby.label({})["refused"])
+        return self.settled()
+
+    def test_an_act_that_dies_says_it_ended_and_why(self):
+        """Not a page left waiting with no word, which looked frozen (issue 125)."""
+        said = self.started({"fail": "the agent could not be reached"})
+        self.assertEqual(said["proposals"], [])
+        self.assertEqual(said["ended"], "it stopped: the agent could not be reached")
+
+    def test_an_act_that_proposes_nothing_says_so_in_the_agents_last_words(self):
+        said = self.started({"say": "I could not find any sheets."})
+        self.assertEqual(said["ended"], "Claude suggested nothing: I could not find any sheets.")
+
+    def test_an_act_that_proposed_has_nothing_more_to_say(self):
+        said = self.started(proposal("beaky", "bird"))
+        self.assertEqual([p["name"] for p in said["proposals"]], ["beaky"])
+        self.assertIsNone(said["ended"])
+
     def test_it_is_offered_only_where_the_console_can_run(self):
         self.assertIn("label", granted())
         with mock.patch.dict(os.environ, {"CONTOUR_CONSOLE_PYTHON": "/nowhere/python"}):
@@ -277,6 +318,12 @@ class PageTest(unittest.TestCase):
         self.assertIn("can.has('label')", render)
         self.assertIn("unlabelled(spaces)", render)
         self.assertIn("'/label'", self.page)
+
+    def test_an_ended_act_replaces_the_line_that_says_it_is_looking(self):
+        """Its reason, where the page said Claude was looking (issue 125)."""
+        labels = function(self.page, "labels")
+        self.assertIn("ended", labels)
+        self.assertIn("textContent = ended", labels)
 
     def test_a_card_ticks_each_word_marks_the_new_and_sends_the_ticked(self):
         card = function(self.page, "proposed")

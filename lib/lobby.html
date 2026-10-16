@@ -698,11 +698,15 @@ function proposed(p) {
 let polling = null;
 let offered = false;
 function labels() {
-  ask('/labels').then(r => r.json()).then(({ labelling, proposals }) => {
+  ask('/labels').then(r => r.json()).then(({ labelling, proposals, ended }) => {
     document.getElementById('proposals').replaceChildren(...proposals.map(proposed));
     if (labelling) document.getElementById('label-said').textContent =
       'Claude is looking at each sheet and suggesting topics…';
-    document.getElementById('labelling').hidden = !offered && !proposals.length && !labelling;
+    // An act that ended with nothing to answer says so, and why, in place of
+    // that line: left waiting with no word, the page looked frozen (issue 125).
+    if (ended) document.getElementById('label-said').textContent = ended;
+    document.getElementById('labelling').hidden =
+      !offered && !proposals.length && !labelling && !ended;
     clearTimeout(polling);
     if (labelling) polling = setTimeout(labels, 2000);
   });

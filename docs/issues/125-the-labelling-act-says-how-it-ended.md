@@ -17,9 +17,9 @@ Three defects in the lobby's labelling act, met on its first real use:
 
 ## Acceptance criteria
 
-- [ ] An act that exits with nothing set aside is shown on the page as ended, with its reason
-- [ ] An act with no space to propose for starts no agent and says why
-- [ ] No act leaves its working directory behind
+- [x] An act that exits with nothing set aside is shown on the page as ended, with its reason
+- [x] An act with no space to propose for starts no agent and says why
+- [x] No act leaves its working directory behind
 
 ## Blocked by
 
