@@ -17,14 +17,15 @@ from lib import views
 
 
 def sheet(res=1024):
-    """A views record as `contour render` leaves one: four tiles, top-left to
-    bottom-right, each with the camera that drew it."""
-    t = res // 2
+    """A views record as `contour render` leaves one: four tiles across, the
+    perspective strip beneath them, each with the camera that drew it."""
+    t = 362 if res == 1024 else res // 4
     return {"resolution": res, "build": "0" * 12,
             "views": [{"label": "front", "tile": [0, 0, t, t]},
                       {"label": "right", "tile": [t, 0, t, t]},
-                      {"label": "top", "tile": [0, t, t, t]},
-                      {"label": "persp", "tile": [t, t, t, t]}]}
+                      {"label": "top", "tile": [2 * t, 0, t, t]},
+                      {"label": "bottom", "tile": [3 * t, 0, t, t]},
+                      {"label": "persp", "tile": [0, t, 4 * t, t]}]}
 
 
 class AimTest(unittest.TestCase):
@@ -32,16 +33,16 @@ class AimTest(unittest.TestCase):
         """The click arrives in sheet pixels, top-left origin, the way the
         browser and the mask count. A camera frame counts from the bottom
         left in 0..1, so the view is found by tile and the row is flipped."""
-        view, u, v = views.aim(sheet(), [128, 384])
+        view, u, v = views.aim(sheet(), [90, 271])
         self.assertEqual(view["label"], "front")
         self.assertAlmostEqual(u, 0.25, places=2)
         self.assertAlmostEqual(v, 0.25, places=2)
 
-    def test_each_quadrant_belongs_to_the_view_that_drew_it(self):
+    def test_each_tile_belongs_to_the_view_that_drew_it(self):
         s = sheet()
         got = [views.aim(s, p)[0]["label"]
-               for p in ([10, 10], [520, 10], [10, 520], [520, 520])]
-        self.assertEqual(got, ["front", "right", "top", "persp"])
+               for p in ([10, 10], [370, 10], [730, 10], [1090, 10], [1400, 370])]
+        self.assertEqual(got, ["front", "right", "top", "bottom", "persp"])
 
 
 class BuildWindowTest(unittest.TestCase):

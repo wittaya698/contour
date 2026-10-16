@@ -25,8 +25,9 @@ STACK = ["cap", "pillar", "plinth"]
 
 def centre_column(table, w, h, data):
     """The parts the front view's centre column names, top to bottom, one
-    entry per run. The front view is the sheet's top-left quadrant."""
-    x, seen = w // 4, []
+    entry per run. The front view is the first of the four tiles across the
+    sheet's top half."""
+    x, seen = w // 8, []
     for y in range(h // 2):
         name = table.get(str(data[y * w + x]))
         if name and (not seen or seen[-1] != name):
@@ -57,7 +58,7 @@ def painted(column, corner=0):
     w = h = 16
     data = [0] * (w * h)
     for y, index in enumerate(column):
-        data[y * w + w // 4] = index
+        data[y * w + w // 8] = index
     data[0] = corner
     return w, h, data
 
@@ -142,7 +143,7 @@ class FixtureTest(unittest.TestCase):
         # that names the cap and no point on it. Written here rather than
         # clicked, because what is checked is the ray, not the page.
         cap = next(int(i) for i, name in cls.table.items() if name == "cap")
-        x = cls.w // 4
+        x = cls.w // 8
         rows = [y for y in range(cls.h // 2) if cls.data[y * cls.w + x] == cap]
         cls.clicked = [x, rows[len(rows) // 2]]
         F.marks.unlink(missing_ok=True)
@@ -175,7 +176,7 @@ class FixtureTest(unittest.TestCase):
 
     def test_the_views_are_the_four_the_sheet_draws_of_the_build_it_drew(self):
         self.assertEqual([v["label"] for v in self.sheet["views"]],
-                         ["front", "right", "top", "persp"])
+                         ["front", "right", "top", "bottom", "persp"])
         self.assertEqual(self.sheet["build"], self.fingerprint)
 
     def test_a_click_on_the_cap_anchors_on_the_caps_own_surface(self):

@@ -88,18 +88,19 @@ class RowTest(unittest.TestCase):
         self.assertEqual(row["picture"], "reference")
 
     def test_a_built_model_is_shown_by_its_perspective_view(self):
-        """One view and not four: at row size the four-view sheet is four
-        thumbnails of a thumbnail, and the one that reads as the model is the
-        perspective (ADR 0025, decision 10, as amended by issue 70). Where on
-        the sheet it sits is read off the views the sheet was drawn with."""
+        """One view and not five: at row size the sheet is five thumbnails of
+        a thumbnail, and the one that reads as the model is the perspective
+        (ADR 0025, decision 10, as amended by issue 70). Where on the sheet it
+        sits is read off the views the sheet was drawn with, and so is the
+        sheet's width, which is not its resolution once it is not square."""
         chair = self.init("chair")
         (chair / "sheet.png").write_bytes(PNG)
         (chair / "out").mkdir(exist_ok=True)
         (chair / "out" / "views.json").write_text(json.dumps({"resolution": 1024, "views": [
-            {"label": "front", "tile": [0, 0, 512, 512], "type": "ORTHO"},
-            {"label": "persp", "tile": [512, 512, 512, 512], "type": "PERSP"}]}))
+            {"label": "front", "tile": [0, 0, 362, 362], "type": "ORTHO"},
+            {"label": "persp", "tile": [0, 362, 1448, 362], "type": "PERSP"}]}))
         self.assertEqual(self.row("chair")["view"],
-                         {"tile": [512, 512, 512, 512], "size": 1024})
+                         {"tile": [0, 362, 1448, 362], "size": 1448})
 
     def test_a_sheet_with_no_views_beside_it_is_shown_whole(self):
         chair = self.init("chair")

@@ -127,7 +127,7 @@ class Canvas(Page):
         """Store one mark as it arrives, not at the end: an interrupted
         session then still leaves behind everything the user had said.
 
-        Two kinds land here. A **sheet mark** names one of our four views, and
+        Two kinds land here. A **sheet mark** names one of our five views, and
         the mask is asked what part its pixel fell on. A **ref mark** names one
         of the user's photographs, which knows nothing about parts and was not
         drawn by any view of ours, so it carries the image and the pixel alone

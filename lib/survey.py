@@ -129,16 +129,19 @@ def sees_rules(root):
 def viewed(here):
     """Where on the sheet its perspective view sits, as `{tile, size}`, or None.
 
-    One view and not four is what a row shows: at row size the four-view sheet
-    is four thumbnails of a thumbnail, and the perspective is the one that
-    reads as the model (ADR 0025, decision 10, as amended by issue 70). Read off
-    the views the sheet was drawn with; with none to read, the row shows the
-    whole sheet, which is still the model and only harder to see."""
+    One view and not five is what a row shows: at row size the sheet is five
+    thumbnails of a thumbnail, and the perspective is the one that reads as the
+    model (ADR 0025, decision 10, as amended by issue 70). Read off the views
+    the sheet was drawn with; with none to read, the row shows the whole sheet,
+    which is still the model and only harder to see. The size is the sheet's
+    width, which the page scales the picture by, and it is read off the tiles
+    because a sheet is not always square."""
     try:
         drawn = json.loads(here.views.read_text(encoding="utf-8"))
         view = next(v for v in drawn["views"]
                     if v.get("label") == "persp" or v.get("type") == "PERSP")
-        return {"tile": [int(n) for n in view["tile"]], "size": int(drawn["resolution"])}
+        width = max(v["tile"][0] + v["tile"][2] for v in drawn["views"])
+        return {"tile": [int(n) for n in view["tile"]], "size": int(width)}
     except (OSError, ValueError, KeyError, TypeError, StopIteration):
         return None
 

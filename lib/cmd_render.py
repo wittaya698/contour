@@ -1,7 +1,7 @@
-"""./contour render <variant>: the 4-view checkpoint sheet (ADR 0005).
+"""./contour render <variant>: the checkpoint sheet (ADR 0005).
 
-Front / right / top / persp, top-left to bottom-right, in ONE Blender process
-(separate runs pay ~1.2s startup each). Workbench needs no lights or materials
+Front / right / top / bottom across the top row, persp as one wide strip
+beneath them, in ONE Blender process (separate runs pay ~1.2s startup each). Workbench needs no lights or materials
 and adds no render noise.
 
 Workbench does not draw wire-display objects in a final render (verified
@@ -19,7 +19,7 @@ from bpy_extras.object_utils import world_to_camera_view
 from mathutils import Vector
 
 from . import badges, ctx_override, mask, marks, measure, miniyaml, space, scene
-from . import views as sheet_views   # `views` is a local here: the four frames
+from . import views as sheet_views   # `views` is a local here: the five frames
 
 BG = (0.93, 0.93, 0.94)
 GRID = (0.72, 0.74, 0.78)
@@ -108,15 +108,35 @@ def text(tile, x, y, s, scale=2, colour=INK):
         x += 6 * scale
 
 
-def add_camera(name, loc, target, ortho_scale=None, look_down=False):
+def layout(res):
+    """Each view's tile on the sheet, top-down `(x, y, w, h)`, and the sheet's
+    `(width, height)`.
+
+    Four orthographic tiles across, and the perspective beneath them as one
+    strip as wide as all four. The sheet keeps the pixels a `res` square has,
+    so the agent's look costs what it did when the sheet was 2 x 2.
+    """
+    t = round(res / (2 * math.sqrt(2)))
+    tiles = {label: (i * t, 0, t, t)
+             for i, label in enumerate(("front", "right", "top", "bottom"))}
+    tiles["persp"] = (0, t, 4 * t, t)
+    return tiles, (4 * t, 2 * t)
+
+
+def add_camera(name, loc, target, ortho_scale=None, turn=None):
     cam = bpy.data.cameras.new(name)
     cam.clip_start, cam.clip_end = 0.05, 200.0
     if ortho_scale:
         cam.type, cam.ortho_scale = "ORTHO", ortho_scale
+    else:
+        # The lens fitted to the frame's height, and not its width: the persp
+        # strip is four times wider than tall, and the model is framed as it
+        # was in a square tile, with room either side.
+        cam.sensor_fit, cam.sensor_height = "VERTICAL", cam.sensor_width
     o = bpy.data.objects.new(name, cam)
     o.location = loc
-    if look_down:  # straight down, +Y up the frame (a track-to would be degenerate)
-        o.rotation_euler = (0.0, 0.0, 0.0)
+    if turn:  # straight down or up: a track-to would be degenerate
+        o.rotation_euler = turn
     else:
         o.rotation_euler = (Vector(target) - Vector(loc)).normalized() \
             .to_track_quat("-Z", "Y").to_euler()
@@ -135,8 +155,7 @@ def setup(res):
     sc.view_settings.view_transform = "Standard"
     sc.render.dither_intensity = 0.0  # noise only bloats the PNG
     sc.render.image_settings.file_format = "PNG"
-    sc.render.resolution_x = sc.render.resolution_y = res // 2
-    sc.render.resolution_percentage = 100
+    sc.render.resolution_percentage = 100   # the size is each tile's, set per view
     return sc
 
 
@@ -238,7 +257,7 @@ def on_part(idtile, number):
 
 
 
-def badge(tile, bgmask, label, at, t, taken):
+def badge(tile, bgmask, label, at, bounds, taken):
     """Draw one badge near a pin, leashed to it. Returns its pixel, or None
     when the tile is too crowded to place it without covering geometry.
 
@@ -250,7 +269,7 @@ def badge(tile, bgmask, label, at, t, taken):
     w, h = GLYPH_W * len(label), GLYPH_H
     spot = badges.badge_spot(
         lambda bx, by, bw, bh: bool(bgmask[by:by + bh, bx:bx + bw].all()),
-        x, y, w, h, (t, t), taken=taken)
+        x, y, w, h, bounds, taken=taken)
     if spot is None:
         return None
     bx, by = spot
@@ -320,25 +339,27 @@ def run(args):
     scale = sheet_views.sheet_scale(lo, hi)
     d = 1.2 * (math.sqrt(sum(e * e for e in ext)) / 2) / math.sin(math.atan(18 / 50))
     far = 20.0
-    views = [  # sheet order: top-left, top-right, bottom-left, bottom-right
-        ("front", ctr + Vector((0, -far, 0)), scale, False),
-        ("right", ctr + Vector((far, 0, 0)), scale, False),
-        ("top", ctr + Vector((0, 0, far)), scale, True),
-        ("persp", ctr + Vector((0.75, -1.0, 0.6)).normalized() * d, None, False),
+    views = [  # sheet order: the top row left to right, then the strip
+        ("front", ctr + Vector((0, -far, 0)), scale, None),
+        ("right", ctr + Vector((far, 0, 0)), scale, None),
+        ("top", ctr + Vector((0, 0, far)), scale, (0.0, 0.0, 0.0)),    # +Y up the frame
+        ("bottom", ctr + Vector((0, 0, -far)), scale, (math.pi, 0.0, 0.0)),  # front up
+        ("persp", ctr + Vector((0.75, -1.0, 0.6)).normalized() * d, None, None),
     ]
     sc = setup(res)
     segs = world_segments(lo, hi)
-    t = res // 2
+    # Top-down tile rects, the way a click counts.
+    rects, (W, H) = layout(res)
     P.out.mkdir(parents=True, exist_ok=True)
-    # Top-down tile rects, the way a click counts: front|right / top|persp.
-    corners = {"front": (0, 0), "right": (t, 0), "top": (0, t), "persp": (t, t)}
     pinned, placed = pins(P.marks, sc), {}
     noted = aimless(P.marks)
     tiles, cams, spare = [], [], []
-    for label, loc, orth, down in views:
-        cam = add_camera(label, loc, ctr, orth, down)
+    for label, loc, orth, turn in views:
+        cam = add_camera(label, loc, ctr, orth, turn)
         cams.append((label, cam))
         sc.camera = cam
+        cx, cy, w, h = rects[label]
+        sc.render.resolution_x, sc.render.resolution_y = w, h
         tmp = P.out / f"_view_{label}.png"
         sc.render.filepath = str(tmp)
         ctx_override.call("render.render", write_still=True)
@@ -349,17 +370,16 @@ def run(args):
             pa, pb = (world_to_camera_view(sc, cam, Vector(p)) for p in (a, b))
             if pa.z <= 0 or pb.z <= 0:  # behind the camera
                 continue
-            paint(tile, bgmask, (pa.x * t, pa.y * t), (pb.x * t, pb.y * t), colour, width)
-        text(tile, 8, t - 22, f"{label}   grid 1 m")
+            paint(tile, bgmask, (pa.x * w, pa.y * h), (pb.x * w, pb.y * h), colour, width)
+        text(tile, 8, h - 22, f"{label}   grid 1 m")
         taken = []
         for mid, world in pinned:
             at = world_to_camera_view(sc, cam, world)
             if at.z <= 0 or not (0 <= at.x <= 1 and 0 <= at.y <= 1):
                 continue                       # behind this camera, or off its frame
-            if badge(tile, bgmask, mid, (at.x * t, at.y * t), t, taken) \
+            if badge(tile, bgmask, mid, (at.x * w, at.y * h), (w, h), taken) \
                     and mid not in placed:
-                cx, cy = corners[label]
-                placed[mid] = (label, int(cx + at.x * t), int(cy + t - at.y * t))
+                placed[mid] = (label, int(cx + at.x * w), int(cy + h - at.y * h))
         tiles.append(tile)
         spare.append((bgmask, taken))    # the agent's badges go on after the mask
 
@@ -369,6 +389,8 @@ def run(args):
     mtiles = []
     for label, cam in cams:
         sc.camera = cam
+        _x, _y, w, h = rects[label]
+        sc.render.resolution_x, sc.render.resolution_y = w, h
         tmp = P.out / f"_mask_{label}.png"
         sc.render.filepath = str(tmp)
         ctx_override.call("render.render", write_still=True)
@@ -381,36 +403,45 @@ def run(args):
                                                             mtiles):
         for mid, part in noted:
             spot = on_part(idtile, number.get(part, -1))
-            if spot and badge(tile, bgmask, mid, spot, t, taken) \
+            cx, cy, w, h = rects[label]
+            if spot and badge(tile, bgmask, mid, spot, (w, h), taken) \
                     and mid not in placed:
-                cx, cy = corners[label]
-                placed[mid] = (label, int(cx + spot[0]), int(cy + t - spot[1]))
+                placed[mid] = (label, int(cx + spot[0]), int(cy + h - spot[1]))
 
-    idx = np.zeros((res, res), dtype=np.uint8)
-    for (row, col), tile in zip([(1, 0), (1, 1), (0, 0), (0, 1)], mtiles):
-        idx[row * t:(row + 1) * t, col * t:(col + 1) * t] = tile
+    def bottom_up(label):
+        """A tile's rows and columns in Blender's pixel order, which counts
+        rows from the bottom where a click counts them from the top."""
+        x, y, w, h = rects[label]
+        return slice(H - y - h, H - y), slice(x, x + w)
+
+    idx = np.zeros((H, W), dtype=np.uint8)
+    for (label, _cam), tile in zip(cams, mtiles):
+        idx[bottom_up(label)] = tile
     mask.write(P.mask, np.flipud(idx))   # Blender reads bottom-up, PNG top-down
     P.parts.write_text(json.dumps(parts, indent=2) + "\n", encoding="utf-8")
 
     sheet_views.record(P.views, res,
-                       [view_record(label, (*corners[label], t, t), cam)
+                       [view_record(label, rects[label], cam)
                         for label, cam in cams], P.blend)
 
-    sheet = np.ones((res, res, 4), dtype=np.float32)
-    for (row, col), tile in zip([(1, 0), (1, 1), (0, 0), (0, 1)], tiles):
-        sheet[row * t:(row + 1) * t, col * t:(col + 1) * t] = tile
-    sheet[t - 1:t + 1, :, :3] = 0.35
-    sheet[:, t - 1:t + 1, :3] = 0.35
-    out = bpy.data.images.new("sheet", res, res, alpha=False)
+    sheet = np.ones((H, W, 4), dtype=np.float32)
+    for (label, _cam), tile in zip(cams, tiles):
+        rows, cols = bottom_up(label)
+        sheet[rows, cols] = tile
+        if cols.start:                       # a rule down its left edge
+            sheet[rows, cols.start - 1:cols.start + 1, :3] = 0.35
+        if rows.start:                       # and along its foot
+            sheet[rows.start - 1:rows.start + 1, cols, :3] = 0.35
+    out = bpy.data.images.new("sheet", W, H, alpha=False)
     out.pixels.foreach_set(sheet.ravel())
     P.sheet.parent.mkdir(parents=True, exist_ok=True)
     out.filepath_raw = str(P.sheet)
     out.file_format = "PNG"
     out.save()
     kb = P.sheet.stat().st_size / 1024
-    return {"ok": True, "lines": [f"{variant} sheet {res}x{res} {kb:.0f}KB -> "
+    return {"ok": True, "lines": [f"{variant} sheet {W}x{H} {kb:.0f}KB -> "
                                   f"{P.display(P.sheet)}"
-                                  "  (front|right / top|persp)",
+                                  "  (front|right|top|bottom / persp)",
                                   f"{variant} mask {len(parts)} parts -> "
                                   f"{P.display(P.mask)}",
                                   *badge_line(variant, placed)]}

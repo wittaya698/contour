@@ -45,7 +45,7 @@ TABLE = (
     Command("check", NONE, True, True, "build",
             (("check", "build + verify, and redraw the sheet"),), "on_build"),
     Command("render", NONE, True, True, "build",
-            (("render", "4-view sheet -> sheet.png, + mask, + mark badges"),), "on_build"),
+            (("render", "5-view sheet -> sheet.png, + mask, + mark badges"),), "on_build"),
     Command("export", NONE, True, True, "build",
             (("export", ".glb + round-trip re-measure"),), "on_build"),
     Command("filmstrip", (0, 1), True, True, None,

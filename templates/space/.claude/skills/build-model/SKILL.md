@@ -87,7 +87,7 @@ When verify is green, or when you are stuck and need to see what you built:
 contour render
 ```
 
-Look at the 4-view sheet. Check specifically for what measurement cannot catch:
+Look at the 5-view sheet. Check specifically for what measurement cannot catch:
 parts in the wrong place or orientation, gaps, intersections, proportions that
 read wrong against the 1 m grid.
 

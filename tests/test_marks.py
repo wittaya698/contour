@@ -44,7 +44,7 @@ class BirthTest(unittest.TestCase):
         self.path = Path(tempfile.mkdtemp()) / "marks.json"
 
     def test_a_sheet_mark_carries_the_view_it_was_placed_on(self):
-        """A click on one of our four views. The view is part of where it is:
+        """A click on one of our five views. The view is part of where it is:
         `too thin` on the front and `too thin` on the side are two findings."""
         born = marks.on_sheet(self.path, "front", [412, 208], "beak sits too low",
                               part="beak")
