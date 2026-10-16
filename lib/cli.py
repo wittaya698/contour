@@ -477,6 +477,7 @@ def on_lobby(cmd, rest, held):
     return emit(lobby.serve(
         survey.listing, grace=seconds("CONTOUR_LOBBY_GRACE", lobby.GRACE_S),
         hidden_grace=seconds("CONTOUR_LOBBY_HIDDEN_GRACE", lobby.HIDDEN_GRACE_S),
+        reload_grace=seconds("CONTOUR_LOBBY_RELOAD_GRACE", lobby.RELOAD_S),
         create=(rest[1] if len(rest) > 1 else "") if rest else None))
 
 

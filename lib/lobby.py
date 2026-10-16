@@ -30,6 +30,7 @@ CONTOUR = PAGE.parent.parent / "contour"
 GRACE_S = 10          # beats are seconds apart; this is several missed ones
 HIDDEN_GRACE_S = 60 * 60   # a background tab's timers may stop; a quit browser
                            # is caught here, and a lingering lobby costs a port
+RELOAD_S = 5          # a reload says going, then beats again within this
 
 RECORD = "lobby.json"
 """The running lobby, said in `~/.contour`: its pid and where it listens, and
@@ -90,9 +91,10 @@ class Lobby(Page):
 
     max_body = 128 * 2**20       # several references, base64 inside the JSON
 
-    def __init__(self, listing, can=None, grace=GRACE_S, hidden_grace=HIDDEN_GRACE_S):
+    def __init__(self, listing, can=None, grace=GRACE_S, hidden_grace=HIDDEN_GRACE_S,
+                 reload_grace=RELOAD_S):
         super().__init__(PAGE, can=granted() if can is None else can, grace=grace,
-                         hidden_grace=hidden_grace)
+                         hidden_grace=hidden_grace, reload_grace=reload_grace)
         self.listing = listing
         self.labelling = None        # the act, while it proposes
 
@@ -404,7 +406,7 @@ def asked_to_show():
 
 
 def serve(listing, grace=GRACE_S, hidden_grace=HIDDEN_GRACE_S, open_browser=True,
-          create=None):
+          create=None, reload_grace=RELOAD_S):
     """One lobby session, start to last line. Blocks until the tab closes.
 
     Or, when a lobby is already running, shows that one and starts nothing: its
@@ -415,7 +417,8 @@ def serve(listing, grace=GRACE_S, hidden_grace=HIDDEN_GRACE_S, open_browser=True
         (policy.home() / SHOWN).write_text(json.dumps(fragment(create)))
         os.kill(there["pid"], SHOW)
         return {"ok": True, "lines": ["lobby already open — shown again"]}
-    lobby = Lobby(listing, grace=grace, hidden_grace=hidden_grace)
+    lobby = Lobby(listing, grace=grace, hidden_grace=hidden_grace,
+                  reload_grace=reload_grace)
     url = lobby.start()
     print(f"lobby at {url}", flush=True)
     try:

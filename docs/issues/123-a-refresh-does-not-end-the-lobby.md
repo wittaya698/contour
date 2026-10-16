@@ -11,9 +11,9 @@ the same, and the reloaded page carries on in the same session.
 
 ## Acceptance criteria
 
-- [ ] A page that says it is going and beats again within the grace leaves the lobby running
-- [ ] A page that says it is going and does not beat again ends it, as today
-- [ ] A reloaded lobby page lists the spaces and acts with its session
+- [x] A page that says it is going and beats again within the grace leaves the lobby running
+- [x] A page that says it is going and does not beat again ends it, as today
+- [x] A reloaded lobby page lists the spaces and acts with its session
 
 ## Blocked by
 

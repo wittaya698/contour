@@ -5,6 +5,7 @@ way the page talks to it — over spaces `contour init` made in a temporary
 directory that `$CONTOUR_SPACES` points at.
 """
 import contextlib
+import inspect
 import io
 import json
 import os
@@ -12,6 +13,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 import urllib.error
 import urllib.request
@@ -21,7 +23,7 @@ ROOT = Path(__file__).resolve().parent.parent
 CONTOUR = ROOT / "contour"
 sys.path.insert(0, str(ROOT))
 
-from lib.lobby import PAGE, Lobby    # noqa: E402
+from lib.lobby import PAGE, Lobby, serve    # noqa: E402
 from lib.page import TOKEN_HEADER    # noqa: E402
 from executables import executable  # noqa: E402
 import one_run  # noqa: E402     # one suite run per machine (issue 94)
@@ -121,14 +123,29 @@ class LobbyTest(unittest.TestCase):
 
     def test_a_tab_that_says_it_is_going_ends_it_promptly(self):
         """Closing the tab still ends the lobby within seconds, hidden or not:
-        the page says so as it goes, and no grace is waited out."""
+        the page says so as it goes, and no beat takes it back, so only the
+        reload grace is waited out and not the silence's."""
         for hidden in (False, True):
             with self.subTest(hidden=hidden):
-                proc = self.lobby(CONTOUR_LOBBY_GRACE="60")
+                proc = self.lobby(CONTOUR_LOBBY_GRACE="60",
+                                  CONTOUR_LOBBY_RELOAD_GRACE="0.5")
                 self.beat(hidden=hidden)
                 self.post("/going", {})
                 self.assertEqual(proc.wait(timeout=5), 0)
                 self.assertEqual(proc.stdout.read(), "lobby closed — the page closed\n")
+
+    def test_a_reload_is_not_a_closed_tab(self):
+        """A reload says going and then beats again: the lobby waits a moment
+        for that beat, and the reloaded page carries on in the same session."""
+        self.init("alpha")
+        proc = self.lobby(CONTOUR_LOBBY_RELOAD_GRACE="1.5")
+        self.beat()
+        self.post("/going", {})
+        time.sleep(0.6)               # the page loading again
+        self.beat()
+        with self.assertRaises(subprocess.TimeoutExpired):
+            proc.wait(timeout=1.5)
+        self.assertEqual([s["name"] for s in self.get("/spaces")["spaces"]], ["alpha"])
 
     def test_closing_the_tab_ends_it_with_one_terse_line(self):
         """A page that stopped beating is a tab that closed. There is no Done
@@ -137,6 +154,9 @@ class LobbyTest(unittest.TestCase):
         self.beat()
         self.assertEqual(proc.wait(timeout=30), 0)
         self.assertEqual(proc.stdout.read(), "lobby closed — the page closed\n")
+
+    def test_it_waits_for_a_reload_by_default(self):
+        self.assertGreater(inspect.signature(serve).parameters["reload_grace"].default, 0)
 
     def test_a_page_that_never_beat_has_not_closed(self):
         """Before a first beat nothing has opened the page yet, and ending then
