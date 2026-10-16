@@ -646,10 +646,10 @@ console two seconds after asking (issues 104 and 107; ADR 0028, decision 6)."""
 def requested(name, prose, requester):
     """Start an unattended run in a named space (ADR 0027, decisions 3, 5 and
     6): its run and space, or why not. Refused while the space is held, while a
-    console is open on it, while approvals wait in it (ADR 0028, decision 7),
-    and while no ceiling is set. The command's and the
-    connector's, so a chat is refused in the words a terminal is."""
-    from lib import ceiling, enter, last_run, lock, presence
+    console is open on it, while approvals wait in it (ADR 0028, decision 7)
+    other than a topic proposal, and while no ceiling is set. The command's and
+    the connector's, so a chat is refused in the words a terminal is."""
+    from lib import ceiling, enter, gate, last_run, lock, presence, topics
 
     def answer(why=None, **said):
         return {"started": why is None, **said, **({"why": why} if why else {})}
@@ -663,13 +663,16 @@ def requested(name, prose, requester):
     refused = enter.unopenable(presence.live(root))
     if refused:
         return answer(refused)
-    waits = len(last_run.approvals(root))
+    # A topic proposal waits and blocks nothing: it changes no file a run
+    # builds on (ADR 0030, decision 6 as amended; issue 122).
+    blocking = [a for a in last_run.approvals(root) if a != gate.WORDS[topics.CATEGORY][0]]
+    waits = len(blocking)
     if waits:
         # A run past them would build on a tree the person has not approved,
         # and the edits waiting would go stale under it (ADR 0028, decision 7).
         return answer(f"{root.name} has {waits} approval{'s' if waits > 1 else ''} "
                       f"waiting; open its console to answer {'them' if waits > 1 else 'it'}.",
-                      approvals=last_run.approvals(root))
+                      approvals=blocking)
     if ceiling.read() is None:
         return answer("no ceiling set; an unattended run is refused until you "
                       "set one with `contour ceiling <n>`")

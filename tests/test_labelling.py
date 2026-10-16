@@ -153,16 +153,30 @@ class AnsweredTest(LabellingCase):
         self.assertEqual([a["id"] for a in approvals.load(wolf)], [kept["id"]])
         self.assertEqual((wolf / "spec.yaml").read_text(), "revision: 1\n")
 
-    def test_while_it_waits_its_space_refuses_a_request_and_once_answered_takes_one(self):
-        # A ceiling, and no console really started: what refuses is what waits.
+    def test_while_it_waits_its_space_takes_a_request(self):
+        """It blocks nothing (ADR 0030, decision 6 as amended; issue 122)."""
+        # A ceiling, and no console really started: nothing refuses it.
+        with mock.patch("lib.ceiling.read", return_value=300000), \
+                mock.patch("lib.enter.requested", side_effect=Taken):
+            with self.assertRaises(Taken):
+                cli.requested("beaky", "paint it blue", "the nightly agent")
+
+    def test_status_and_the_lobby_still_say_it_waits(self):
+        act = "Claude suggests words to find this model by"
+        self.assertEqual(survey.status(self.beaky)["approvals"], [act])
+        [row] = [s for s in survey.listing()["spaces"] if s["name"] == "beaky"]
+        self.assertEqual(row["approvals"], [act])
+
+    def test_any_other_approval_waiting_refuses_it_and_is_the_only_one_named(self):
+        approvals.set_aside(self.beaky, "r1", "spec-write", "Write",
+                            {"file_path": "spec.yaml", "content": "revision: 2\n"},
+                            {"act": "Claude wants to change the spec"}, "a case")
+        console_last_run.amend(self.beaky, approvals=approvals.acts(self.beaky))
         with mock.patch("lib.ceiling.read", return_value=300000), \
                 mock.patch("lib.enter.requested", side_effect=Taken):
             refused = cli.requested("beaky", "paint it blue", "the nightly agent")
-            self.assertIn("1 approval waiting", refused.get("why", ""))
-            shown = {p["name"]: p for p in labelling.shown()}
-            labelling.answered(str(self.beaky), shown["beaky"]["id"], ["bird"])
-            with self.assertRaises(Taken):
-                cli.requested("beaky", "paint it blue", "the nightly agent")
+        self.assertIn("beaky has 1 approval waiting", refused["why"])
+        self.assertEqual(refused["approvals"], ["Claude wants to change the spec"])
 
     def test_no_file_git_tracks_changes_before_its_proposal_is_answered(self):
         for root in (self.beaky, self.cube):

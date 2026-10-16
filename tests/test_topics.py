@@ -155,18 +155,23 @@ class WatchedTest(AnsweredCase):
 
 
 class UnattendedTest(AnsweredCase):
-    """A proposal nobody was watching for waits as an approval like any other
-    (ADR 0030, decision 6), and is answered later, on the page."""
+    """A proposal nobody was watching for waits as an approval does and is
+    answered later, on the page, but blocks nothing while it waits (ADR 0030,
+    decision 6 as amended)."""
 
-    def test_it_waits_holds_the_space_and_is_answered_word_by_word_later(self):
+    def test_it_waits_blocks_nothing_and_is_answered_word_by_word_later(self):
         self.set_aside(PROPOSED)
         [waiting] = approvals.load(self.beaky)
         self.assertEqual(waiting["category"], "topics")
         self.assertEqual(waiting["call"]["words"], ["creature", "bird", "fauna"])
         self.assertEqual(topics.load(self.beaky), {"topics": [], "struck": []})
-        with mock.patch.dict(os.environ, {"CONTOUR_SPACES": str(self.beaky.parent)}):
-            refused = cli.requested(self.beaky.name, "paint it blue", "the nightly agent")
-        self.assertFalse(refused["started"])
+        # A request is taken while it waits (ADR 0030, decision 6 as amended;
+        # issue 122): no console really started, so nothing refused it.
+        with mock.patch.dict(os.environ, {"CONTOUR_SPACES": str(self.beaky.parent)}), \
+                mock.patch("lib.ceiling.read", return_value=300000), \
+                mock.patch("lib.enter.requested", side_effect=RuntimeError("taken")):
+            with self.assertRaisesRegex(RuntimeError, "taken"):
+                cli.requested(self.beaky.name, "paint it blue", "the nightly agent")
 
         said = approvals.answer(self.beaky, waiting["id"], True,
                                 words=["creature", "bird"])

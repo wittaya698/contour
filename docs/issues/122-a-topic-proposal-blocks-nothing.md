@@ -11,10 +11,10 @@ the lobby still say a proposal waits.
 
 ## Acceptance criteria
 
-- [ ] A request to a space whose only waiting approval is a topic proposal starts
-- [ ] A request to a space with any other approval waiting is refused, as today, and names only those
-- [ ] Status, the lobby and the connector still say the proposal waits
-- [ ] A run that ends with a proposal waiting leaves it waiting, answered as before
+- [x] A request to a space whose only waiting approval is a topic proposal starts
+- [x] A request to a space with any other approval waiting is refused, as today, and names only those
+- [x] Status, the lobby and the connector still say the proposal waits
+- [x] A run that ends with a proposal waiting leaves it waiting, answered as before
 
 ## Blocked by
 
