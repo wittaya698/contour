@@ -395,6 +395,7 @@ sliced work is.
 | [124](124-a-console-nobody-can-reach-lets-go.md) | A console nobody can reach lets go | HITL | — |
 | [125](125-the-labelling-act-says-how-it-ended.md) | The labelling act says how it ended | AFK | — |
 | [126](126-a-spec-gate-shows-all-it-changes.md) | A spec gate shows all it changes | AFK | — |
+| [127](127-a-refresh-does-not-end-a-console.md) | A refresh does not end a console | AFK | — |
 
 **27 came out of slice 17's own suite runs.** `contour-console` forwards `SIGINT`
 and not `SIGTERM`, so every console a test terminates leaves its server running —
