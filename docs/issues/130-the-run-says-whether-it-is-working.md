@@ -18,6 +18,10 @@ three states:
 - **The state comes from the events, not from the tab.** A `prompt` with no
   `ended` after it is live, and a gate with no verdict is open. A reloaded tab
   replays the run (issue 127), so it gets the state right too.
+  As built, the console says the state with every page of the transcript
+  (`now` on `/events`) and the page draws it: testable without a browser, as
+  issue 128's tree is, and still not the tab's. The run is over once `ended`
+  is on the transcript, though its thread is still winding down.
 - **It does not name what the agent is doing.** The page cannot tell a tool
   running from the model thinking, since a call's result makes no event. The
   last activity line is already right above.
@@ -30,11 +34,11 @@ how far along it is.
 
 ## Acceptance criteria
 
-- [ ] A page reloaded mid-run shows *Claude is working*, not *no run yet*
-- [ ] A page reloaded while a gate waits shows *Waiting for you*, with no pulse
-- [ ] After 15 s without an event the line adds *quiet for N s*, and nothing else changes
-- [ ] An `ended` event returns the line to *no run*
-- [ ] Under `prefers-reduced-motion` the dot is still
+- [x] A page reloaded mid-run shows *Claude is working*, not *no run yet*
+- [x] A page reloaded while a gate waits shows *Waiting for you*, with no pulse
+- [x] After 15 s without an event the line adds *quiet for N s*, and nothing else changes
+- [x] An `ended` event returns the line to *no run*
+- [x] Under `prefers-reduced-motion` the dot is still
 
 ## Blocked by
 

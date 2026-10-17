@@ -115,6 +115,19 @@
   #run { border-top: 1px solid var(--line); padding-top: 12px; display: flex;
          flex-direction: column; gap: 8px; }
   #state { opacity: .6; font-size: 12px; }
+  /* Whether the run is working, from the console (issue 130). A dot in the
+     agent's colour that breathes while it works; in the gate's colour, still,
+     while it waits on you; none when nothing runs. Never how far along. */
+  #state.working, #state.waiting { opacity: 1; }
+  #state .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+                margin-right: 6px; vertical-align: 1px; }
+  #state.working .dot { background: var(--agent); animation: breathe 1.6s ease-in-out infinite; }
+  #state.waiting .dot { background: var(--pin); }
+  #state.idle .dot { display: none; }
+  @keyframes breathe { 50% { opacity: .25; } }
+  @media (prefers-reduced-motion: reduce) {
+    #state .dot { animation: none; }
+  }
   /* Measurement, so it reads as an instrument and not as a warning: there is no
      threshold here to be near. */
   #spend { font-size: 11px; opacity: .6; margin: 0 0 4px;
@@ -453,7 +466,9 @@ function drive() {
     if (!prose.value.trim() && !chosen.size) return;
     const said = await ask('/run', { prompt: prose.value.trim(),
                                      marks: [...chosen] }).then(r => r.json());
-    state.textContent = said.started ? 'running' : said.why;
+    // Why it did not start, until the console has something else to say:
+    // whether it did is the console's to tell, on the next poll.
+    if (!said.started) state.textContent = said.why;
     if (said.started) {
       // The scope belonged to that run. Kept ticked, it would quietly seed the
       // next one too, and the report at the end would be about marks the user
@@ -468,7 +483,6 @@ function drive() {
 
   document.getElementById('end').addEventListener('click', async () => {
     await ask('/end', {});                  // the run, not the console
-    state.textContent = 'no run';
   });
 
   // The vetoes, on the same clock as the panel rather than the transcript: one
@@ -502,8 +516,29 @@ function drive() {
       if (line) turns.append(line);         // a folded read redrew its line
     }
     if (said.events.length) turns.scrollTop = turns.scrollHeight;
-    if (said.events.some(e => e.kind === 'ended')) state.textContent = 'no run';
+    if (said.now) running(state, said.now);
   }, 600);
+}
+
+// The line under the transcript, as the console says it (issue 130). Redrawn
+// only when what it says changes, so a reason a run did not start stays up
+// until there is news; and its dot is one element, kept, so a line that counts
+// the quiet seconds does not restart the dot's breathing every second.
+let shown = '';
+function running(state, now) {
+  const said = now.state + '\n' + now.said;
+  if (said === shown) return;
+  shown = said;
+  state.className = now.state;
+  let words = state.querySelector('.words');
+  if (!words) {                       // first time, or a refusal's reason was shown
+    const dot = document.createElement('span');
+    dot.className = 'dot';
+    words = document.createElement('span');
+    words.className = 'words';
+    state.replaceChildren(dot, words);
+  }
+  words.textContent = now.said;
 }
 
 // What was refused. The whole section goes away

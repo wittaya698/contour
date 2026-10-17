@@ -10,11 +10,13 @@ import importlib.util
 import os
 import secrets
 import threading
+import time
 from pathlib import Path
 
 from console import approvals, last_run, launcher, seed, spend, vetoes
 from lib import activity, gate as gate_words, intent, lock, marks, policy, prose, survey, topics
 from lib.last_run import ENDED
+
 
 
 class Stopped(Exception):
@@ -193,6 +195,21 @@ def spec_edit(space, content):
     return "Edit", {"file_path": str(spec), "old_string": was, "new_string": content}
 
 
+QUIET = 15
+"""Seconds without an event before the line says how long it has been."""
+
+
+def working(quiet):
+    """The line while the agent works, `quiet` seconds after the transcript
+    last grew. A measurement and never a verdict, as the idle timeout and
+    spend are: no warning, no colour, nothing ends (issue 130)."""
+    if quiet < QUIET:
+        return "Claude is working"
+    minutes, seconds = divmod(int(quiet), 60)
+    return ("Claude is working · quiet for "
+            + (f"{minutes}m {seconds:02d}s" if minutes else f"{seconds}s"))
+
+
 class Run:
     """One agent session, from the first prompt to the agent stopping.
 
@@ -206,6 +223,7 @@ class Run:
         self.drive = drive
         self.events = []
         self.pending = None                   # the gate waiting for a verdict
+        self.heard = time.monotonic()         # when the transcript last grew
         self.record = None                    # the hold on the space, while live
         self.stopped = False                  # the user said the run is over
         self.seeded = []                      # the marks this run was started from
@@ -692,6 +710,7 @@ class Run:
             if kind == "call" and fields["tool"] in activity.QUIET:
                 self.fold(event)
             self.events.append(event)
+            self.heard = time.monotonic()
         return event
 
     def fold(self, event):
@@ -709,4 +728,21 @@ class Run:
     def since(self, n):
         """The transcript from a cursor, and the cursor to ask with next."""
         with self._lock:
-            return {"events": self.events[n:], "next": len(self.events)}
+            return {"events": self.events[n:], "next": len(self.events),
+                    "now": self.status()}
+
+    def status(self):
+        """The line under the transcript: whether the agent is working, never
+        how far along it is (issue 130; ADR 0019, decision 4). The console's to
+        say and not the tab's, so a reloaded tab that started nothing is told
+        the same as the one that did."""
+        # Over once the transcript says so, though the thread is still winding
+        # down: the line and the transcript are one reply, and must not be two
+        # answers to whether the run is going.
+        latest = next((e["kind"] for e in reversed(self.events)
+                       if e["kind"] in ("prompt", "ended")), None)
+        if not self.live or latest == "ended":
+            return {"state": "idle", "said": "no run"}
+        if self.pending is not None:
+            return {"state": "waiting", "said": "Waiting for you: answer above"}
+        return {"state": "working", "said": working(time.monotonic() - self.heard)}
