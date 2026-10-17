@@ -10,6 +10,8 @@
   #stage { flex: 1; position: relative; overflow: auto; padding: 12px; }
   #wrap { position: relative; display: inline-block; }
   canvas { display: block; max-width: 100%; height: auto; cursor: crosshair; }
+  /* The perspective is to look at: a click there marks nothing (issue 131). */
+  #sheet.look { cursor: default; }
   aside { width: 300px; border-left: 1px solid var(--line); padding: 16px; display: flex;
           flex-direction: column; gap: 12px; overflow: auto; }
   h1 { font-size: 13px; letter-spacing: .08em; text-transform: uppercase; margin: 0; opacity: .6; }
@@ -43,6 +45,8 @@
      Not a close — the finding stands until the user says otherwise, so this
      dims the badge and never removes it. */
   .pin.done { opacity: .4; }
+  /* Not the span the card is asking about (issue 131). */
+  .pin.faded { opacity: .35; }
   li.done .text { opacity: .55; }
   .who { font-size: 11px; letter-spacing: .06em; text-transform: uppercase;
          opacity: .6; color: var(--agent); }
@@ -76,7 +80,7 @@
   #questions .zoom { width: 100%; cursor: default; border-radius: 4px;
                      border: 1px solid var(--line); }
   #questions p { margin: 0; }
-  #questions .number { font-family: ui-monospace, SFMono-Regular, monospace;
+  #questions .which, #questions .number { font-family: ui-monospace, SFMono-Regular, monospace;
                        font-size: 12px; color: var(--agent); }
   #questions .asks { font-weight: 700; }
   #questions .eyed { font-size: 12px; font-style: italic; color: var(--agent); }
@@ -256,7 +260,7 @@
   <section id="questions" hidden>
     <h1 class="count"></h1>
     <canvas class="zoom" width="536" height="320"></canvas>
-    <p class="number"></p>
+    <p><span class="which"></span> · <span class="number"></span></p>
     <p class="asks"></p>
     <p class="eyed" hidden>Claude placed these ends by eye — check them closely.</p>
     <div class="answers">
@@ -1066,6 +1070,7 @@ img.onload = () => { cv.width = img.width; cv.height = img.height;
 
 function show(name) {
   showing = name;
+  cv.classList.toggle('look', name === PERSP);
   pending = null;
   entry.hidden = true;
   for (const b of strip.children)
@@ -1103,7 +1108,7 @@ labelled().then(() => ask('/refs.json').then(r => r.json()).then(names => {
     b.addEventListener('click', () => show(name));
     strip.appendChild(b);
   }
-  show(null);
+  show(showing);         // the sheet, unless the card's question brought up its picture first
 }));
 
 // Marks outlive the session that made them, so the page starts from the file.
@@ -1128,6 +1133,17 @@ function at(e) {
           Math.round((e.clientY - r.top) * cv.height / r.height)];
 }
 
+// How a mark is drawn while the card asks about a span: that span heavier, and
+// everything else faded but the reading carrying its number, so the picture
+// points at what the card zooms (issue 131). Width is a multiple of the line
+// every span is drawn with. A by-eye span is broken whether or not it is asked
+// (ADR 0022, decision 3).
+function stroke(mark, asked) {
+  return { width: asked && mark.id === asked.id ? 2 : 1,
+           dashed: mark.placed === 'by eye',
+           faded: !!asked && mark.id !== asked.id && mark.id !== asked.reading };
+}
+
 function draw() {
   for (const old of wrap.querySelectorAll('.pin')) old.remove();
   // The picture goes back down first: a span is stroked onto the canvas, so
@@ -1135,16 +1151,20 @@ function draw() {
   if (cv.width && img.complete) { ctx.clearRect(0, 0, cv.width, cv.height);
                                   ctx.drawImage(img, 0, 0); }
   list.replaceChildren();
+  // Asked before drawing, so the picture can point at the card's span.
+  const now = asking(marks, skipped).mark;
   marks.forEach((mark, i) => {
     const closed = mark.status === 'closed';
     const here = (mark.ref || null) === showing;
     const eyed = mark.placed === 'by eye';
+    const line = stroke(mark, now);
     if (cv.width && mark.to && here) {
       ctx.save();
       ctx.strokeStyle = mark.author === 'agent' ? '#2f6fd8' : '#d8442f';
-      ctx.lineWidth = Math.max(2, cv.width / 400);
+      ctx.lineWidth = Math.max(2, cv.width / 400) * line.width;
+      ctx.globalAlpha = line.faded ? 0.35 : 1;
       ctx.lineCap = 'round';
-      if (eyed) ctx.setLineDash([ctx.lineWidth * 3, ctx.lineWidth * 3]);
+      if (line.dashed) ctx.setLineDash([ctx.lineWidth * 3, ctx.lineWidth * 3]);
       ctx.beginPath();
       ctx.moveTo(mark.pixel[0], mark.pixel[1]);
       ctx.lineTo(mark.to[0], mark.to[1]);
@@ -1152,7 +1172,8 @@ function draw() {
       ctx.restore();
       const far = document.createElement('div');
       far.className = 'pin ref end' + (closed ? ' closed' : '')
-                      + (mark.author === 'agent' ? ' agent' : '');
+                      + (mark.author === 'agent' ? ' agent' : '')
+                      + (line.faded ? ' faded' : '');
       far.style.left = (mark.to[0] / cv.width * 100) + '%';
       far.style.top = (mark.to[1] / cv.height * 100) + '%';
       wrap.appendChild(far);
@@ -1161,7 +1182,8 @@ function draw() {
       const pin = document.createElement('div');
       pin.className = 'pin' + (closed ? ' closed' : '') + (mark.ref ? ' ref' : '')
                       + (mark.author === 'agent' ? ' agent' : '')
-                      + (mark.addressed ? ' done' : '');
+                      + (mark.addressed ? ' done' : '')
+                      + (line.faded ? ' faded' : '');
       pin.textContent = closed ? '✓' : i + 1;
       pin.style.left = (mark.pixel[0] / cv.width * 100) + '%';
       pin.style.top = (mark.pixel[1] / cv.height * 100) + '%';
@@ -1311,16 +1333,42 @@ function spanState(mark) {
 // written and a reload asks them again.
 const skipped = new Set();
 let asked = null;                            // the span the card is asking about
+// The question the picture last followed, and whether a mouse button is down
+// on the picture. Held is not `down`, which a click reads after the button
+// comes up, and which a drag let go off the picture leaves set.
+let followed = null, held = false;
+
+// Which picture to bring up for the card's question, if any: the question's
+// own, when the card has moved to one on another picture, and never while the
+// person is part-way through a mark or a drag. That waits, unfollowed, and
+// switches once they finish. A question already followed lets them look
+// elsewhere (issue 131).
+function follow(showing, asked, followed, busy) {
+  if (!asked || asked.id === followed || busy) return { show: null, followed };
+  return { show: asked.ref === showing ? null : asked.ref, followed: asked.id };
+}
+
+// The question to ask, and how the card names it: by the number on its badge,
+// which is its place in the list, so the card and the picture never name two
+// different spans (issue 131).
+function asking(marks, skipped) {
+  const open = marks.filter(m => spanState(m) === 'unanswered' && m.status !== 'closed');
+  const mark = open.find(m => !skipped.has(m.id)) || null;
+  return { mark, number: mark ? 'span ' + (marks.indexOf(mark) + 1) : '', open: open.length };
+}
 
 function questions() {
   const card = document.getElementById('questions');
-  const open = marks.filter(m => spanState(m) === 'unanswered' && m.status !== 'closed');
-  const mark = open.find(m => !skipped.has(m.id)) || null;
+  const { mark, number, open } = asking(marks, skipped);
   card.hidden = !mark;
   asked = mark;
+  const step = follow(showing, mark, followed, pending !== null || held);
+  followed = step.followed;
+  if (step.show) { show(step.show); return; }   // its load redraws, and asks again
   if (!mark) return;
-  card.querySelector('.count').textContent = 'Claude has ' + open.length
-    + (open.length === 1 ? ' question' : ' questions') + ' about your pictures';
+  card.querySelector('.count').textContent = 'Claude has ' + open
+    + (open === 1 ? ' question' : ' questions') + ' about your pictures';
+  card.querySelector('.which').textContent = number;
   // The number the span gave, from the reading it is linked to: *span m4: 640
   // mm ±3 mm  (213 px at …)* is shown as *640 mm ±3 mm*. A span drawn before
   // readings were linked has none to show, and the question still stands.
@@ -1422,7 +1470,14 @@ cv.addEventListener('mousemove', e => {
   hint.textContent = part || 'Click the sheet, then type one line.';
 });
 
-cv.addEventListener('mousedown', e => { down = showing ? at(e) : null; });
+cv.addEventListener('mousedown', e => { down = showing ? at(e) : null; held = true; });
+// Wherever the button comes up. After the click, which may open a mark, so a
+// switch the drag held off is asked for only once that is known.
+window.addEventListener('mouseup', () => {
+  if (!held) return;
+  held = false;
+  setTimeout(questions, 0);
+});
 
 cv.addEventListener('click', e => {
   if (showing === PERSP) return;  // to look at, never to mark

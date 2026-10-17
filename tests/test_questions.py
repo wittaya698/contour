@@ -44,9 +44,11 @@ class PageTest(unittest.TestCase):
         """The count is every unanswered agent span, skipped or not: skipping
         puts a question off, it does not answer it. Asked in the agent's own
         words for what the span measures."""
+        chosen = self.script("asking")      # and run under node in test_asked
+        self.assertIn("spanState(m) === 'unanswered'", chosen)
+        self.assertIn("skipped.has(", chosen)
         asking = self.script("questions")
-        self.assertIn("spanState(m) === 'unanswered'", asking)
-        self.assertIn("skipped.has(", asking)
+        self.assertIn("asking(marks, skipped)", asking)
         self.assertIn("'Claude has '", asking)
         self.assertIn("' about your pictures'", asking)
         self.assertIn("'Is this ' + mark.text + '?'", asking)
