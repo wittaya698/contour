@@ -380,6 +380,35 @@ promised to keep — and is worth landing if topics never ship.
 **114 stays whole.** A topic that can be proposed and not approved is not
 verifiable, so proposal, gate, page and record go in together.
 
+## Batch 12 — the transcript reads
+
+From a design session on 2026-10-17, looking at a real run's transcript. Three AFK.
+
+| # | Slice | Type | Blocked by |
+|---|---|---|---|
+| [128](128-the-agents-words-keep-their-formatting.md) | The agent's words keep their formatting | AFK | — |
+| [129](129-the-transcript-reads-in-tiers.md) | The transcript reads in tiers | AFK | — |
+| [130](130-the-run-says-whether-it-is-working.md) | The run says whether it is working | AFK | — |
+
+## Batch 13 — answering Claude's spans
+
+From a design session on 2026-10-18, answering nine questions on a real
+reference. Six AFK.
+
+| # | Slice | Type | Blocked by |
+|---|---|---|---|
+| [131](131-the-span-being-asked-is-the-one-you-see.md) | The span being asked about is the one you see | AFK | — |
+| [132](132-a-span-is-moved-by-its-ends.md) | A span is moved by its ends, and you see it move | AFK | 131 |
+| [133](133-the-picture-fills-its-space.md) | The picture fills its space | AFK | — |
+| [134](134-the-column-is-as-wide-as-you-set-it.md) | The column is as wide as you set it | AFK | — |
+| [135](135-an-answer-shows-what-comes-next.md) | An answer shows what comes next without a reload | AFK | — |
+| [136](136-a-slip-can-be-undone.md) | A slip can be undone | AFK | 131 |
+
+**131 and 132 first**: they are what made the card hard to work. **135 starts
+by reproducing**, since which answer leaves the card stale is not known.
+**136 is the one exception to ADR 0022's *answers are final***, for slips only;
+a change of mind is a span of the person's own.
+
 ## Found in flight
 
 Not from either review — a defect the work turned up, filed where the rest of the
