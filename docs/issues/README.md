@@ -409,6 +409,25 @@ by reproducing**, since which answer leaves the card stale is not known.
 **136 is the one exception to ADR 0022's *answers are final***, for slips only;
 a change of mind is a span of the person's own.
 
+## Batch 14 — a span measured through the camera
+
+From [ADR 0032](../adr/0032-a-span-is-measured-through-the-camera.md), decided
+on 2026-10-18 after a three-quarter photograph showed a span's millimetres
+assumed a straight-on, upright, flat-background picture. One HITL, five AFK.
+
+| # | Slice | Type | Blocked by |
+|---|---|---|---|
+| [137](137-accept-adr-0032.md) | Accept ADR 0032 | HITL | — |
+| [138](138-a-span-is-read-through-the-camera.md) | A span is read through the camera | AFK | 137 |
+| [139](139-the-anchor-is-a-span.md) | The anchor is a span | AFK | 138 |
+| [140](140-claude-proposes-directions.md) | Claude proposes directions | AFK | 138 |
+| [141](141-the-card-asks-foundations-first.md) | The card asks foundations first | AFK | 132, 136, 139, 140 |
+| [142](142-old-readings-are-read-again.md) | Old readings are read again | AFK | 141 |
+
+**137 comes before any code**: it reverses ADR 0017's *disclosed, not
+corrected*. **138 is pure arithmetic** and can land while batch 13 is still
+open; the page work, 141, waits for 132 and 136 so it reuses them as built.
+
 ## Found in flight
 
 Not from either review — a defect the work turned up, filed where the rest of the
