@@ -277,7 +277,14 @@ Under the sheet it says whether the model is right: *matches the spec*, or one
 plain sentence per check that fails, *Height is 1640 mm; the spec wants 1700,
 give or take 5*. The transcript shows each call as one line of what was done,
 *Built the model — 2 things don't match*, with the raw call a click away, and
-the agent itself speaks in the same plain words. **Export** runs
+the agent itself speaks in the same plain words, with the formatting it gave
+them: its lists, its emphasis, and a spec draft in monospace with every line
+where it put it. Its words are the loudest thing in the transcript after a
+gate; what it did is quieter, and the bookkeeping quieter still. A link it
+writes is shown with where it points and is never followed. Under the
+transcript one line says whether it is working, *Claude is working · quiet for
+40s*, or *Waiting for you* while a gate waits, and a reloaded tab says the
+same. It never says how far along a run is. **Export** runs
 `contour export` once the build is green, and a card shows the file with
 Download and Show in Finder. Words worth learning, like *spec* and *span*,
 explain themselves where they first appear. Every page carries the header
