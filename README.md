@@ -126,6 +126,11 @@ contour export                     # .glb, re-imported and re-measured to prove 
 git add -A && git commit
 ```
 
+The sheet is four orthographic views, front | right over top | bottom, on a
+1 m grid with rulers. The bottom view is there for the underside, which no other
+view shows. The same model in perspective is drawn beside the sheet as
+`out/persp.png` (ADR 0005, amended).
+
 When an agent is doing the work, it stops before that last line. It shows you
 the `check` report and the sheet the build was drawn from, and commits only
 once you have seen both and said ship (rule 5 in `CLAUDE.md`).
@@ -183,7 +188,9 @@ a pin in the hit part's own coordinates, so it moves with the geometry instead o
 pointing at a pixel that stopped meaning anything at the next build. The agent
 marks too — `contour mark --part cap "..."` — and only you ever close one: the
 agent can attach *addressed in this build*, which dims the badge and settles
-nothing.
+nothing. The strip above the picture also offers **persp**, to look at the
+model in perspective. It takes no marks, because no camera is kept that could
+pin a click on it; mark the same spot in one of the four views instead.
 
 ```sh
 contour canvas                     # the sheet, to mark on; waits for you
@@ -287,7 +294,7 @@ contour lobby                      # from anywhere; no space needed
 ```
 
 The lobby is a page above the spaces (ADR 0021). Each space is a row: the
-model's last sheet, or a reference before its first build, its name, whether
+model in perspective from its last build, or a reference before its first build, its name, whether
 it matches its spec, and when it was last worked on. Health shows only when
 something is wrong: *needs an update*, or a remote, which a model must never
 have. There is one lobby: running `contour lobby` again shows the one already
@@ -488,7 +495,7 @@ A model space, anywhere on disk, its own git repository:
     CLAUDE.md     the agent's rules          (copied from the toolkit; `contour doctor` says which are behind or edited, `contour update` brings the behind ones in step)
     .claude/      the spec guard's settings, and the build and release skills
     .contour/     the marker, plus logs               (git-ignored)
-    out/          generated .blend, filmstrip, scratch (git-ignored)
+    out/          generated .blend, persp.png, filmstrip, scratch (git-ignored)
     exports/      generated .glb                      (git-ignored)
     release/v<N>/ archived .blend + .glb + sheet      (tracked, at a tag)
     work/scene.blend  YOUR file — materials, lights, camera (git-ignored)
