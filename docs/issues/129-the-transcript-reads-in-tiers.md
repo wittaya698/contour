@@ -25,10 +25,10 @@ bubbles: it is a log, half a page wide.
 
 ## Acceptance criteria
 
-- [ ] The agent's words are set at body size with an `--agent` rule; the prompt has a `--line` rule and no bold
-- [ ] Activity lines are unchanged; bookkeeping lines are smaller than activity
-- [ ] A gate waiting is still the only red-bordered line in the transcript
-- [ ] No colour is added to `lib/look.css` or `lib/canvas.html`
+- [x] The agent's words are set at body size with an `--agent` rule; the prompt has a `--line` rule and no bold
+- [x] Activity lines are unchanged; bookkeeping lines are smaller than activity
+- [x] A gate waiting is still the only red-bordered line in the transcript
+- [x] No colour is added to `lib/look.css` or `lib/canvas.html`
 
 ## Blocked by
 

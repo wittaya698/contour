@@ -147,8 +147,15 @@
            overflow: auto; }
   body.driving #turns { flex: 1; max-height: none; }
   body.driving #run { flex: 1; }
-  #turns li { font-size: 12px; }
-  #turns .prompt { font-weight: 600; }
+  #turns > li { font-size: 12px; }
+  /* The agent's words (issue 129): what a person reads here, at body size, in
+     full colour, with a rule in the colour of everything the agent makes. */
+  #turns > .text { font-size: 14px; border-left: 2px solid var(--agent);
+                   padding-left: 8px; }
+  /* What you asked (issue 129): a quiet rule and no bold, so bold inside a
+     line only ever means the agent stressed it. */
+  #turns > .prompt, #turns > .asked { font-size: 13px; border-left: 2px solid var(--line);
+                                     padding-left: 8px; }
   /* The agent's words, as it formatted them (issue 128). Its line breaks kept,
      its code and spec drafts in monospace with every space where it put it. */
   #turns .text p { margin: 0 0 6px; white-space: pre-wrap; }
@@ -159,14 +166,20 @@
   #turns .text ul ul { margin: 4px 0 0; }
   #turns .text ul li { position: relative; padding-left: 1.8em; white-space: pre-wrap; }
   #turns .text .marker { position: absolute; left: 0; opacity: .6; }
-  #turns .text pre, #turns .text code { font-family: ui-monospace, SFMono-Regular, monospace;
-                                        font-size: 11px; }
+  #turns .text pre, #turns .text code { font-family: ui-monospace, SFMono-Regular, monospace; }
+  #turns .text pre { font-size: 11px; }
+  /* Inline, a little under the words around it: monospace runs wide, and a
+     fixed size would shrink a name in a sentence to a footnote. */
+  #turns .text code { font-size: .9em; }
   #turns .text pre { margin: 0 0 6px; padding: 6px 8px; border: 1px solid var(--line);
                      border-radius: 4px; overflow-x: auto; white-space: pre; }
   #turns .text pre[data-lang]::before { content: attr(data-lang); display: block;
                                         opacity: .6; margin-bottom: 4px; }
-  #turns .limit, #turns .ended, #turns .verdict,
-  #turns .resolved { opacity: .6; }
+  /* Bookkeeping (issue 129): quieter than what the agent did, and a hairline
+     above the end, so a run visibly closes. */
+  #turns > .limit, #turns > .ended, #turns > .verdict,
+  #turns > .resolved { opacity: .6; font-size: 11px; }
+  #turns > .ended { border-top: 1px solid var(--line); padding-top: 6px; }
   /* One line per seeded mark, so the report reads as a list and not a paragraph:
      it is answering *what happened to each of these*. */
   #turns .seeds { white-space: pre-line; border-left: 2px solid currentColor;
