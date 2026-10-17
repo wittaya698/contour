@@ -13,7 +13,7 @@ import threading
 from pathlib import Path
 
 from console import approvals, last_run, launcher, seed, spend, vetoes
-from lib import activity, gate as gate_words, intent, lock, marks, policy, survey, topics
+from lib import activity, gate as gate_words, intent, lock, marks, policy, prose, survey, topics
 from lib.last_run import ENDED
 
 
@@ -682,6 +682,11 @@ class Run:
             # page keeps one click away (ADR 0025, decision 8).
             fields["activity"] = activity.line(fields.get("tool"), fields.get("call") or {})
             fields["fold"] = None
+        if kind == "text":
+            # The words as the agent formatted them, beside the words as it
+            # wrote them: the page draws the one and nothing that reads the
+            # other changes (issue 128).
+            fields["blocks"] = prose.blocks(fields["text"])
         with self._lock:
             event = {"n": len(self.events), "kind": kind, **fields}
             if kind == "call" and fields["tool"] in activity.QUIET:

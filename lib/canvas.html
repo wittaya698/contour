@@ -149,6 +149,22 @@
   body.driving #run { flex: 1; }
   #turns li { font-size: 12px; }
   #turns .prompt { font-weight: 600; }
+  /* The agent's words, as it formatted them (issue 128). Its line breaks kept,
+     its code and spec drafts in monospace with every space where it put it. */
+  #turns .text p { margin: 0 0 6px; white-space: pre-wrap; }
+  #turns .text > :last-child { margin-bottom: 0; }
+  #turns .text .heading { font-weight: 700; }
+  #turns .text ul { list-style: none; margin: 0 0 6px; padding: 0;
+                    display: flex; flex-direction: column; gap: 4px; }
+  #turns .text ul ul { margin: 4px 0 0; }
+  #turns .text ul li { position: relative; padding-left: 1.8em; white-space: pre-wrap; }
+  #turns .text .marker { position: absolute; left: 0; opacity: .6; }
+  #turns .text pre, #turns .text code { font-family: ui-monospace, SFMono-Regular, monospace;
+                                        font-size: 11px; }
+  #turns .text pre { margin: 0 0 6px; padding: 6px 8px; border: 1px solid var(--line);
+                     border-radius: 4px; overflow-x: auto; white-space: pre; }
+  #turns .text pre[data-lang]::before { content: attr(data-lang); display: block;
+                                        opacity: .6; margin-bottom: 4px; }
   #turns .limit, #turns .ended, #turns .verdict,
   #turns .resolved { opacity: .6; }
   /* One line per seeded mark, so the report reads as a list and not a paragraph:
@@ -616,8 +632,56 @@ function turn(event) {
   if (event.kind === 'call') return activity(event);
   const li = document.createElement('li');
   li.className = event.kind;
-  li.textContent = event.text || '';
+  if (event.blocks) li.append(...words(event.blocks));
+  else li.textContent = event.text || '';
   return li;
+}
+
+// The agent's words with the formatting it gave them, drawn from the tree the
+// console parsed them into (issue 128). Elements and `textContent` and never
+// markup, so nothing it writes can run whatever it writes; and a link is its
+// words and where it points, shown and not followed, since the agent chose it.
+function words(blocks) {
+  return blocks.map(block => {
+    if (block.kind === 'list') return wordList(block.items);
+    const el = document.createElement(block.kind === 'code' ? 'pre' : 'p');
+    if (block.kind === 'code') {
+      el.textContent = block.text;
+      if (block.lang) el.dataset.lang = block.lang;
+    } else {
+      if (block.kind === 'heading') el.className = 'heading';
+      el.append(...block.spans.map(styled));
+    }
+    return el;
+  });
+}
+
+// A list, with the markers the agent wrote: its numbers are its own, and a
+// question it numbered 3 stays 3 wherever the list happens to start.
+function wordList(items) {
+  const ul = document.createElement('ul');
+  for (const item of items) {
+    const li = document.createElement('li');
+    const marker = document.createElement('span');
+    marker.className = 'marker';
+    marker.textContent = /\d/.test(item.marker) ? item.marker : '•';
+    li.append(marker, ...item.spans.map(styled));
+    if (item.items) li.append(wordList(item.items));
+    ul.append(li);
+  }
+  return ul;
+}
+
+// One run of words, in the styles it is in.
+function styled(span) {
+  let node = document.createTextNode(span.text);
+  for (const [style, tag] of [['code', 'code'], ['italic', 'em'], ['bold', 'strong']]) {
+    if (!span[style]) continue;
+    const el = document.createElement(tag);
+    el.append(node);
+    node = el;
+  }
+  return node;
 }
 
 // One call, as what it did, with the call itself a click away (ADR 0025,
@@ -634,7 +698,9 @@ function activity(event) {
     if (event.fold != null) li.dataset.fold = event.fold;
     const raw = document.createElement('details');
     raw.className = 'raw';
-    raw.innerHTML = '<summary>the exact call</summary>';
+    const summary = document.createElement('summary');
+    summary.textContent = 'the exact call';
+    raw.append(summary);
     li.append(document.createElement('span'), raw);
   }
   li.firstChild.textContent = event.activity || called(event);

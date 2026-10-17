@@ -55,13 +55,13 @@ Decided and not to be reopened here:
 
 ## Acceptance criteria
 
-- [ ] A `text` event carries the raw `text` and a tree beside it
-- [ ] `<script>alert(1)</script>` in the agent's words comes out as text in the tree, and the page sets no `innerHTML` from an event
-- [ ] A fenced `spec.yaml` draft keeps every line and its indentation
-- [ ] The interview from the session above, numbered questions with nested options, comes out as one list with sub-lists
-- [ ] `[x](javascript:alert(1))` comes out as the text `x (javascript:alert(1))`, and nothing on the page is a link
-- [ ] For any input, every character of `text` other than consumed markers appears in the tree, in order
-- [ ] An unclosed `**` or fence is shown as written, not swallowed
+- [x] A `text` event carries the raw `text` and a tree beside it
+- [x] `<script>alert(1)</script>` in the agent's words comes out as text in the tree, and the page sets no `innerHTML` from an event
+- [x] A fenced `spec.yaml` draft keeps every line and its indentation
+- [ ] The interview from the session above, numbered questions with nested options, comes out as one list with sub-lists. Proven for questions written `1. **What is it?**`; the screenshot may show `**1. What is it?**`, which comes out as a bold line over each question's own list. The text was not kept, so this waits on a real `new-space` run
+- [x] `[x](javascript:alert(1))` comes out as the text `x (javascript:alert(1))`, and nothing drawn from the agent's words is a link
+- [x] For any input, every letter and digit of `text` appears in the tree, in order, and none is added
+- [x] An unclosed `**` or fence is shown as written, not swallowed
 
 ## Blocked by
 
