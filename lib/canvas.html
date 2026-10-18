@@ -286,6 +286,8 @@
        overview and still answers; this is the same three answers, asked. -->
   <section id="questions" hidden>
     <h1 class="count"></h1>
+    <!-- The last answer, offered back for a slip (issue 136). -->
+    <p class="slip" hidden><span class="did"></span> · <button type="button" class="undo shut">undo</button></p>
     <canvas class="zoom" width="536" height="320"></canvas>
     <p><span class="which"></span> · <span class="number"></span></p>
     <p class="asks"></p>
@@ -555,6 +557,9 @@ function drive() {
       // the transcript would bury what the agent actually said under an
       // accountant, so the running total replaces itself in one place.
       if (event.kind === 'spend') { spendLine(event); continue; }
+      // A run started, on any tab: the last answer may be used now, so it is
+      // offered back no more (issue 136). The server refuses it anyway.
+      if (event.kind === 'prompt' && slip) { slip = null; draw(); }
       const line = turn(event);
       if (line) turns.append(line);         // a folded read redrew its line
     }
@@ -1402,6 +1407,15 @@ function draw() {
       shut.addEventListener('click', () => shutMark(mark));
       li.append(shut);
     }
+    // The last answer, offered back beside its span when there is no card
+    // showing to offer it (issue 136).
+    if (!now && slip && mark.id === slip.id) {
+      const back = document.createElement('button');
+      back.className = 'shut';
+      back.textContent = 'undo';
+      back.addEventListener('click', () => undo());
+      li.append(back);
+    }
     list.appendChild(li);
   });
   if (cv.width && sketch) {
@@ -1485,6 +1499,7 @@ function spanState(mark) {
 // written and a reload asks them again.
 const skipped = new Set();
 let asked = null;                            // the span the card is asking about
+let slip = null;                             // the last answer, to undo: { id, did }
 // The question the picture last followed, and whether a mouse button is down
 // on the picture. Held is not `down`, which a click reads after the button
 // comes up, and which a drag let go off the picture leaves set.
@@ -1512,11 +1527,21 @@ function asking(marks, skipped, moving) {
   return { mark, number: mark ? 'span ' + (marks.indexOf(mark) + 1) : '', open: open.length };
 }
 
+// The last answer, as the page offers it back: *Adopted span 15*, by the
+// number on the span's badge, or nothing once the span is not on file.
+function slipped(slip, marks) {
+  const at = slip ? marks.findIndex(m => m.id === slip.id) : -1;
+  return at < 0 ? null : slip.did + ' span ' + (at + 1);
+}
+
 function questions() {
   const card = document.getElementById('questions');
   const { mark, number, open } = asking(marks, skipped, (moving && moving.mark) || rejecting);
   card.hidden = !mark;
   asked = mark;
+  const offer = slipped(slip, marks);
+  card.querySelector('.slip').hidden = !offer;
+  card.querySelector('.slip .did').textContent = offer || '';
   const step = follow(showing, mark, followed, pending !== null || held);
   followed = step.followed;
   if (step.show) { show(step.show); return; }   // its load redraws, and asks again
@@ -1646,8 +1671,9 @@ function askedAnswers() {
   on('.yes', () => adoptSpan(asked));
   on('.move', () => correctSpan(asked));
   on('.wrong', () => rejectSpan(asked));
-  on('.skip', () => { skipped.add(asked.id); questions(); });
+  on('.skip', () => { skipped.add(asked.id); slip = null; questions(); });
   on('.save', () => answered('/correct', correction(moving.mark, moving.ends)));
+  on('.undo', () => undo());
   on('.cancel', () => {
     moving = null;
     hint.textContent = 'Click the reference, or drag across a distance.';
@@ -1687,6 +1713,10 @@ async function answered(path, body) {
   moving = null;
   rejecting = null;
   if (said.refused) hint.textContent = said.refused;
+  // The one answer that can be taken back, for a slip, until the person moves
+  // on (issue 136): the server keeps the same one, and checks it.
+  else slip = { id: body.id,
+                did: { '/adopt': 'Adopted', '/correct': 'Corrected', '/reject': 'Rejected' }[path] };
   if (!await reread())
     hint.textContent = 'Your answer is recorded. The marks could not be read back after it, '
                      + 'so the card may be behind for a moment.';
@@ -1708,6 +1738,21 @@ async function reread() {
   marks = said;
   draw();
   return true;
+}
+
+// The last answer, taken back for a slip (issue 136). Refused, it is said and
+// offered no more: the server has said the answer stands. Not arrived, it is
+// said and still offered, to be tried again.
+async function undo() {
+  const said = await ask('/unanswer', { id: slip.id }).then(r => r.json()).catch(() => null);
+  if (!said) {
+    hint.textContent = 'That undo did not reach the console, so the answer stands for now. Try it again.';
+    return;
+  }
+  slip = null;
+  if (said.refused) hint.textContent = said.refused;
+  draw();
+  await reread();
 }
 
 function adoptSpan(mark) { answered('/adopt', { id: mark.id }); }

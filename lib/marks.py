@@ -351,6 +351,9 @@ def _answering(path, mark_id, change):
     corrected it is the user's, so it cannot be answered twice; once rejected
     it is closed. `change(mark, kept)` edits the record in place — and may add
     to `kept`, which is saved with it — or returns why it refuses.
+
+    The mark comes with the answer's slip: what `unanswer` needs to take it
+    back (issue 136).
     """
     kept = load(path)
     found = next((m for m in kept if m.get("id") == mark_id), None)
@@ -361,11 +364,44 @@ def _answering(path, mark_id, change):
         return {"refused": f"{mark_id} is not an agent span waiting on an "
                            f"answer: only an open one the agent drew is a "
                            f"question"}
+    was = json.loads(json.dumps(kept))      # as it stood, untouched by change
     refused = change(found, kept)
     if refused:
         return {"refused": refused}
     save(path, kept)
-    return {"mark": found}
+    return {"mark": found, "slip": _slip(mark_id, was, kept)}
+
+
+def _slip(mark_id, was, now):
+    """What one answer to `mark_id` did: every record it touched, as it was
+    and as the answer left it. A record it added has no before."""
+    before = {m.get("id"): m for m in was}
+    touched = [m for m in now if before.get(m.get("id")) != m]
+    return {"id": mark_id,
+            "before": [before[m["id"]] for m in touched if m["id"] in before],
+            "after": json.loads(json.dumps(touched))}
+
+
+def unanswer(path, slip):
+    """Take one answer back, for a slip (issue 136): every record it touched
+    as it was, in its place, and any it added gone, so the file is as it was
+    before the answer. Returns `{"mark": span}`, or `{"refused": why}` with
+    nothing written.
+
+    Only while all of it is still exactly as the answer left it. Anything
+    since — another answer, a run's use of the number — means the answer has
+    been built on, and it stands (ADR 0022, decision 5).
+    """
+    kept = load(path)
+    here = {m.get("id"): m for m in kept}
+    for m in slip["after"]:
+        if here.get(m["id"]) != m:
+            return {"refused": f"{m['id']} has changed since you answered, so "
+                               f"the answer stands"}
+    before = {m["id"]: m for m in slip["before"]}
+    added = {m["id"] for m in slip["after"]} - set(before)
+    save(path, [before.get(m.get("id"), m) for m in kept if m.get("id") not in added])
+    return {"mark": before[slip["id"]]}
 
 
 def spanned(path, mark, answer, at):

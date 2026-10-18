@@ -21,6 +21,7 @@ from console import vetoes as veto_store
 from console import launcher
 from lib import canvas as canvas_lib
 from lib import exported
+from lib import last_run
 from lib import gate as gate_words
 from lib import panel as panel_state
 from lib import policy, presence, signals
@@ -164,6 +165,9 @@ class Console:
             views=here.views, blend=here.blend, persp=here.persp,
             verdict=here.dot / panel_state.NAME, name=self.space.resolve().name,
             reload_grace=reload_grace,
+            # Which run is the latest, so an answer is undone only while no
+            # run has started since it (issue 136).
+            runs=last_run.path(self.space),
             routes={("POST", "/run"): self.started,
                     ("GET", "/events"): self.transcript,
                     ("POST", "/verdict"): self.verdict,

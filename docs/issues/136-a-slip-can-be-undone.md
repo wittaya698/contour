@@ -25,10 +25,30 @@ and already outranks Claude's reading.
 
 ## Acceptance criteria
 
-- [ ] Each of the three answers, undone, leaves `marks.json` as it was before it
-- [ ] Undo is offered for the last answer only, on the card or in the list
-- [ ] Answering another, skipping, reloading or a run starting takes the offer away
-- [ ] The server refuses an undo once the span changed or a run started, and the page says why
+- [x] Each of the three answers, undone, leaves `marks.json` as it was before it
+- [x] Undo is offered for the last answer only, on the card or in the list
+- [x] Answering another, skipping, reloading or a run starting takes the offer away
+- [x] The server refuses an undo once the span changed or a run started, and the page says why
+
+## How it was built
+
+- **One way back for all three answers.** Each answer keeps a *slip*: every
+  record it touched, as it was and as the answer left it. `marks.unanswer`
+  puts those back in place and drops any record the answer added, so adopt,
+  correct and reject are undone the same way and `marks.json` comes back
+  byte for byte.
+- **The canvas holds the last slip only, in memory.** `POST /unanswer` refuses
+  any span but that one, and refuses it again once it has been undone. It also
+  refuses when any record the answer touched has changed since, or when the
+  run named in `.contour/last-run.json` is not the one that was latest at the
+  answer. That last check covers a run started from any console.
+- **The page holds the window.** It offers *Adopted span 15 · undo* on the
+  card, or beside the span in the list when the card is not showing. Another
+  answer, a skip, a reload, or a run's prompt arriving in the transcript takes
+  the offer away. A refusal is said under the list.
+
+`tests/test_slip.py`. Checked end to end on the stand-in console, driven
+headless.
 
 ## Blocked by
 

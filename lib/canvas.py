@@ -20,6 +20,7 @@ from lib import mask as mask_store
 from lib import refs as refs_store
 from lib import signals
 from lib import span
+from lib import store
 from lib.page import TOKEN_HEADER, TOKEN_PARAM, Blob, Page  # noqa: F401  (re-exported)
 
 PAGE = Path(__file__).resolve().parent / "canvas.html"
@@ -45,7 +46,7 @@ class Canvas(Page):
     def __init__(self, sheet, marks, mask=None, parts=None, resolve=None,
                  refs=None, can=MARKS_ONLY, routes=None, views=None,
                  blend=None, verdict=None, name=None, grace=None,
-                 hidden_grace=None, reload_grace=0, persp=None):
+                 hidden_grace=None, reload_grace=0, persp=None, runs=None):
         # What this host can do, for the page to ask about. The caller's to
         # declare and not the Canvas's to infer: the console's extra surface
         # is the console's, and a Canvas that guessed would guess wrong for
@@ -83,9 +84,14 @@ class Canvas(Page):
         # The space's name, for the header every page carries: *Models ›
         # oak-chair* (ADR 0025, decision 12).
         self.name = name
+        # The space's run record, which names the latest run: an answer is
+        # undone only while no run has started since it (issue 136). None
+        # under a host that starts no runs.
+        self.runs = Path(runs) if runs else None
         self.captured = []
         self.pruned = None
         self._lock = threading.Lock()         # two posts can land at once
+        self.slip = None                      # the last answer, to undo a slip
 
     def served(self):
         """The sheet, the mask, the references and the marks: what the canvas
@@ -117,6 +123,9 @@ class Canvas(Page):
                     self.corrected, b.get("id"), b.get("pixel"), b.get("to")),
                 ("POST", "/reject"): lambda b: self.answer(
                     marks_store.reject, b.get("id"), b.get("why")),
+                # The one exception to an answer being final: the last one,
+                # taken back for a slip (issue 136).
+                ("POST", "/unanswer"): lambda b: self.unanswer(b.get("id")),
                 # The header's *Models* (ADR 0025, decision 12): the lobby, shown
                 # if one is running and started if not — `contour lobby` decides
                 # which, so the page and a terminal cannot disagree.
@@ -187,6 +196,28 @@ class Canvas(Page):
         `{"refused": why}`. Only ever reached from the page, as `close` is."""
         with self._lock:
             said = transition(self.marks, *args)
+            if "mark" in said:
+                self.slip = said["slip"]        # the last answer, and only it
+                self.slip_run = self.latest_run()
+        return said.get("mark") or said
+
+    def latest_run(self):
+        """The id of the space's latest run, or None before any."""
+        return store.load(self.runs, {}).get("run") if self.runs else None
+
+    def unanswer(self, mark_id):
+        """Take back the last answer, for a slip: the mark as it now stands
+        again, or `{"refused": why}`."""
+        with self._lock:
+            if not self.slip or self.slip["id"] != mark_id:
+                return {"refused": f"{mark_id}'s answer stands: only the last "
+                                   f"answer, once, can be undone"}
+            if self.latest_run() != self.slip_run:
+                return {"refused": f"{mark_id}'s answer stands: a run has started "
+                                   f"since, and may have used it"}
+            said = marks_store.unanswer(self.marks, self.slip)
+            if "mark" in said:
+                self.slip = None
         return said.get("mark") or said
 
     def corrected(self, marks, mark_id, a, b):
