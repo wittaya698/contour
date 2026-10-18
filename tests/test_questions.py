@@ -48,7 +48,7 @@ class PageTest(unittest.TestCase):
         self.assertIn("spanState(m) === 'unanswered'", chosen)
         self.assertIn("skipped.has(", chosen)
         asking = self.script("questions")
-        self.assertIn("asking(marks, skipped)", asking)
+        self.assertIn("asking(marks, skipped,", asking)
         self.assertIn("'Claude has '", asking)
         self.assertIn("' about your pictures'", asking)
         self.assertIn("'Is this ' + mark.text + '?'", asking)

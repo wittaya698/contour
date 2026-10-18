@@ -12,6 +12,9 @@
   canvas { display: block; max-width: 100%; height: auto; cursor: crosshair; }
   /* The perspective is to look at: a click there marks nothing (issue 131). */
   #sheet.look { cursor: default; }
+  /* Over a moving span's handle, a hand; holding one, a closed hand (issue 132). */
+  #sheet.grab, #questions .zoom.grab { cursor: grab; }
+  #sheet.grabbing, #questions .zoom.grabbing { cursor: grabbing; }
   aside { width: 300px; border-left: 1px solid var(--line); padding: 16px; display: flex;
           flex-direction: column; gap: 12px; overflow: auto; }
   h1 { font-size: 13px; letter-spacing: .08em; text-transform: uppercase; margin: 0; opacity: .6; }
@@ -55,6 +58,11 @@
      stroked on the canvas itself, because it has to sit under the pins and
      scale with the picture. */
   .pin.end { width: 12px; height: 12px; margin: -6px 0 0 -6px; }
+  /* A moving span's ends: round handles, hollow so the exact pixel shows
+     through, ringed in white to read on any photograph (issue 132). */
+  .pin.handle { width: 18px; height: 18px; margin: -9px 0 0 -9px; border-radius: 50%;
+                background: transparent; border: 2px solid var(--agent);
+                box-shadow: 0 0 0 1.5px #fff; color: transparent; }
   /* The strip: the sheet, then the user's references. One canvas, one at a time. */
   #strip { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
   #strip button { padding: 4px 10px; font-size: 12px; opacity: .65; }
@@ -84,7 +92,8 @@
                        font-size: 12px; color: var(--agent); }
   #questions .asks { font-weight: 700; }
   #questions .eyed { font-size: 12px; font-style: italic; color: var(--agent); }
-  #questions .answers { display: flex; flex-wrap: wrap; gap: 6px; }
+  #questions .answers, #questions .moving { display: flex; flex-wrap: wrap; gap: 6px; }
+  #questions [hidden] { display: none; }
   #questions .skip { align-self: flex-start; }
   li.adopted .verdict, li.corrected .verdict { color: var(--pin); }
   li.rejected .why { display: block; font-size: 12px; text-decoration: none; }
@@ -267,6 +276,11 @@
       <button type="button" class="yes">Yes, that&rsquo;s it</button>
       <button type="button" class="move">Let me move it</button>
       <button type="button" class="wrong">Wrong thing&hellip;</button>
+    </div>
+    <!-- While a span is moved by its ends (issue 132). -->
+    <div class="moving" hidden>
+      <button type="button" class="save" disabled>Save</button>
+      <button type="button" class="cancel">Cancel</button>
     </div>
     <button type="button" class="skip shut">skip for now</button>
   </section>
@@ -992,9 +1006,19 @@ let down = null;
 // could pin a click on it (ADR 0005, amended 2026-10-16).
 const PERSP = {};
 let showing = null;
-// The agent span the user is redrawing, or null. The next drag on its
-// reference becomes its ends, and nothing else does.
-let correcting = null;
+// The agent span being moved by its ends, or null (issue 132): its mark, the
+// ends where they are now (Claude's own until Save), the end held (0, 1 or
+// null) and the canvas it is held on. Nothing new is marked while one moves.
+let moving = null;
+// A new span while the mouse is down on a reference, from where it went down
+// to where it is: drawn as it is dragged, not once the button comes up.
+let sketch = null;
+// How the card framed its span, so a press on the card is carried back to the
+// picture through the crop it was drawn by.
+let framed = null;
+// A handle's radius on the card, in card pixels, and how near a press has to
+// come to an end to take it, in screen pixels on either picture.
+const HANDLE = 9, REACH = 14;
 
 // The mask is read here, never fetched per mouse move: hover has to be instant.
 // It is the same size and the same four-tile layout as the sheet, so a sheet
@@ -1152,13 +1176,16 @@ function draw() {
                                   ctx.drawImage(img, 0, 0); }
   list.replaceChildren();
   // Asked before drawing, so the picture can point at the card's span.
-  const now = asking(marks, skipped).mark;
+  const now = asking(marks, skipped, moving && moving.mark).mark;
   marks.forEach((mark, i) => {
     const closed = mark.status === 'closed';
     const here = (mark.ref || null) === showing;
     const eyed = mark.placed === 'by eye';
     const line = stroke(mark, now);
-    if (cv.width && mark.to && here) {
+    // A span being moved is drawn where its ends are now, each a handle.
+    const handled = moving && moving.mark.id === mark.id;
+    const [a, b] = handled ? moving.ends : [mark.pixel, mark.to];
+    if (cv.width && b && here) {
       ctx.save();
       ctx.strokeStyle = mark.author === 'agent' ? '#2f6fd8' : '#d8442f';
       ctx.lineWidth = Math.max(2, cv.width / 400) * line.width;
@@ -1166,27 +1193,27 @@ function draw() {
       ctx.lineCap = 'round';
       if (line.dashed) ctx.setLineDash([ctx.lineWidth * 3, ctx.lineWidth * 3]);
       ctx.beginPath();
-      ctx.moveTo(mark.pixel[0], mark.pixel[1]);
-      ctx.lineTo(mark.to[0], mark.to[1]);
+      ctx.moveTo(a[0], a[1]);
+      ctx.lineTo(b[0], b[1]);
       ctx.stroke();
       ctx.restore();
       const far = document.createElement('div');
       far.className = 'pin ref end' + (closed ? ' closed' : '')
                       + (mark.author === 'agent' ? ' agent' : '')
-                      + (line.faded ? ' faded' : '');
-      far.style.left = (mark.to[0] / cv.width * 100) + '%';
-      far.style.top = (mark.to[1] / cv.height * 100) + '%';
+                      + (line.faded ? ' faded' : '') + (handled ? ' handle' : '');
+      far.style.left = (b[0] / cv.width * 100) + '%';
+      far.style.top = (b[1] / cv.height * 100) + '%';
       wrap.appendChild(far);
     }
-    if (cv.width && mark.pixel && here) {
+    if (cv.width && a && here) {
       const pin = document.createElement('div');
       pin.className = 'pin' + (closed ? ' closed' : '') + (mark.ref ? ' ref' : '')
                       + (mark.author === 'agent' ? ' agent' : '')
                       + (mark.addressed ? ' done' : '')
-                      + (line.faded ? ' faded' : '');
+                      + (line.faded ? ' faded' : '') + (handled ? ' handle' : '');
       pin.textContent = closed ? '✓' : i + 1;
-      pin.style.left = (mark.pixel[0] / cv.width * 100) + '%';
-      pin.style.top = (mark.pixel[1] / cv.height * 100) + '%';
+      pin.style.left = (a[0] / cv.width * 100) + '%';
+      pin.style.top = (a[1] / cv.height * 100) + '%';
       wrap.appendChild(pin);
     }
     const li = document.createElement('li');
@@ -1263,6 +1290,17 @@ function draw() {
     }
     list.appendChild(li);
   });
+  if (cv.width && sketch) {
+    ctx.save();
+    ctx.strokeStyle = '#d8442f';
+    ctx.lineWidth = Math.max(2, cv.width / 400);
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(sketch[0][0], sketch[0][1]);
+    ctx.lineTo(sketch[1][0], sketch[1][1]);
+    ctx.stroke();
+    ctx.restore();
+  }
   questions();
 }
 
@@ -1350,16 +1388,19 @@ function follow(showing, asked, followed, busy) {
 
 // The question to ask, and how the card names it: by the number on its badge,
 // which is its place in the list, so the card and the picture never name two
-// different spans (issue 131).
-function asking(marks, skipped) {
+// different spans (issue 131). A span being moved is the question until it is
+// saved or cancelled, skipped or not: its Save and Cancel are on the card
+// (issue 132).
+function asking(marks, skipped, moving) {
   const open = marks.filter(m => spanState(m) === 'unanswered' && m.status !== 'closed');
-  const mark = open.find(m => !skipped.has(m.id)) || null;
+  const mark = open.find(m => moving && m.id === moving.id)
+               || open.find(m => !skipped.has(m.id)) || null;
   return { mark, number: mark ? 'span ' + (marks.indexOf(mark) + 1) : '', open: open.length };
 }
 
 function questions() {
   const card = document.getElementById('questions');
-  const { mark, number, open } = asking(marks, skipped);
+  const { mark, number, open } = asking(marks, skipped, moving && moving.mark);
   card.hidden = !mark;
   asked = mark;
   const step = follow(showing, mark, followed, pending !== null || held);
@@ -1377,7 +1418,54 @@ function questions() {
     ? reading.text.replace(/^span \S+: /, '').split('  ')[0] : '';
   card.querySelector('.asks').textContent = 'Is this ' + mark.text + '?';
   card.querySelector('.eyed').hidden = mark.placed !== 'by eye';
+  // Moving, the answers give way to Save and Cancel, and Save waits for an end
+  // to have moved: unmoved, the answer is Yes.
+  card.querySelector('.answers').hidden = !!moving;
+  card.querySelector('.skip').hidden = !!moving;
+  card.querySelector('.moving').hidden = !moving;
+  card.querySelector('.save').disabled = !moving
+    || String(moving.ends) === String([mark.pixel, mark.to]);
   zoom(mark);
+}
+
+// The part of the picture the card shows for a span from a to b: its box,
+// padded, then widened to the card's shape so nothing is stretched, and held
+// inside the picture. k is card pixels per picture pixel.
+function crop(a, b, picture, card) {
+  const pad = Math.max(Math.hypot(b[0] - a[0], b[1] - a[1]) * 0.35, 40);
+  let w = Math.abs(b[0] - a[0]) + 2 * pad, h = Math.abs(b[1] - a[1]) + 2 * pad;
+  const shape = card.width / card.height;
+  if (w / h < shape) w = h * shape; else h = w / shape;
+  w = Math.min(w, picture.width); h = Math.min(h, picture.height);
+  const x = Math.min(Math.max((a[0] + b[0]) / 2 - w / 2, 0), picture.width - w);
+  const y = Math.min(Math.max((a[1] + b[1]) / 2 - h / 2, 0), picture.height - h);
+  return { x, y, w, h, k: Math.min(card.width / w, card.height / h) };
+}
+
+// A point on the card, as the picture pixel under it: the same pixel a drag
+// on the big picture would have given (issue 132).
+function fromCard(point, frame) {
+  return [Math.round(frame.x + point[0] / frame.k), Math.round(frame.y + point[1] / frame.k)];
+}
+
+// Which end of a span a press at point takes hold of: the nearer, if it is
+// within reach, else none (issue 132). 0 is the span's pixel, 1 its far end.
+function grab(ends, point, reach) {
+  const off = ends.map(e => Math.hypot(e[0] - point[0], e[1] - point[1]));
+  const near = off[0] <= off[1] ? 0 : 1;
+  return off[near] <= reach ? near : null;
+}
+
+// The ends after one end is dragged to a point: new ends, never the old ones
+// changed, so the span Claude placed is still there for Cancel.
+function moved(ends, which, to) {
+  return ends.map((e, i) => i === which ? [to[0], to[1]] : e);
+}
+
+// What Save sends: the correction `/correct` has always taken, a span's two
+// ends as the person left them.
+function correction(mark, ends) {
+  return { id: mark.id, pixel: ends[0], to: ends[1] };
 }
 
 // The reference, cropped to the span with room either side, and the span drawn
@@ -1392,18 +1480,12 @@ function zoom(mark) {
     pic.onload = () => { if (asked === mark) zoom(mark); };
     return;
   }
-  const [a, b] = [mark.pixel, mark.to];
-  const pad = Math.max(Math.hypot(b[0] - a[0], b[1] - a[1]) * 0.35, 40);
-  // The span's box, padded, then widened to the card's shape so nothing is
-  // stretched, and held inside the picture.
-  let w = Math.abs(b[0] - a[0]) + 2 * pad, h = Math.abs(b[1] - a[1]) + 2 * pad;
-  const shape = cv.width / cv.height;
-  if (w / h < shape) w = h * shape; else h = w / shape;
-  w = Math.min(w, pic.naturalWidth); h = Math.min(h, pic.naturalHeight);
-  const x = Math.min(Math.max((a[0] + b[0]) / 2 - w / 2, 0), pic.naturalWidth - w);
-  const y = Math.min(Math.max((a[1] + b[1]) / 2 - h / 2, 0), pic.naturalHeight - h);
+  // Framed by Claude's ends, so the card holds still while one is dragged.
+  framed = crop(mark.pixel, mark.to, { width: pic.naturalWidth, height: pic.naturalHeight }, cv);
+  const { x, y, w, h, k } = framed;
+  const handled = moving && moving.mark.id === mark.id;
+  const [a, b] = handled ? moving.ends : [mark.pixel, mark.to];
   const c = cv.getContext('2d');
-  const k = Math.min(cv.width / w, cv.height / h);
   c.clearRect(0, 0, cv.width, cv.height);
   c.drawImage(pic, x, y, w, h, 0, 0, w * k, h * k);
   c.save();
@@ -1415,6 +1497,19 @@ function zoom(mark) {
   c.moveTo((a[0] - x) * k, (a[1] - y) * k);
   c.lineTo((b[0] - x) * k, (b[1] - y) * k);
   c.stroke();
+  c.restore();
+  if (!handled) return;
+  c.save();
+  for (const e of [a, b]) {
+    c.beginPath();
+    c.arc((e[0] - x) * k, (e[1] - y) * k, HANDLE, 0, 2 * Math.PI);
+    c.lineWidth = 4;
+    c.strokeStyle = '#fff';
+    c.stroke();
+    c.lineWidth = 2;
+    c.strokeStyle = '#2f6fd8';
+    c.stroke();
+  }
   c.restore();
 }
 
@@ -1430,6 +1525,12 @@ function askedAnswers() {
   on('.move', () => correctSpan(asked));
   on('.wrong', () => rejectSpan(asked));
   on('.skip', () => { skipped.add(asked.id); questions(); });
+  on('.save', () => answered('/correct', correction(moving.mark, moving.ends)));
+  on('.cancel', () => {
+    moving = null;
+    hint.textContent = 'Click the reference, or drag across a distance.';
+    draw();
+  });
 }
 askedAnswers();
 
@@ -1437,7 +1538,7 @@ askedAnswers();
 // whole: an answer can close a reading or add one, which is more than the one
 // mark the page clicked on.
 async function answered(path, body) {
-  correcting = null;
+  moving = null;
   const said = await ask(path, body).then(r => r.json()).catch(() => null);
   if (said && said.refused) hint.textContent = said.refused;
   marks = await ask('/marks').then(r => r.json());
@@ -1451,10 +1552,13 @@ function rejectSpan(mark) {
   if (why && why.trim()) answered('/reject', { id: mark.id, why: why.trim() });
 }
 
+// The span keeps its place and gets a handle on each end, on the big picture
+// and on the card: only the end that is wrong is dragged (issue 132).
 function correctSpan(mark) {
   if (showing !== mark.ref) show(mark.ref);
-  correcting = mark;
-  hint.textContent = 'Drag the span as it should be.';
+  moving = { mark, ends: [mark.pixel, mark.to], which: null, on: null };
+  hint.textContent = 'Drag the end that is wrong, here or on the card, then Save.';
+  draw();
 }
 
 // One click, no typing: only the user ever closes a mark.
@@ -1463,19 +1567,72 @@ async function shutMark(mark) {
   if (res.ok) { mark.status = 'closed'; draw(); }
 }
 
+// A point under the mouse on either picture, as a picture pixel, and the reach
+// of a handle there in picture pixels: the card through its own crop.
+function under(e, canvas) {
+  const r = canvas.getBoundingClientRect();
+  const p = [(e.clientX - r.left) * canvas.width / r.width,
+             (e.clientY - r.top) * canvas.height / r.height];
+  const reach = REACH * canvas.width / r.width;
+  return canvas === cv ? { point: p.map(Math.round), reach }
+                       : { point: fromCard(p, framed), reach: reach / framed.k };
+}
+
+// Which end of the moving span is under the mouse on this canvas, if any.
+function handleAt(e, canvas) {
+  if (!moving || (canvas === cv ? showing !== moving.mark.ref : !framed)) return null;
+  const { point, reach } = under(e, canvas);
+  return grab(moving.ends, point, reach);
+}
+
+const cardCv = document.querySelector('#questions .zoom');
+for (const canvas of [cv, cardCv]) {
+  canvas.addEventListener('mousedown', e => {
+    const which = handleAt(e, canvas);
+    if (which === null) return;
+    moving.which = which;
+    moving.on = canvas;
+    canvas.classList.add('grabbing');
+    e.stopImmediatePropagation();   // a handle taken is not the start of a span
+    held = true;
+  });
+  canvas.addEventListener('mousemove', e => {
+    if (!moving || moving.which !== null) return;
+    canvas.classList.toggle('grab', handleAt(e, canvas) !== null);
+  });
+}
+// The held end follows the mouse wherever it goes, off either picture too,
+// and both pictures redraw as it does.
+window.addEventListener('mousemove', e => {
+  if (!moving || moving.which === null) return;
+  moving.ends = moved(moving.ends, moving.which, under(e, moving.on).point);
+  draw();
+});
+
 cv.addEventListener('mousemove', e => {
+  if (down && sketch) { sketch = [down, at(e)]; draw(); return; }
   if (showing) return;           // a photograph or the perspective: no parts to name
   const [x, y] = at(e);
   const part = partAt(x, y);
   hint.textContent = part || 'Click the sheet, then type one line.';
 });
 
-cv.addEventListener('mousedown', e => { down = showing ? at(e) : null; held = true; });
+cv.addEventListener('mousedown', e => {
+  // While a span moves nothing new is marked: a press off its handles is idle.
+  down = showing && !moving ? at(e) : null;
+  sketch = down && showing !== PERSP ? [down, down] : null;
+  held = true;
+});
 // Wherever the button comes up. After the click, which may open a mark, so a
 // switch the drag held off is asked for only once that is known.
 window.addEventListener('mouseup', () => {
   if (!held) return;
   held = false;
+  if (moving && moving.which !== null) {
+    moving.on.classList.remove('grabbing');
+    moving.which = null;
+  }
+  if (sketch) { sketch = null; draw(); }
   setTimeout(questions, 0);
 });
 
@@ -1486,12 +1643,7 @@ cv.addEventListener('click', e => {
   // Far enough to be meant. A hand is not steady on a click, and a span of
   // three pixels is a slip, not a distance the user chose.
   const drag = down && Math.hypot(x - down[0], y - down[1]) > cv.width / 100;
-  if (correcting && showing === correcting.ref) {
-    // The drag is the correction, not a new mark.
-    if (drag) answered('/correct', { id: correcting.id, pixel: down, to: [x, y] });
-    down = null;
-    return;
-  }
+  if (moving) { down = null; return; }   // its ends are dragged, not drawn again
   pending = showing ? { ref: showing, pixel: drag ? down : [x, y] }
                     : { view: viewAt(x, y), pixel: [x, y] };
   if (drag) pending.to = [x, y];

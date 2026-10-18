@@ -22,12 +22,12 @@ pixels off an edge, and both ends have to be placed again for it.
 
 ## Acceptance criteria
 
-- [ ] *Let me move it* shows handles on the asked span's two ends
-- [ ] Dragging a handle redraws the span as it moves, on the big picture and the card
-- [ ] Save records a correction with the moved ends; the other end is unchanged
-- [ ] Cancel leaves the span unanswered and where Claude put it
-- [ ] Drawing a new span draws it while the mouse is down
-- [ ] Looked at in a real console
+- [x] *Let me move it* shows handles on the asked span's two ends
+- [x] Dragging a handle redraws the span as it moves, on the big picture and the card
+- [x] Save records a correction with the moved ends; the other end is unchanged
+- [x] Cancel leaves the span unanswered and where Claude put it
+- [x] Drawing a new span draws it while the mouse is down
+- [x] Looked at in a real console
 
 ## Blocked by
 
