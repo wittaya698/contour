@@ -1006,6 +1006,7 @@ const taughtRef = document.getElementById('taught-ref');
 taughtSheet.append(teach('sheet'), teach('mark'));
 taughtRef.append(teach('reference'), teach('span'));
 let marks = [], pending = null, added = 0, parts = {};
+let reads = 0;                               // of the marks, numbered: see reread
 // Whether this host can run an agent, and which open marks the next run is to be
 // seeded with. Ids and not marks: `draw()` rebuilds the list from scratch, and a
 // selection held as objects would survive as a copy of a mark that has moved on.
@@ -1224,8 +1225,10 @@ labelled().then(() => ask('/refs.json').then(r => r.json()).then(names => {
   show(showing);         // the sheet, unless the card's question brought up its picture first
 }));
 
-// Marks outlive the session that made them, so the page starts from the file.
-ask('/marks').then(r => r.json()).then(on => { marks = on; draw(); });
+// Marks outlive the session that made them, so the page starts from the file,
+// and others write it while the page is open (issue 135).
+reread();
+setInterval(reread, 2000);
 
 // Sheet layout, from contour render: front | right over top | bottom.
 function viewAt(x, y) {
@@ -1633,13 +1636,38 @@ askedAnswers();
 
 // The user's three answers. Each goes to the server and the list is read back
 // whole: an answer can close a reading or add one, which is more than the one
-// mark the page clicked on.
+// mark the page clicked on. One that does not arrive is said, and a span being
+// moved keeps its dragged ends, so Save can be pressed again (issue 135).
 async function answered(path, body) {
-  moving = null;
   const said = await ask(path, body).then(r => r.json()).catch(() => null);
-  if (said && said.refused) hint.textContent = said.refused;
-  marks = await ask('/marks').then(r => r.json());
+  if (!said) {
+    hint.textContent = 'That answer did not reach the console, so it is not recorded. Try it again.';
+    return;
+  }
+  if (moving) hint.textContent = 'Click the reference, or drag across a distance.';  // as Cancel
+  moving = null;
+  if (said.refused) hint.textContent = said.refused;
+  if (!await reread())
+    hint.textContent = 'Your answer is recorded. The marks could not be read back after it, '
+                     + 'so the card may be behind for a moment.';
+}
+
+// The marks, read back whole. The page is not their only writer: a run's agent
+// places spans while the page is open, and another tab answers them, so they
+// are read on a clock as well as after an answer (issue 135). Redrawn only when
+// they changed, so a clock does not rebuild the list under the mouse. The
+// latest read wins: one that comes back after a newer one is older news, and
+// would put back a question just answered. A read that fails changes nothing
+// and says false: the clock's next one tries again.
+async function reread() {
+  const n = ++reads;
+  const said = await ask('/marks').then(r => r.json()).catch(() => null);
+  if (n !== reads) return true;                 // a newer read has the news
+  if (!said) return false;
+  if (JSON.stringify(said) === JSON.stringify(marks)) return true;
+  marks = said;
   draw();
+  return true;
 }
 
 function adoptSpan(mark) { answered('/adopt', { id: mark.id }); }
