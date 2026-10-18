@@ -88,23 +88,23 @@ class SpanAnchorTest(unittest.TestCase):
         self.addCleanup(shutil.rmtree, self.tmp, True)
         self.spec = self.tmp / "spec.yaml"
 
-    def test_the_anchor_is_the_height_the_user_already_stated(self):
-        """Not a second number to author and keep in step with the first.
-        `dimensions.height` is the one real dimension the user gave the space,
-        and the references are pictures of that same object."""
+    def test_an_anchor_span_claims_a_size_the_spec_already_states(self):
+        """Not a second number to author and keep in step with the first: the
+        span claims one the spec states, any of them (ADR 0032, decision 3)."""
         self.spec.write_text("dimensions:\n"
                              "  height: { value: 1700, tol: 5 }\n"
                              "  width:  { value: 820, tol: 60 }\n")
-        self.assertEqual(span.anchor_mm(self.spec), 1700.0)
+        self.assertEqual(span.claimed(self.spec, "height")["mm"], 1700.0)
+        self.assertEqual(span.claimed(self.spec, "width")["mm"], 820.0)
 
     def test_a_space_that_has_stated_no_height_has_no_anchor(self):
         """A space may be drafted before the user has said how big the thing
         is — `beaky-solo` spent its first day that way, measured in pixels
         with no `dimensions` in its spec at all. There is then no scale to be
         had, and none is invented."""
-        self.assertIsNone(span.anchor_mm(self.spec))
+        self.assertIn("refused", span.claimed(self.spec, "height"))
         self.spec.write_text("model: beaky-solo\nparts:\n  - { name: head }\n")
-        self.assertIsNone(span.anchor_mm(self.spec))
+        self.assertIn("refused", span.claimed(self.spec, "height"))
 
 
 class SpanMeasureTest(unittest.TestCase):

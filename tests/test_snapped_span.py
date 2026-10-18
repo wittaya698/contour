@@ -123,7 +123,7 @@ class NoAnchorTest(DrawCase):
         self.assertIn("160 px", answer["text"])
         self.assertNotIn("mm", answer["text"])
         self.assertIn("no anchor", answer["text"])
-        self.assertIn("dimensions.height", answer["text"])
+        self.assertIn("anchor span", answer["text"])
         self.assertIn("160 px", said["lines"][0])
 
 

@@ -61,6 +61,12 @@ Propose three, square to each other on the object, where it has edges that
 go three ways. A line nothing snaps to is placed with `--line-by-eye`, and is
 labelled by eye. The user answers a direction as they answer a span.
 
+Then the **anchor span**: the span on that reference that a size the spec
+states is the length of, drawn with any span form plus `--claims width` (or
+whichever size it is). It asks the user *is this the width you told me?*
+Until they answer it and the directions, every span there reads in pixels
+and says what it waits on.
+
 Run `contour worksheet` and look at it once, before you propose: every span on
 its reference, with its id and number, so you can see each measures what it
 says. Then propose the change, wait for the user to confirm it, and write it

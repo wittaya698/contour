@@ -274,6 +274,13 @@ def on_api(cmd, rest, held):
 
 
 def on_measure(cmd, rest, held):
+    if "--anchor" in rest:
+        # Refused here, before Blender starts: the flag set a scale from the
+        # foreground box, which ADR 0032 retired.
+        return emit({"ok": False, "lines": [
+            "FAIL measure  --anchor is gone: the foreground box sets no scale "
+            "(ADR 0032). Draw the span a size the spec states is the length of, "
+            "with --claims and that size's name, e.g. --claims width"]})
     if rest[:1] == ["--standing"] and len(rest) == 2:
         # Whether a span's number may be proposed is read off `marks.json`
         # alone, so it is answered here and costs no Blender start.

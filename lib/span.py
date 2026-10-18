@@ -12,7 +12,7 @@ what needs to be checkable without a scene.
 import math
 from pathlib import Path
 
-from . import agent, marks, miniyaml
+from . import agent, camera, marks, miniyaml
 
 
 def reading(a, b, k):
@@ -36,25 +36,71 @@ def line(got):
             f"  ({got['px']:.0f} px at {got['mm'] / got['px']:.3f} mm/px)")
 
 
-def anchor_mm(spec):
-    """The one real dimension the space has stated, or None.
+STANDS = ("adopted", "corrected")
+"""What the user said that makes an agent's foundation theirs: a direction or
+an anchor span stands on these, and argues nothing before them (ADR 0032)."""
 
-    `dimensions.height` and not a second number of its own: the user already
-    gave the object's height, and a reference is a picture of that same
-    object. A second anchor would be a second thing to keep in step, and the
-    day the two disagreed nothing would say which was meant.
 
-    None when there is no spec, or none of this in it. None is a refusal, not
-    a default — a picture carries proportion and never scale (ADR 0017), and a
-    guessed anchor is wrong in every millimetre it reports.
+def through(all_marks, ref, ends, leaving=None):
+    """What a span between `ends` on `ref` reads, through the camera (ADR
+    0032): millimetres and their bar once the reference's anchor span and its
+    directions are answered, else pixels and what they wait on.
+
+    From the marks alone: the anchor span carries the millimetres the user
+    answered it for, and the picture's size, so neither the spec nor the image
+    is read here. `leaving` is a span read again at new ends, which its old
+    ones must not tie.
+    """
+    on = [m for m in all_marks if marks.reference(m) == ref
+          and m.get("answer") != "rejected" and m.get("id") != leaving]
+    anchor = next((m for m in reversed(on) if m.get("claims")
+                   and m.get("answer") in STANDS), None)
+    directions = {m["direction"]: [(got["from"], got["to"]) for got in marks.lines(m)]
+                  for m in on if marks.lines(m) and m.get("answer") in STANDS}
+    if anchor is None:
+        asked = next((m for m in reversed(on) if m.get("claims")), None)
+        return unscaled(*ends, (
+            f"waits on {asked['id']}, the anchor span, being answered" if asked else
+            f"no anchor span on {ref}: propose the span a size the spec states "
+            f"is the length of, with --claims"))
+    if not directions:
+        return unscaled(*ends, f"waits on {ref}'s directions: none is answered")
+    others = {m["id"]: {"ends": (marks.pixel(m), marks.span_end(m))}
+              for m in on if marks.span_end(m) and m is not anchor}
+    got = camera.read(anchor["size"], directions,
+                      {"ends": (marks.pixel(anchor), marks.span_end(anchor)),
+                       "mm": anchor["claims"]["mm"]},
+                      {**others, "it": {"ends": tuple(ends)}})["it"]
+    if "why" in got:
+        return unscaled(*ends, got["why"])
+    return (f"{got['mm']:.0f} mm \u00b1{got['tol']:.0f} mm  (through the camera, "
+            f"along {got['along']}, against {anchor['id']})")
+
+
+def claimed(spec, dimension):
+    """`{"dimension", "mm"}` for a size the spec states, which an anchor span
+    may claim to be the length of, or `{"refused": why}` (ADR 0032, decision 3).
+
+    Any one the spec states, not only a height: the user gives whichever real
+    size they know. What the user answers is that number, so the span keeps
+    it, and is not read from the spec again.
     """
     spec = Path(spec) if spec else None
-    if not spec or not spec.exists():
-        return None
-    doc = miniyaml.load(spec) or {}
-    height = (doc.get("dimensions") or {}).get("height") or {}
-    value = height.get("value") if isinstance(height, dict) else height
-    return float(value) if isinstance(value, (int, float)) else None
+    doc = (miniyaml.load(spec) or {}) if spec and spec.exists() else {}
+    stated = doc.get("dimensions") or {}
+    value = stated.get(dimension)
+    value = value.get("value") if isinstance(value, dict) else value
+    if not isinstance(value, (int, float)):
+        return {"refused": (f"the spec states no {dimension}: it states "
+                            f"{', '.join(stated) or 'no size at all'}, and a "
+                            f"picture carries proportion, never scale")}
+    return {"dimension": dimension, "mm": float(value)}
+
+
+def asking(claims, a, b):
+    """An anchor span's reading: the question it puts to the user."""
+    return (f"is this the {claims['dimension']} you told me, {claims['mm']:g} mm? "
+            f"({math.dist(a, b):.0f} px)")
 
 
 def marked(path, mark_id):
@@ -111,16 +157,14 @@ def measure(path, mark_id, k):
             f"FAIL measure  {mark_id} has no length: both ends are the same "
             f"pixel, so there is no distance to read"]}
     if k is None:
-        return {"ok": False, "lines": [
-            "FAIL measure  no anchor: this space states no dimensions.height, "
-            "so the picture gives proportion and not millimetres"]}
-    got = reading(marks.pixel(found), marks.span_end(found), k)
-    said = agent.write(path, f"span {mark_id}: {line(got)}",
+        return {"ok": False, "lines": [f"FAIL measure  {NO_ANCHOR}"]}
+    got = reads(marks.pixel(found), marks.span_end(found), k)
+    said = agent.write(path, f"span {mark_id}: {got}",
                        ref=marks.reference(found),
                        pixel=midpoint(marks.pixel(found), marks.span_end(found)))
     return {"ok": True, "lines": [f"ok   measure {said['id']} "
                                   f"{marks.reference(found)}  "
-                                  f"{marks.text(found)}  {line(got)}"]}
+                                  f"{marks.text(found)}  {got}"]}
 
 
 BETWEEN = ("centres", "gap", "extent")
@@ -178,7 +222,7 @@ def found_runs(runs):
     return ", ".join(f"run {n} x {a}..{b}px" for n, (a, b) in enumerate(runs, 1))
 
 
-def draw(path, ref, question, runs, row, height, k, text):
+def draw(path, ref, question, runs, row, height, k, text, claims=None, size=None):
     """An agent span, snapped to what a scanline found (ADR 0022, decisions 2
     and 4). Returns a report.
 
@@ -193,10 +237,10 @@ def draw(path, ref, question, runs, row, height, k, text):
             f"FAIL measure  pick two different runs of the {len(runs)} the "
             f"scanline found: {found_runs(runs) or 'none'}"]}
     a, b = snap(runs, picked, question["between"], row, height)
-    return pinned(path, ref, question, (a, b), k, text)
+    return pinned(path, ref, question, (a, b), k, text, claims, size)
 
 
-def draw_extent(path, ref, question, box, height, k, text):
+def draw_extent(path, ref, question, box, height, k, text, claims=None, size=None):
     """An agent span across an extent, snapped to its edges (issue 41).
     Returns a report.
 
@@ -211,19 +255,20 @@ def draw_extent(path, ref, question, box, height, k, text):
             f"{question['tol']:g}: there is no extent to draw a span across, "
             f"so nothing was drawn"]}
     return pinned(path, ref, question, edges(box, question["extent"], height),
-                  k, text)
+                  k, text, claims, size)
 
 
-def pinned(path, ref, question, ends, k, text):
+def pinned(path, ref, question, ends, k, text, claims=None, size=None):
     """A snapped span on file, and its answer pinned between its ends: the
     one record every query that places one makes."""
     a, b = ends
     return _drawn(path, {"ref": ref, "pixel": a, "to": b, "text": text,
-                         "placed": "snapped", "question": question, "scale": k},
-                  reads(a, b, k))
+                         "placed": "snapped", "question": question,
+                         **_scaled(k, claims, size)},
+                  asking(claims, a, b) if claims else reads(a, b, k))
 
 
-def by_eye(path, ref, ends, k, text):
+def by_eye(path, ref, ends, k, text, claims=None, size=None):
     """An agent span with free ends, where nothing would snap (ADR 0022,
     decision 3; issue 44). Returns a report.
 
@@ -236,8 +281,8 @@ def by_eye(path, ref, ends, k, text):
             "FAIL measure  a span needs two different ends: both are the same "
             "pixel, so there is no distance to read"]}
     return _drawn(path, {"ref": ref, "pixel": list(a), "to": list(b), "text": text,
-                         "placed": "by eye", "scale": k},
-                  f"{reads(a, b, k)}  {BY_EYE}")
+                         "placed": "by eye", **_scaled(k, claims, size)},
+                  f"{asking(claims, a, b) if claims else reads(a, b, k)}  {BY_EYE}")
 
 
 BY_EYE = ("by eye: the bar covers the arithmetic between the ends, not the "
@@ -256,13 +301,25 @@ def _drawn(path, mark, answer):
 
 
 def reads(a, b, k):
-    """What a span between these ends reads: millimetres at scale `k`, the
-    mm per pixel it was drawn at, or pixels when there is none."""
+    """What a span between these ends reads. `k` is how it is read: a
+    function of the two ends, as `through` reads one through the camera; or
+    the mm per pixel an older span was drawn at; or None, for pixels."""
+    if callable(k):
+        return k(a, b)
     return line(reading(a, b, k)) if k else unscaled(a, b)
 
 
-NO_ANCHOR = ("no anchor: this space states no dimensions.height, so the "
-             "picture gives proportion and not millimetres")
+def _scaled(k, claims, size):
+    """What a span keeps of how it was read: a flat scale, which a correction
+    reads again at, and an anchor span's claim and the picture's size."""
+    kept = {} if callable(k) else {"scale": k}
+    if claims:
+        kept.update(claims=claims, size=list(size))
+    return kept
+
+
+NO_ANCHOR = ("no anchor: the picture gives proportion and not millimetres "
+             "until an anchor span on it is answered")
 
 
 def unscaled(a, b, why=NO_ANCHOR):

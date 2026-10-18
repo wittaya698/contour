@@ -12,7 +12,8 @@ A scanline across the legs still finds their two centres without needing to know
 what a leg is.
 
 Rows are indexed from the bottom of the image, so a height reads the way the
-model frame does: millimetres above the ground.
+model frame does. Every query here reports pixels: a span's millimetres come
+through the camera (ADR 0032), never from the foreground box.
 
     --span ID          read the distance between the two ends of one span mark
                        and pin the answer back on the same reference (ADR 0018).
@@ -45,7 +46,11 @@ model frame does: millimetres above the ground.
     --standing ID      whether a span's number may be proposed, and as whose:
                        the user's, the agent's own reading, or not until the
                        user answers it. Reads marks.json only
-    --anchor MM        the silhouette's height is MM; everything reports in mm
+    --claims DIM       with any span form: this span is the length of the size
+                       the spec states as DIM, e.g. width. The anchor span: once
+                       the user answers it, and the reference's directions, the
+                       spans on that reference read in mm (ADR 0032). Until
+                       then every span reads in pixels and says what it waits on
     --silhouette       bounding box of everything that is not background
     --region HEX       bounding box + centroid of one palette colour
     --scanline V[,V]   runs across the figure at one or more heights
@@ -153,18 +158,18 @@ def scan(px, fg, S, v, of, tol, minrun):
     return row, [(int(a), int(b)) for a, b in runs(m[row]) if b - a + 1 >= minrun]
 
 
-SPAN_FLAGS = ("--scanline", "--of", "--runs", "--between", "--anchor", "--tol",
+SPAN_FLAGS = ("--scanline", "--of", "--runs", "--between", "--claims", "--tol",
               "--bg-tol", "--min-run")
 """Every flag the span form takes, each with a value. Anything else is refused,
 not ignored: an end given as a pixel would otherwise be dropped silently, and
 the agent would believe it had placed one (ADR 0022, decision 2)."""
 
-EXTENT_FLAGS = ("--region", "--extent", "--anchor", "--tol", "--bg-tol")
+EXTENT_FLAGS = ("--region", "--extent", "--claims", "--tol", "--bg-tol")
 """The same, for a span across an extent (issue 41); `--silhouette` is its one
 flag with no value."""
 
 
-BY_EYE_FLAGS = ("--from", "--to", "--anchor", "--bg-tol")
+BY_EYE_FLAGS = ("--from", "--to", "--claims", "--bg-tol")
 """The same, for a span placed by eye (issue 44): its two ends, and what the
 scale is read with. `--by-eye` is its one flag with no value, and is required."""
 
@@ -246,25 +251,26 @@ def extent(px, fg, of, tol):
 
 
 class Scale:
-    """mm per pixel, from the one real dimension the user stated (ADR 0016)."""
+    """Where a query height falls, and how a report prints a length: pixels.
 
-    def __init__(self, anchor_mm, sil):
+    `stored_mm` is only ever a stored question's, from before ADR 0032: its
+    scanline height was in millimetres above the silhouette's base, and
+    `--again` places the same row from it. No length is reported in it.
+    """
+
+    def __init__(self, stored_mm, sil):
         self.sil = sil
-        self.k = None if anchor_mm is None else anchor_mm / (sil[3] - sil[2] + 1)
-
-    def mm(self, px):
-        return None if self.k is None else px * self.k
+        self.k = None if stored_mm is None else stored_mm / (sil[3] - sil[2] + 1)
 
     def row_for(self, v):
-        """A query height -> an image row. mm above the silhouette base when an
-        anchor is set, else a fraction of the silhouette's height."""
+        """A query height -> an image row: a fraction of the silhouette's
+        height, or millimetres above its base for a stored question that was
+        asked in them."""
         x0, x1, y0, y1 = self.sil
         return int(round(y0 + (v / self.k if self.k else v * (y1 - y0))))
 
     def fmt(self, px, unit=True):
-        if self.k is None:
-            return f"{px:.0f}px"
-        return f"{px * self.k:.0f}mm" if unit else f"{px * self.k:.0f}"
+        return f"{px:.0f}px" if unit else f"{px:.0f}"
 
 
 def flag(args, name, cast=str, default=None):
@@ -329,7 +335,7 @@ def run(args):
         name = f"refs/{aimed['ref']}"
     elif named is None:
         return {"ok": False, "lines": ["FAIL measure: name a reference image first",
-                                       "  e.g. contour measure refs/front.jpg --anchor 1700 --silhouette"]}
+                                       "  e.g. contour measure refs/front.jpg --silhouette"]}
     else:
         name = named
     path = next((p for p in (P.root / name, P.toolkit / name) if p.exists()), None)
@@ -347,30 +353,33 @@ def run(args):
 
     tol = flag(rest, "--tol", float, 0.05)
     bg_tol = flag(rest, "--bg-tol", float, BG_TOL)
-    # A span reports in millimetres or not at all, so it falls back to the one
-    # real dimension the space has already stated rather than making the user
-    # retype it -- and to nothing else. Every other query keeps its old
-    # behaviour of measuring in pixels until an anchor is given.
-    anchor = flag(rest, "--anchor", float)
-    spanned = asked or eyed or "--runs" in rest or "--extent" in rest
-    if spanned and anchor is None:
-        anchor = span.anchor_mm(P.spec)
+    claims = None
+    if flag(rest, "--claims"):
+        claims = span.claimed(P.spec, flag(rest, "--claims"))
+        if "refused" in claims:
+            return {"ok": False, "lines": [f"FAIL measure  {claims['refused']}: "
+                                           f"nothing was drawn"]}
+    ref = Path(name).name
+
+    def through(a, b):
+        """A span read through the camera, from the marks as they are now."""
+        return span.through(marks.load(store), ref, (a, b))
     px = load(path)
     h, w = px.shape[:2]
     bg, fg = masks(px, bg_tol)
     sil = bbox(fg)
     if sil is None:
         return {"ok": False, "lines": [f"FAIL measure: {name} is entirely background"]}
-    S = Scale(anchor, sil)
+    S = Scale(None, sil)
     x0, x1, y0, y1 = sil
     lines = [f"{name} {w}x{h}px  bg #{''.join('%02x' % int(c * 255) for c in bg)}"
-             + f"  fg {100 * fg.mean():.1f}%"
-             + (f"  scale {S.k:.4f}mm/px" if S.k else "  no anchor: px only")]
+             + f"  fg {100 * fg.mean():.1f}%"]
+    drawn = {"claims": claims, "size": (w, h)}
 
     if asked:
-        # The scale is the only thing the image is asked for here: where the
-        # span runs was decided by the user, on the picture, with a mouse.
-        got = span.measure(store, asked, S.k)
+        # Where the span runs was decided by the user, on the picture, with a
+        # mouse; it is read through the camera as every span is.
+        got = span.measure(store, asked, through)
         return {**got, "lines": lines + got["lines"]}
 
     if eyed:
@@ -382,27 +391,29 @@ def run(args):
         # Rows from the bottom, as every height here reads; a mark's pixel
         # counts from the top, as the canvas draws it.
         got = span.by_eye(store, Path(name).name,
-                          [[x, h - 1 - y] for x, y in ends], k=S.k, text=text)
+                          [[x, h - 1 - y] for x, y in ends], k=through, text=text, **drawn)
         return {**got, "lines": lines + got["lines"]}
 
     if "--runs" in rest:
         q = {"scanline": flag(rest, "--scanline", float),
              "of": flag(rest, "--of"),
              "runs": [int(n) for n in flag(rest, "--runs").split(",")],
-             "between": flag(rest, "--between"), "anchor": anchor,
+             "between": flag(rest, "--between"),
              "tol": tol, "bg_tol": bg_tol, "min_run": flag(rest, "--min-run", int, 3)}
         row, rr = scan(px, fg, S, q["scanline"], q["of"], tol, q["min_run"])
         if rr is None:
             return {"ok": False, "lines": lines + [
                 f"FAIL measure  scanline {q['scanline']:g} is row {row}, outside the image"]}
-        got = span.draw(store, Path(name).name, q, rr, row=row, height=h, k=S.k, text=text)
+        got = span.draw(store, Path(name).name, q, rr, row=row, height=h, k=through,
+                        text=text, **drawn)
         return {**got, "lines": lines + got["lines"]}
 
     if "--extent" in rest:
         q = {"extent": flag(rest, "--extent"), "of": flag(rest, "--region"),
-             "anchor": anchor, "tol": tol, "bg_tol": bg_tol}
+             "tol": tol, "bg_tol": bg_tol}
         got = span.draw_extent(store, Path(name).name, q,
-                               extent(px, fg, q["of"], tol), height=h, k=S.k, text=text)
+                               extent(px, fg, q["of"], tol), height=h, k=through,
+                               text=text, **drawn)
         return {**got, "lines": lines + got["lines"]}
 
     edged = flag(rest, "--edges")
@@ -499,6 +510,6 @@ def asked_again(P, store, mark_id):
     if "extent" in q:
         return span.again_extent(store, mark_id, extent(px, fg, q["of"], q["tol"]),
                                  height=px.shape[0])
-    row, rr = scan(px, fg, Scale(q["anchor"], sil), q["scanline"], q["of"],
+    row, rr = scan(px, fg, Scale(q.get("anchor"), sil), q["scanline"], q["of"],
                    q["tol"], q["min_run"])
     return span.again(store, mark_id, rr or [], row=row, height=px.shape[0])

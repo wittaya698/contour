@@ -221,18 +221,19 @@ class Canvas(Page):
         return said.get("mark") or said
 
     def corrected(self, marks, mark_id, a, b):
-        """The user's correction: their ends, read afresh at the scale the
-        agent's reading was taken at. The ends are the user's, so no image is
-        read; the scale is the span's own, so no anchor is asked again."""
+        """The user's correction: their ends, read afresh through the camera
+        (ADR 0032), from the marks alone: the anchor span keeps its
+        millimetres and the picture's size, so no image or spec is read. Never
+        at a scale the span kept: that came from the foreground box. An anchor
+        span corrected asks its question again at the new ends."""
         found = span.marked(marks, mark_id) or {}
         if not (a and b and a != b):
             said = ""                       # refused by the record, with why
-        elif "scale" not in found:
-            said = span.unscaled(a, b, f"drawn before spans kept their scale: "
-                                       f"contour measure --span {mark_id} reads "
-                                       f"it in millimetres")
+        elif found.get("claims"):
+            said = span.asking(found["claims"], a, b)
         else:
-            said = span.reads(a, b, found["scale"])
+            said = span.through(marks_store.load(marks), found.get("ref"), (a, b),
+                                leaving=mark_id)
         return marks_store.correct(marks, mark_id, a, b, said)
 
     def wait(self):

@@ -85,15 +85,19 @@ class CorrectTest(AnswerCase):
         self.assertFalse(span.asked(self.marks, mark_id)["ok"])
 
     def test_it_is_measured_again_and_the_old_answer_is_closed(self):
-        """A fresh answer in millimetres, at the scale the agent's was read
-        at, pinned between the new ends; the old number no longer stands."""
+        """A fresh answer, read through the camera (ADR 0032; issue 139) and
+        never at the scale the agent's was read at, which came from the
+        foreground box; pinned between the new ends. The old number no longer
+        stands. With no anchor span on the reference, the fresh one is in
+        pixels and says so."""
         mark_id = self.drawn()
         old = self.stored(mark_id)["reading"]
         self.correct(mark_id)
         got = self.stored(mark_id)
         fresh = self.stored(got["reading"])
         self.assertNotEqual(got["reading"], old)
-        self.assertIn(f"span {mark_id}: 500 mm ±4 mm", fresh["text"])
+        self.assertIn(f"span {mark_id}: 250 px ±2 px", fresh["text"])
+        self.assertIn("no anchor span on front.jpg", fresh["text"])
         self.assertEqual(fresh["pixel"], span.midpoint(got["pixel"], got["to"]))
         self.assertEqual(fresh["status"], "open")
         self.assertEqual(self.stored(old)["status"], "closed")
@@ -229,14 +233,14 @@ class OlderMarksTest(AnswerCase):
         self.assertEqual(get(self.canvas, "/marks")[1], BEFORE)
 
     def test_an_older_agent_span_can_still_be_answered(self):
-        """With no link to its reading, the reading is left as it was; with
-        no scale, the correction is answered in pixels."""
+        """With no link to its reading, the reading is left as it was; the
+        correction is read through the camera as any is, here in pixels."""
         _, said = post(self.canvas, "/correct", {"id": "m3", "pixel": [400, 749],
                                                  "to": [600, 749]})
         self.assertEqual(said["answer"], "corrected")
         fresh = self.stored(said["reading"])["text"]
         self.assertIn("200 px", fresh)
-        self.assertIn("contour measure --span m3", fresh)
+        self.assertIn("no anchor span on", fresh)
         self.assertEqual(self.stored("m4")["status"], "open")
 
 
