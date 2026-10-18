@@ -22,14 +22,35 @@ its `±`.
 - **Tested against known answers:** renders of a box of known size from known
   cameras, straight on and steep, read back within their own `±`.
 
+## What was built
+
+`lib/camera.py`, `camera.read(size, directions, anchor, spans)`, tested in
+`tests/test_camera.py` against a box projected through known cameras, its
+corners rounded to pixels.
+
+- **The lens comes from three directions**, by least squares over their pairs.
+  Where it does not come (fewer than three, or a straight-on picture), a span
+  is read across a range of lenses: one that reads the same at all of them is
+  read, as a straight-on picture's x and y edges are with two directions; one
+  that does not is refused, naming what it needs. That is decision 4's rule
+  found by arithmetic, not listed by case.
+- **The `±` adds an end's wider side for every end** the reading rests on (the
+  anchor's, the span's, the tie chain's), as the old bar added a pixel at each
+  end of the span, and **one widest point per direction**: a direction's lines
+  say one meeting point between them, and adding every line's ends counted it
+  eight times over. Straight on, that is the old bar plus the anchor's share.
+- **A shared end is two ends within 2 px.** A plane tie is declared, as
+  `"on": (direction, direction)`, through the anchor's first end; a span along
+  a direction off that plane is refused.
+
 ## Acceptance criteria
 
-- [ ] A box rendered straight on reads its edges back within `±`, as the old scale did
-- [ ] The same box rendered at a steep three-quarter view reads its edges back within `±`
-- [ ] A steeper view earns a wider `±`
-- [ ] A diagonal span, or one along an unscalable direction, gives no number and says which direction it needs
-- [ ] A box edge at another depth from the anchor, tied to it by a shared corner, reads back within `±`; the same edge with its corner untied gives no number and says what would tie it
-- [ ] Nothing in it imports `bpy`; `test_lib_split` lists it as free
+- [x] A box rendered straight on reads its edges back within `±`, as the old scale did
+- [x] The same box rendered at a steep three-quarter view reads its edges back within `±`
+- [x] A steeper view earns a wider `±`
+- [x] A diagonal span, or one along an unscalable direction, gives no number and says which direction it needs
+- [x] A box edge at another depth from the anchor, tied to it by a shared corner, reads back within `±`; the same edge with its corner untied gives no number and says what would tie it
+- [x] Nothing in it imports `bpy`; `test_lib_split` lists it as free
 
 ## Blocked by
 
