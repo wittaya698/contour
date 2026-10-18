@@ -16,10 +16,11 @@ from . import cmd_measure, marks, space, worksheet, worksheet_draw
 def run(args):
     P = space.parse([])
     kept = marks.load(P.marks)
-    drawn = worksheet.spans(kept)
+    drawn = worksheet.spans(kept) + worksheet.directions(kept)
     if not drawn:
         return {"ok": True, "lines": [
-            "ok   worksheet  no spans on file: nothing to draw, nothing written"]}
+            "ok   worksheet  no spans or directions on file: nothing to draw, "
+            "nothing written"]}
     pictures, missing = {}, []
     for ref in sorted({s["ref"] for s in drawn}):
         path = P.root / "refs" / ref
@@ -44,8 +45,10 @@ def run(args):
     out.filepath_raw = str(target)
     out.file_format = "PNG"
     out.save()
-    n = sum(1 for s in drawn if s["ref"] in placed)
+    n = sum(1 for s in drawn if s["ref"] in placed and "lines" not in s)
+    d = sum(1 for s in drawn if s["ref"] in placed and "lines" in s)
+    aimed = f", {d} direction{'s' if d != 1 else ''}" if d else ""
     return {"ok": True, "lines": [
-        f"ok   worksheet  {n} span{'s' if n != 1 else ''} on {len(placed)} "
+        f"ok   worksheet  {n} span{'s' if n != 1 else ''}{aimed} on {len(placed)} "
         f"reference{'s' if len(placed) != 1 else ''} -> {P.display(target)}  "
         f"{w}x{h}px", *lines]}

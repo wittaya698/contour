@@ -287,9 +287,10 @@ def on_worksheet(cmd, rest, held):
     on file there is nothing to draw, which the marks alone can say: no
     Blender, and no file left from the last time there were some."""
     from lib import marks, worksheet
-    if not worksheet.spans(marks.load(HERE.marks)):
+    if not worksheet.anything(marks.load(HERE.marks)):
         return emit({"ok": True, "lines": [
-            "ok   worksheet  no spans on file: nothing to draw, nothing written"]})
+            "ok   worksheet  no spans or directions on file: nothing to draw, "
+            "nothing written"]})
     rep = stage(["worksheet"])
     if rep["ok"]:
         worksheet.record(HERE.dot, HERE.marks)

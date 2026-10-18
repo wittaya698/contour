@@ -46,6 +46,21 @@ reading, beside its id. A number from an unanswered **by-eye** span is not
 proposed until the user has answered it on the canvas.
 `contour measure --standing <id>` says which a span is.
 
+**Directions come first**, before any span on a reference that is not straight
+on. A direction is two or more lines along edges that are parallel on the
+object: *the body tube's top and bottom edges*. Where the lines meet tells
+how the camera saw the object, which a span on an angled photograph needs
+before its number means anything (ADR 0032). Ask what a column or row of the
+picture crosses, then pick each line's two ends from the numbered crossings:
+
+    contour measure refs/side.jpg --edges col:0.3,col:0.6
+    contour measure refs/side.jpg --direction x --line col:0.3#2,col:0.6#2 \
+        --line col:0.3#4,col:0.6#4 "the body tube's top and bottom edges"
+
+Propose three, square to each other on the object, where it has edges that
+go three ways. A line nothing snaps to is placed with `--line-by-eye`, and is
+labelled by eye. The user answers a direction as they answer a span.
+
 Run `contour worksheet` and look at it once, before you propose: every span on
 its reference, with its id and number, so you can see each measures what it
 says. Then propose the change, wait for the user to confirm it, and write it

@@ -32,6 +32,16 @@ model frame does: millimetres above the ground.
                        snap: a photograph, a soft gradient (ADR 0022). Labelled
                        by eye everywhere, and its answer says the bar does not
                        cover the placing. The only spelling that takes a pixel
+    --direction NAME --line col:F#N,col:F#N --line ... "what the edges are"
+                       propose a direction: lines along edges parallel in the
+                       object (ADR 0032). Each line is two crossings picked from
+                       --edges, by their numbers; two lines at least. A line
+                       nothing snaps to is --line-by-eye X0,Y0,X1,Y1, and says so.
+                       Here rows count from the top, as a mark's pixel does
+    --edges col:F|row:F[,...]
+                       the crossings one column or row finds, F from 0 to 1
+                       across the picture: every place the colour changes
+                       sharply, numbered from the top or the left
     --standing ID      whether a span's number may be proposed, and as whose:
                        the user's, the agent's own reading, or not until the
                        user answers it. Reads marks.json only
@@ -54,7 +64,7 @@ import numpy as np
 
 import bpy
 
-from . import marks, space, span
+from . import direction, marks, space, span
 
 BG_TOL = 0.10     # distance from the sampled background colour
 DARK = 0.22       # below this mean brightness a pixel is toon outline, not colour
@@ -326,6 +336,15 @@ def run(args):
     if path is None:
         return {"ok": False, "lines": [f"FAIL measure: no such reference {name}"]}
 
+    if "--direction" in rest:
+        asked_for = direction.form(rest)
+        if not asked_for["ok"]:
+            return asked_for
+        px = load(path)
+        h, w = px.shape[:2]
+        return direction.propose(store, Path(name).name, asked_for["name"],
+                                 asked_for["picks"], strips(px), (w, h), asked_for["text"])
+
     tol = flag(rest, "--tol", float, 0.05)
     bg_tol = flag(rest, "--bg-tol", float, BG_TOL)
     # A span reports in millimetres or not at all, so it falls back to the one
@@ -386,7 +405,12 @@ def run(args):
                                extent(px, fg, q["of"], tol), height=h, k=S.k, text=text)
         return {**got, "lines": lines + got["lines"]}
 
-    if "--silhouette" in rest or not any(f in rest for f in ("--region", "--scanline", "--profile")):
+    edged = flag(rest, "--edges")
+    if edged:
+        lines += [direction.edges(strips(px), (w, h), said) for said in edged.split(",")]
+
+    if "--silhouette" in rest or not any(f in rest for f in ("--region", "--scanline", "--profile",
+                                                              "--edges")):
         lines.append(f"  silhouette  w {S.fmt(x1 - x0 + 1)}  h {S.fmt(y1 - y0 + 1)}"
                      f"  [x {x0}..{x1}  y {y0}..{y1} px]")
 
@@ -443,6 +467,17 @@ def run(args):
                              f" {S.fmt((z - a + 1) / 2):>7}  centre"
                              f" {S.fmt((a + z) / 2 - (x0 + x1) / 2):>7}")
     return {"ok": True, "lines": lines}
+
+
+def strips(px):
+    """One column or row of the picture as `direction` reads it: colours as
+    lists, counted from the top, as a mark's pixel is. `load` hands the
+    picture over bottom row first."""
+    top = px[::-1]
+
+    def strip(kind, index):
+        return (top[:, index] if kind == "col" else top[index]).tolist()
+    return strip
 
 
 def asked_again(P, store, mark_id):

@@ -6,6 +6,7 @@ picture for the agent, once. What it says about each span is worked out here
 without Blender: only reading the photographs and saving the image need it.
 """
 import hashlib
+import json
 import os
 import shutil
 import subprocess
@@ -95,6 +96,37 @@ class LabelTest(SpanCase):
         self.assertFalse({note["id"], sheet["id"]} & set(self.labels()))
 
 
+class DirectionLabelTest(SpanCase):
+    """A direction is on the worksheet apart from the spans: its own entry,
+    saying it is one, whose, how its lines were placed, and the answer."""
+
+    def directed(self, ref="front.jpg", eyed=False):
+        lines = [{"from": [10, 20], "to": [110, 30], "placed": "snapped", "question": ["a", "b"]},
+                 {"from": [10, 120], "to": [110, 110],
+                  "placed": "by eye" if eyed else "snapped", "question": ["c", "d"]}]
+        return marks_store.append(self.marks, {"ref": ref, "direction": "x", "lines": lines,
+                                               "pixel": [60, 25], "text": "the long edges"},
+                                  author="agent")["id"]
+
+    def test_a_direction_says_it_is_one_and_is_not_a_span(self):
+        snapped, eyed = self.directed(), self.directed(eyed=True)
+        got = {d["id"]: d["label"] for d in worksheet.directions(marks_store.load(self.marks))}
+        self.assertEqual(got[snapped], [f"{snapped} direction x", "agent, snapped, unanswered"])
+        self.assertEqual(got[eyed], [f"{eyed} direction x", "agent, 1 line by eye, unanswered"])
+        self.assertEqual(self.labels(), {})
+
+    def test_a_direction_changes_what_the_worksheet_was_drawn_from(self):
+        """And spans alone print as they did, so no worksheet drawn before
+        directions existed is called stale by their arriving in the code."""
+        self.snapped()
+        kept = marks_store.load(self.marks)
+        said = json.dumps(worksheet.spans(kept), sort_keys=True).encode()
+        self.assertEqual(worksheet.fingerprint(kept), hashlib.sha256(said).hexdigest()[:12])
+        self.directed()
+        self.assertNotEqual(worksheet.fingerprint(marks_store.load(self.marks)),
+                            worksheet.fingerprint(kept))
+
+
 def paper(h=200, w=300):
     """A reference with nothing on it: white, as `beaky`'s paper is."""
     return np.ones((h, w, 3), dtype=np.float32)
@@ -111,6 +143,19 @@ class ComposeTest(SpanCase):
         """Where a pixel of a reference landed on the worksheet."""
         x, y, k = placed[ref]
         return int(round(y + point[1] * k)), int(round(x + point[0] * k))
+
+    def test_a_direction_is_drawn_across_its_reference_to_show_where_it_meets(self):
+        """Its lines run past their ends, to the picture's edge, where a span
+        stops at its own: the point is where they would cross."""
+        lines = [{"from": [10, 20], "to": [110, 30], "placed": "snapped"},
+                 {"from": [10, 120], "to": [110, 110], "placed": "snapped"}]
+        marks_store.append(self.marks, {"ref": "side.jpg", "direction": "x", "lines": lines,
+                                        "pixel": [60, 25], "text": "the long edges"},
+                           author="agent")
+        image, placed = self.compose({"side.jpg": paper()})
+        self.assertEqual(set(placed), {"side.jpg"})
+        y, x = self.at(placed, "side.jpg", (250, 44))
+        np.testing.assert_allclose(image[y, x], worksheet_draw.AGENT, atol=1e-6)
 
     def test_only_references_with_a_span_are_on_it(self):
         self.snapped("front.jpg")
@@ -197,6 +242,14 @@ class NoSpansTest(SpanCase):
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertIn("no spans", r.stdout)
         self.assertFalse((self.tmp / worksheet.NAME).exists())
+
+    def test_a_direction_alone_is_something_to_draw(self):
+        lines = [{"from": [1, 2], "to": [9, 3]}, {"from": [1, 8], "to": [9, 7]}]
+        marks_store.append(self.marks, {"ref": "front.jpg", "direction": "x",
+                                        "lines": lines, "pixel": [5, 2], "text": "edges"},
+                           author="agent")
+        r = self.contour("worksheet")
+        self.assertNotIn("nothing to draw", r.stdout)
 
 
 BLENDER = os.environ.get("BLENDER")

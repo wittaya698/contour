@@ -122,6 +122,12 @@ def span_end(mark):
     return mark.get("to")
 
 
+def lines(mark):
+    """A direction's lines, each `{"from", "to"}`, or None when the mark is
+    not a direction (ADR 0032, decision 2)."""
+    return mark.get("lines")
+
+
 def view(mark):
     """Which of our views this was placed on, or None. A ref mark answers None:
     it was drawn by no view of ours."""
@@ -360,10 +366,11 @@ def _answering(path, mark_id, change):
     if found is None:
         return {"refused": f"no mark {mark_id} on file"}
     if not (found.get("author") == "agent" and reference(found)
-            and span_end(found) and is_open(found) and not answered(found)):
-        return {"refused": f"{mark_id} is not an agent span waiting on an "
-                           f"answer: only an open one the agent drew is a "
-                           f"question"}
+            and (span_end(found) or lines(found)) and is_open(found)
+            and not answered(found)):
+        return {"refused": f"{mark_id} is not an agent span or direction "
+                           f"waiting on an answer: only an open one the agent "
+                           f"drew is a question"}
     was = json.loads(json.dumps(kept))      # as it stood, untouched by change
     refused = change(found, kept)
     if refused:
@@ -452,6 +459,8 @@ def correct(path, mark_id, pixel, to, answer):
     ends again, and the agent's question goes with the flag.
     """
     def change(mark, kept):
+        if lines(mark):
+            return f"{mark_id} is a direction, not a span: it is corrected by its lines"
         if not (pixel and to) or list(pixel) == list(to):
             return "a correction needs two different ends"
         _superseded(kept, mark)
@@ -463,6 +472,23 @@ def correct(path, mark_id, pixel, to, answer):
                     pixel=list(pixel), to=list(to), reading=said["id"])
         mark.pop("placed", None)
         mark.pop("question", None)
+        return None
+    return _answering(path, mark_id, change)
+
+
+def correct_lines(path, mark_id, drawn):
+    """*Not quite: these edges.* A direction takes the user's lines and is
+    theirs, and keeps the lines the agent drew, as a corrected span keeps its
+    ends. The user placed them, so no question would place them again, and
+    each line's goes."""
+    def change(mark, kept):
+        if not lines(mark):
+            return f"{mark_id} is a span, not a direction: it is corrected by its ends"
+        if len(drawn) < 2:
+            return "a direction needs at least two lines, since it is where they meet"
+        mark.update(author="user", drawn_by="agent", answer="corrected",
+                    agent_lines=mark["lines"],
+                    lines=[{"from": list(got["from"]), "to": list(got["to"])} for got in drawn])
         return None
     return _answering(path, mark_id, change)
 

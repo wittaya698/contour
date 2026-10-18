@@ -45,6 +45,34 @@ def spans(all_marks):
             for m in all_marks if marks.reference(m) and marks.span_end(m)]
 
 
+def directions(all_marks):
+    """Every direction on a reference, as `{"id", "ref", "lines", "label"}` and
+    what it is drawn as, as `spans` gives a span (ADR 0032, decision 2). Apart
+    from the spans: a direction has no number of its own, and its lines are
+    drawn to show where they meet."""
+    return [{"id": m["id"], "ref": marks.reference(m),
+             "lines": [[got["from"], got["to"]] for got in marks.lines(m)],
+             "by_eye": [got.get("placed") == "by eye" for got in marks.lines(m)],
+             "label": [f"{m['id']} direction {m['direction']}", ", ".join(_aimed(m))],
+             "agent": m.get("author") == "agent",
+             "rejected": m.get("answer") == "rejected"}
+            for m in all_marks if marks.reference(m) and marks.lines(m)]
+
+
+def _aimed(mark):
+    yield mark.get("author", "user")
+    placed = [got.get("placed") for got in marks.lines(mark)]
+    eyed = placed.count("by eye")
+    if eyed:
+        yield f"{eyed} line{'s' if eyed != 1 else ''} by eye"
+    else:
+        yield "snapped" if all(p == "snapped" for p in placed) else "by hand"
+    if mark.get("answer"):
+        yield mark["answer"]
+    elif mark.get("author") == "agent":
+        yield "unanswered"
+
+
 def label(mark, all_marks):
     """Two lines: the id and the number; whose, how placed, and the answer."""
     return [f"{mark['id']} {number(mark, all_marks)}",
@@ -74,8 +102,18 @@ def number(mark, all_marks):
 def fingerprint(all_marks):
     """Which spans these are, as twelve hex characters — what the worksheet
     draws, so a change it would draw differently is a change here."""
-    said = json.dumps(spans(all_marks), sort_keys=True).encode()
+    drawn = spans(all_marks)
+    aimed = directions(all_marks)
+    # Spans alone print as they did before directions were drawn, so no
+    # worksheet on disk goes stale because the code learned something new.
+    said = json.dumps({"spans": drawn, "directions": aimed} if aimed else drawn,
+                      sort_keys=True).encode()
     return hashlib.sha256(said).hexdigest()[:12]
+
+
+def anything(all_marks):
+    """Whether there is anything to draw: a span, or a direction."""
+    return bool(spans(all_marks) or directions(all_marks))
 
 
 def record(dot, marks_path):

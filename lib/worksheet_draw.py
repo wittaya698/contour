@@ -8,7 +8,7 @@ Blender and not with a bare clone, and the launcher has to run on one.
 """
 import numpy as np
 
-from .worksheet import spans
+from .worksheet import directions, spans
 
 TILE = 720
 """How tall each reference is drawn, in pixels. Two or three side by side come
@@ -42,7 +42,8 @@ def compose(pictures, all_marks):
     say.
     """
     drawn = [s for s in spans(all_marks) if s["ref"] in pictures]
-    refs = sorted({s["ref"] for s in drawn})
+    aimed = [d for d in directions(all_marks) if d["ref"] in pictures]
+    refs = sorted({s["ref"] for s in drawn + aimed})
     placed, x, y, row_w = {}, GAP, GAP, 0
     for ref in refs:
         h, w = pictures[ref].shape[:2]
@@ -66,6 +67,18 @@ def compose(pictures, all_marks):
         x0, y0, k = placed[s["ref"]]
         ends.append(((x0 + s["pixel"][0] * k, y0 + s["pixel"][1] * k),
                      (x0 + s["to"][0] * k, y0 + s["to"][1] * k)))
+    # A direction first, under the spans: thin, and run to the edges of its
+    # reference, so the eye can follow its lines to where they meet.
+    for d in aimed:
+        x0, y0, k = placed[d["ref"]]
+        h, w = pictures[d["ref"]].shape[:2]
+        box = (x0, y0, x0 + w * k - 1, y0 + h * k - 1)
+        for (p, q), eyed in zip(d["lines"], d["by_eye"]):
+            a, b = (x0 + p[0] * k, y0 + p[1] * k), (x0 + q[0] * k, y0 + q[1] * k)
+            far = _across(a, b, box)
+            if far:
+                _line(image, *far, _colour(d), width=1)
+            _line(image, a, b, _colour(d), dashed=eyed)
     # Every line before any label, and each line's box an obstacle to them all:
     # a label is moved off any span, not only off the labels drawn before it.
     taken = [_around(a, b) for a, b in ends]
@@ -76,7 +89,29 @@ def compose(pictures, all_marks):
         taken.append(_tagged(image, s["id"], min(a, b)))
     for s, (a, b) in zip(drawn, ends):
         _labelled(image, s["label"], a, b, _colour(s), taken)
+    for d in aimed:
+        x0, y0, k = placed[d["ref"]]
+        p, q = d["lines"][0]
+        _labelled(image, d["label"], (x0 + p[0] * k, y0 + p[1] * k),
+                  (x0 + q[0] * k, y0 + q[1] * k), _colour(d), taken)
     return image, placed
+
+
+def _across(a, b, box):
+    """The line through `a` and `b` where it crosses `box`, `(x0, y0, x1,
+    y1)`: its two ends on the box's edges, or None when it misses the box."""
+    lo, hi = -1e9, 1e9
+    for start, step, low, high in ((a[0], b[0] - a[0], box[0], box[2]),
+                                   (a[1], b[1] - a[1], box[1], box[3])):
+        if step == 0:
+            if not low <= start <= high:
+                return None
+            continue
+        t0, t1 = sorted(((low - start) / step, (high - start) / step))
+        lo, hi = max(lo, t0), min(hi, t1)
+    if lo > hi:
+        return None
+    return tuple((a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t) for t in (lo, hi))
 
 
 def _tagged(image, mark_id, end):
@@ -103,7 +138,7 @@ def _colour(s):
     return AGENT if s["agent"] else USER
 
 
-def _line(image, a, b, colour, dashed=False):
+def _line(image, a, b, colour, dashed=False, width=LINE):
     n = int(max(abs(b[0] - a[0]), abs(b[1] - a[1]))) * 2 + 2
     t = np.linspace(0.0, 1.0, n)
     if dashed:
@@ -111,8 +146,8 @@ def _line(image, a, b, colour, dashed=False):
         t = t[(along // DASH) % 2 == 0]
     xs, ys = a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t
     h, w = image.shape[:2]
-    for ox in range(-(LINE // 2), LINE - LINE // 2):
-        for oy in range(-(LINE // 2), LINE - LINE // 2):
+    for ox in range(-(width // 2), width - width // 2):
+        for oy in range(-(width // 2), width - width // 2):
             ix = np.round(xs).astype(int) + ox
             iy = np.round(ys).astype(int) + oy
             ok = (ix >= 0) & (ix < w) & (iy >= 0) & (iy < h)
