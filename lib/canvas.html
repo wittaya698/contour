@@ -19,12 +19,20 @@
   /* Over a moving span's handle, a hand; holding one, a closed hand (issue 132). */
   #sheet.grab, #questions .zoom.grab { cursor: grab; }
   #sheet.grabbing, #questions .zoom.grabbing { cursor: grabbing; }
-  aside { width: 300px; border-left: 1px solid var(--line); padding: 16px; display: flex;
-          flex-direction: column; gap: 12px; overflow: auto; }
+  /* As wide as the divider sets it, and nothing in it widens it (issue 134). */
+  aside { width: 300px; flex: none; border-left: 1px solid var(--line); padding: 16px;
+          display: flex; flex-direction: column; gap: 12px; overflow: auto;
+          overflow-x: hidden; overflow-wrap: anywhere; }
+  #divider { flex: none; width: 6px; margin-right: -3px; position: relative; z-index: 1;
+             cursor: col-resize; }
+  #divider:hover, body.resizing #divider { background: var(--line); }
+  body.resizing { cursor: col-resize; user-select: none; }
   h1 { font-size: 13px; letter-spacing: .08em; text-transform: uppercase; margin: 0; opacity: .6; }
   ol { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; }
   li::marker { color: var(--pin); font-weight: 700; }
   li.closed::marker { color: var(--line); }
+  /* Room for a two-digit number: mark 10 was clipped at the column's edge. */
+  #list { padding-left: 2.4em; }
   .view { opacity: .55; font-size: 12px; }
   form { display: flex; flex-direction: column; gap: 8px; }
   #done { border-color: var(--pin); color: var(--pin); }
@@ -265,6 +273,9 @@
        whichever build happens to be on disk (ADR 0019, decision 13). -->
   <p id="build"></p>
 </div>
+<!-- Dragged to set the column's width, double-clicked to put it back (issue 134). -->
+<div id="divider" role="separator" aria-orientation="vertical"
+     title="Drag to widen the column; double-click to reset"></div>
 <aside>
   <!-- Claude's questions about the references, one at a time: each unanswered
        agent span, zoomed, with its number and the three answers in words
@@ -1107,6 +1118,68 @@ function refit() {
   cv.style.height = size.height + 'px';
 }
 new ResizeObserver(refit).observe(room);
+
+// The column is as wide as the divider sets it (issue 134), never narrower than
+// its controls fit or so wide the picture has no room. A window too small for
+// both keeps the column, which holds the controls.
+const COLUMN_MIN = 260, PICTURE_MIN = 320;
+function bounded(want, total) {
+  return Math.max(COLUMN_MIN, Math.min(want, total - PICTURE_MIN));
+}
+
+// Kept per browser, a viewer's convenience: another person's layout is their
+// own. Storage can refuse or come back empty, a private window or blocked site
+// data, and then the column takes the default and nothing breaks.
+const COLUMN_KEY = 'contour.column';
+function kept(store) {
+  try {
+    const width = Number.parseInt(store.getItem(COLUMN_KEY), 10);
+    return Number.isFinite(width) ? width : null;
+  } catch { return null; }
+}
+function keep(store, width) {
+  try { store.setItem(COLUMN_KEY, String(width)); } catch {}
+}
+function forget(store) {
+  try { store.removeItem(COLUMN_KEY); } catch {}
+}
+// Reaching `localStorage` can itself throw where site data is blocked.
+function storage() {
+  try { return window.localStorage; } catch { return null; }
+}
+
+const split = document.getElementById('under');
+const aside = document.querySelector('aside');
+const divider = document.getElementById('divider');
+function column(want) {
+  aside.style.width = bounded(want, split.clientWidth) + 'px';
+}
+// Nothing kept, and the stylesheet's default stands: 300 px, or half under the
+// console.
+{
+  const width = kept(storage());
+  if (width !== null) column(width);
+}
+window.addEventListener('resize', () => {
+  if (aside.style.width) column(Number.parseInt(aside.style.width, 10));
+});
+divider.addEventListener('mousedown', e => {
+  e.preventDefault();               // a drag, not a text selection
+  document.body.classList.add('resizing');
+  const follow = m => column(split.getBoundingClientRect().right - m.clientX);
+  const done = () => {
+    document.body.classList.remove('resizing');
+    window.removeEventListener('mousemove', follow);
+    window.removeEventListener('mouseup', done);
+    keep(storage(), Number.parseInt(aside.style.width, 10));
+  };
+  window.addEventListener('mousemove', follow);
+  window.addEventListener('mouseup', done);
+});
+divider.addEventListener('dblclick', () => {
+  aside.style.width = '';
+  forget(storage());
+});
 
 function show(name) {
   showing = name;

@@ -18,10 +18,10 @@ in the session that found this, and the picture shrinks to make room.
 
 ## Acceptance criteria
 
-- [ ] Dragging the divider sets the column's width, and the picture refits (133)
-- [ ] Nothing in the column widens it past what was set
-- [ ] A reload keeps the width; a browser that keeps nothing still works
-- [ ] Neither side goes below its minimum; double-click restores the default
+- [x] Dragging the divider sets the column's width, and the picture refits (133)
+- [x] Nothing in the column widens it past what was set
+- [x] A reload keeps the width; a browser that keeps nothing still works
+- [x] Neither side goes below its minimum; double-click restores the default
 
 ## Blocked by
 
