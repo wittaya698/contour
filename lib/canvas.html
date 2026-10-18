@@ -7,7 +7,11 @@
   /* The header across the top; the sheet and the column side by side under it. */
   body { height: 100vh; display: flex; flex-direction: column; }
   #under { flex: 1; min-height: 0; display: flex; }
-  #stage { flex: 1; position: relative; overflow: auto; padding: 12px; }
+  #stage { flex: 1; min-width: 0; position: relative; overflow: auto; padding: 12px;
+           display: flex; flex-direction: column; }
+  /* The picture's room: what the stage has left under the strip and over the
+     label. The picture is fitted to it, whole (issue 133). */
+  #room { flex: 1; min-height: 0; overflow: hidden; }
   #wrap { position: relative; display: inline-block; }
   canvas { display: block; max-width: 100%; height: auto; cursor: crosshair; }
   /* The perspective is to look at: a click there marks nothing (issue 131). */
@@ -254,7 +258,7 @@
   <div id="verdict" class="verdict" hidden><p class="line"></p><ul class="failing"></ul>
     <details><summary>what matched</summary><ul class="passing"></ul></details></div></header>
 <div id="under">
-<div id="stage"><div id="strip"></div><div id="wrap"><canvas id="sheet"></canvas></div>
+<div id="stage"><div id="strip"></div><div id="room"><div id="wrap"><canvas id="sheet"></canvas></div></div>
   <!-- Which build this is a picture of. Beside the picture, because it is a fact
        about what you are looking at and is read while looking at it. A sheet is
        only ever of a finished build, so an unlabelled one is authoritative about
@@ -1088,9 +1092,21 @@ function verdict(said) {
 }
 
 const img = new Image();
-img.onload = () => { cv.width = img.width; cv.height = img.height;
+img.onload = () => { cv.width = img.width; cv.height = img.height; refit();
                      ctx.clearRect(0, 0, cv.width, cv.height);
                      ctx.drawImage(img, 0, 0); draw(); };
+
+// The picture drawn as large as its room allows. Pins sit at percentages of
+// it, and a click is read through its drawn size (`at`), so neither moves.
+const room = document.getElementById('room');
+function refit() {
+  if (!cv.width || !room.clientWidth || !room.clientHeight) return;
+  const size = fit({ width: cv.width, height: cv.height },
+                   { width: room.clientWidth, height: room.clientHeight });
+  cv.style.width = size.width + 'px';
+  cv.style.height = size.height + 'px';
+}
+new ResizeObserver(refit).observe(room);
 
 function show(name) {
   showing = name;
@@ -1149,6 +1165,14 @@ function viewAt(x, y) {
 function partAt(x, y) {
   if (!mk.width) return null;
   return parts[mctx.getImageData(x, y, 1, 1).data[0]] || null;
+}
+
+// The size the big picture is drawn at: as large as its room allows, all of it
+// in view and in its own shape, a small one enlarged (issue 133). Only its
+// drawn size: its pixels, and every mark kept in them, are the picture's own.
+function fit(picture, room) {
+  const k = Math.min(room.width / picture.width, room.height / picture.height);
+  return { width: Math.floor(picture.width * k), height: Math.floor(picture.height * k) };
 }
 
 function at(e) {

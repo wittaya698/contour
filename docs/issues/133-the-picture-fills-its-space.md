@@ -19,10 +19,10 @@ The big picture is drawn at its own pixel size and only ever shrunk
 
 ## Acceptance criteria
 
-- [ ] A small reference fills the space beside the column, whole, in its own shape
-- [ ] Resizing the window refits it
-- [ ] A mark placed on an enlarged picture lands on the same picture pixel as at natural size
-- [ ] The sheet fits the same way
+- [x] A small reference fills the space beside the column, whole, in its own shape
+- [x] Resizing the window refits it
+- [x] A mark placed on an enlarged picture lands on the same picture pixel as at natural size
+- [x] The sheet fits the same way
 
 ## Blocked by
 
