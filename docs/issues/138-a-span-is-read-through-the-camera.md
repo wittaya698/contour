@@ -32,7 +32,7 @@ corners rounded to pixels.
   Where it does not come (fewer than three, or a straight-on picture), a span
   is read across a range of lenses: one that reads the same at all of them is
   read, as a straight-on picture's x and y edges are with two directions; one
-  that does not is refused, naming what it needs. That is decision 4's rule
+  that does not is refused, naming what it needs. That is ADR 0032 decision 4's rule
   found by arithmetic, not listed by case.
 - **The `±` adds an end's wider side for every end** the reading rests on (the
   anchor's, the span's, the tie chain's), as the old bar added a pixel at each
