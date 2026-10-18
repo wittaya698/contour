@@ -11,8 +11,8 @@ amended, or sent back; the issues below follow whatever it becomes.
 
 ## Acceptance criteria
 
-- [ ] ADR 0032's status says Accepted (or amended, with what changed)
-- [ ] `CONTEXT.md`'s **direction** and **anchor** match what was accepted
+- [x] ADR 0032's status says Accepted (or amended, with what changed)
+- [x] `CONTEXT.md`'s **direction** and **anchor** match what was accepted
 
 ## Blocked by
 

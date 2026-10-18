@@ -1,6 +1,6 @@
 # 0032 — A span is measured through the camera
 
-**Status:** Proposed · 2026-10-18 · **amends ADR 0017's "perspective error is disclosed, not corrected", and the anchor of ADR 0016 and `lib/span.py`** ([0017](0017-scaffold-measured-from-references.md), [0016](0016-specs-from-references-and-revision.md), [0022](0022-the-agent-reads-the-references-in-spans.md))
+**Status:** Accepted, amended · 2026-10-18 · **amends ADR 0017's "perspective error is disclosed, not corrected", and the anchor of ADR 0016 and `lib/span.py`** ([0017](0017-scaffold-measured-from-references.md), [0016](0016-specs-from-references-and-revision.md), [0022](0022-the-agent-reads-the-references-in-spans.md))
 
 ## Context
 
@@ -41,12 +41,20 @@ precision the picture does not have.
    and answered by the user. The foreground box no longer sets a scale. A
    straight-on reference is the case where the directions do not converge, not
    a second method.
-4. **Three square directions scale everything; fewer scale their own.** Three
-   directions square to each other in the object recover the lens and the
-   camera's turn, and one anchor then scales spans along any of them. With
-   fewer, a span along the anchor's direction is measured and any other says
-   which direction it needs. A span along no direction — a diagonal — gives no
-   number and says so.
+4. **Three square directions give the camera; ties to the anchor give the
+   scale.** Three directions square to each other in the object recover the
+   lens and the camera's turn. That fixes a span's direction in the object but
+   not its distance from the camera, and a length in the picture shrinks with
+   distance. So the anchor scales a span only where the span is tied to it: it
+   shares an end with the anchor or with a span already measured, or it lies
+   on a plane through one of the anchor's ends, spanned by two of the
+   directions. With fewer than three directions, a span along the anchor's
+   direction is measured under the same tie, and any other says which
+   direction it needs. A span along no direction (a diagonal) gives no number
+   and says so, and so does a span tied to nothing, which says what would tie
+   it. (Amended on acceptance, 2026-10-18: this said one anchor scales spans
+   along any of the directions, which holds only at the anchor's own
+   distance.)
 5. **The `±` carries the lines.** Every traced line and both span ends are
    moved a pixel each way and the span read again; the `±` is that spread. A
    steep photograph earns a wide one, and a reading too wide to settle a
@@ -65,6 +73,13 @@ precision the picture does not have.
 - **The lens is ideal.** No distortion is corrected: a phone's wide angle bends
   straight edges, which this reads as perspective. Small at ordinary zoom, and
   disclosed rather than corrected, as ADR 0017 did for perspective itself.
+- **The picture's centre is taken for the lens's.** Recovering the lens from
+  directions assumes the camera's optical centre is the middle of the picture.
+  A cropped photograph, a screenshot or a generated image may not have it, and
+  its readings drift by how far off it is. This is disclosed rather than
+  corrected, as lens distortion is. A fourth direction, where the object gives
+  one, lets the centre be checked rather than assumed. (Added on acceptance,
+  2026-10-18.)
 - **A picture with no parallel edges measures only along its anchor.** A smooth
   object on a plain background has no directions to give; a second real size
   the user knows can serve as a second anchor.
