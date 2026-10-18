@@ -123,7 +123,7 @@ class PageTest(unittest.TestCase):
         for part in ('class="save"', 'class="cancel"'):
             self.assertIn(part, self.card)
         asked = self.script("questions")
-        self.assertIn("'.answers').hidden = !!moving", asked)
+        self.assertIn("'.answers').hidden = !!(moving || rejecting)", asked)   # and while a reason is typed (issue 143)
         self.assertIn("'.moving').hidden = !moving", asked)
 
     def test_save_records_the_correction(self):

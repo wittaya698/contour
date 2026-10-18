@@ -105,6 +105,9 @@
   #questions .asks { font-weight: 700; }
   #questions .eyed { font-size: 12px; font-style: italic; color: var(--agent); }
   #questions .answers, #questions .moving { display: flex; flex-wrap: wrap; gap: 6px; }
+  /* Why it is the wrong thing, typed on the card (issue 143). */
+  #questions .why { display: flex; gap: 6px; }
+  #questions .why .reason { flex: 1; min-width: 0; }
   #questions [hidden] { display: none; }
   #questions .skip { align-self: flex-start; }
   li.adopted .verdict, li.corrected .verdict { color: var(--pin); }
@@ -292,6 +295,13 @@
       <button type="button" class="move">Let me move it</button>
       <button type="button" class="wrong">Wrong thing&hellip;</button>
     </div>
+    <!-- Why it is the wrong thing: typed here, never in a dialog, which would
+         stop the page and its heartbeat with it (issue 143). -->
+    <form class="why" hidden>
+      <input class="reason" placeholder="What did it measure instead? One line." autocomplete="off">
+      <button type="submit" class="reject" disabled>Reject</button>
+      <button type="button" class="unwhy">Cancel</button>
+    </form>
     <!-- While a span is moved by its ends (issue 132). -->
     <div class="moving" hidden>
       <button type="button" class="save" disabled>Save</button>
@@ -1026,6 +1036,10 @@ let showing = null;
 // ends where they are now (Claude's own until Save), the end held (0, 1 or
 // null) and the canvas it is held on. Nothing new is marked while one moves.
 let moving = null;
+// The agent span whose reason for *Wrong thing* is being typed, or null (issue
+// 143). Typed on the card, and never in a dialog: a dialog stops the page,
+// and the heartbeat with it.
+let rejecting = null;
 // A new span while the mouse is down on a reference, from where it went down
 // to where it is: drawn as it is dragged, not once the button comes up.
 let sketch = null;
@@ -1276,7 +1290,7 @@ function draw() {
                                   ctx.drawImage(img, 0, 0); }
   list.replaceChildren();
   // Asked before drawing, so the picture can point at the card's span.
-  const now = asking(marks, skipped, moving && moving.mark).mark;
+  const now = asking(marks, skipped, (moving && moving.mark) || rejecting).mark;
   marks.forEach((mark, i) => {
     const closed = mark.status === 'closed';
     const here = (mark.ref || null) === showing;
@@ -1500,7 +1514,7 @@ function asking(marks, skipped, moving) {
 
 function questions() {
   const card = document.getElementById('questions');
-  const { mark, number, open } = asking(marks, skipped, moving && moving.mark);
+  const { mark, number, open } = asking(marks, skipped, (moving && moving.mark) || rejecting);
   card.hidden = !mark;
   asked = mark;
   const step = follow(showing, mark, followed, pending !== null || held);
@@ -1519,9 +1533,17 @@ function questions() {
   card.querySelector('.asks').textContent = 'Is this ' + mark.text + '?';
   card.querySelector('.eyed').hidden = mark.placed !== 'by eye';
   // Moving, the answers give way to Save and Cancel, and Save waits for an end
-  // to have moved: unmoved, the answer is Yes.
-  card.querySelector('.answers').hidden = !!moving;
-  card.querySelector('.skip').hidden = !!moving;
+  // to have moved: unmoved, the answer is Yes. Rejecting, they give way to the
+  // reason, which opens empty and ready to type.
+  const why = card.querySelector('.why');
+  if (rejecting && why.hidden) {
+    why.querySelector('.reason').value = '';
+    why.querySelector('.reject').disabled = true;
+    setTimeout(() => why.querySelector('.reason').focus(), 0);
+  }
+  card.querySelector('.why').hidden = !rejecting;
+  card.querySelector('.answers').hidden = !!(moving || rejecting);
+  card.querySelector('.skip').hidden = !!(moving || rejecting);
   card.querySelector('.moving').hidden = !moving;
   card.querySelector('.save').disabled = !moving
     || String(moving.ends) === String([mark.pixel, mark.to]);
@@ -1631,13 +1653,30 @@ function askedAnswers() {
     hint.textContent = 'Click the reference, or drag across a distance.';
     draw();
   });
+  // The reason: Enter or Reject sends it, once there is one; Cancel or Escape
+  // puts it away, and the span is a question still.
+  const why = card.querySelector('.why');
+  const reason = why.querySelector('.reason'), reject = why.querySelector('.reject');
+  reason.addEventListener('input', () => { reject.disabled = !reason.value.trim(); });
+  reason.addEventListener('keydown', e => { if (e.key === 'Escape') unreject(); });
+  why.addEventListener('submit', e => {
+    e.preventDefault();
+    if (rejecting) giveWhy(reason.value);
+  });
+  on('.unwhy', unreject);
+}
+
+function unreject() {
+  rejecting = null;
+  draw();
 }
 askedAnswers();
 
 // The user's three answers. Each goes to the server and the list is read back
 // whole: an answer can close a reading or add one, which is more than the one
 // mark the page clicked on. One that does not arrive is said, and a span being
-// moved keeps its dragged ends, so Save can be pressed again (issue 135).
+// moved keeps its dragged ends, so Save can be pressed again (issue 135), as a
+// reason being given keeps its field (issue 143).
 async function answered(path, body) {
   const said = await ask(path, body).then(r => r.json()).catch(() => null);
   if (!said) {
@@ -1646,6 +1685,7 @@ async function answered(path, body) {
   }
   if (moving) hint.textContent = 'Click the reference, or drag across a distance.';  // as Cancel
   moving = null;
+  rejecting = null;
   if (said.refused) hint.textContent = said.refused;
   if (!await reread())
     hint.textContent = 'Your answer is recorded. The marks could not be read back after it, '
@@ -1672,15 +1712,26 @@ async function reread() {
 
 function adoptSpan(mark) { answered('/adopt', { id: mark.id }); }
 
+// From the card or the list: the span becomes the card's question, its reason
+// field open, as a span being moved does.
 function rejectSpan(mark) {
-  const why = prompt('What did it measure instead? One line.');
-  if (why && why.trim()) answered('/reject', { id: mark.id, why: why.trim() });
+  moving = null;
+  rejecting = mark;
+  draw();
+}
+
+// The reason, sent as `/reject` has always taken it: one line, trimmed. A
+// blank one is not sent, which the server would refuse anyway.
+async function giveWhy(why) {
+  if (!why.trim()) return;
+  await answered('/reject', { id: rejecting.id, why: why.trim() });
 }
 
 // The span keeps its place and gets a handle on each end, on the big picture
 // and on the card: only the end that is wrong is dragged (issue 132).
 function correctSpan(mark) {
   if (showing !== mark.ref) show(mark.ref);
+  rejecting = null;
   moving = { mark, ends: [mark.pixel, mark.to], which: null, on: null };
   hint.textContent = 'Drag the end that is wrong, here or on the card, then Save.';
   draw();
