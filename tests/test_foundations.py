@@ -69,17 +69,6 @@ class LastFoundationTest(ReadAgainCase):
         post(self.canvas, "/unanswer", {"id": anchor})
         self.assertEqual(self.marks.read_bytes(), before)
 
-    def test_a_reading_made_by_the_foreground_box_is_left_for_its_own_route(self):
-        """Issue 142 reads those again, and keeps the old number."""
-        self.directions()
-        anchor = self.anchor(answer=False)
-        a, b = edge(SEEN, (1, 0, 1), (1, 1, 1))
-        span.by_eye(self.marks, "box.png", (a, b), 0.8, "the box's depth")
-        drawn = [m for m in marks.load(self.marks) if m.get("to")][-1]["id"]
-        old = self.reading(drawn)
-        post(self.canvas, "/adopt", {"id": anchor})
-        self.assertEqual(self.reading(drawn), old)
-
 
 class DirectionTest(ReadAgainCase):
     """A direction is answered on the card as a span is, and moved by its
@@ -171,7 +160,7 @@ class CardTest(unittest.TestCase):
         self.assertEqual(said, {"id": "m1", "pixel": [10, 10], "to": [60, 10]})
 
     def number(self, text):
-        return self.run_page(["numbered"], "numbered(text)", text=text)
+        return self.run_page(["oldWay", "numbered"], "numbered(text)", text=text)
 
     def test_a_span_asked_before_its_foundations_shows_pixels_and_why(self):
         said = self.number("span m5: 246 px \u00b12 px  (waits on m4, the anchor span, "
@@ -190,7 +179,7 @@ class CardTest(unittest.TestCase):
         self.assertEqual(said, {"number": "155 px", "why": ""})
 
     def test_a_direction_shows_how_many_lines_it_is(self):
-        said = self.run_page(["numberOf", "numbered"], "numberOf(marks[0], marks)",
+        said = self.run_page(["numberOf", "oldWay", "numbered"], "numberOf(marks[0], marks)",
                              marks=[asked_direction("m2")])
         self.assertEqual(said, {"number": "2 lines", "why": ""})
 
@@ -201,7 +190,7 @@ class CardTest(unittest.TestCase):
                       "status": "open", "text": "span m1: 115 px \u00b12 px  (waits on m4, "
                                                 "the anchor span, being answered)"}]
         all_marks[0]["reading"] = "m5"
-        said = self.run_page(["named", "numbered", "numberOf"], "numberOf(marks[0], marks)",
+        said = self.run_page(["named", "oldWay", "numbered", "numberOf"], "numberOf(marks[0], marks)",
                              marks=all_marks)
         self.assertEqual(said, {"number": "115 px \u00b12 px",
                                 "why": "waits on span 3, the anchor span, being answered"})

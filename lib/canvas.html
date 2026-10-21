@@ -1383,6 +1383,15 @@ function draw() {
       li.append(verdict);
     }
     li.append(document.createElement('br'), body);
+    // A number made the old way says so, and one read again through the
+    // camera says that it was (issue 142).
+    if (oldWay(mark.text)) {
+      const how = document.createElement('span');
+      how.className = 'how';
+      how.textContent = mark.superseded ? ' · read again through the camera'
+                                        : ' · made the old way, by the foreground box';
+      li.append(how);
+    }
     if (state === 'rejected') {
       const why = document.createElement('span');
       why.className = 'why';
@@ -1622,6 +1631,10 @@ function questions() {
 // when that is pixels, why: what the millimetres wait on (issue 141). A span
 // drawn before readings were linked has none, and the question still stands.
 function numbered(text) {
+  if (oldWay(text))
+    return { number: text.replace(/^span \S+: /, '').split('  ')[0],
+             why: 'made the old way, by the foreground box: read again once this '
+                  + "picture's directions and anchor span are answered" };
   const [number, why] = text.replace(/^span \S+: /, '').split('  ');
   // An anchor span's reading is its question, which the card asks above it.
   const asked = (number || '').match(/\? \((\d+ px)\)$/);
@@ -1630,6 +1643,12 @@ function numbered(text) {
   return { number: number || '', why: waits ? why.slice(1, -1) : '' };
 }
 
+// A reading made the old way, at a flat scale the foreground box gave: *123
+// mm ±1 mm  (246 px at 0.500 mm/px)*. Read again through the camera once its
+// picture's foundations are answered, and labelled until then (issue 142).
+function oldWay(text) {
+  return /\(\d+ px at [\d.]+ mm\/px\)/.test(text || '');
+}
 // What the card shows beside a question's name: a direction's count of
 // lines, or a span's reading, its ids said by the badges the person sees,
 // as the card names the span it asks.

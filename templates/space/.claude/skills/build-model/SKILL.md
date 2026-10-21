@@ -67,6 +67,13 @@ whichever size it is). It asks the user *is this the width you told me?*
 Until they answer it and the directions, every span there reads in pixels
 and says what it waits on.
 
+A reading **made the old way**, at a scale the foreground box gave, says so.
+Once its reference's directions and anchor span are answered it is read
+again through the camera, and the old number is kept beside the new:
+`contour measure --standing <id>` gives both. For each spec number such a
+span backs, compare: one that moved by more than its ± is a proposal like
+any other, naming the span and both numbers. The spec never moves on its own.
+
 Run `contour worksheet` and look at it once, before you propose: every span on
 its reference, with its id and number, so you can see each measures what it
 says. Then propose the change, wait for the user to confirm it, and write it

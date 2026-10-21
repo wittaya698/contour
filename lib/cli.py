@@ -903,6 +903,12 @@ def doctor():
         lines.append(f"NOTE {marks.phrase(len(old))} in the old spelling "
                      f"(the part named under the anchor) — run contour "
                      f"migrate-marks")
+    made = marks.old_way(marks.load(HERE.marks))
+    if made:
+        lines.append(f"NOTE {len(made)} reading{'s' if len(made) != 1 else ''} made "
+                     f"the old way, by the foreground box: each is read again through "
+                     f"the camera once its reference's foundations are answered on "
+                     f"the canvas")
     if not shutil.which("contour"):
         lines.append("WARN `contour` is not on PATH: the spec guard in "
                      ".claude/settings.json cannot run,")

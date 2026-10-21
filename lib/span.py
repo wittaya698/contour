@@ -73,8 +73,12 @@ def through(all_marks, ref, ends, leaving=None):
                       {**others, "it": {"ends": tuple(ends)}})["it"]
     if "why" in got:
         return unscaled(*ends, got["why"])
-    return (f"{got['mm']:.0f} mm \u00b1{got['tol']:.0f} mm  (through the camera, "
+    return (f"{got['mm']:.0f} mm \u00b1{got['tol']:.0f} mm  ({THROUGH}, "
             f"along {got['along']}, against {anchor['id']})")
+
+
+THROUGH = "through the camera"
+"""What a reading in millimetres from `through` says it was read by."""
 
 
 def reread(kept, ref):
@@ -83,19 +87,24 @@ def reread(kept, ref):
     they read (ADR 0032, decision 6; issue 141). Run inside that answer's
     write, so taking the answer back takes these with it.
 
-    Only open readings of spans read through the camera. An anchor span's
-    reading is its question, and one read at a scale the span kept came from
-    the foreground box, which is read again by its own route (issue 142).
+    Only open readings, and not an anchor span's, which is its question. A
+    reading made the old way, at a scale the span kept from the foreground
+    box, is read again only once the camera gives millimetres, and is then
+    superseded rather than said again: it is kept, closed, beside the one
+    that replaced it (ADR 0032, decision 7; issue 142).
     """
     for m in kept:
         said = marks.reading_of(kept, m)
         if (marks.reference(m) != ref or not marks.span_end(m) or m.get("claims")
-                or "scale" in m or said is None or not marks.is_open(said)):
+                or said is None or not marks.is_open(said)):
             continue
         number = through(kept, ref, (marks.pixel(m), marks.span_end(m)), leaving=m["id"])
         if m.get("placed") == "by eye":
             number = f"{number}  {BY_EYE}"
-        marks.restate(said, m, number)
+        if "scale" not in m:
+            marks.restate(said, m, number)
+        elif THROUGH in number:
+            marks.supersede(kept, m, number)
 
 
 def claimed(spec, dimension):
@@ -379,10 +388,17 @@ def standing(path, mark_id):
         may, why = True, (f"snapped, and the user has not answered it: its number "
                           f"may be proposed as the agent's own reading, naming "
                           f"{mark_id}")
-    number = marked(path, found.get("reading"))
-    number = marks.text(number) if number else "no reading on file"
-    return {"ok": True, "proposable": may,
-            "lines": [f"ok   measure {mark_id} {why}", f"  {number}"]}
+    said = marked(path, found.get("reading"))
+    number = marks.text(said) if said else "no reading on file"
+    lines = [f"ok   measure {mark_id} {why}", f"  {number}"]
+    was = marked(path, said.get("was")) if said else None
+    if was:
+        # Read again through the camera (issue 142): the old number beside the
+        # new, which is the argument a proposal makes if a spec number moved.
+        lines.append(f"  read again through the camera: was "
+                     f"{marks.text(was).split(': ', 1)[-1].split('  ')[0]}, made by "
+                     f"the foreground box ({was['id']})")
+    return {"ok": True, "proposable": may, "lines": lines}
 
 
 def asked(path, mark_id):

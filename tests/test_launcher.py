@@ -118,6 +118,26 @@ class LauncherTest(unittest.TestCase):
         self.assertIn("2 marks in the old spelling", r.stdout)
         self.assertIn("contour migrate-marks", r.stdout)
 
+    def test_doctor_counts_the_readings_still_made_the_old_way(self):
+        """Made by the foreground box and not yet read again through the
+        camera (issue 142): said, with what reads them again."""
+        stored = []
+        # Two old readings open; one read again, so closed; one span drawn
+        # with no anchor at all, which read pixels and was no box's number.
+        for n, (scale, status) in enumerate(((0.5, "open"), (0.5, "open"),
+                                             (0.5, "closed"), (None, "open"))):
+            span_id, said_id = f"m{2 * n + 1}", f"m{2 * n + 2}"
+            stored += [{"id": span_id, "ref": "a.png", "pixel": [1, 2], "to": [30, 40],
+                        "text": "a span", "placed": "by eye", "scale": scale,
+                        "author": "agent", "status": "open", "reading": said_id},
+                       {"id": said_id, "ref": "a.png", "pixel": [15, 21],
+                        "text": f"span {span_id}: 25 mm \u00b11 mm  (49 px at 0.500 mm/px)",
+                        "author": "agent", "status": status}]
+        (self.space / "marks.json").write_text(json.dumps(stored))
+        r = self.run_contour("doctor")
+        self.assertIn("2 readings made the old way, by the foreground box", r.stdout)
+        self.assertIn("once its reference's foundations are answered", r.stdout)
+
     def test_doctor_says_nothing_about_spelling_when_there_is_none(self):
         """A space that has nothing to migrate must not carry a line about
         migrating. A report that always mentions it is furniture, and an ok

@@ -450,6 +450,30 @@ def restate(said, mark, answer):
     said["text"] = f"span {mark['id']}: {answer}"
 
 
+def old_way(all_marks):
+    """The spans whose number is still a reading made the old way: at a scale
+    the foreground box gave, not yet read again through the camera (ADR 0032,
+    decision 7). A span drawn with no anchor kept no scale to read at, so its
+    pixels were no box's number."""
+    return [m for m in all_marks if isinstance(m.get("scale"), (int, float))
+            and is_open(reading_of(all_marks, m) or {"status": "closed"})]
+
+
+def supersede(kept, mark, answer):
+    """A span's old reading, made at a scale it kept from the foreground box,
+    replaced by one through the camera (issue 142). Nothing is deleted: the
+    old reading is closed as superseded, as a correction's is, and the new one
+    says which it replaced. The span keeps no scale after: it is read through
+    the camera from then on. In place, in a list the caller saves."""
+    old = _superseded(kept, mark)
+    old["superseded"] = True
+    said = _reading(next_id(kept), mark["id"], mark["ref"], answer, old["pixel"])
+    said["was"] = old["id"]
+    kept.append(said)
+    mark["reading"] = said["id"]
+    mark.pop("scale")
+
+
 def _superseded(kept, mark):
     """Close the reading a span gave: its number no longer stands. Returns it,
     or None for a span drawn before readings were linked."""
