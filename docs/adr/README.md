@@ -38,3 +38,4 @@ works — the alternative you are about to suggest is probably here with a reaso
 | [0030](0030-topics-label-a-model-for-finding.md) | Topics label a model for finding, and leave only in a release — *Proposed*; adds to [0028](0028-approvals-wait-and-the-run-goes-on.md), [0013](0013-releases-are-versioned-folders.md) |
 | [0031](0031-a-console-nobody-can-reach-lets-go.md) | A console nobody can reach lets go — *Proposed*; amends [0027](0027-the-unattended-run.md), [0021](0021-the-lobby.md) |
 | [0032](0032-a-span-is-measured-through-the-camera.md) | A span is measured through the camera — *Proposed*; amends [0017](0017-scaffold-measured-from-references.md), [0016](0016-specs-from-references-and-revision.md) |
+| [0033](0033-create-carries-a-said-anchor.md) | `create` carries what the chat said the anchor is, and the console asks it — *Accepted*; amends [0024](0024-the-connector-desktop-reads-and-opens.md), [0021](0021-the-lobby.md) |

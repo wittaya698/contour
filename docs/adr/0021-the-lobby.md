@@ -1,6 +1,6 @@
 # 0021 — The lobby: a page above the spaces
 
-**Status:** Accepted · 2026-10-02
+**Status:** Accepted · 2026-10-02 · **decision 4 amended by [ADR 0033](0033-create-carries-a-said-anchor.md)** (a new-space console may be begun with a said anchor, as a value)
 
 > **Accepted on its tracer bullet, as drafted** (issue 33). `contour lobby`
 > listed the spaces on this machine. A throwaway space was renamed end to end

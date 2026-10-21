@@ -428,6 +428,20 @@ assumed a straight-on, upright, flat-background picture. One HITL, five AFK.
 corrected*. **138 is pure arithmetic** and can land while batch 13 is still
 open; the page work, 141, waits for 132 and 136 so it reuses them as built.
 
+## Batch 15 — a size said in the chat
+
+From [ADR 0033](../adr/0033-create-carries-a-said-anchor.md), decided on
+2026-10-22: a Desktop chat that makes a space already knows how big the thing
+is, and `create` drops it. One HITL, one AFK.
+
+| # | Slice | Type | Blocked by |
+|---|---|---|---|
+| [144](144-accept-adr-0033.md) | Accept ADR 0033 | HITL | — |
+| [145](145-create-carries-a-said-anchor.md) | `create` carries a said anchor | AFK | 144 |
+
+**The size is a suggestion the console asks, never an anchor.** Whatever the
+chat sends, the anchor is the answer the user gives on the console page.
+
 ## Found in flight
 
 Not from either review — a defect the work turned up, filed where the rest of the
