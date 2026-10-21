@@ -104,6 +104,7 @@
                        font-size: 12px; color: var(--agent); }
   #questions .asks { font-weight: 700; }
   #questions .eyed { font-size: 12px; font-style: italic; color: var(--agent); }
+  #questions .waits { font-size: 12px; color: var(--muted); }
   #questions .answers, #questions .moving { display: flex; flex-wrap: wrap; gap: 6px; }
   /* Why it is the wrong thing, typed on the card (issue 143). */
   #questions .why { display: flex; gap: 6px; }
@@ -290,6 +291,8 @@
     <p class="slip" hidden><span class="did"></span> · <button type="button" class="undo shut">undo</button></p>
     <canvas class="zoom" width="536" height="320"></canvas>
     <p><span class="which"></span> · <span class="number"></span></p>
+    <!-- Why a span's number is pixels: what it waits on (issue 141). -->
+    <p class="waits" hidden></p>
     <p class="asks"></p>
     <p class="eyed" hidden>Claude placed these ends by eye — check them closely.</p>
     <div class="answers">
@@ -1301,10 +1304,12 @@ function draw() {
     const here = (mark.ref || null) === showing;
     const eyed = mark.placed === 'by eye';
     const line = stroke(mark, now);
-    // A span being moved is drawn where its ends are now, each a handle.
+    // A span or direction being moved is drawn where its ends are now, each a
+    // handle. A direction is its lines, each drawn as a span is (issue 141).
     const handled = moving && moving.mark.id === mark.id;
-    const [a, b] = handled ? moving.ends : [mark.pixel, mark.to];
-    if (cv.width && b && here) {
+    const ends = handled ? moving.ends : (mark.to || mark.lines) ? endsOf(mark) : [];
+    const a = mark.lines ? mark.pixel : ends[0] || mark.pixel;
+    if (cv.width && ends.length && here) {
       ctx.save();
       ctx.strokeStyle = mark.author === 'agent' ? '#2f6fd8' : '#d8442f';
       ctx.lineWidth = Math.max(2, cv.width / 400) * line.width;
@@ -1312,24 +1317,31 @@ function draw() {
       ctx.lineCap = 'round';
       if (line.dashed) ctx.setLineDash([ctx.lineWidth * 3, ctx.lineWidth * 3]);
       ctx.beginPath();
-      ctx.moveTo(a[0], a[1]);
-      ctx.lineTo(b[0], b[1]);
+      for (let n = 0; n < ends.length; n += 2) {
+        ctx.moveTo(ends[n][0], ends[n][1]);
+        ctx.lineTo(ends[n + 1][0], ends[n + 1][1]);
+      }
       ctx.stroke();
       ctx.restore();
-      const far = document.createElement('div');
-      far.className = 'pin ref end' + (closed ? ' closed' : '')
-                      + (mark.author === 'agent' ? ' agent' : '')
-                      + (line.faded ? ' faded' : '') + (handled ? ' handle' : '');
-      far.style.left = (b[0] / cv.width * 100) + '%';
-      far.style.top = (b[1] / cv.height * 100) + '%';
-      wrap.appendChild(far);
+      // A span's far end is pinned; a direction's ends only while it moves.
+      const pinned = mark.lines ? (handled ? ends : []) : ends.slice(1);
+      for (const b of pinned) {
+        const far = document.createElement('div');
+        far.className = 'pin ref end' + (closed ? ' closed' : '')
+                        + (mark.author === 'agent' ? ' agent' : '')
+                        + (line.faded ? ' faded' : '') + (handled ? ' handle' : '');
+        far.style.left = (b[0] / cv.width * 100) + '%';
+        far.style.top = (b[1] / cv.height * 100) + '%';
+        wrap.appendChild(far);
+      }
     }
     if (cv.width && a && here) {
       const pin = document.createElement('div');
       pin.className = 'pin' + (closed ? ' closed' : '') + (mark.ref ? ' ref' : '')
                       + (mark.author === 'agent' ? ' agent' : '')
                       + (mark.addressed ? ' done' : '')
-                      + (line.faded ? ' faded' : '') + (handled ? ' handle' : '');
+                      + (line.faded ? ' faded' : '')
+                      + (handled && !mark.lines ? ' handle' : '');
       pin.textContent = closed ? '✓' : i + 1;
       pin.style.left = (a[0] / cv.width * 100) + '%';
       pin.style.top = (a[1] / cv.height * 100) + '%';
@@ -1487,11 +1499,18 @@ function seedLine() {
     : '';
 }
 
-// Where an agent span stands: `unanswered` while it is a question, then the
-// answer it got. Not a span the agent drew, or not a span: no state at all.
+// Where an agent span or direction stands: `unanswered` while it is a
+// question, then the answer it got. Not one the agent drew: no state at all.
 function spanState(mark) {
   if (mark.answer) return mark.answer;
-  return mark.author === 'agent' && mark.ref && mark.to ? 'unanswered' : null;
+  return mark.author === 'agent' && mark.ref && (mark.to || mark.lines) ? 'unanswered' : null;
+}
+
+// What a question is to its reference's other spans: its directions first,
+// then its anchor span, then the spans those read (ADR 0032, decision 6), so
+// a person never answers a span by a number that changes after.
+function foundation(mark) {
+  return mark.lines ? 0 : mark.claims ? 1 : 2;
 }
 
 // Claude's questions, asked one at a time (issue 75). The ids put off with
@@ -1522,16 +1541,39 @@ function follow(showing, asked, followed, busy) {
 // (issue 132).
 function asking(marks, skipped, moving) {
   const open = marks.filter(m => spanState(m) === 'unanswered' && m.status !== 'closed');
+  // One reference at a time, in the order the list first reaches each, and
+  // on each its foundations before its spans (issue 141).
+  const refs = [...new Set(open.map(m => m.ref))];
+  const turn = m => [refs.indexOf(m.ref), foundation(m), marks.indexOf(m)];
+  const order = open.slice().sort((a, b) => {
+    const [x, y] = [turn(a), turn(b)];
+    return x[0] - y[0] || x[1] - y[1] || x[2] - y[2];
+  });
   const mark = open.find(m => moving && m.id === moving.id)
-               || open.find(m => !skipped.has(m.id)) || null;
-  return { mark, number: mark ? 'span ' + (marks.indexOf(mark) + 1) : '', open: open.length };
+               || order.find(m => !skipped.has(m.id)) || null;
+  return { mark, number: mark ? named(mark, marks) : '', open: open.length };
+}
+
+// A question by the number on its badge, and by what it is.
+function named(mark, marks) {
+  return (mark.lines ? 'direction ' : 'span ') + (marks.indexOf(mark) + 1);
+}
+
+// What the card asks, in the agent's words for what it drew: a span whether
+// it measures that, a direction whether its edges are parallel, and the
+// anchor span whether it is the size the person stated (ADR 0032).
+function phrased(mark) {
+  if (mark.lines) return 'Are these ' + mark.text + ', parallel on the object?';
+  if (mark.claims) return 'Is this ' + mark.text + ' \u2014 the ' + mark.claims.dimension
+                          + ' you told me, ' + mark.claims.mm + ' mm?';
+  return 'Is this ' + mark.text + '?';
 }
 
 // The last answer, as the page offers it back: *Adopted span 15*, by the
 // number on the span's badge, or nothing once the span is not on file.
 function slipped(slip, marks) {
   const at = slip ? marks.findIndex(m => m.id === slip.id) : -1;
-  return at < 0 ? null : slip.did + ' span ' + (at + 1);
+  return at < 0 ? null : slip.did + ' ' + named(marks[at], marks);
 }
 
 function questions() {
@@ -1550,12 +1592,13 @@ function questions() {
     + (open === 1 ? ' question' : ' questions') + ' about your pictures';
   card.querySelector('.which').textContent = number;
   // The number the span gave, from the reading it is linked to: *span m4: 640
-  // mm ±3 mm  (213 px at …)* is shown as *640 mm ±3 mm*. A span drawn before
-  // readings were linked has none to show, and the question still stands.
-  const reading = marks.find(m => m.id === mark.reading);
-  card.querySelector('.number').textContent = reading
-    ? reading.text.replace(/^span \S+: /, '').split('  ')[0] : '';
-  card.querySelector('.asks').textContent = 'Is this ' + mark.text + '?';
+  // mm ±3 mm  (through the camera, …)* is shown as *640 mm ±3 mm*, and
+  // pixels with what the millimetres wait on (issue 141).
+  const said = numberOf(mark, marks);
+  card.querySelector('.number').textContent = said.number;
+  card.querySelector('.waits').textContent = said.why;
+  card.querySelector('.waits').hidden = !said.why;
+  card.querySelector('.asks').textContent = phrased(mark);
   card.querySelector('.eyed').hidden = mark.placed !== 'by eye';
   // Moving, the answers give way to Save and Cancel, and Save waits for an end
   // to have moved: unmoved, the answer is Yes. Rejecting, they give way to the
@@ -1571,8 +1614,31 @@ function questions() {
   card.querySelector('.skip').hidden = !!(moving || rejecting);
   card.querySelector('.moving').hidden = !moving;
   card.querySelector('.save').disabled = !moving
-    || String(moving.ends) === String([mark.pixel, mark.to]);
+    || String(moving.ends) === String(endsOf(mark));
   zoom(mark);
+}
+
+// A span's reading as the card shows it: *640 mm ±3 mm*, its number, and
+// when that is pixels, why: what the millimetres wait on (issue 141). A span
+// drawn before readings were linked has none, and the question still stands.
+function numbered(text) {
+  const [number, why] = text.replace(/^span \S+: /, '').split('  ');
+  // An anchor span's reading is its question, which the card asks above it.
+  const asked = (number || '').match(/\? \((\d+ px)\)$/);
+  if (asked) return { number: asked[1], why: '' };
+  const waits = / px\b/.test(number || '') && /^\(.*\)$/.test(why || '');
+  return { number: number || '', why: waits ? why.slice(1, -1) : '' };
+}
+
+// What the card shows beside a question's name: a direction's count of
+// lines, or a span's reading, its ids said by the badges the person sees,
+// as the card names the span it asks.
+function numberOf(mark, marks) {
+  if (mark.lines) return { number: mark.lines.length + ' lines', why: '' };
+  const reading = marks.find(m => m.id === mark.reading);
+  const said = numbered(reading ? reading.text : '');
+  const badge = id => { const m = marks.find(x => x.id === id); return m ? named(m, marks) : id; };
+  return { number: said.number, why: said.why.replace(/\bm\d+\b/g, badge) };
 }
 
 // The part of the picture the card shows for a span from a to b: its box,
@@ -1595,12 +1661,19 @@ function fromCard(point, frame) {
   return [Math.round(frame.x + point[0] / frame.k), Math.round(frame.y + point[1] / frame.k)];
 }
 
-// Which end of a span a press at point takes hold of: the nearer, if it is
-// within reach, else none (issue 132). 0 is the span's pixel, 1 its far end.
+// Which end a press at point takes hold of: the nearest, if it is within
+// reach, else none (issue 132). Its place in `ends`: for a span, 0 is its
+// pixel and 1 its far end.
 function grab(ends, point, reach) {
   const off = ends.map(e => Math.hypot(e[0] - point[0], e[1] - point[1]));
-  const near = off[0] <= off[1] ? 0 : 1;
+  const near = off.indexOf(Math.min(...off));
   return off[near] <= reach ? near : null;
+}
+
+// The ends a question is moved by: a span's two, or every end of every line
+// of a direction, in order, two to a line (issue 141).
+function endsOf(mark) {
+  return mark.lines ? mark.lines.flatMap(l => [l.from, l.to]) : [mark.pixel, mark.to];
 }
 
 // The ends after one end is dragged to a point: new ends, never the old ones
@@ -1612,7 +1685,10 @@ function moved(ends, which, to) {
 // What Save sends: the correction `/correct` has always taken, a span's two
 // ends as the person left them.
 function correction(mark, ends) {
-  return { id: mark.id, pixel: ends[0], to: ends[1] };
+  if (!mark.lines) return { id: mark.id, pixel: ends[0], to: ends[1] };
+  const lines = [];
+  for (let i = 0; i < ends.length; i += 2) lines.push({ from: ends[i], to: ends[i + 1] });
+  return { id: mark.id, lines };
 }
 
 // The reference, cropped to the span with room either side, and the span drawn
@@ -1627,11 +1703,14 @@ function zoom(mark) {
     pic.onload = () => { if (asked === mark) zoom(mark); };
     return;
   }
-  // Framed by Claude's ends, so the card holds still while one is dragged.
-  framed = crop(mark.pixel, mark.to, { width: pic.naturalWidth, height: pic.naturalHeight }, cv);
+  // Framed by Claude's ends, so the card holds still while one is dragged: a
+  // span's two, or the box around every line of a direction.
+  const placed = endsOf(mark), xs = placed.map(e => e[0]), ys = placed.map(e => e[1]);
+  framed = crop([Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)],
+                { width: pic.naturalWidth, height: pic.naturalHeight }, cv);
   const { x, y, w, h, k } = framed;
   const handled = moving && moving.mark.id === mark.id;
-  const [a, b] = handled ? moving.ends : [mark.pixel, mark.to];
+  const ends = handled ? moving.ends : placed;
   const c = cv.getContext('2d');
   c.clearRect(0, 0, cv.width, cv.height);
   c.drawImage(pic, x, y, w, h, 0, 0, w * k, h * k);
@@ -1641,13 +1720,15 @@ function zoom(mark) {
   c.lineCap = 'round';
   if (mark.placed === 'by eye') c.setLineDash([9, 9]);
   c.beginPath();
-  c.moveTo((a[0] - x) * k, (a[1] - y) * k);
-  c.lineTo((b[0] - x) * k, (b[1] - y) * k);
+  for (let n = 0; n < ends.length; n += 2) {
+    c.moveTo((ends[n][0] - x) * k, (ends[n][1] - y) * k);
+    c.lineTo((ends[n + 1][0] - x) * k, (ends[n + 1][1] - y) * k);
+  }
   c.stroke();
   c.restore();
   if (!handled) return;
   c.save();
-  for (const e of [a, b]) {
+  for (const e of ends) {
     c.beginPath();
     c.arc((e[0] - x) * k, (e[1] - y) * k, HANDLE, 0, 2 * Math.PI);
     c.lineWidth = 4;
@@ -1777,7 +1858,7 @@ async function giveWhy(why) {
 function correctSpan(mark) {
   if (showing !== mark.ref) show(mark.ref);
   rejecting = null;
-  moving = { mark, ends: [mark.pixel, mark.to], which: null, on: null };
+  moving = { mark, ends: endsOf(mark), which: null, on: null };
   hint.textContent = 'Drag the end that is wrong, here or on the card, then Save.';
   draw();
 }

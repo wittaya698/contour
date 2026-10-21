@@ -207,7 +207,7 @@ class OfferTest(unittest.TestCase):
     def test_the_offer_names_the_span_by_its_badge(self):
         """By its place in the list, as the card names a question (issue 131),
         and nothing once the span is not on file."""
-        said = self.run_page(["slipped"], """
+        said = self.run_page(["named", "slipped"], """
             const marks = [{ id: 'm1' }, { id: 'm2' }, { id: 'm7' }];
             return [slipped({ id: 'm7', did: 'Corrected' }, marks), slipped({ id: 'm9', did: 'Adopted' }, marks),
                     slipped(null, marks)];""")

@@ -98,7 +98,7 @@ class MovedTest(unittest.TestCase):
                   "status": "open", "text": "seat"},
                  {"id": "m2", "ref": "a.png", "pixel": [1, 5], "to": [9, 5], "author": "agent",
                   "status": "open", "text": "back"}]
-        said = self.run_page(["spanState", "asking"], "asking(marks, new Set(['m2']), marks[1])",
+        said = self.run_page(["spanState", "foundation", "named", "asking"], "asking(marks, new Set(['m2']), marks[1])",
                              marks=marks)
         self.assertEqual((said["mark"]["id"], said["number"], said["open"]), ("m2", "span 2", 2))
 

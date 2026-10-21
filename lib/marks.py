@@ -349,7 +349,7 @@ def answered(mark):
     return mark.get("answer")
 
 
-def _answering(path, mark_id, change):
+def _answering(path, mark_id, change, then=None):
     """Give one agent span the user's answer. Returns `{"mark": ...}`, or
     `{"refused": why}` with nothing written.
 
@@ -359,7 +359,9 @@ def _answering(path, mark_id, change):
     to `kept`, which is saved with it — or returns why it refuses.
 
     The mark comes with the answer's slip: what `unanswer` needs to take it
-    back (issue 136).
+    back (issue 136). `then(kept, mark)` runs after the change, inside the
+    same write: what the answer changes beyond its own mark, such as the
+    readings it reads again (issue 141), is then undone with it.
     """
     kept = load(path)
     found = next((m for m in kept if m.get("id") == mark_id), None)
@@ -375,6 +377,8 @@ def _answering(path, mark_id, change):
     refused = change(found, kept)
     if refused:
         return {"refused": refused}
+    if then:
+        then(kept, found)
     save(path, kept)
     return {"mark": found, "slip": _slip(mark_id, was, kept)}
 
@@ -433,24 +437,37 @@ def _reading(mark_id, of, ref, answer, at):
             "author": "agent", "status": "open"}
 
 
+def reading_of(kept, mark):
+    """The reading a span gave, among `kept`, or None for a span drawn before
+    readings were linked, or for a mark that is no span."""
+    return next((m for m in kept if m.get("id") == mark.get("reading")), None)
+
+
+def restate(said, mark, answer):
+    """A span's reading, said again: what the span reads now that its
+    reference's foundations have changed (issue 141). In place, in a list the
+    caller saves, as an answer's `then` does."""
+    said["text"] = f"span {mark['id']}: {answer}"
+
+
 def _superseded(kept, mark):
     """Close the reading a span gave: its number no longer stands. Returns it,
     or None for a span drawn before readings were linked."""
-    old = next((m for m in kept if m.get("id") == mark.get("reading")), None)
+    old = reading_of(kept, mark)
     if old is not None:
         old["status"] = "closed"
     return old
 
 
-def adopt(path, mark_id):
+def adopt(path, mark_id, then=None):
     """*It is right.* The span is the user's from then on, and still says who
     drew it."""
     def change(mark, kept):
         mark.update(author="user", drawn_by="agent", answer="adopted")
-    return _answering(path, mark_id, change)
+    return _answering(path, mark_id, change, then)
 
 
-def correct(path, mark_id, pixel, to, answer):
+def correct(path, mark_id, pixel, to, answer, then=None):
     """*Not quite: here.* The span takes the user's ends and is theirs, keeps
     the ends the agent drew, and is answered afresh. `answer` is the reading
     at the new ends, worked out by the caller, which knows the scale.
@@ -473,10 +490,10 @@ def correct(path, mark_id, pixel, to, answer):
         mark.pop("placed", None)
         mark.pop("question", None)
         return None
-    return _answering(path, mark_id, change)
+    return _answering(path, mark_id, change, then)
 
 
-def correct_lines(path, mark_id, drawn):
+def correct_lines(path, mark_id, drawn, then=None):
     """*Not quite: these edges.* A direction takes the user's lines and is
     theirs, and keeps the lines the agent drew, as a corrected span keeps its
     ends. The user placed them, so no question would place them again, and
@@ -490,10 +507,10 @@ def correct_lines(path, mark_id, drawn):
                     agent_lines=mark["lines"],
                     lines=[{"from": list(got["from"]), "to": list(got["to"])} for got in drawn])
         return None
-    return _answering(path, mark_id, change)
+    return _answering(path, mark_id, change, then)
 
 
-def reject(path, mark_id, why):
+def reject(path, mark_id, why, then=None):
     """*It measured the wrong thing.* Closed, with the user's one line of why,
     and its number — on the span and on the reading — marked not to be used.
 
@@ -510,7 +527,7 @@ def reject(path, mark_id, why):
             old["unused"] = True
         mark.update(status="closed", answer="rejected", why=why, unused=True)
         return None
-    return _answering(path, mark_id, change)
+    return _answering(path, mark_id, change, then)
 
 
 def _released(path):

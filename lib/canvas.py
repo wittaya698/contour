@@ -119,7 +119,10 @@ class Canvas(Page):
                 # decision 5). Here, so every host that serves the page has them.
                 ("POST", "/adopt"): lambda b: self.answer(
                     marks_store.adopt, b.get("id")),
+                # A direction is corrected by its lines, a span by its ends.
                 ("POST", "/correct"): lambda b: self.answer(
+                    marks_store.correct_lines, b.get("id"), b["lines"])
+                    if "lines" in b else self.answer(
                     self.corrected, b.get("id"), b.get("pixel"), b.get("to")),
                 ("POST", "/reject"): lambda b: self.answer(
                     marks_store.reject, b.get("id"), b.get("why")),
@@ -195,7 +198,7 @@ class Canvas(Page):
         """The user's answer to an agent span: the mark as it now stands, or
         `{"refused": why}`. Only ever reached from the page, as `close` is."""
         with self._lock:
-            said = transition(self.marks, *args)
+            said = transition(self.marks, *args, then=reread)
             if "mark" in said:
                 self.slip = said["slip"]        # the last answer, and only it
                 self.slip_run = self.latest_run()
@@ -220,7 +223,7 @@ class Canvas(Page):
                 self.slip = None
         return said.get("mark") or said
 
-    def corrected(self, marks, mark_id, a, b):
+    def corrected(self, marks, mark_id, a, b, then=None):
         """The user's correction: their ends, read afresh through the camera
         (ADR 0032), from the marks alone: the anchor span keeps its
         millimetres and the picture's size, so no image or spec is read. Never
@@ -234,7 +237,7 @@ class Canvas(Page):
         else:
             said = span.through(marks_store.load(marks), found.get("ref"), (a, b),
                                 leaving=mark_id)
-        return marks_store.correct(marks, mark_id, a, b, said)
+        return marks_store.correct(marks, mark_id, a, b, said, then=then)
 
     def wait(self):
         """Serve until the page says done or its tab goes, then stop, anchor,
@@ -273,6 +276,13 @@ class Canvas(Page):
             lines.append(f"ok   canvas  {self.pruned}")
         return {"ok": True, "lines": lines + list(extra)}
 
+
+
+def reread(kept, mark):
+    """After any answer, its reference's spans read again: an answered
+    direction or anchor span changes what they read, and so does a span they
+    were tied through (ADR 0032, decision 6)."""
+    span.reread(kept, marks_store.reference(mark))
 
 
 def models():

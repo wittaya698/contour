@@ -56,7 +56,7 @@ class ReasonTest(unittest.TestCase):
     def test_wrong_thing_asks_for_the_reason_on_the_card(self):
         """From the card or from the list: the span is the card's question,
         with its reason field open, and nothing is sent yet."""
-        said = self.run_page(["rejectSpan", "asking"], """
+        said = self.run_page(["rejectSpan", "foundation", "named", "asking"], """
             rejectSpan(marks[1]);
             return { asks: asking(marks, skipped, rejecting).mark.id, sent };""")
         self.assertEqual(said, {"asks": "m2", "sent": []})

@@ -51,7 +51,8 @@ class PageTest(unittest.TestCase):
         self.assertIn("asking(marks, skipped,", asking)
         self.assertIn("'Claude has '", asking)
         self.assertIn("' about your pictures'", asking)
-        self.assertIn("'Is this ' + mark.text + '?'", asking)
+        self.assertIn("phrased(mark)", asking)
+        self.assertIn("'Is this ' + mark.text + '?'", self.script("phrased"))
         self.assertIn("questions()", self.script("draw"), "redrawn with the list")
 
     def test_its_number_is_the_reading_the_span_is_linked_to(self):
@@ -59,7 +60,8 @@ class PageTest(unittest.TestCase):
         (`reading`); the card shows that number and not the arithmetic after
         it, which the list still has."""
         asking = self.script("questions")
-        self.assertIn("m.id === mark.reading", asking)
+        self.assertIn("numberOf(mark, marks)", asking)
+        self.assertIn("m.id === mark.reading", self.script("numberOf"))
         self.assertIn("'.number'", asking)
 
     def test_a_by_eye_span_says_so(self):
@@ -91,8 +93,7 @@ class PageTest(unittest.TestCase):
         self.assertIn("zoom(mark)", self.script("questions"))
         zoom = self.script("zoom")
         self.assertIn("'/ref?name='", zoom)
-        self.assertIn("mark.pixel", zoom)
-        self.assertIn("mark.to", zoom)
+        self.assertIn("endsOf(mark)", zoom)     # its two ends, or a direction's lines
         self.assertIn("drawImage(", zoom)
         self.assertIn("stroke()", zoom)
 

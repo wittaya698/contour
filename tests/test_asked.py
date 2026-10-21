@@ -45,7 +45,7 @@ class AskedTest(unittest.TestCase):
         return json.loads(out.stdout)
 
     def asking(self, marks, skipped=()):
-        return self.run_page(["spanState", "asking"], "asking(marks, new Set(skipped))",
+        return self.run_page(["spanState", "foundation", "named", "asking"], "asking(marks, new Set(skipped))",
                              marks=marks, skipped=list(skipped))
 
     def test_the_card_names_the_span_by_the_number_on_its_badge(self):

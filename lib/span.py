@@ -77,6 +77,27 @@ def through(all_marks, ref, ends, leaving=None):
             f"along {got['along']}, against {anchor['id']})")
 
 
+def reread(kept, ref):
+    """Read every agent span on `ref` again through the camera, in `kept`, in
+    place: an answer that changes the reference's foundations changes what
+    they read (ADR 0032, decision 6; issue 141). Run inside that answer's
+    write, so taking the answer back takes these with it.
+
+    Only open readings of spans read through the camera. An anchor span's
+    reading is its question, and one read at a scale the span kept came from
+    the foreground box, which is read again by its own route (issue 142).
+    """
+    for m in kept:
+        said = marks.reading_of(kept, m)
+        if (marks.reference(m) != ref or not marks.span_end(m) or m.get("claims")
+                or "scale" in m or said is None or not marks.is_open(said)):
+            continue
+        number = through(kept, ref, (marks.pixel(m), marks.span_end(m)), leaving=m["id"])
+        if m.get("placed") == "by eye":
+            number = f"{number}  {BY_EYE}"
+        marks.restate(said, m, number)
+
+
 def claimed(spec, dimension):
     """`{"dimension", "mm"}` for a size the spec states, which an anchor span
     may claim to be the length of, or `{"refused": why}` (ADR 0032, decision 3).
