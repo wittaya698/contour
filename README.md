@@ -198,10 +198,20 @@ contour canvas                     # the sheet, to mark on; waits for you
 
 **A number read off a reference is a span** (ADR 0022). Drag on a reference
 instead of clicking, and the mark has two ends: *this distance, right here*.
-`contour measure --span m9` reads it in millimetres, scaled from the
-`dimensions.height` your spec states, and pins the answer beside it. A picture
-carries proportion and never scale, so with no height in the spec it refuses
-rather than guess.
+`contour measure --span m9` reads it and pins the answer beside it. A
+picture carries proportion and never scale, and an angled photograph does not
+even carry proportion straight, so a span is read through the camera that took
+the picture (ADR 0032), from two kinds of question the agent asks first:
+
+- **Directions** — two or more lines along edges that are parallel on the
+  object, *the body tube's top and bottom edges*. Where they meet says how the
+  camera saw it.
+- **The anchor span** — a span on that picture that a size your spec states is
+  the length of, which asks *is this the width you told me, 300 mm?*
+
+Until you have answered both, a span on that picture reads in pixels and says
+which question it waits on; nothing is scaled off the background, and nothing
+is guessed.
 
 The agent draws spans too, and never types a pixel for an end. It names what to
 measure and code places the ends on what was found:
@@ -211,6 +221,11 @@ contour measure refs/side.jpg --silhouette --extent across "depth, front to back
 contour measure refs/front.jpg --scanline 250 --of '#3B3F72' --runs 1,2 \
     --between centres "the legs, centre to centre"
 contour measure --again m4         # ask a snapped span's question again
+contour measure refs/side.jpg --edges col:0.3,col:0.6      # the crossings to pick from
+contour measure refs/side.jpg --direction x --line col:0.3#2,col:0.6#2 \
+    --line col:0.3#4,col:0.6#4 "the body tube's top and bottom edges"
+contour measure refs/side.jpg --silhouette --extent across --claims width \
+    "the body, end to end"         # the anchor span
 ```
 
 Only where nothing snaps — a photograph of a real object, a soft gradient —
@@ -222,10 +237,19 @@ An agent span is a question, and you answer it on the canvas: **adopt** (it is
 right, and yours from then on), **correct** (drag its ends where they belong; it
 is re-measured), or **reject** (with one line of why; its number is not used).
 When spans are waiting, the canvas says *Claude has 4 questions about your
-pictures* and steps through them one at a time, each zoomed on its reference:
+pictures* and steps through them one at a time, each zoomed on its reference,
+and on each picture its directions first, then its anchor span, then the rest:
 *Yes, that's it*, *Let me move it* and *Wrong thing…* are adopt, correct and
-reject, and *skip for now* leaves one unanswered. Answering from the marks list
-still works.
+reject, and *skip for now* leaves one unanswered. A direction is moved by its
+lines' ends, as a span is by its own. Answering from the marks list still
+works.
+
+A reading made before ADR 0032, scaled off the picture's foreground box, says
+*made the old way* wherever it shows. Once its picture's directions and anchor
+span are answered it is read again through the camera, and the old number is
+kept beside the new. Neither moves the spec: a number that moved by more than
+its ± comes back to you as a proposal. `contour doctor` counts the readings
+still made the old way.
 `contour measure --standing m4` says whether a span's number may go into a
 proposal: yours, the agent's own reading for a snapped span you have not
 answered yet, or not at all — a by-eye span waits for your answer, and a

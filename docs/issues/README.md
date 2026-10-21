@@ -7,7 +7,7 @@ through one of them. A finished slice is demoable or verifiable on its own.
 **HITL** needs the user: a decision, a wording, a review. **AFK** can be
 implemented and landed without one.
 
-Two batches so far, and a third section for what the work itself turned up. Each
+Fourteen batches so far, and a last section for what the work itself turned up. Each
 file cites what it comes from; read that before arguing with a slice.
 
 ## Batch 1 — the console
@@ -444,6 +444,7 @@ sliced work is.
 | [125](125-the-labelling-act-says-how-it-ended.md) | The labelling act says how it ended | AFK | — |
 | [126](126-a-spec-gate-shows-all-it-changes.md) | A spec gate shows all it changes | AFK | — |
 | [127](127-a-refresh-does-not-end-a-console.md) | A refresh does not end a console | AFK | — |
+| [143](143-a-reason-is-typed-without-stopping-the-page.md) | A reason is typed without stopping the page | AFK | — |
 
 **27 came out of slice 17's own suite runs.** `contour-console` forwards `SIGINT`
 and not `SIGTERM`, so every console a test terminates leaves its server running —
@@ -470,3 +471,9 @@ page server's `shutdown()` sits out `serve_forever`'s default 0.5 s poll, and
 macOS adds about 0.25 s to the first run of each stub a test writes in `setUp`.
 Patching the poll alone took one full run to 184 s, all green; the slice
 re-measures on an idle machine before and after.
+
+**143 came out of verifying 136.** A reason for *Wrong thing…* was asked with
+the browser's `prompt()`, which stops the page's script and its heartbeat with
+it, so a reason that took more than ten seconds to type ended the console and
+the answer never arrived. The headless checks answered `prompt()` themselves,
+which is why nothing caught it sooner.
