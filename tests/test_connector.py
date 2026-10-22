@@ -154,6 +154,17 @@ class ToolsTest(unittest.TestCase):
         self.assertIn("never name a spec's new numbers", tool["description"])
         self.assertIn("the run argues them", tool["description"])
 
+    def test_the_create_tool_takes_a_size_the_chat_said_as_a_suggestion(self):
+        """Optional, one of the overall three, and said to be asked: the chat
+        is never told it sets the size (ADR 0033, decision 1)."""
+        [got] = talk(call(1, "tools/list"), tools={"create": lambda args: {}})
+        [tool] = got["result"]["tools"]
+        self.assertEqual(tool["inputSchema"]["required"], ["name", "references"])
+        anchor = tool["inputSchema"]["properties"]["anchor"]
+        self.assertEqual(anchor["properties"]["dimension"]["enum"],
+                         ["height", "width", "depth"])
+        self.assertIn("console asks", tool["description"])
+
     def test_calling_a_tool_returns_its_reading_as_text(self):
         [got] = talk(call(1, "tools/call", name="spaces", arguments={}),
                      tools=self.TOOLS)
@@ -794,10 +805,11 @@ class CreateTest(PagesCase):
         self.space = self.tmp / "beta"      # whose pages `close_pages` closes
         self.coming = False                 # whether a console is starting on it
 
-    def create(self, name, *paths):
+    def create(self, name, *paths, **more):
         r = self.contour("mcp", stdin=json.dumps(call(
             1, "tools/call", name="create",
-            arguments={"name": name, "references": [str(p) for p in paths]})) + "\n")
+            arguments={"name": name, "references": [str(p) for p in paths],
+                       **more})) + "\n")
         self.assertEqual(r.returncode, 0, r.stderr)
         got = json.loads(r.stdout)["result"]
         [block] = got["content"]
@@ -833,6 +845,67 @@ class CreateTest(PagesCase):
         self.assertIn("new-space skill", self.begun_on())
         [url] = self.urls()
         self.assertSecretless(text, url)
+
+    def test_a_size_the_chat_said_is_asked_and_never_taken(self):
+        """The anchor a chat passes is the console's suggestion, in the
+        toolkit's words: what another model wrote, asked of the user, whose
+        answer there is the only anchor (ADR 0033, decision 4)."""
+        _, said = self.create("beta", self.front, anchor={"dimension": "width", "mm": 300})
+        self.assertIsNone(said["refused"], said)
+        prompt = self.begun_on()
+        self.assertIn("300 mm wide", prompt)
+        self.assertIn("Is it 300 mm wide, as you said in the chat?", prompt)
+        self.assertIn("not something the user told you", prompt)
+        self.assertIn("How big is it in real life?", prompt)
+
+    def test_the_answer_says_the_size_is_a_suggestion_and_not_set(self):
+        """So the chat does not tell the user the size is settled (ADR 0033)."""
+        _, said = self.create("beta", self.front, anchor={"dimension": "height", "mm": 1200.5})
+        self.assertIn("suggestion", said["anchor"])
+        self.assertIn("the console will ask whether it is 1200.5 mm tall", said["anchor"])
+        _, said = self.create("gamma", self.front)
+        self.space = self.tmp / "gamma"
+        self.assertIsNone(said["anchor"])
+
+    def test_an_anchor_writes_nothing_in_the_space(self):
+        """It rides the launch line only: the same files as a create without
+        one (ADR 0033, decision 2)."""
+        by_hand = Path(tempfile.mkdtemp()).resolve()
+        r = subprocess.run([sys.executable, str(CONTOUR), "init", "beta"],
+                           cwd=str(by_hand), env=self.env, capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.create("beta", self.front, anchor={"dimension": "width", "mm": 300})
+        self.begun_on()
+
+        def files(root):
+            return {str(p.relative_to(root)) for p in root.rglob("*") if p.is_file()
+                    and not p.relative_to(root).parts[0] in (".git", ".contour")}
+        self.assertEqual(files(self.space), files(by_hand / "beta") | {"refs/front.jpg"})
+        for f in files(self.space) - {"refs/front.jpg"}:
+            self.assertNotIn(b"300", (self.space / f).read_bytes(), f)
+
+    def test_with_no_console_environment_the_said_size_is_on_the_way_to_go_on(self):
+        self.env["CONTOUR_CONSOLE_PYTHON"] = str(self.tmp / "no-python")
+        _, said = self.create("beta", self.front, anchor={"dimension": "depth", "mm": 640})
+        self.assertIn("contour-console --begin new-space --said depth:640", said["next"])
+
+    def test_an_anchor_that_is_not_a_size_is_refused_and_nothing_is_made(self):
+        """One of the overall three, and a positive, finite number: a part's
+        dimension has no part yet to belong to (ADR 0033, decision 1)."""
+        for bad in ({"dimension": "seat_height", "mm": 300},
+                    {"dimension": "width", "mm": 0},
+                    {"dimension": "width", "mm": -300},
+                    {"dimension": "width", "mm": "300"},
+                    {"dimension": "width", "mm": True},
+                    {"dimension": "width"},
+                    "300 mm wide"):
+            with self.subTest(anchor=bad):
+                _, said = self.create("beta", self.front, anchor=bad)
+                self.assertIn("anchor", said["refused"])
+                self.assertIsNone(said["path"])
+                self.assertFalse(self.space.exists())
+        time.sleep(1)                         # long enough for one started anyway to show
+        self.assertFalse(self.opened.exists(), "a console was opened anyway")
 
     def test_a_path_that_is_no_readable_image_is_refused_and_nothing_is_made(self):
         """Missing, unreadable, or not an image by its bytes or its name: each

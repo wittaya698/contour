@@ -14,7 +14,7 @@ reachable from here.
 import base64
 import json
 
-from . import space, survey
+from . import said as said_lib, space, survey
 
 LATEST = "2025-06-18"
 
@@ -95,11 +95,18 @@ TOOLS = (
     {"name": "create",
      "description": "Make a new model space from reference pictures on disk, "
                     "and open its console to draft the spec. Takes their paths, "
-                    "never a picture pasted into the chat.",
+                    "never a picture pasted into the chat. An anchor is how big "
+                    "the user said it is, if they did: the console asks them "
+                    "whether it is right, so it is never set here.",
      "inputSchema": {"type": "object", "required": ["name", "references"],
                      "properties": {"name": {"type": "string"},
                                     "references": {"type": "array",
-                                                   "items": {"type": "string"}}}}},
+                                                   "items": {"type": "string"}},
+                                    "anchor": {"type": "object",
+                                               "required": ["dimension", "mm"],
+                                               "properties": {
+                                                   "dimension": {"enum": list(said_lib.DIMENSIONS)},
+                                                   "mm": {"type": "number"}}}}}},
     {"name": "request",
      "description": "Ask for a run in a space nobody is watching: the prose is the "
                     "whole of what it is asked, what the user wants of the model in "

@@ -401,7 +401,8 @@ def on_mcp(cmd, rest, held):
         **connector.readings(),
         "open": lambda args: opened(args.get("page"), args.get("space"),
                                     create=bool(args.get("create")), name=args.get("name")),
-        "create": lambda args: created(args.get("name"), args.get("references") or []),
+        "create": lambda args: created(args.get("name"), args.get("references") or [],
+                                       args.get("anchor")),
         "request": lambda args: connector.asking(requested(
             connector.naming(args.get("space")), args.get("prose") or "",
             args.get("as") or "a chat")),
@@ -1021,11 +1022,17 @@ def opened(page, called, create=False, name=None):
     return {"page": page, "space": root.name, "refused": refused}
 
 
-def created(name, paths):
+def created(name, paths, anchor=None):
     """The lobby's create, where the lobby would make it, plus references
     already on disk (ADR 0024, decision 10). Every path is read before
-    anything is made, so a bad one leaves no half a space."""
-    from lib import lobby
+    anything is made, so a bad one leaves no half a space; so is `anchor`, the
+    size the chat said, which goes to the console as a value and nowhere else
+    (ADR 0033)."""
+    from lib import lobby, said as said_lib
+    try:
+        said = said_lib.value(anchor) if anchor is not None else None
+    except ValueError as e:
+        return refused_create(str(e))
     read = []
     for p in map(Path, paths):
         try:
@@ -1036,11 +1043,16 @@ def created(name, paths):
         if why:
             return refused_create(why)
         read.append((p.name, data))
-    return lobby.made(str(name or ""), lobby.location(space.roots(ROOT)), pictures=read)
+    made = lobby.made(str(name or ""), lobby.location(space.roots(ROOT)), pictures=read,
+                      anchor=said)
+    # Said so the chat does not tell the user the size is set (ADR 0033).
+    return dict(made, anchor=None if made["refused"] or not said else
+                f"passed on as a suggestion: the console will ask whether it is "
+                f"{said_lib.size(anchor['dimension'], anchor['mm'])}")
 
 
 def refused_create(why):
-    return {"path": None, "next": None, "refused": why}
+    return {"path": None, "next": None, "refused": why, "anchor": None}
 
 
 def spaces(name=None, as_json=False):

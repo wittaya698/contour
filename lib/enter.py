@@ -90,16 +90,17 @@ def requested(space, prose, requester):
                     "--requester", requester)
 
 
-def console(space, begin=None, of=None):
+def console(space, begin=None, of=None, said=None):
     """Start `contour-console` in `space`, and return without waiting for it.
 
     Given nothing but where to stand, and `begin`, the name of a flow for its
     run to start on (ADR 0021, decision 4), and `of`, the space a variation
-    varies. In a session of its own, so nothing that ends the lobby — a closed
-    tab, a Ctrl-C, a closed terminal — reaches it: the console has its own
-    lifetime, its own port and its own tab."""
+    varies, and `said`, a size the chat that made it said, as a value the
+    console asks (ADR 0033). In a session of its own, so nothing that ends the
+    lobby — a closed tab, a Ctrl-C, a closed terminal — reaches it: the console
+    has its own lifetime, its own port and its own tab."""
     detached(space, str(CONSOLE), *(("--begin", begin) if begin else ()),
-             *(("--of", str(of)) if of else ()))
+             *(("--of", str(of)) if of else ()), *(("--said", said) if said else ()))
 
 
 def page(where, command, *args):

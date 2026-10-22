@@ -347,14 +347,15 @@ def dropped(references):
     return pictures, None
 
 
-def made(name, location, of=None, pictures=()):
+def made(name, location, of=None, pictures=(), anchor=None):
     """`contour init --new` in `location`, its answer as it gave it; then
     `pictures`, `(filename, bytes)` pairs checked before this was called, written
     into the new space's `refs/` as they came; then its console on the
     new-space flow, or the variation flow `of` a space. The lobby and the
     connector both make a space here, so neither drafts anything (ADR 0024,
     decision 10). With no console environment the space is still made, and
-    `next` says how to go on from a terminal."""
+    `next` says how to go on from a terminal. `anchor` is a size the chat said,
+    in `--said`'s spelling, for the new-space console to ask (ADR 0033)."""
     flow = "variation" if of else "new-space"
     said = contour(CONTOUR.parent, "init", name, "--to", str(location), "--new", "--json")
     if said["refused"]:
@@ -368,8 +369,9 @@ def made(name, location, of=None, pictures=()):
         return dict(said, next=f"no console environment to open it in; make one, "
                                f"from {enter.ROOT}: {missing}, then: cd {said['path']} "
                                f"&& {enter.CONSOLE} --begin {flow}"
-                               + (f" --of {of}" if of else ""))
-    enter.console(said["path"], begin=flow, of=of)
+                               + (f" --of {of}" if of else "")
+                               + (f" --said {anchor}" if anchor else ""))
+    enter.console(said["path"], begin=flow, of=of, said=anchor)
     return dict(said, next=None)
 
 

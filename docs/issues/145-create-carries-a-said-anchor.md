@@ -16,7 +16,7 @@ written anywhere and never taken as the anchor.
   `--begin new-space`. The launcher refuses `--said` on any other flow and any
   value that does not parse back to the three and a positive number.
 - **`console/server.py` adds the toolkit's sentence to `NEW_SPACE` step 1**
-  (decision 4's wording). `BEGIN`'s docstring says why a value is not words.
+  (ADR 0033 decision 4's wording). `BEGIN`'s docstring says why a value is not words.
 - **No console environment:** the terminal instruction `create` prints
   includes `--said`.
 - **`create`'s answer says it was passed on as a suggestion**, e.g. *the
@@ -25,10 +25,10 @@ written anywhere and never taken as the anchor.
 
 ## Acceptance criteria
 
-- [ ] `create` with `anchor` makes the same files as without it: only `refs/`
-- [ ] A bad dimension or a non-positive or non-finite number is refused, and no space is made
-- [ ] The new-space run's first prompt names the size as the chat's, and asks it
-- [ ] `--said` on `--begin variation`, or with no `--begin`, is refused
+- [x] `create` with `anchor` makes the same files as without it: only `refs/`
+- [x] A bad dimension or a non-positive or non-finite number is refused, and no space is made
+- [x] The new-space run's first prompt names the size as the chat's, and asks it
+- [x] `--said` on `--begin variation`, or with no `--begin`, is refused
 - [ ] Looked at in a real console from Desktop: the size is asked, and answering *no, 320* gives an anchor span claiming 320 mm
 
 ## Blocked by

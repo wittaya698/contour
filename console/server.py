@@ -25,6 +25,7 @@ from lib import last_run
 from lib import gate as gate_words
 from lib import panel as panel_state
 from lib import policy, presence, signals
+from lib import said as said_lib
 from lib import space as space_lib
 
 
@@ -42,7 +43,11 @@ RELOAD_S = canvas_lib.RELOAD_S   # a reload says going, then beats again (issue 
 
 TOOLKIT = Path(__file__).resolve().parent.parent
 
-NEW_SPACE = (
+def new_space(said=None):
+    """The new-space flow's first prompt; with `said`, a size the chat that made
+    the space said, as the suggestion step 1's question opens with (ADR 0033)."""
+    asked = f" {said_lib.sentence(*said)}" if said else ""
+    return (
         "A new model, just made: nothing is in it yet. Start it the way the "
         "toolkit's new-space skill says "
         f"({TOOLKIT}/.claude/skills/new-space/SKILL.md); it is already named and "
@@ -50,13 +55,16 @@ NEW_SPACE = (
         "1. Before writing anything, ask the user, in plain words: What is it? "
         "How big is it in real life? Where will it be seen? What parts must it "
         "have? One real measurement is enough when there are pictures; never "
-        "guess one.\n"
+        f"guess one.{asked}\n"
         "2. Any reference pictures the user gave are already in refs/. Measure "
         "them; never change them.\n"
         "3. Propose the tolerances and the triangle budget yourself, from what "
         "it is and where it will be seen, and say they are yours.\n"
         "4. Draft spec.yaml, and flag every number you chose rather than the "
         "user, tolerances first. Ask the user before writing it (rule 1).")
+
+
+NEW_SPACE = new_space()
 
 
 def variation(of):
@@ -72,13 +80,17 @@ def variation(of):
         "drafted and confirmed here like any new one.\n" + NEW_SPACE)
 
 
-BEGIN = {"new-space": lambda of: NEW_SPACE, "variation": variation}
+BEGIN = {"new-space": lambda of, said: new_space(said),
+         "variation": lambda of, said: variation(of)}
 """The runs a console can be begun on, by name (ADR 0021, decision 4). A name
 and never a prompt's text: the launch line is the one way into a console that
 is not its own page, so it carries the choice of a flow the toolkit wrote, and
 nothing anybody could put words in. A variation's `--of` is a path, and only a
-model space's: the prompt is still the toolkit's words about it. The prompt is
-the run's first line in the transcript like any other.
+model space's: the prompt is still the toolkit's words about it. A new space's
+`--said` is a value, not words: a dimension of the fixed three and a number,
+which `lib/said.py` puts into a sentence the toolkit wrote, asking the user
+what a Desktop chat said the size is (ADR 0033). The prompt is the run's first
+line in the transcript like any other.
 
 The one launch line that does carry words is `--request`, and it carries them
 as what they are: a request, from somebody who is not watching, into a run
@@ -93,6 +105,8 @@ def value(argv, flag):
 
 def begun(argv):
     """The first prompt `argv` asks for, or None; and why it cannot be had."""
+    if "--said" in argv and value(argv, "--begin") != "new-space":
+        return None, "--said is for --begin new-space only: a size the chat that made it said"
     if "--begin" not in argv:
         return None, None
     flow = value(argv, "--begin")
@@ -101,7 +115,13 @@ def begun(argv):
     of = value(argv, "--of")
     if flow == "variation" and not (of and (Path(of) / space_lib.MARKER).is_file()):
         return None, "--begin variation takes --of <the model space it varies>"
-    return BEGIN[flow](of), None
+    said = None
+    if "--said" in argv:
+        try:
+            said = said_lib.read(value(argv, "--said"))
+        except ValueError as e:
+            return None, f"--said: {e}"
+    return BEGIN[flow](of, said), None
 
 NO_CEILING = ("no ceiling set; an unattended run is refused until you set one "
               "with `contour ceiling <n>`")

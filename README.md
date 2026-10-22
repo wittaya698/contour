@@ -434,7 +434,11 @@ It refuses any path that is not a `.png`, `.jpg` or `.webp` image before
 anything is made, and drafts no spec. A picture pasted into the chat is not the
 file, so it is not taken as a reference: `open` brings up the lobby on its
 create form instead, the name filled in if you gave one, for the file to be
-dropped there. `request` and `stop` are `contour request` and `contour stop`,
+dropped there. If you told the chat how big the thing is, `create` can pass
+that on as an anchor, one of height, width or depth in millimetres. It is
+written nowhere: the console opens by asking you whether it is right — *Is it
+300 mm wide, as you said in the chat?* — and only your answer there sets the
+size (ADR 0033). `request` and `stop` are `contour request` and `contour stop`,
 with the same arguments and the same refusals: a chat can ask for a run nobody
 watches and end one, and that is all it can start in a space. It never answers
 a gate or a question. `stop` on a space whose console has no run going closes

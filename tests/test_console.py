@@ -847,6 +847,30 @@ class RunTest(ConsoleCase):
                 self.assertNotIn("http://", said)
                 self.assertIn("--of", said)
 
+    def test_a_said_size_off_the_new_space_flow_or_not_a_size_is_refused_before_it_serves(self):
+        """`--said` is a dimension of three and a positive number, and only
+        for a new space: a variation's size is the space it varies' to argue
+        (ADR 0033, decision 3)."""
+        varied = self.space()
+        for argv in (("--said", "width:300"),
+                     ("--begin", "variation", "--of", str(varied), "--said", "width:300"),
+                     ("--begin", "new-space", "--said"),
+                     ("--begin", "new-space", "--said", "seat_height:300"),
+                     ("--begin", "new-space", "--said", "width:-3"),
+                     ("--begin", "new-space", "--said", "width:inf"),
+                     ("--begin", "new-space", "--said", "about thirty centimetres")):
+            with self.subTest(argv=argv):
+                proc = subprocess.Popen(
+                    [str(CONSOLE), "--no-browser", *argv],
+                    cwd=str(self.space()), stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT, text=True,
+                    env=dict(os.environ, CONTOUR_CONSOLE_PYTHON=sys.executable))
+                self.addCleanup(self.finish, proc)
+                self.assertEqual(proc.wait(timeout=30), 2)
+                said = proc.stdout.read()
+                self.assertNotIn("http://", said)
+                self.assertIn("--said", said)
+
     def marked(self, space):
         """A space the user has marked and has not resolved: a build on disk, a
         sheet drawn from that build, and a pin still carrying the pixel it was
