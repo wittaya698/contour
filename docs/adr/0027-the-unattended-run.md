@@ -1,6 +1,6 @@
 # 0027 — The unattended run: a request, a channel, and a gate nobody else can answer
 
-**Status:** Accepted, amended · 2026-10-11 (proposed 2026-10-09) · amended by [ADR 0028](0028-approvals-wait-and-the-run-goes-on.md) · **amends ADR 0019 decisions 11, 17 and 37, and ADR 0024 decisions 2, 3 and 4 and its first consequence** ([0019](0019-console-a-driven-agent-behind-a-gate.md), [0024](0024-the-connector-desktop-reads-and-opens.md))
+**Status:** Accepted, amended · 2026-10-11 (proposed 2026-10-09) · amended by [ADR 0028](0028-approvals-wait-and-the-run-goes-on.md), and by [ADR 0034](0034-questions-are-a-form-the-chat-can-fill.md) (a chat may fill the agent's questions, never approve them) · **amends ADR 0019 decisions 11, 17 and 37, and ADR 0024 decisions 2, 3 and 4 and its first consequence** ([0019](0019-console-a-driven-agent-behind-a-gate.md), [0024](0024-the-connector-desktop-reads-and-opens.md))
 
 > **Accepted on its tracer bullet, with how a run meets a gate amended by
 > [ADR 0028](0028-approvals-wait-and-the-run-goes-on.md)** (issue 93). Used by

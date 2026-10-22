@@ -442,6 +442,25 @@ is, and `create` drops it. One HITL, one AFK.
 **The size is a suggestion the console asks, never an anchor.** Whatever the
 chat sends, the anchor is the answer the user gives on the console page.
 
+## Batch 16 — questions on a form
+
+From [ADR 0034](../adr/0034-questions-are-a-form-the-chat-can-fill.md), decided
+on 2026-10-23 after a new-space run asked six questions as prose in its closing
+and stopped. One HITL, four AFK.
+
+| # | Slice | Type | Blocked by |
+|---|---|---|---|
+| [146](146-accept-adr-0034.md) | Accept ADR 0034 | HITL | — |
+| [147](147-questions-are-a-form.md) | The agent's questions are a form | AFK | 146 |
+| [148](148-an-approved-guess-keeps-its-name.md) | An approved guess keeps its name | AFK | 147 |
+| [149](149-the-chats-size-fills-the-size-field.md) | The chat's size fills the size field | AFK | 147 |
+| [150](150-a-chat-fills-the-form.md) | A chat fills the form | AFK | 147 |
+
+**147 is worth having without the rest**: it helps every new space, Desktop or
+not. **150 is the relay**, and the one that loosens ADR 0027 decision 12; it
+comes last so it is a small slice on a form already in use. A chat fills
+words, never a span and never a gate.
+
 ## Found in flight
 
 Not from either review — a defect the work turned up, filed where the rest of the
@@ -459,6 +478,7 @@ sliced work is.
 | [126](126-a-spec-gate-shows-all-it-changes.md) | A spec gate shows all it changes | AFK | — |
 | [127](127-a-refresh-does-not-end-a-console.md) | A refresh does not end a console | AFK | — |
 | [143](143-a-reason-is-typed-without-stopping-the-page.md) | A reason is typed without stopping the page | AFK | — |
+| [151](151-a-new-space-asks-for-no-tolerance.md) | A new space asks for no tolerance | AFK | — |
 
 **27 came out of slice 17's own suite runs.** `contour-console` forwards `SIGINT`
 and not `SIGTERM`, so every console a test terminates leaves its server running —
@@ -491,3 +511,8 @@ the browser's `prompt()`, which stops the page's script and its heartbeat with
 it, so a reason that took more than ten seconds to type ended the console and
 the answer never arrived. The headless checks answered `prompt()` themselves,
 which is why nothing caught it sooner.
+
+**151 came out of the run that started batch 16.** A new-space run
+asked the user how far off each size may be, which the skill and the prompt
+both say to propose instead. It is filed apart from the batch because it is
+wrong with or without a form.
