@@ -131,7 +131,7 @@ def answer(space, at, allow, reason=None, answers=None, words=None):
     if found["category"] == QUESTION:
         if not answers:
             return {"answered": False, "why": "a question is answered with its answers"}
-        answered = form.answered(found["call"].get("questions") or [], answers)
+        answered = form.answered(found["said"].get("fields") or [], answers)
         form.keep(space, found["run"], answered)
         dropped(space, at)
         return {"answered": True, "id": at, "outcome": "answered", "said": "",

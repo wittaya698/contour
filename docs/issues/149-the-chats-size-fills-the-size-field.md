@@ -16,9 +16,9 @@ console does with it changes.
 
 ## Acceptance criteria
 
-- [ ] A new space made with `--said width:300` shows its size field as *300 mm wide*, *from the chat*
-- [ ] With `--said` equal to Claude's guess, the field says *Claude's guess*
-- [ ] The new-space prompt no longer carries the said sentence
+- [x] A new space made with `--said width:300` shows its size field as *300 mm wide*, *from the chat*
+- [x] With `--said` equal to Claude's guess, the field says *Claude's guess*
+- [x] The new-space prompt no longer carries the said sentence
 
 ## Blocked by
 

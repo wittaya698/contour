@@ -267,10 +267,12 @@ class Run:
         self.latest = None                    # what the space's run record says
         self.ceiling = None                   # the weighted spend it stops at
         self.requester = None                 # who asked, if nobody is watching
+        self.chat_size = None                 # the size a chat said, for the first form
         self._lock = threading.Lock()
         self._thread = None
 
-    def start(self, prompt, marks_selected=(), ceiling=None, requester=None):
+    def start(self, prompt, marks_selected=(), ceiling=None, requester=None,
+              chat_size=None):
         """Begin. The prompt is the transcript's first line, because it is the
         first turn and the page is showing a conversation — so what is said there
         is the composed prompt and not the prose, because the composed one is
@@ -282,7 +284,11 @@ class Run:
 
         `requester` is who asked for a run nobody is watching, as it described
         itself; a run started with one is unattended to its end (ADR 0027,
-        decision 11)."""
+        decision 11).
+
+        `chat_size` is the size a chat that made the space said, as *300 mm
+        wide*: it fills the size field of this run's first form, as *from the
+        chat* (ADR 0034, decision 6)."""
         prompt, self.seeded = seed.compose(self.space, prompt, marks_selected)
         # Hold the space first: a run whose transcript had started and whose
         # hold had been refused would be a run the user was watching happen
@@ -291,6 +297,7 @@ class Run:
         self.gates = 0
         self.ceiling = ceiling
         self.requester = requester
+        self.chat_size = chat_size
         self.record = lock.take(self.space, "console run")
         # A first green said to nobody is said to this run, and spent only
         # once the run has the space (issue 121).
@@ -381,7 +388,7 @@ class Run:
         self.told()
         waiting = self.pending
         if aside and waiting is not None and waiting["category"] == approvals.QUESTION:
-            self.asked(waiting["call"])
+            self.asked(waiting["call"], waiting["said"]["fields"])
         elif aside and waiting is not None:
             self.aside(waiting["category"], waiting["tool"], waiting["call"],
                        waiting["case"])
@@ -536,6 +543,7 @@ class Run:
             self.say("text", text=case)
         # After the case is said: it is the proposal the gate names a span from.
         said = said or gate_words.say(category, self.space, tool, payload, self.proposal())
+        waiting["said"] = said
         self.say("gate", id=waiting["id"], category=category, tool=tool,
                  call=dict(payload), said=said)
         # The act and nothing under it: the call and what it would change are
@@ -562,7 +570,11 @@ class Run:
             return False, why
         if self.requester is not None:
             return self.asked(payload)
-        said = {"act": "Claude has questions", "fields": form.fields(payload["questions"])}
+        # The first form only: a later one asks again, and a size said once
+        # in a chat is not an answer to it.
+        size, self.chat_size = self.chat_size, None
+        said = {"act": "Claude has questions",
+                "fields": form.fields(payload["questions"], size)}
         waiting = self.waited(approvals.QUESTION, ASK_TOOL, payload, None, said)
         return True, waiting["reason"]
 
@@ -614,7 +626,7 @@ class Run:
         8). Nothing is posted on the machine: no banner (ADR 0028, decision 4)."""
         self.now("waiting for you", act=act, **said)
 
-    def asked(self, payload):
+    def asked(self, payload, fields=None):
         """Set a question aside for the person, in a run nobody is watching,
         and tell the agent so (ADR 0028, decision 2). Returns (False, why).
 
@@ -626,7 +638,9 @@ class Run:
         """
         questions = [dict(q) for q in payload.get("questions") or ()]
         asking = " ".join(q.get("question", "") for q in questions)
-        said = {"act": "Claude has questions", "fields": form.fields(questions)}
+        # As the page showed it, if it did: a field the chat filled stays
+        # the chat's (ADR 0034, decision 6).
+        said = {"act": "Claude has questions", "fields": fields or form.fields(questions)}
         kept = approvals.set_aside(self.space, self.record["run"], approvals.QUESTION,
                                    ASK_TOOL, payload, said, self.proposal())
         # The question's text and nothing else: it is the act, and what a
@@ -705,7 +719,7 @@ class Run:
         if waiting["category"] == approvals.QUESTION:
             # Approved, the answers are what the agent is told, each with
             # where its text came from (ADR 0034, decisions 2 and 3).
-            waiting["reason"] = form.answered(waiting["call"]["questions"], answers or [])
+            waiting["reason"] = form.answered(waiting["said"]["fields"], answers or [])
             form.keep(self.space, self.record["run"], waiting["reason"])
             self.say("verdict", id=at, allowed=True, text="")
             waiting["answered"].set()

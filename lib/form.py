@@ -35,29 +35,38 @@ def refused(payload):
     return None
 
 
-def fields(questions):
+def fields(questions, size=None):
     """The form as the page first shows it: every field filled with Claude's
-    guess, and the basis under it (ADR 0034, decision 2)."""
-    return [{"question": q["question"], "text": q["suggested"], "source": "guess",
-             "basis": q["basis"], **({"is_size": True} if q.get("is_size") else {})}
-            for q in questions]
+    guess, and the basis under it (ADR 0034, decision 2). `size` is what a
+    chat said the size is, which fills the size field instead, as *from the
+    chat*: it beats a guess, and one identical to the guess stays Claude's,
+    since the agreement says nothing the page can check (ADR 0034, decision 3)."""
+    return [_field(q, size if q.get("is_size") else None) for q in questions]
 
 
-def source(question, text):
-    """Where an approved field's text came from: Claude's guess if it still
-    reads as suggested, and the person's otherwise (ADR 0034, decision 3)."""
-    return "guess" if text == question["suggested"] else "yours"
+def _field(q, chat):
+    chat = chat if chat and chat != q["suggested"] else None
+    return {"question": q["question"], "text": chat or q["suggested"],
+            "source": "chat" if chat else "guess", "basis": q["basis"],
+            **({"is_size": True} if q.get("is_size") else {})}
 
 
-def answered(questions, texts):
-    """The form as approved: each question, its answer, and the answer's
-    source. A field the page sent nothing for is the guess it was filled
-    with."""
-    texts = list(texts) + [None] * len(questions)
-    return [{"question": q["question"], "answer": q["suggested"] if t is None else t,
-             "source": source(q, q["suggested"] if t is None else t),
-             **({"is_size": True} if q.get("is_size") else {})}
-            for q, t in zip(questions, texts)]
+def source(field, text):
+    """Where an approved field's text came from: wherever it was filled from,
+    if it still reads as filled, and the person's otherwise (ADR 0034,
+    decision 3)."""
+    return field["source"] if text == field["text"] else "yours"
+
+
+def answered(fields, texts):
+    """The form as approved, from the fields the page showed: each question,
+    its answer, and the answer's source. A field the page sent nothing for is
+    what it was filled with."""
+    texts = list(texts) + [None] * len(fields)
+    return [{"question": f["question"], "answer": f["text"] if t is None else t,
+             "source": source(f, f["text"] if t is None else t),
+             **({"is_size": True} if f.get("is_size") else {})}
+            for f, t in zip(fields, texts)]
 
 
 TOLD = {"guess": "Claude's guess, approved", "chat": "from the chat", "yours": "yours"}
