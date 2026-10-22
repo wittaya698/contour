@@ -492,7 +492,7 @@ the choice to allow that, and Desktop asks before each call.
 | `contour stop <name>` | end the run in that space, a waiting gate set aside; with no run, close its console |
 | `contour ceiling [<n>]` | what an unattended run may spend; for you, not the agent |
 | `contour-console` | drive a run from the browser, behind a gate |
-| `contour-console --begin <flow>` | the same, its run begun on `new-space` or `variation --of <space>` |
+| `contour-console --begin <flow>` | the same, its run begun on `new-space` or `variation --of <space>`; `new-space --said width:300` first asks whether that size, a chat's, is right |
 
 The commands a client reads — `init`, `spaces`, `rename`, `update`, `delete`,
 `restore`, `purge`, `asks` — take `--json`, which is how the lobby runs them. The model commands
