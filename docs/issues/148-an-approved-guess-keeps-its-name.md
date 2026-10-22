@@ -20,9 +20,9 @@ is used next, since a wrong one shows nowhere else (ADR 0016).
 
 ## Acceptance criteria
 
-- [ ] An anchor span whose size was an approved guess asks with *approved from Claude's guess*
-- [ ] An anchor span whose size the user typed asks as today
-- [ ] Rule 1, the space template and the new-space skill list the fourth source, and say the same thing
+- [x] An anchor span whose size was an approved guess asks with *approved from Claude's guess*
+- [x] An anchor span whose size the user typed asks as today
+- [x] Rule 1, the space template and the new-space skill list the fourth source, and say the same thing
 
 ## Blocked by
 

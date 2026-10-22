@@ -12,7 +12,7 @@ what needs to be checkable without a scene.
 import math
 from pathlib import Path
 
-from . import agent, camera, marks, miniyaml
+from . import agent, camera, form, marks, miniyaml
 
 
 def reading(a, b, k):
@@ -113,7 +113,10 @@ def claimed(spec, dimension):
 
     Any one the spec states, not only a height: the user gives whichever real
     size they know. What the user answers is that number, so the span keeps
-    it, and is not read from the spec again.
+    it, and is not read from the spec again. A size the user approved from
+    Claude's guess says so, and the span keeps that too (ADR 0034, decision
+    4): wrong, it would be wrong everywhere by one factor, and nothing else
+    would show it.
     """
     spec = Path(spec) if spec else None
     doc = (miniyaml.load(spec) or {}) if spec and spec.exists() else {}
@@ -124,11 +127,17 @@ def claimed(spec, dimension):
         return {"refused": (f"the spec states no {dimension}: it states "
                             f"{', '.join(stated) or 'no size at all'}, and a "
                             f"picture carries proportion, never scale")}
-    return {"dimension": dimension, "mm": float(value)}
+    claims = {"dimension": dimension, "mm": float(value)}
+    if spec and form.sized(spec.parent) == "guess":
+        claims["source"] = "guess"
+    return claims
 
 
 def asking(claims, a, b):
     """An anchor span's reading: the question it puts to the user."""
+    if claims.get("source") == "guess":
+        return (f"is this the {claims['mm']:g} mm {claims['dimension']} you approved "
+                f"from Claude's guess? ({math.dist(a, b):.0f} px)")
     return (f"is this the {claims['dimension']} you told me, {claims['mm']:g} mm? "
             f"({math.dist(a, b):.0f} px)")
 

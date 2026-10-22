@@ -1590,9 +1590,13 @@ function named(mark, marks) {
 
 // What the card asks, in the agent's words for what it drew: a span whether
 // it measures that, a direction whether its edges are parallel, and the
-// anchor span whether it is the size the person stated (ADR 0032).
+// anchor span whether it is the size the person stated (ADR 0032), or the one
+// they approved from Claude's guess, named as a guess (ADR 0034).
 function phrased(mark) {
   if (mark.lines) return 'Are these ' + mark.text + ', parallel on the object?';
+  if (mark.claims && mark.claims.source === 'guess')
+    return 'Is this ' + mark.text + ' \u2014 the ' + mark.claims.mm + ' mm '
+           + mark.claims.dimension + " you approved from Claude's guess?";
   if (mark.claims) return 'Is this ' + mark.text + ' \u2014 the ' + mark.claims.dimension
                           + ' you told me, ' + mark.claims.mm + ' mm?';
   return 'Is this ' + mark.text + '?';

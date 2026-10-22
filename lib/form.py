@@ -86,3 +86,11 @@ def keep(space, run, answers):
     kept = {"run": run, "at": time.time(), "answers": answers}
     store.save(path(space), approved(space) + [kept])
     return kept
+
+
+def sized(space):
+    """Where the size the user last approved came from: its answer's source,
+    or None when no approved form has answered the size. The anchor span
+    reads it, so a guess approved is asked as one (ADR 0034, decision 4)."""
+    said = [a for kept in approved(space) for a in kept["answers"] if a.get("is_size")]
+    return said[-1]["source"] if said else None
