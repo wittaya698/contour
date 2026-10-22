@@ -242,7 +242,8 @@
   /* A question: a gate's border, since it too is waiting for you. */
   #run .question .asked { margin: 0; padding-left: 18px; display: flex;
                             flex-direction: column; gap: 6px; }
-  #run .question .source { margin-left: 6px; font-size: 12px; color: var(--muted); }
+  #run .question input { width: 100%; box-sizing: border-box; }
+  #run .question .source { display: block; font-size: 12px; color: var(--muted); }
   #run .question .basis { margin: 2px 0 0; font-size: 12px; opacity: .8; }
   #turns .changes { margin: 0; padding-left: 18px; }
   #turns .changes:empty, #turns .spans:empty { display: none; }
@@ -955,7 +956,7 @@ const LABELS = { guess: "Claude's guess", chat: 'from the chat', yours: 'yours' 
 
 // A field's label for what it now says: where its text came from until the
 // person changes it, and theirs from then on.
-function labelled(field, value) {
+function fieldSource(field, value) {
   return value === field.text ? LABELS[field.source] : LABELS.yours;
 }
 
@@ -974,8 +975,8 @@ function question(asking, send) {
     own.autocomplete = 'off';
     const source = document.createElement('span');
     source.className = 'source';
-    source.textContent = labelled(field, own.value);
-    own.addEventListener('input', () => { source.textContent = labelled(field, own.value); });
+    source.textContent = fieldSource(field, own.value);
+    own.addEventListener('input', () => { source.textContent = fieldSource(field, own.value); });
     const basis = document.createElement('p');
     basis.className = 'basis';
     basis.textContent = field.basis || '';

@@ -31,7 +31,7 @@ with every field already filled. No MCP yet: this is the console and its page.
 - [x] Approve under an attended run hands the run every answer with its source
 - [x] An unattended run's `ask` is set aside, and approving it starts a run with the questions and answers
 - [x] The approved answers and their sources are on disk after Approve
-- [ ] Looked at in a real console: a new space's questions arrive as a form, not prose
+- [x] Looked at in a real console: a new space's questions arrive as a form, not prose
 
 ## Blocked by
 

@@ -210,8 +210,8 @@ class PageTest(unittest.TestCase):
 
     def labelled(self, field, value):
         page = PAGE.read_text(encoding="utf-8")
-        js = (function(page, "labelled") + page.split("// LABELS\n")[1].split("\n\n")[0]
-              + f"\nconsole.log(JSON.stringify(labelled({json.dumps(field)}, "
+        js = (function(page, "fieldSource") + page.split("// LABELS\n")[1].split("\n\n")[0]
+              + f"\nconsole.log(JSON.stringify(fieldSource({json.dumps(field)}, "
                 f"{json.dumps(value)})));")
         out = subprocess.run(["node", "-e", js], capture_output=True, text=True, timeout=30)
         self.assertEqual(out.returncode, 0, out.stderr)
@@ -224,6 +224,14 @@ class PageTest(unittest.TestCase):
         chat = {"text": "320 mm long", "source": "chat"}
         self.assertEqual(self.labelled(chat, "320 mm long"), "from the chat")
         self.assertEqual(self.labelled(chat, "330 mm long"), "yours")
+
+    def test_no_function_on_the_page_is_declared_twice(self):
+        """The later of two declarations wins: a second `labelled` once turned
+        every field's label into *[object Promise]* on a real console."""
+        import re
+        names = re.findall(r"^(?:async )?function (\w+)\(", PAGE.read_text(encoding="utf-8"),
+                           re.M)
+        self.assertEqual(sorted({n for n in names if names.count(n) > 1}), [])
 
     def test_one_approve_sends_every_field_watched_or_set_aside(self):
         page = PAGE.read_text(encoding="utf-8")
