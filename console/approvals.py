@@ -17,7 +17,7 @@ import time
 from pathlib import Path
 
 from console import last_run, launcher, vetoes
-from lib import intent, lock, marks, space as space_lib, store, topics
+from lib import form, intent, lock, marks, space as space_lib, store, topics
 
 TOOLKIT = Path(__file__).resolve().parent.parent
 
@@ -131,9 +131,11 @@ def answer(space, at, allow, reason=None, answers=None, words=None):
     if found["category"] == QUESTION:
         if not answers:
             return {"answered": False, "why": "a question is answered with its answers"}
+        answered = form.answered(found["call"].get("questions") or [], answers)
+        form.keep(space, found["run"], answered)
         dropped(space, at)
         return {"answered": True, "id": at, "outcome": "answered", "said": "",
-                "prompt": asked(found["call"], answers)}
+                "prompt": asked(answered)}
     if found["category"] == topics.CATEGORY:
         # Word by word, and no veto either way: a struck word refuses a word,
         # not a call (ADR 0030, decision 5).
@@ -175,14 +177,12 @@ def dropped(space, at):
     last_run.amend(space, approvals=acts(space))
 
 
-def asked(call, answers):
-    """The first message of the run an answer starts: the question as it was
-    asked, and the person's answer to it, in their words and nobody else's."""
-    lines = ["In a run nobody was watching, you asked:"]
-    for q in call.get("questions") or ():
-        lines += [f"  {q.get('question', '')}",
-                  f"The user answers: {answers.get(q.get('question', ''), '(no answer)')}"]
-    return "\n".join(lines)
+def asked(answers):
+    """The first message of the run an approved form starts: the questions as
+    they were asked, and the answers the person approved, each with where it
+    came from (ADR 0034, decision 2)."""
+    return ("In a run nobody was watching, you asked, and the user approved "
+            "these answers:\n" + form.told(answers))
 
 
 def applied(space, approval):

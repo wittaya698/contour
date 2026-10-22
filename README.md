@@ -445,9 +445,12 @@ a gate or a question. `stop` on a space whose console has no run going closes
 that console, and gives the space back. A run it asked for does not stop at a gate: the act is
 set aside for you, and the run carries on. Its console shows what waits, oldest
 first, with the diff and Claude's case, whenever you open it: allow makes the
-call then, and deny is a veto. A question is set aside the same way, in its
-place in the order: your answer starts a new run in that console, with the
-question and the answer as its first message. Until they are answered, the
+call then, and deny is a veto. Claude's questions are a form, with every
+field already filled with its guess and the reason for it, each saying whether
+the text is *Claude's guess* or *yours*; you edit what is wrong and approve
+the form once (ADR 0034). A run you watch waits at it. One nobody watched sets
+it aside the same way, in its place in the order: approving it starts a new
+run in that console, with the questions and the answers as its first message. Until they are answered, the
 lobby's row and `status` say how many wait and for what, never why, and a
 request to that space is refused; the chat asks whether you want to answer
 them now, which is `open`, or later. Its answers are meant to read as the pages do, in plain words. Otherwise

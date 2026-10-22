@@ -25,12 +25,12 @@ with every field already filled. No MCP yet: this is the console and its page.
 
 ## Acceptance criteria
 
-- [ ] An `ask` with a suggestion and no basis is refused, and nothing waits
-- [ ] `AskUserQuestion` under a console is refused and names `ask`
-- [ ] The page shows each question prefilled and labelled *Claude's guess*; an edited field says *yours*
-- [ ] Approve under an attended run hands the run every answer with its source
-- [ ] An unattended run's `ask` is set aside, and approving it starts a run with the questions and answers
-- [ ] The approved answers and their sources are on disk after Approve
+- [x] An `ask` with a suggestion and no basis is refused, and nothing waits
+- [x] `AskUserQuestion` under a console is refused and names `ask`
+- [x] The page shows each question prefilled and labelled *Claude's guess*; an edited field says *yours*
+- [x] Approve under an attended run hands the run every answer with its source
+- [x] An unattended run's `ask` is set aside, and approving it starts a run with the questions and answers
+- [x] The approved answers and their sources are on disk after Approve
 - [ ] Looked at in a real console: a new space's questions arrive as a form, not prose
 
 ## Blocked by

@@ -242,7 +242,8 @@
   /* A question: a gate's border, since it too is waiting for you. */
   #run .question .asked { margin: 0; padding-left: 18px; display: flex;
                             flex-direction: column; gap: 6px; }
-  #run .question .choices { display: flex; flex-wrap: wrap; gap: 4px; }
+  #run .question .source { margin-left: 6px; font-size: 12px; color: var(--muted); }
+  #run .question .basis { margin: 2px 0 0; font-size: 12px; opacity: .8; }
   #turns .changes { margin: 0; padding-left: 18px; }
   #turns .changes:empty, #turns .spans:empty { display: none; }
   #turns .raw summary { cursor: pointer; opacity: .6; font-size: 11px; }
@@ -391,16 +392,17 @@
         </div>
       </li>
     </template>
-    <!-- The agent's question, set aside by a run nobody was watching (ADR 0028,
-         decision 2). Answered here and nowhere else: an answer becomes intent,
-         and a requester relaying one would be an agent giving the anchor rule 1
-         says the user gives. Each question takes one of its options or the
-         person's own words. -->
+    <!-- The agent's questions, as a form already filled (ADR 0034). Each field
+         says where its text came from, Claude's guess until the person edits
+         it, with the guess's basis under it; one Approve sends them all. A
+         watched run waits at it; one nobody watched set it aside (ADR 0028,
+         decision 2), and approving it starts a run on the answers. Only the
+         person approves: an answer becomes intent (rule 1). -->
     <template id="question">
       <li class="gate question">
-        <span class="act">Claude has a question</span>
+        <span class="act">Claude has questions</span>
         <ol class="asked"></ol>
-        <div class="pair"><button class="send">Answer</button></div>
+        <div class="pair"><button class="send">Approve</button></div>
       </li>
     </template>
   </section>
@@ -724,8 +726,18 @@ function vetoed(veto) {
   return li;
 }
 
+// A watched run's questions, waiting at the form until Approve (ADR 0034).
+function form(event) {
+  const li = question(event.said, answers =>
+    ask('/verdict', { id: event.id, allow: true, answers: answers }));
+  li.dataset.gate = event.id;
+  li.dataset.allow = 'approved';
+  return li;
+}
+
 // One line of the transcript.
 function turn(event) {
+  if (event.kind === 'gate' && event.category === 'question') return form(event);
   if (event.kind === 'gate') return gate(event);
   if (event.kind === 'verdict') return closeGate(event);
   if (event.kind === 'call') return activity(event);
@@ -937,37 +949,44 @@ function approval(a) {
   return li;
 }
 
-// The agent's question, set aside until the person answers it (ADR 0028,
-// decision 2). An option fills in its question's answer and the person's own
-// words may replace it; one Answer sends them all, since the agent asked them
-// together.
+// Where a field's text came from, as the field says it (ADR 0034, decision 3).
+// LABELS
+const LABELS = { guess: "Claude's guess", chat: 'from the chat', yours: 'yours' };
+
+// A field's label for what it now says: where its text came from until the
+// person changes it, and theirs from then on.
+function labelled(field, value) {
+  return value === field.text ? LABELS[field.source] : LABELS.yours;
+}
+
+// The agent's questions, as a form already filled: each field labelled with
+// where its text came from, the basis for Claude's guess under it, and one
+// Approve that sends every field as it reads (ADR 0034, decision 2).
 function question(asking, send) {
   const li = document.getElementById('question').content.firstElementChild.cloneNode(true);
-  const fields = {};
-  for (const asked of asking.questions) {
+  const inputs = [];
+  for (const field of asking.fields) {
     const item = document.createElement('li');
     const text = document.createElement('p');
-    text.textContent = asked.question;
+    text.textContent = field.question;
     const own = document.createElement('input');
-    own.placeholder = 'your answer';
+    own.value = field.text;
     own.autocomplete = 'off';
-    const choices = document.createElement('div');
-    choices.className = 'choices';
-    for (const option of asked.options || []) {
-      const b = document.createElement('button');
-      b.textContent = option.label;
-      b.title = option.description || '';
-      b.addEventListener('click', () => { own.value = option.label; });
-      choices.append(b);
-    }
-    item.append(text, choices, own);
+    const source = document.createElement('span');
+    source.className = 'source';
+    source.textContent = labelled(field, own.value);
+    own.addEventListener('input', () => { source.textContent = labelled(field, own.value); });
+    const basis = document.createElement('p');
+    basis.className = 'basis';
+    basis.textContent = field.basis || '';
+    item.append(text, own, source, basis);
     li.querySelector('.asked').append(item);
-    fields[asked.question] = own;
+    inputs.push(own);
   }
   li.querySelector('.send').addEventListener('click', () => {
-    const answers = {};
-    for (const [asked, own] of Object.entries(fields)) answers[asked] = own.value.trim();
+    const answers = inputs.map(own => own.value.trim());
     for (const b of li.querySelectorAll('button')) b.disabled = true;
+    for (const own of inputs) own.disabled = true;
     send(answers);
   });
   return li;
@@ -986,7 +1005,7 @@ function closeGate(event) {
     return line;
   }
   li.classList.add('answered');
-  li.querySelector('.because').remove();
+  li.querySelector('.because')?.remove();
   li.querySelector('.pair').remove();
   const said = { allow: li.dataset.allow, deny: li.dataset.deny };
   const was = document.createElement('p');

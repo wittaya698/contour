@@ -718,6 +718,24 @@ class RunTest(ConsoleCase):
             url, lambda ev: any(e.get("text") == "the check is green" for e in ev))
         self.assertTrue([e for e in said if e["kind"] == "result"][0]["allowed"])
 
+    def test_the_pages_approve_hands_the_agent_its_form_answered(self):
+        """The form is a gate the page answers with what its fields say, and
+        the agent is given each answer with its source (ADR 0034, decision 2)."""
+        asking = {"questions": [{"question": "What is it?", "suggested": "a megaphone",
+                                 "basis": "the cone in the reference"}]}
+        _, url = self.driven({"call": {"tool": "mcp__contour__ask", **asking}})
+        self.ask(url, "/run", {"prompt": "a new model"})
+        gate, _ = self.gate(url)
+        self.assertEqual(gate["category"], "question")
+        self.assertEqual([f["text"] for f in gate["said"]["fields"]], ["a megaphone"])
+        self.ask(url, "/verdict", {"id": gate["id"], "allow": True,
+                                   "answers": ["a loudhailer"]})
+        said = self.transcript(url, lambda ev: any(e["kind"] == "result" for e in ev))
+        got = [e for e in said if e["kind"] == "result"][0]
+        self.assertTrue(got["allowed"])
+        self.assertEqual(got["text"], [{"question": "What is it?", "answer": "a loudhailer",
+                                        "source": "yours"}])
+
     def test_deny_hands_the_agent_the_sentence_as_the_calls_result(self):
         """The cheapest correction channel in the system: a sentence, at the
         moment it applies, instead of a paragraph after the fact. The reason is

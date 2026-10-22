@@ -313,7 +313,7 @@ class ToolTest(unittest.TestCase):
             "print(sorted(t.name for t in agent.tools('.')))\n")],
             cwd=str(ROOT), capture_output=True, text=True)
         self.assertEqual(done.stdout.split("\n")[:2],
-                         ["True", "['spec_write', 'topics_propose']"], done.stderr)
+                         ["True", "['ask', 'spec_write', 'topics_propose']"], done.stderr)
 
     def test_the_consoles_tool_carries_the_words_in_use_on_this_machine(self):
         """Read when the run's tools are made, from every space found."""

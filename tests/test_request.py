@@ -110,7 +110,8 @@ class StartsTest(RequestCase):
         the space for the person."""
         from console import approvals
         said, _ = self.request("make the beak longer",
-                               script=({"ask": [{"question": "How long?"}]}, {"say": "done"}))
+                               script=({"ask": [{"question": "How long?", "suggested": "300 mm",
+                                                 "basis": "as drawn"}]}, {"say": "done"}))
         self.assertTrue(said["started"], said)
         self.assertEqual(self.until("finished")["approvals"], ["How long?"])
         self.assertTrue(self.gone(), "a question held the console")

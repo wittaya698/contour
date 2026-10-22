@@ -70,6 +70,14 @@ class InterviewTest(unittest.TestCase):
         for asked in ("How big is it in real life?", "Where will it be seen?"):
             self.assertIn(asked, NEW_SPACE)
 
+    def test_the_first_prompt_asks_with_ask_and_never_in_a_closing(self):
+        """So the questions arrive as a form, not prose (ADR 0034, decision 1)."""
+        said = flat(NEW_SPACE)
+        self.assertIn("with the ask tool", said)
+        self.assertIn("your suggested answer and what it rests on", said)
+        self.assertIn("is_size", said)
+        self.assertIn("never in your closing", said)
+
     def test_the_first_prompt_never_says_anchor(self):
         self.assertNotIn("anchor", NEW_SPACE.lower())
 

@@ -54,8 +54,12 @@ def new_space(said=None):
         "made, so skip that step.\n"
         "1. Before writing anything, ask the user, in plain words: What is it? "
         "How big is it in real life? Where will it be seen? What parts must it "
-        "have? One real measurement is enough when there are pictures; never "
-        f"guess one.{asked}\n"
+        "have? Ask them all at once with the ask tool, each with your suggested "
+        "answer and what it rests on, and mark is_size on how big it is: the "
+        "user sees a form already filled, edits what is wrong and approves it. "
+        "Ask there and never in your closing. One real measurement is enough "
+        "when there are pictures; a size you suggested is a guess until the "
+        f"user approves it.{asked}\n"
         "2. Any reference pictures the user gave are already in refs/. Measure "
         "them; never change them.\n"
         "3. Propose the tolerances and the triangle budget yourself, from what "
@@ -256,10 +260,11 @@ class Console:
         off the body — a gate has two answers and a sentence, and the call is
         not among them. *Always* is an allow that also writes this space's
         ask-list entry (ADR 0025, decision 6). A topic proposal's allow names
-        the `words` kept, which are its answer as a question's are (ADR 0030)."""
+        the `words` kept, which are its answer as a question's are (ADR 0030);
+        a form's Approve, the `answers` its fields say (ADR 0034)."""
         return self.run.answer(body.get("id"), body.get("allow"),
                                body.get("reason"), always=bool(body.get("always")),
-                               kept=body.get("words"))
+                               kept=body.get("words"), answers=body.get("answers"))
 
     def approvals(self, query):
         """`GET /approvals`: what an unattended run set aside, oldest first,

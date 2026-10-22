@@ -14,7 +14,7 @@ import time
 from pathlib import Path
 
 from console import approvals, last_run, launcher, seed, spend, vetoes
-from lib import activity, gate as gate_words, intent, lock, marks, policy, prose, survey, topics
+from lib import activity, form, gate as gate_words, intent, lock, marks, policy, prose, survey, topics
 from lib.last_run import ENDED
 
 
@@ -37,7 +37,9 @@ PASSING = ("act",)
 """What the run record says only while the state that set it lasts."""
 
 QUESTION = "AskUserQuestion"
-"""The tool an agent asks the person a question with (ADR 0027, decision 12)."""
+"""The harness's own question tool, refused under a console: its fields hold no
+suggestion with a basis, and the page could show no form (ADR 0034, decision
+1)."""
 
 SPEC_TOOL = "mcp__contour__spec_write"
 """The console's own spec write, which carries its case: three runs argued
@@ -46,6 +48,10 @@ theirs only in their thinking, where no gate or person reads it (ADR 0029)."""
 TOPICS_TOOL = "mcp__contour__topics_propose"
 """The console's topic proposal: words for the person to keep or strike one by
 one (ADR 0030, decision 2)."""
+
+ASK_TOOL = "mcp__contour__ask"
+"""The console's question: each with a suggested answer and its basis, shown
+to the person as a form already filled (ADR 0034, decision 1)."""
 
 TOPICS = topics.CATEGORY
 
@@ -127,6 +133,35 @@ SPEC_WRITER = {
 """The console's spec write, as the driver hands it to the agent: the one way
 a spec changes under a console, so that its case cannot be left in thinking
 (ADR 0029). `console/agent.py` puts it in the SDK's shape and nothing more."""
+
+
+ASKER = {
+    "name": "ask",
+    "description": ("Ask the person questions: each with your suggested answer "
+                    "and its basis, what the suggestion rests on. The page shows "
+                    "them as a form already filled with your suggestions, each "
+                    "labelled as your guess, and the person edits what is wrong "
+                    "and approves the form once; you are given the answers, each "
+                    "with where it came from. Ask every question here, together, "
+                    "and never in your closing or in prose. Mark is_size on the "
+                    "one question, if any, whose answer is the model's real size."),
+    "schema": {"type": "object", "required": ["questions"],
+               "properties": {"questions": {"type": "array", "items": {
+                   "type": "object", "required": ["question", "suggested", "basis"],
+                   "properties": {"question": {"type": "string"},
+                                  "suggested": {"type": "string"},
+                                  "basis": {"type": "string"},
+                                  "is_size": {"type": "boolean"}}}}}},
+}
+"""The console's question, as the driver hands it to the agent: the one way an
+agent asks under a console, so that every question arrives as a field with a
+guess and its basis (ADR 0034, decision 1)."""
+
+
+def asked(payload):
+    """What the agent is told once the person has approved its form: each
+    answer and where it came from. The console kept them already."""
+    return form.told(payload.get("answers") or [])
 
 
 def topics_proposer(vocabulary):
@@ -345,7 +380,9 @@ class Run:
         # most, the run stopped with work still outstanding.
         self.told()
         waiting = self.pending
-        if aside and waiting is not None:
+        if aside and waiting is not None and waiting["category"] == approvals.QUESTION:
+            self.asked(waiting["call"])
+        elif aside and waiting is not None:
             self.aside(waiting["category"], waiting["tool"], waiting["call"],
                        waiting["case"])
         self.stopped = True
@@ -382,8 +419,8 @@ class Run:
 
     def gate(self, tool, payload):
         """Stop, and wait for the user — or, in a run nobody is watching, set the
-        call aside for them. Returns (allow, reason) — or, for a
-        question in a run nobody is watching, (True, the person's answers).
+        call aside for them. Returns (allow, reason) — or, for a form
+        the person approved, (True, the answers with their sources).
 
         The launcher is asked what the call *means* and the answer is a category
         — a build, a spec write, a commit — because one intent has four
@@ -409,8 +446,15 @@ class Run:
         if why:
             self.say("refused", text=why)
             return False, why
-        if tool == QUESTION and self.requester is not None:
-            return self.asked(payload)
+        if tool == ASK_TOOL:
+            return self.form(payload)
+        if tool == QUESTION:
+            # Its fields are fixed: no suggestion with a basis, and no field
+            # for the person to find filled (ADR 0034, decision 1).
+            why = ("under this console a question is asked with `ask`: each "
+                   "question with your suggested answer and its basis")
+            self.say("refused", text=why)
+            return False, why
         case = None
         if tool == SPEC_TOOL:
             # The case comes with it rather than from what was said (ADR 0029).
@@ -472,6 +516,12 @@ class Run:
         # The call is kept on the gate rather than looked up when the verdict
         # lands: what a veto records is what the user was shown, and a second
         # reading of the agent's own dict could differ from it by then.
+        waiting = self.waited(category, tool, payload, case)
+        return self.approved(waiting["allow"], waiting["reason"], category)
+
+    def waited(self, category, tool, payload, case, said=None):
+        """Stop at a gate until the person answers it, shown as `said` or as
+        the gate's words say it. Returns the gate, answered."""
         waiting = {"id": secrets.token_hex(8), "answered": threading.Event(),
                    "allow": None, "reason": None, "category": category,
                    "tool": tool, "call": dict(payload), "case": case}
@@ -484,7 +534,8 @@ class Run:
             # Watched, the case is read where rule 1 puts it, as Claude's words
             # just before the gate: carried, it was not said (ADR 0029).
             self.say("text", text=case)
-        said = gate_words.say(category, self.space, tool, payload, self.proposal())
+        # After the case is said: it is the proposal the gate names a span from.
+        said = said or gate_words.say(category, self.space, tool, payload, self.proposal())
         self.say("gate", id=waiting["id"], category=category, tool=tool,
                  call=dict(payload), said=said)
         # The act and nothing under it: the call and what it would change are
@@ -498,7 +549,22 @@ class Run:
         # stopping and the asking. A call the user allowed in advance cost the
         # agent nothing to have made.
         self.gates += 1
-        return self.approved(waiting["allow"], waiting["reason"], category)
+        return waiting
+
+    def form(self, payload):
+        """The agent's questions, as a form already filled (ADR 0034). Watched,
+        the run waits at it; unwatched, it is set aside. Never on the ask-list
+        and never a veto: nobody allows a question in advance, and an answer
+        refuses nothing."""
+        why = form.refused(payload)
+        if why:
+            self.say("refused", text=why)
+            return False, why
+        if self.requester is not None:
+            return self.asked(payload)
+        said = {"act": "Claude has questions", "fields": form.fields(payload["questions"])}
+        waiting = self.waited(approvals.QUESTION, ASK_TOOL, payload, None, said)
+        return True, waiting["reason"]
 
     def unlabelled(self, tool, payload):
         """Why this call may not label the model, or None. Refused before any
@@ -560,9 +626,9 @@ class Run:
         """
         questions = [dict(q) for q in payload.get("questions") or ()]
         asking = " ".join(q.get("question", "") for q in questions)
-        said = {"act": "Claude has a question", "questions": questions}
+        said = {"act": "Claude has questions", "fields": form.fields(questions)}
         kept = approvals.set_aside(self.space, self.record["run"], approvals.QUESTION,
-                                   QUESTION, payload, said, self.proposal())
+                                   ASK_TOOL, payload, said, self.proposal())
         # The question's text and nothing else: it is the act, and what a
         # requester relays is that one waits, never an answer to it.
         with self._lock:
@@ -621,7 +687,7 @@ class Run:
         for line in lines:
             self.say("resolved", text=line)
 
-    def answer(self, at, allow, reason=None, always=False, kept=None):
+    def answer(self, at, allow, reason=None, always=False, kept=None, answers=None):
         """The user's verdict on the gate that is waiting, or None if none is.
 
         On the transcript, because the decision is as much a part of the run as
@@ -636,6 +702,14 @@ class Run:
             return None
         waiting["allow"], waiting["reason"] = bool(allow), reason
         self.pending = None
+        if waiting["category"] == approvals.QUESTION:
+            # Approved, the answers are what the agent is told, each with
+            # where its text came from (ADR 0034, decisions 2 and 3).
+            waiting["reason"] = form.answered(waiting["call"]["questions"], answers or [])
+            form.keep(self.space, self.record["run"], waiting["reason"])
+            self.say("verdict", id=at, allowed=True, text="")
+            waiting["answered"].set()
+            return {"answered": True}
         if waiting["category"] == TOPICS:
             # Answered word by word, and no veto either way: a struck word
             # refuses a word, not a call (ADR 0030, decision 5). What was kept
