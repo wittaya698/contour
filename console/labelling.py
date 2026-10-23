@@ -168,7 +168,7 @@ def aside(space, act, payload):
     call = run_lib.topics_shown(space, {k: v for k, v in payload.items() if k != "model"})
     said = gate_words.say(topics.CATEGORY, space, TOPICS_TOOL, call, case)
     approvals.set_aside(space, act, topics.CATEGORY, TOPICS_TOOL, call, said, case)
-    last_run.amend(space, approvals=approvals.acts(space))
+    last_run.amend(space, **approvals.recorded(space))
     return False, "set aside for the user, who answers it on the lobby's page"
 
 

@@ -84,23 +84,26 @@ class UnnamedTest(RunsCase):
 
 
 class NoAnswerTest(RunsCase):
-    """It asks and stops, and answers nothing: an answer to a gate or a
+    """It asks and stops, and approves nothing: an answer to a gate or a
     question is intent, and only the person's is the person's (ADR 0027,
-    decisions 5 and 12)."""
+    decisions 5 and 12). A form's fields are the one thing a chat fills, with
+    `answer`, and the person approves them on the page (ADR 0034, decision
+    5)."""
 
     def listed(self):
         r = self.contour("mcp", stdin=json.dumps(call(1, "tools/list")) + "\n")
         return json.loads(r.stdout)["result"]["tools"]
 
-    def test_ten_tools_and_none_takes_an_answer(self):
+    def test_eleven_tools_and_only_answer_takes_answers_and_none_a_verdict(self):
         tools = self.listed()
         self.assertEqual([t["name"] for t in tools],
                          ["spaces", "status", "log", "picture", "spec", "spend",
-                          "open", "create", "request", "stop"])
+                          "open", "create", "request", "answer", "stop"])
         for t in tools:
             taken = set(t["inputSchema"].get("properties", {}))
-            self.assertFalse(taken & {"id", "answers", "allow", "verdict", "answer"},
-                             t["name"])
+            self.assertFalse(taken & {"id", "allow", "verdict", "approve"}, t["name"])
+            if t["name"] != "answer":
+                self.assertFalse(taken & {"answers", "answer", "form"}, t["name"])
 
     def test_no_request_or_stop_carries_a_console_url(self):
         text, said = self.tool("request", (WORKING,),

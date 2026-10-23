@@ -64,6 +64,15 @@ def parked(space):
     return run.get("act")
 
 
+def forms(space):
+    """The forms waiting in this space, as a chat may read them: the one a
+    watched run waits at, while it does, and those set aside (ADR 0034,
+    decision 5)."""
+    said = store.load(path(space), None) or {}
+    live = [said["form"]] if said.get("form") and parked(space) else []
+    return live + list(said.get("forms") or [])
+
+
 def path(space):
     return space_lib.layout(space).dot / NAME
 

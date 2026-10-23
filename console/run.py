@@ -33,7 +33,9 @@ class Stopped(Exception):
 HERE = Path(__file__).resolve().parent
 DEFAULT = f"{HERE / 'agent.py'}:drive"
 
-PASSING = ("act",)
+PASSING = ("act", "form")
+RELAY_S = 0.25
+"""How often a form waiting looks for what a chat filled in it."""
 """What the run record says only while the state that set it lasts."""
 
 QUESTION = "AskUserQuestion"
@@ -308,7 +310,7 @@ class Run:
         # What waits in the space is the space's, not the run's that set it
         # aside: a run started past it carries it on (ADR 0028, decision 5).
         if approvals.acts(self.space):
-            self.latest["approvals"] = approvals.acts(self.space)
+            self.latest.update(approvals.recorded(self.space))
         self.now("running")
         self.say("prompt", text=prompt)
         if requester is not None:
@@ -548,8 +550,12 @@ class Run:
                  call=dict(payload), said=said)
         # The act and nothing under it: the call and what it would change are
         # the page's, where the argument for them is (rule 1).
-        self.parked(said["act"])
-        waiting["answered"].wait()
+        # A form, as a chat may read it from `status` (ADR 0034, decision 5).
+        self.parked(said["act"], **({"form": form.relayable(waiting["id"], payload["questions"])}
+                                    if category == approvals.QUESTION else {}))
+        while not waiting["answered"].wait(RELAY_S):
+            if category == approvals.QUESTION:
+                self.refilled(waiting)
         if self.stopped:
             raise Stopped()
         self.now("running")
@@ -577,6 +583,16 @@ class Run:
                 "fields": form.fields(payload["questions"], size)}
         waiting = self.waited(approvals.QUESTION, ASK_TOOL, payload, None, said)
         return True, waiting["reason"]
+
+    def refilled(self, waiting):
+        """What a chat filled in the form this run waits at, said to the page
+        as `filled` when it changes anything (ADR 0034, decision 5). The page
+        fills only the fields the person has not edited."""
+        fields = waiting["said"]["fields"]
+        now = form.filled(self.space, waiting["id"], waiting["call"]["questions"], fields)
+        if now != fields:
+            waiting["said"] = {**waiting["said"], "fields": now}
+            self.say("filled", id=waiting["id"], fields=now)
 
     def unlabelled(self, tool, payload):
         """Why this call may not label the model, or None. Refused before any
@@ -611,7 +627,7 @@ class Run:
         # The act and nothing under it, as for a veto: the call, the diff and
         # the case are the page's (rule 1).
         with self._lock:
-            self.latest["approvals"] = approvals.acts(self.space)
+            self.latest.update(approvals.recorded(self.space))
             self.latest["set_aside"] = True
         self.say("aside", id=kept["id"], category=category, act=said["act"],
                  text=f"set aside for you to answer later: {said['act']}")
@@ -646,7 +662,7 @@ class Run:
         # The question's text and nothing else: it is the act, and what a
         # requester relays is that one waits, never an answer to it.
         with self._lock:
-            self.latest["approvals"] = approvals.acts(self.space)
+            self.latest.update(approvals.recorded(self.space))
             self.latest["set_aside"] = True
         self.say("aside", id=kept["id"], category=approvals.QUESTION, act=asking,
                  text=f"set aside for you to answer later: {asking}")
@@ -721,6 +737,7 @@ class Run:
             # where its text came from (ADR 0034, decisions 2 and 3).
             waiting["reason"] = form.answered(waiting["said"]["fields"], answers or [])
             form.keep(self.space, self.record["run"], waiting["reason"])
+            form.forget(self.space, at)
             self.say("verdict", id=at, allowed=True, text="")
             waiting["answered"].set()
             return {"answered": True}

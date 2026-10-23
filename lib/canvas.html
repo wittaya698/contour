@@ -739,6 +739,12 @@ function form(event) {
 // One line of the transcript.
 function turn(event) {
   if (event.kind === 'gate' && event.category === 'question') return form(event);
+  if (event.kind === 'filled') {
+    // A chat filled the form: no line of its own, the fields say it.
+    document.getElementById('turns').querySelector(`li[data-gate="${event.id}"]`)
+      ?.refill?.(event.fields);
+    return null;
+  }
   if (event.kind === 'gate') return gate(event);
   if (event.kind === 'verdict') return closeGate(event);
   if (event.kind === 'call') return activity(event);
@@ -897,7 +903,14 @@ async function refreshApprovals() {
   const said = await ask('/approvals').then(r => r.json()).catch(() => null);
   if (!said) return;
   const ids = said.approvals.map(a => a.id + a.next).join(' ');
-  if (ids === approvalsShown) return;
+  if (ids === approvalsShown) {
+    // The same list: a form a chat has filled since fills in place, and
+    // nothing typed is wiped (ADR 0034, decision 5).
+    for (const a of said.approvals) {
+      document.querySelector(`#approvals li[data-approval="${a.id}"]`)?.refill?.(a.fields);
+    }
+    return;
+  }
   approvalsShown = ids;
   document.getElementById('approvals').replaceChildren(...said.approvals.map(approval));
   document.getElementById('waiting').hidden = !said.approvals.length;
@@ -930,6 +943,7 @@ function approval(a) {
     const li = question(a, async answers => answered(
       await ask('/approval', { id: a.id, answers: answers }).then(r => r.json()).catch(() => null)));
     if (!a.next) for (const b of li.querySelectorAll('button')) b.disabled = true;
+    li.dataset.approval = a.id;
     return li;
   }
   const li = gate({ id: a.id, tool: a.tool, call: a.call, said: a }, async (allow, reason, words) =>
@@ -960,12 +974,21 @@ function fieldSource(field, value) {
   return value === field.text ? LABELS[field.source] : LABELS.yours;
 }
 
+// A field a chat has filled: it takes the chat's text if it still reads as it
+// was filled, and a field the person edited is theirs and is never
+// overwritten (ADR 0034, decision 3). `shown` is what it was filled with.
+function refill(shown, value, field) {
+  if (value !== shown.text) return { shown: shown, value: value };
+  return { shown: field, value: field.text };
+}
+
 // The agent's questions, as a form already filled: each field labelled with
 // where its text came from, the basis for Claude's guess under it, and one
 // Approve that sends every field as it reads (ADR 0034, decision 2).
 function question(asking, send) {
   const li = document.getElementById('question').content.firstElementChild.cloneNode(true);
   const inputs = [];
+  const shown = [];
   for (const field of asking.fields) {
     const item = document.createElement('li');
     const text = document.createElement('p');
@@ -975,8 +998,9 @@ function question(asking, send) {
     own.autocomplete = 'off';
     const source = document.createElement('span');
     source.className = 'source';
+    const n = shown.push(field) - 1;
     source.textContent = fieldSource(field, own.value);
-    own.addEventListener('input', () => { source.textContent = fieldSource(field, own.value); });
+    own.addEventListener('input', () => { source.textContent = fieldSource(shown[n], own.value); });
     const basis = document.createElement('p');
     basis.className = 'basis';
     basis.textContent = field.basis || '';
@@ -984,6 +1008,14 @@ function question(asking, send) {
     li.querySelector('.asked').append(item);
     inputs.push(own);
   }
+  li.refill = fields => fields.forEach((field, n) => {
+    const own = inputs[n];
+    if (!own || own.disabled) return;
+    const now = refill(shown[n], own.value, field);
+    shown[n] = now.shown;
+    own.value = now.value;
+    own.parentElement.querySelector('.source').textContent = fieldSource(now.shown, own.value);
+  });
   li.querySelector('.send').addEventListener('click', () => {
     const answers = inputs.map(own => own.value.trim());
     for (const b of li.querySelectorAll('button')) b.disabled = true;

@@ -65,9 +65,9 @@ class ProtocolTest(unittest.TestCase):
         and never answered."""
         [got] = talk(call(1, "initialize", protocolVersion=connector.LATEST))
         said = got["result"]["instructions"].splitlines()
-        self.assertEqual(len(said), 6)
+        self.assertEqual(len(said), 7)
         self.assertNotIn("changes nothing", got["result"]["instructions"])
-        for word in ("request", "stop", "never answers a gate or a question", "open"):
+        for word in ("request", "stop", "never answers a gate or approves a question", "open"):
             self.assertIn(word, said[0])
         self.assertIn("span", said[1])
         self.assertIn("canvas", said[1])
