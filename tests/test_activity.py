@@ -135,6 +135,25 @@ class TableTest(unittest.TestCase):
         self.assertEqual(activity.line("Bash", {"command": "contour measure side.png --runs 3,4"}),
                          "Measured the side picture")
 
+    def test_a_picture_named_by_a_variable_reads_as_that_picture(self):
+        """Issue 153: a run set `R=…` and the page said *Measured the $R
+        picture*. A `$` word is shell, and the user is never shown one."""
+        from lib import activity
+        for spelled in ("R=refs/side.png; contour measure $R --runs 3,4",
+                        'R="refs/side.png" && contour measure "${R}" --help 2>&1'):
+            with self.subTest(spelled=spelled):
+                self.assertEqual(activity.line("Bash", {"command": spelled}),
+                                 "Measured the side picture")
+
+    def test_a_picture_that_cannot_be_known_is_a_picture(self):
+        from lib import activity
+        for spelled in ("contour measure $R --runs 3,4",
+                        "contour measure refs/$NAME.png",
+                        "contour measure $(ls refs/*.png | head -1)"):
+            with self.subTest(spelled=spelled):
+                self.assertEqual(activity.line("Bash", {"command": spelled}),
+                                 "Measured a picture")
+
 
 class PageTest(unittest.TestCase):
     """The page's source, as `test_always.PageTest` reads it."""

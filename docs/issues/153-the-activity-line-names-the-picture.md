@@ -16,9 +16,16 @@ user a `$` word.
 
 ## Acceptance criteria
 
-- [ ] `R=refs/x.png; contour measure $R …` reads *Measured the x picture*
-- [ ] A variable set nowhere in the line reads *Measured a picture*
-- [ ] `contour measure refs/x.png` reads as it does now
+- [x] `R=refs/x.png; contour measure $R …` reads *Measured the x picture*
+- [x] A variable set nowhere in the line reads *Measured a picture*
+- [x] `contour measure refs/x.png` reads as it does now
+
+## Found (2026-10-23)
+
+`activity.assigned` reads `$R` or `${R}` back to the last `R=…` before it in
+the same line, past a `;` or an `&&`. A word that still holds shell after
+that, a variable set elsewhere, `refs/$NAME.png`, a glob or a `$(…)`, reads
+*Measured a picture*. `test_activity.TableTest` holds both.
 
 ## Blocked by
 
