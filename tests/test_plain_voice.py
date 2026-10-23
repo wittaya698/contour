@@ -121,6 +121,22 @@ class FirstWriteTest(unittest.TestCase):
         self.assertIn("the toolkit's usual ones too", said)
 
 
+class WorksheetWaitsTest(unittest.TestCase):
+    """Under a console the worksheet waits for the user's answers to the
+    spans placed by eye, and the agent is told to expect it (issue 157)."""
+
+    def test_the_first_prompt_says_the_worksheet_waits_for_the_answers(self):
+        said = flat(NEW_SPACE)
+        self.assertIn("contour worksheet", said)
+        self.assertIn("waits until the user has answered the spans you placed by eye", said)
+
+    def test_the_skill_says_it_too(self):
+        look = flat(SKILLS[0].read_text(encoding="utf-8"))
+        look = look.split("**Look at the worksheet once, before you propose.**", 1)[1]
+        self.assertIn("waits until the user has answered the spans you placed by eye",
+                      look.split("**", 1)[0])
+
+
 class ProposedTest(unittest.TestCase):
     """A tolerance and a triangle budget are proposed, never asked (issue 151).
 

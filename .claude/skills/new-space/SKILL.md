@@ -130,6 +130,10 @@ proposed: ask the user to answer that span on the canvas first.
 reading is finished, run `contour worksheet` and look at `worksheet.png`: every
 span drawn on its reference, with its id and its number. Check each one measures
 what its label says it does. Once, at that checkpoint — not after every span.
+Under a console it waits until the user has answered the spans you placed by
+eye, then says each answer: adopted, moved with its new number, rejected with
+why, or skipped and still not proposable (ADR 0035). Propose only what those
+answers allow.
 
 **Propose each measured number with its error bar.** `depth 640 ±3 (span m4),
 proposing tol 15` is something the user can argue with; `tol: 20` alone is not.

@@ -349,6 +349,15 @@ def answered(mark):
     return mark.get("answer")
 
 
+def by_eye(all_marks):
+    """The open agent spans placed by eye that the user has not answered: the
+    ones whose numbers cannot be proposed yet, which a run waits on (ADR 0035,
+    decision 2). A snapped span is not one, nor is a direction."""
+    return [m for m in all_marks
+            if m.get("author") == "agent" and reference(m) and span_end(m)
+            and m.get("placed") == "by eye" and is_open(m) and not answered(m)]
+
+
 def _answering(path, mark_id, change, then=None):
     """Give one agent span the user's answer. Returns `{"mark": ...}`, or
     `{"refused": why}` with nothing written.

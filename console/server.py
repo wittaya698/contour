@@ -61,7 +61,10 @@ def new_space():
         "when there are pictures; a size you suggested is a guess until the "
         "user approves it.\n"
         "2. Any reference pictures the user gave are already in refs/. Measure "
-        "them; never change them.\n"
+        "them; never change them. When your reading is finished, run contour "
+        "worksheet before you draft: under this console it waits until the user "
+        "has answered the spans you placed by eye, then says each answer, and "
+        "you propose only what those answers allow.\n"
         "3. Propose the tolerances and the triangle budget yourself, from what "
         "it is and where it will be seen, and say they are yours: never ask "
         "for them, as rule 1 says.\n"
@@ -209,6 +212,7 @@ class Console:
                     ("POST", "/export"): self.exporting,
                     ("GET", "/export.glb"): self.handed,
                     ("POST", "/reveal"): self.revealed,
+                    ("POST", "/skip"): self.skipping,
                     ("POST", "/end"): self.ending})
 
     def started(self, body):
@@ -235,6 +239,11 @@ class Console:
         of whatever happened after it reconnected.
         """
         return self.run.since(int(query.get("since") or 0))
+
+    def skipping(self, body):
+        """`POST /skip`: *skip for now*, on a span the run waits on. The page
+        skips it in its own tab as well; this is the run's (ADR 0035)."""
+        return self.run.skip(body.get("id"))
 
     def ending(self, body):
         """`POST /end`: end the run, keep the console. The page's other ending,

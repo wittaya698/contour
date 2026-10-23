@@ -1575,8 +1575,9 @@ function foundation(mark) {
 }
 
 // Claude's questions, asked one at a time (issue 75). The ids put off with
-// *skip for now*, for this tab only: skipping answers nothing, so nothing is
-// written and a reload asks them again.
+// *skip for now*, for this tab only: skipping answers nothing, so no mark is
+// written and a reload asks them again. A console's run is told, so it stops
+// waiting on the span (ADR 0035, decision 4).
 const skipped = new Set();
 let asked = null;                            // the span the card is asking about
 let slip = null;                             // the last answer, to undo: { id, did }
@@ -1839,7 +1840,8 @@ function zoom(mark) {
 
 // The card's answers are the list's: adopt, correct and reject, by the same
 // functions, so an answer given here is recorded exactly as one given there.
-// Skip writes nothing and asks the next.
+// Skip answers nothing, tells a run waiting on the span (ADR 0035), and asks
+// the next.
 function askedAnswers() {
   const card = document.getElementById('questions');
   const on = (cls, act) => card.querySelector(cls).addEventListener('click', () => {
@@ -1848,7 +1850,7 @@ function askedAnswers() {
   on('.yes', () => adoptSpan(asked));
   on('.move', () => correctSpan(asked));
   on('.wrong', () => rejectSpan(asked));
-  on('.skip', () => { skipped.add(asked.id); slip = null; questions(); });
+  on('.skip', () => { skipped.add(asked.id); slip = null; if (seeding) ask('/skip', { id: asked.id }); questions(); });
   on('.save', () => answered('/correct', correction(moving.mark, moving.ends)));
   on('.undo', () => undo());
   on('.cancel', () => {

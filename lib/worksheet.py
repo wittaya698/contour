@@ -116,6 +116,53 @@ def anything(all_marks):
     return bool(spans(all_marks) or directions(all_marks))
 
 
+SKIPPED = "skipped.json"
+"""The spans a run's person put off with *skip for now*, in `.contour/`: the
+console writes it, and the worksheet the run calls reads it (ADR 0035)."""
+
+
+def skip(dot, run, ids):
+    """Keep the spans `run` was told to skip for now, replacing any run's."""
+    store.save(dot / SKIPPED, {"run": run, "spans": sorted(ids)})
+
+
+def skipped(dot, run):
+    """The spans skipped for now in `run`, the one holding the space; a
+    skip in any other run is spent, and a new run asks again."""
+    kept = store.load(dot / SKIPPED, None) or {}
+    return list(kept.get("spans") or []) if run and kept.get("run") == run else []
+
+
+def answers(all_marks, skipped=()):
+    """One line for each span the agent drew whose answer the agent needs to
+    know: what the user answered, or that a by-eye one is still unanswered.
+    A snapped span unanswered is not listed: its number is already the agent's
+    reading to propose (ADR 0022, decision 6; ADR 0035, decision 4)."""
+    lines = []
+    for m in all_marks:
+        if not (marks.reference(m) and marks.span_end(m)
+                and "agent" in (m.get("author"), m.get("drawn_by"))):
+            continue
+        said, at = m.get("answer"), f"  {m['id']} {marks.text(m)}:"
+        may = f"its number may be proposed, naming {m['id']}"
+        if said == "adopted":
+            lines.append(f"{at} adopted by the user; {may}")
+        elif said == "corrected":
+            reading = marks.reading_of(all_marks, m)
+            now = (marks.text(reading).split(": ", 1)[-1].split("  ")[0]
+                   if reading else "not measured")
+            lines.append(f"{at} moved by the user, now {now}; {may}")
+        elif said == "rejected":
+            lines.append(f"{at} rejected by the user ({m.get('why')}); its number "
+                         f"may not be used")
+        elif m.get("placed") == "by eye" and marks.is_open(m):
+            lines.append(f"{at} skipped for now, still unanswered; its number may not "
+                         f"be proposed" if m["id"] in skipped else
+                         f"{at} by eye and unanswered; its number may not be proposed "
+                         f"until the user answers it")
+    return lines
+
+
 def record(dot, marks_path):
     """Say which spans the worksheet just drawn is of."""
     store.save(dot / RECORD, {"spans": fingerprint(marks.load(marks_path))})

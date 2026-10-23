@@ -110,6 +110,22 @@ def contour(command):
     return None
 
 
+def verb(command):
+    """The `contour` command a shell call runs, through `contour run` too, or
+    None for anything else: what the console waits before (ADR 0035)."""
+    try:
+        words = shlex.split(command)
+    except ValueError:
+        return None
+    for at, word in enumerate(words[:-1]):
+        if word.rsplit("/", 1)[-1] == "contour":
+            found, rest = words[at + 1], words[at + 2:]
+            if found == "run" and rest:
+                return verb(shlex.join(rest)) or found
+            return found
+    return None
+
+
 def assigned(word, before):
     """What `$R` or `${R}` holds, from an `R=…` earlier in the same line, or
     the word itself when it names no variable (issue 153)."""
