@@ -104,8 +104,10 @@ class PageTest(unittest.TestCase):
 
     def test_the_card_asks_the_span_being_rejected_with_its_field_open(self):
         for name in ("draw", "questions"):
-            self.assertIn("asking(marks, skipped, (moving && moving.mark) || rejecting)",
-                          function(self.page, name), name)
+            # A run's park, if any, follows it (issue 158).
+            self.assertRegex(function(self.page, name),
+                             r"asking\(marks, skipped, \(moving && moving\.mark\) \|\| rejecting[,)]",
+                             name)
         asking = function(self.page, "questions")
         self.assertIn("card.querySelector('.why').hidden = !rejecting;", asking)
         self.assertIn("card.querySelector('.answers').hidden = !!(moving || rejecting);", asking)

@@ -58,6 +58,9 @@ SPANS = "spans"
 SPANS_ACT = "Claude has questions about your pictures"
 """What that wait is, in the words the canvas's card says them."""
 
+ANSWERED = {"adopted": "adopted", "corrected": "moved", "rejected": "rejected"}
+"""A span's answer, as the transcript says it once the park ends."""
+
 ASK_TOOL = "mcp__contour__ask"
 """The console's question: each with a suggested answer and its basis, shown
 to the person as a form already filled (ADR 0034, decision 1)."""
@@ -610,8 +613,18 @@ class Run:
         if self.stopped:
             raise Stopped()
         self.pending = None
+        # What was answered, kept in the transcript as a form keeps its
+        # answers; the page closes the card on it (issue 158).
+        self.say("spans-answered", id=park["id"], text=self.answered_spans(waiting_on))
         self.now("running")
         self.gates += 1
+
+    def answered_spans(self, ids):
+        """The park's spans as answered, by what each measures."""
+        kept = {m["id"]: m for m in marks.load(self.space / marks.NAME)}
+        said = [f"{marks.text(kept[i])} {ANSWERED.get(kept[i].get('answer'), 'skipped for now')}"
+                for i in ids if i in kept]
+        return "You answered Claude's spans: " + ", ".join(said)
 
     def skip(self, mark_id):
         """*skip for now*, on a span the run waits on: answered nothing, so it

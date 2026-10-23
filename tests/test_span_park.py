@@ -92,6 +92,22 @@ class ParksTest(ParkCase):
                 self.parked(run)
                 run.end()
 
+    def test_the_transcript_keeps_what_was_answered_once_the_park_ends(self):
+        """As a form keeps its answers (issue 158): by what each measures, and
+        a skip as a skip. The page closes the card on it."""
+        held = self.space / marks.NAME
+        width, grille, knob = self.drawn("width"), self.drawn("grille"), self.drawn("knob")
+        run, given = self.worksheets()
+        at = self.parked(run)["id"]
+        marks.adopt(held, width)
+        marks.reject(held, grille, "that is the speaker")
+        run.skip(knob)
+        self.through(given)
+        [said] = [e for e in run.events if e["kind"] == "spans-answered"]
+        self.assertEqual(said["id"], at)
+        self.assertEqual(said["text"], "You answered Claude's spans: width adopted, "
+                                       "grille rejected, knob skipped for now")
+
     def test_a_snapped_span_unanswered_never_parks_it(self):
         """Its number may be proposed as the agent's reading: making the run
         wait for it is the second gate ADR 0022 rejected (ADR 0035, decision 2)."""
@@ -277,6 +293,28 @@ class PageTest(ConsoleCase):
         self.assertIn("Claude has questions about your pictures", park["text"])
         self.assertEqual(self.ask(url, "/skip", {"id": width}), (200, {"skipped": width}))
         self.transcript(url, lambda ev: any(e.get("text") == "drawn" for e in ev))
+
+    def test_the_park_brings_the_panels_own_card_into_the_transcript(self):
+        """The same card, not a second one: moved, so an answer in either
+        place is the answer in both (issue 158)."""
+        page = PAGE.read_text(encoding="utf-8")
+        turn = page.split("function turn(", 1)[1].split("\n}\n", 1)[0]
+        self.assertIn("event.kind === 'spans') return park(event)", turn)
+        self.assertIn("event.kind === 'spans-answered') return unpark(event)", turn)
+        self.assertIn("event.kind === 'ended'", turn, "a run ended while parked gives it back")
+        parked = page.split("function park(", 1)[1].split("\n}\n", 1)[0]
+        self.assertIn("document.getElementById('questions')", parked)
+        self.assertIn("li.append(", parked)
+        self.assertEqual(page.count('id="questions"'), 1, "one card")
+        back = page.split("function unpark(", 1)[1].split("\n}\n", 1)[0]
+        self.assertIn("replaceWith(card)", back)
+
+    def test_the_card_asks_what_the_run_waits_on_with_its_count(self):
+        page = PAGE.read_text(encoding="utf-8")
+        asks = page.split("function questions(", 1)[1].split("\n}\n", 1)[0]
+        self.assertIn("asking(marks, skipped, (moving && moving.mark) || rejecting, parkedOn)",
+                      asks)
+        self.assertIn("' \\u00b7 ' + of", asks)
 
     def test_the_skip_button_tells_the_console_under_one(self):
         page = PAGE.read_text(encoding="utf-8")

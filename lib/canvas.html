@@ -737,6 +737,39 @@ function form(event) {
 }
 
 // One line of the transcript.
+// The run waits on its by-eye spans: the panel's own card comes to the
+// transcript, where the person is, and asks only those (ADR 0035, decision
+// 3). Moved, not copied, so an answer in either place is the answer in both.
+// `home` keeps its place in the panel to go back to.
+let parkedOn = null;
+const home = document.createComment('the questions card, while a run waits on its spans');
+function park(event) {
+  const card = document.getElementById('questions');
+  if (!home.parentNode) card.before(home);
+  const li = document.createElement('li');
+  li.className = 'spans';
+  const said = document.createElement('p');
+  said.textContent = event.text || '';
+  li.append(said, card);
+  parkedOn = event.spans || [];
+  questions();
+  return li;
+}
+
+// The park is over: the card goes back to the panel, and the transcript keeps
+// what was answered, as a form keeps its answers (issue 158).
+function unpark(event) {
+  const card = document.getElementById('questions');
+  if (home.parentNode) home.replaceWith(card);
+  parkedOn = null;
+  questions();
+  if (!event.text) return null;
+  const li = document.createElement('li');
+  li.className = 'spans-answered';
+  li.textContent = event.text;
+  return li;
+}
+
 function turn(event) {
   if (event.kind === 'gate' && event.category === 'question') return form(event);
   if (event.kind === 'filled') {
@@ -748,6 +781,9 @@ function turn(event) {
   if (event.kind === 'gate') return gate(event);
   if (event.kind === 'verdict') return closeGate(event);
   if (event.kind === 'call') return activity(event);
+  if (event.kind === 'spans') return park(event);
+  if (event.kind === 'spans-answered') return unpark(event);
+  if (event.kind === 'ended') unpark({});   // a run ended while waiting gives the card back
   const li = document.createElement('li');
   li.className = event.kind;
   if (event.blocks) li.append(...words(event.blocks));
@@ -1350,7 +1386,7 @@ function draw() {
                                   ctx.drawImage(img, 0, 0); }
   list.replaceChildren();
   // Asked before drawing, so the picture can point at the card's span.
-  const now = asking(marks, skipped, (moving && moving.mark) || rejecting).mark;
+  const now = asking(marks, skipped, (moving && moving.mark) || rejecting, parkedOn).mark;
   marks.forEach((mark, i) => {
     const closed = mark.status === 'closed';
     const here = (mark.ref || null) === showing;
@@ -1601,8 +1637,17 @@ function follow(showing, asked, followed, busy) {
 // different spans (issue 131). A span being moved is the question until it is
 // saved or cancelled, skipped or not: its Save and Cancel are on the card
 // (issue 132).
-function asking(marks, skipped, moving) {
-  const open = marks.filter(m => spanState(m) === 'unanswered' && m.status !== 'closed');
+//
+// `parked` is the spans a run waits on, or null: then they are the only
+// questions, counted *1 of 7* (ADR 0035, decision 3).
+function asking(marks, skipped, moving, parked) {
+  let open = marks.filter(m => spanState(m) === 'unanswered' && m.status !== 'closed');
+  let of = null;
+  if (parked) {
+    open = open.filter(m => parked.includes(m.id));
+    const left = open.filter(m => !skipped.has(m.id)).length;
+    of = left ? (parked.length - left + 1) + ' of ' + parked.length : null;
+  }
   // One reference at a time, in the order the list first reaches each, and
   // on each its foundations before its spans (issue 141).
   const refs = [...new Set(open.map(m => m.ref))];
@@ -1613,7 +1658,7 @@ function asking(marks, skipped, moving) {
   });
   const mark = open.find(m => moving && m.id === moving.id)
                || order.find(m => !skipped.has(m.id)) || null;
-  return { mark, number: mark ? named(mark, marks) : '', open: open.length };
+  return { mark, number: mark ? named(mark, marks) : '', open: open.length, of };
 }
 
 // A question by the number on its badge, and by what it is.
@@ -1644,7 +1689,7 @@ function slipped(slip, marks) {
 
 function questions() {
   const card = document.getElementById('questions');
-  const { mark, number, open } = asking(marks, skipped, (moving && moving.mark) || rejecting);
+  const { mark, number, open, of } = asking(marks, skipped, (moving && moving.mark) || rejecting, parkedOn);
   card.hidden = !mark;
   asked = mark;
   const offer = slipped(slip, marks);
@@ -1654,8 +1699,9 @@ function questions() {
   followed = step.followed;
   if (step.show) { show(step.show); return; }   // its load redraws, and asks again
   if (!mark) return;
-  card.querySelector('.count').textContent = 'Claude has ' + open
-    + (open === 1 ? ' question' : ' questions') + ' about your pictures';
+  card.querySelector('.count').textContent = of
+    ? 'Claude has questions about your pictures' + ' \u00b7 ' + of
+    : 'Claude has ' + open + (open === 1 ? ' question' : ' questions') + ' about your pictures';
   card.querySelector('.which').textContent = number;
   // The number the span gave, from the reading it is linked to: *span m4: 640
   // mm ±3 mm  (through the camera, …)* is shown as *640 mm ±3 mm*, and
