@@ -17,7 +17,7 @@ import time
 from pathlib import Path
 
 from console import last_run, launcher, vetoes
-from lib import intent, lock, marks, space as space_lib, store, topics
+from lib import form, intent, lock, marks, space as space_lib, store, topics
 
 TOOLKIT = Path(__file__).resolve().parent.parent
 
@@ -68,6 +68,16 @@ def acts(space):
             if a["category"] == QUESTION else a["said"]["act"] for a in load(space)]
 
 
+def recorded(space):
+    """What the run record says waits here: each act in plain words, and each
+    form as a chat may read it, its questions and never Claude's suggestions
+    (ADR 0028, decision 5; ADR 0034, decision 5)."""
+    kept = load(space)
+    return {"approvals": acts(space),
+            "forms": [form.relayable(a["id"], a["call"].get("questions") or [])
+                      for a in kept if a["category"] == QUESTION]}
+
+
 def save(space, approvals):
     """Written beside and moved into place: a console reads it while a run in
     another may still be adding to it."""
@@ -84,9 +94,19 @@ def shown(space):
     oldest is, because a save set aside after a spec write must not be answered
     before it (ADR 0028, decision 3)."""
     return [{"id": a["id"], "category": a["category"], "tool": a["tool"],
-             "call": a["call"], **a["said"], "case": case(a), "next": n == 0,
+             "call": a["call"], **showing(space, a), "case": case(a), "next": n == 0,
              **({"changes": unsaved(space)} if a["category"] == "commit" else {})}
             for n, a in enumerate(load(space))]
+
+
+def showing(space, approval):
+    """What its gate would have shown, and for a form, with what a chat has
+    filled in it since (ADR 0034, decision 5)."""
+    if approval["category"] != QUESTION:
+        return approval["said"]
+    return {**approval["said"], "fields": form.filled(
+        space, approval["id"], approval["call"].get("questions") or [],
+        approval["said"].get("fields") or [])}
 
 
 def case(approval):
@@ -131,9 +151,12 @@ def answer(space, at, allow, reason=None, answers=None, words=None):
     if found["category"] == QUESTION:
         if not answers:
             return {"answered": False, "why": "a question is answered with its answers"}
+        answered = form.answered(showing(space, found)["fields"], answers)
+        form.keep(space, found["run"], answered)
+        form.forget(space, at)
         dropped(space, at)
         return {"answered": True, "id": at, "outcome": "answered", "said": "",
-                "prompt": asked(found["call"], answers)}
+                "prompt": asked(answered)}
     if found["category"] == topics.CATEGORY:
         # Word by word, and no veto either way: a struck word refuses a word,
         # not a call (ADR 0030, decision 5).
@@ -172,17 +195,15 @@ def dropped(space, at):
     """No longer waiting, here and in the run record, which is where the lobby,
     `status` and a request learn what waits: they never read this store."""
     save(space, [a for a in load(space) if a["id"] != at])
-    last_run.amend(space, approvals=acts(space))
+    last_run.amend(space, **recorded(space))
 
 
-def asked(call, answers):
-    """The first message of the run an answer starts: the question as it was
-    asked, and the person's answer to it, in their words and nobody else's."""
-    lines = ["In a run nobody was watching, you asked:"]
-    for q in call.get("questions") or ():
-        lines += [f"  {q.get('question', '')}",
-                  f"The user answers: {answers.get(q.get('question', ''), '(no answer)')}"]
-    return "\n".join(lines)
+def asked(answers):
+    """The first message of the run an approved form starts: the questions as
+    they were asked, and the answers the person approved, each with where it
+    came from (ADR 0034, decision 2)."""
+    return ("In a run nobody was watching, you asked, and the user approved "
+            "these answers:\n" + form.told(answers))
 
 
 def applied(space, approval):

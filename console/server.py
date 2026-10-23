@@ -43,10 +43,10 @@ RELOAD_S = canvas_lib.RELOAD_S   # a reload says going, then beats again (issue 
 
 TOOLKIT = Path(__file__).resolve().parent.parent
 
-def new_space(said=None):
-    """The new-space flow's first prompt; with `said`, a size the chat that made
-    the space said, as the suggestion step 1's question opens with (ADR 0033)."""
-    asked = f" {said_lib.sentence(*said)}" if said else ""
+def new_space():
+    """The new-space flow's first prompt. A size the chat that made the space
+    said is not in it: it fills the first form's size field, as the chat's
+    (ADR 0034, decision 6)."""
     return (
         "A new model, just made: nothing is in it yet. Start it the way the "
         "toolkit's new-space skill says "
@@ -54,12 +54,17 @@ def new_space(said=None):
         "made, so skip that step.\n"
         "1. Before writing anything, ask the user, in plain words: What is it? "
         "How big is it in real life? Where will it be seen? What parts must it "
-        "have? One real measurement is enough when there are pictures; never "
-        f"guess one.{asked}\n"
+        "have? Ask them all at once with the ask tool, each with your suggested "
+        "answer and what it rests on, and mark is_size on how big it is: the "
+        "user sees a form already filled, edits what is wrong and approves it. "
+        "Ask there and never in your closing. One real measurement is enough "
+        "when there are pictures; a size you suggested is a guess until the "
+        "user approves it.\n"
         "2. Any reference pictures the user gave are already in refs/. Measure "
         "them; never change them.\n"
         "3. Propose the tolerances and the triangle budget yourself, from what "
-        "it is and where it will be seen, and say they are yours.\n"
+        "it is and where it will be seen, and say they are yours: never ask "
+        "for them, as rule 1 says.\n"
         "4. Draft spec.yaml, and flag every number you chose rather than the "
         "user, tolerances first. Ask the user before writing it (rule 1).")
 
@@ -80,17 +85,17 @@ def variation(of):
         "drafted and confirmed here like any new one.\n" + NEW_SPACE)
 
 
-BEGIN = {"new-space": lambda of, said: new_space(said),
-         "variation": lambda of, said: variation(of)}
+BEGIN = {"new-space": lambda of: NEW_SPACE,
+         "variation": lambda of: variation(of)}
 """The runs a console can be begun on, by name (ADR 0021, decision 4). A name
 and never a prompt's text: the launch line is the one way into a console that
 is not its own page, so it carries the choice of a flow the toolkit wrote, and
 nothing anybody could put words in. A variation's `--of` is a path, and only a
 model space's: the prompt is still the toolkit's words about it. A new space's
 `--said` is a value, not words: a dimension of the fixed three and a number,
-which `lib/said.py` puts into a sentence the toolkit wrote, asking the user
-what a Desktop chat said the size is (ADR 0033). The prompt is the run's first
-line in the transcript like any other.
+which fills the size field of the run's first form as the chat's, for the user
+to approve or change (ADR 0033; ADR 0034, decision 6). It is never in the
+prompt, which is the run's first line in the transcript like any other.
 
 The one launch line that does carry words is `--request`, and it carries them
 as what they are: a request, from somebody who is not watching, into a run
@@ -115,13 +120,12 @@ def begun(argv):
     of = value(argv, "--of")
     if flow == "variation" and not (of and (Path(of) / space_lib.MARKER).is_file()):
         return None, "--begin variation takes --of <the model space it varies>"
-    said = None
     if "--said" in argv:
         try:
-            said = said_lib.read(value(argv, "--said"))
+            said_lib.read(value(argv, "--said"))
         except ValueError as e:
             return None, f"--said: {e}"
-    return BEGIN[flow](of, said), None
+    return BEGIN[flow](of), None
 
 NO_CEILING = ("no ceiling set; an unattended run is refused until you set one "
               "with `contour ceiling <n>`")
@@ -256,10 +260,11 @@ class Console:
         off the body — a gate has two answers and a sentence, and the call is
         not among them. *Always* is an allow that also writes this space's
         ask-list entry (ADR 0025, decision 6). A topic proposal's allow names
-        the `words` kept, which are its answer as a question's are (ADR 0030)."""
+        the `words` kept, which are its answer as a question's are (ADR 0030);
+        a form's Approve, the `answers` its fields say (ADR 0034)."""
         return self.run.answer(body.get("id"), body.get("allow"),
                                body.get("reason"), always=bool(body.get("always")),
-                               kept=body.get("words"))
+                               kept=body.get("words"), answers=body.get("answers"))
 
     def approvals(self, query):
         """`GET /approvals`: what an unattended run set aside, oldest first,
@@ -451,6 +456,12 @@ def main(argv, space):
         return serving(console, argv, begin, request)
 
 
+def chat_size(argv):
+    """What `--said` says the size is, as *300 mm wide*, or None. Read after
+    `begun` has refused anything but a size."""
+    return said_lib.size(*said_lib.read(value(argv, "--said"))) if "--said" in argv else None
+
+
 def serving(console, argv, begin=None, request=None):
     if request:
         # Before the clock starts: the console lives as long as this run, and
@@ -460,7 +471,7 @@ def serving(console, argv, begin=None, request=None):
                           requester=request["requester"])
     url = console.start()
     if begin:
-        console.run.start(begin)
+        console.run.start(begin, chat_size=chat_size(argv))
     print(f"console at {url}", flush=True)
     try:
         try:

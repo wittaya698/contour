@@ -1,6 +1,6 @@
 # 0028 — Approvals wait, and the run goes on
 
-**Status:** Accepted, amended · 2026-10-11 · **amends ADR 0027 decisions 1, 4, 7, 8, 9 and 12, and its fifth consequence** ([0027](0027-the-unattended-run.md))
+**Status:** Accepted, amended · 2026-10-11 · amended by [ADR 0034](0034-questions-are-a-form-the-chat-can-fill.md) (a question is a form a chat may fill; approving it is still the person's, on the page) · **amends ADR 0027 decisions 1, 4, 7, 8, 9 and 12, and its fifth consequence** ([0027](0027-the-unattended-run.md))
 
 > **Accepted on its tracer bullet, with decisions 5 and 6 amended** (issue 100).
 > Used by hand on 2026-10-11, from Claude Desktop, in a throwaway space,

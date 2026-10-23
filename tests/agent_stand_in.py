@@ -75,10 +75,10 @@ def drive(prompt, options, gate, say):
             used = dict(step["use"])
             say("call", tool=used.pop("tool"), call=used)
         if "ask" in step:
-            # A question, as the SDK puts one: a call to `AskUserQuestion`, and
-            # what comes back from the gate is the person's answers or nothing
-            # (ADR 0027, decision 12).
-            allow, answers = gate("AskUserQuestion", {"questions": step["ask"]})
+            # Questions, as a console asks them: a call to `ask`, and what
+            # comes back from the gate is the approved form or why not
+            # (ADR 0034, decision 1).
+            allow, answers = gate("mcp__contour__ask", {"questions": step["ask"]})
             say("result", allowed=allow, answers=answers)
         if "call" in step:
             # Asked for, then reported — the two halves an agent actually has.

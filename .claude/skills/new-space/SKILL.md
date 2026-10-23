@@ -18,19 +18,23 @@ object, not the way the spec is laid out, and in the words the space's
 - **What is it?** Concrete, not a category.
 - **How big is it in real life?** With numbers, overall dimensions in
   millimetres. With pictures, one real measurement is enough — its height, say —
-  and every other dimension is read off the pictures from it. Never guess it.
-  That measurement is the spec's *anchor*: your word, never one you say to the
-  user, who is only ever asked how big it is. Pictures carry proportion, never scale, and a guessed
-  scale is wrong on every dimension at once, so verify goes green on a model
-  that is uniformly the wrong size and only the user at the gate would see it
-  (ADR 0016). With no answer, do not draft `dimensions` at all.
+  and every other dimension is read off the pictures from it. That measurement
+  is the spec's *anchor*: your word, never one you say to the user, who is only
+  ever asked how big it is. You may suggest it, with what the suggestion rests
+  on, as every answer in the form is (ADR 0034). A guessed anchor is the user's
+  only once approved, and is named *Claude's guess, approved* wherever it is
+  used. Pictures carry proportion, never scale, and a wrong anchor is wrong on
+  every dimension at once, so verify goes green on a model that is uniformly
+  the wrong size and only the user would see it (ADR 0016): that is why a guess
+  keeps its name. With no approved answer, do not draft `dimensions` at all.
 - **Where will it be seen?** In what game or engine, how close, on what device.
   This is what the triangle budget and the tolerances come from.
 - **What parts must it have?** These become the named parts.
 - Anything else that matters but cannot be measured.
 
 **Never ask the user for a tolerance or a triangle budget.** Propose both
-yourself, from what it is and where it will be seen, and say they are yours.
+yourself, from what it is and where it will be seen, and say they are yours:
+never ask for them, as rule 1 says, in the form or in a closing.
 If the user cannot answer anything else, propose a value and mark it clearly as
 your assumption. Do not invent silently — the spec is *their* intent (ADR 0002).
 
@@ -110,9 +114,11 @@ You say *which* edges; the command says *where*. Only where nothing snaps — a
 photograph of a real object, a soft gradient — place the ends yourself, with
 `--by-eye --from X,Y --to X,Y`, and the span is labelled by eye wherever it shows.
 
-**Every number in the draft names its source**, and there are three:
+**Every number in the draft names its source**, and there are four:
 - a span, by id: `depth 640 ±3 (span m4)`;
 - the user, who gave it;
+- *Claude's guess, approved*: the size you suggested in the form and the user
+  approved, `height 150 (Claude's guess, approved)`;
 - *not measurable*, said plainly — a depth hidden behind the body, say.
 
 A number from an unanswered **snapped** span is listed as the agent's own

@@ -211,7 +211,8 @@ def status(root):
             "held": held, "said": said,
             "marks": sum(1 for m in marks.load(here.marks) if marks.is_open(m)),
             "vetoes": vetoes.uncommitted(root),
-            "doctor": out_of_step(root), "run": run, "approvals": waits}
+            "doctor": out_of_step(root), "run": run, "approvals": waits,
+            "forms": last_run.forms(root)}
 
 
 def log(root, lines=40):

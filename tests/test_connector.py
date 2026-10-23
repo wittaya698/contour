@@ -65,9 +65,9 @@ class ProtocolTest(unittest.TestCase):
         and never answered."""
         [got] = talk(call(1, "initialize", protocolVersion=connector.LATEST))
         said = got["result"]["instructions"].splitlines()
-        self.assertEqual(len(said), 6)
+        self.assertEqual(len(said), 7)
         self.assertNotIn("changes nothing", got["result"]["instructions"])
-        for word in ("request", "stop", "never answers a gate or a question", "open"):
+        for word in ("request", "stop", "never answers a gate or approves a question", "open"):
             self.assertIn(word, said[0])
         self.assertIn("span", said[1])
         self.assertIn("canvas", said[1])
@@ -846,16 +846,14 @@ class CreateTest(PagesCase):
         [url] = self.urls()
         self.assertSecretless(text, url)
 
-    def test_a_size_the_chat_said_is_asked_and_never_taken(self):
-        """The anchor a chat passes is the console's suggestion, in the
-        toolkit's words: what another model wrote, asked of the user, whose
-        answer there is the only anchor (ADR 0033, decision 4)."""
+    def test_a_size_the_chat_said_is_never_in_the_prompt(self):
+        """It fills the first form's size field, as the chat's, for the user
+        to approve (ADR 0034, decision 6; `test_chat_size`): the agent never
+        reads it as something the user told it."""
         _, said = self.create("beta", self.front, anchor={"dimension": "width", "mm": 300})
         self.assertIsNone(said["refused"], said)
         prompt = self.begun_on()
-        self.assertIn("300 mm wide", prompt)
-        self.assertIn("Is it 300 mm wide, as you said in the chat?", prompt)
-        self.assertIn("not something the user told you", prompt)
+        self.assertNotIn("300 mm", prompt)
         self.assertIn("How big is it in real life?", prompt)
 
     def test_the_answer_says_the_size_is_a_suggestion_and_not_set(self):

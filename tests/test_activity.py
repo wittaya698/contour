@@ -113,6 +113,21 @@ class TableTest(unittest.TestCase):
                     if activity.line("Bash", {"command": f"contour {c.name}"}) is None]
         self.assertEqual(unworded, [])
 
+    def test_the_consoles_own_tools_read_as_what_they_do(self):
+        """Its form, spec write and topic proposal have words: raw, `ask` was
+        a wall of JSON above the form that said it again."""
+        from lib import activity
+        asked = {"questions": [{"question": "What is it?"}, {"question": "How big?"}]}
+        self.assertEqual(activity.line("mcp__contour__ask", asked), "Asked you 2 questions")
+        self.assertEqual(activity.line("mcp__contour__ask", {"questions": [{}]}),
+                         "Asked you 1 question")
+        self.assertEqual(activity.line("mcp__contour__spec_write", {"content": "", "case": ""}),
+                         "Proposed a change to the spec")
+        self.assertEqual(activity.line("mcp__contour__topics_propose", {"words": []}),
+                         "Suggested words to find this model by")
+        self.assertEqual(activity.line("ToolSearch", {"query": "select:x"}),
+                         "Looked up its tools")
+
     def test_a_contour_command_reads_as_its_act_however_it_is_spelled(self):
         from lib import activity
         for spelled in ("contour check", "./contour check", "cd /m/beaky && contour check"):

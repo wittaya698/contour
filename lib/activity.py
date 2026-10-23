@@ -55,6 +55,14 @@ here (`tests/test_activity.py`), and in the page's tiers (ADR 0025, decision
 1): *sheet*, *mark*, *span* and *reference* are shown, so they stay; a hold,
 a toolkit and a commit are hidden, so they do not appear."""
 
+TOOLS = {
+    "mcp__contour__spec_write": "Proposed a change to the spec",
+    "mcp__contour__topics_propose": "Suggested words to find this model by",
+    "ToolSearch": "Looked up its tools",
+}
+"""A tool with one thing to say, whatever its call: the console's own, whose
+call the page shows again as a gate, and the harness's lookup of them."""
+
 QUIET = ("Read", "Grep", "Glob", "LS", "NotebookRead")
 """Tools that only read. Consecutive ones fold into one line, *Looked at 3
 files*: a dozen reads between two edits is how an agent works, and a line
@@ -73,7 +81,11 @@ def line(tool, call):
         return f"Changed {named(call.get('file_path', ''))}"
     if tool == "Bash":
         return contour(call.get("command", ""))
-    return None
+    if tool == "mcp__contour__ask":
+        # The form says the questions again, just under it (ADR 0034).
+        n = len(call.get("questions") or ())
+        return f"Asked you {n} question" + ("" if n == 1 else "s")
+    return TOOLS.get(tool)
 
 
 def contour(command):

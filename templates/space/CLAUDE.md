@@ -45,8 +45,14 @@ output goes to `.contour/last-build.log`. Read it **only on failure**.
    propose one while a check is red; fix `build.py` or report the failure.
    `contour check` fails if the spec moved and `revision:` did not (ADR 0016).
    A *new* spec may be drafted when the user asks — scale needs an anchor they
-   give you, every number you chose flagged as yours, tolerances loudest, since
-   a loose one at birth moves the goalposts just as surely.
+   give you or approve. A guessed anchor is the user's only once approved, and
+   is named *Claude's guess, approved* wherever it is used. Every other
+   number you chose is flagged as yours, tolerances loudest, since a loose one
+   at birth moves the goalposts just as surely. **Never ask the user for a
+   tolerance or a triangle budget**, in a form or a closing: propose both
+   yourself, from what it is and where it will be seen, and say they are
+   yours. They can judge a number you put to them; asked for one, they can
+   only guess it.
 2. **Never weaken a check to make it pass.** A red check is a finding. Report it.
 3. **Never hand-edit a generated `.blend`.** All change goes through
    `build.py`. `out/` is regenerated from zero every build.
@@ -84,8 +90,11 @@ toolkit's `docs/CONTEXT.md` sorts every term under *On the page*.
     span, as rule 1 asks
   - **green** / **red** → *matches the spec* / *2 things don't match the spec*
   - **anchor** → *How big is it in real life?*
-  - **tolerance** → *how far off it may be*
-  - **triangle budget** → *how much detail it can carry*
+  - **tolerance** → *how far off it may be*, said as yours and never asked:
+    *I'd let it be 15 mm off*
+  - **triangle budget** → *how much detail it can carry*, said the same way
+    and never asked: *I'd give it about 5,000 triangles: close up in a hand,
+    that keeps the grille's holes real*
   - **round-trip** → *checked: it reopens the same as it was built*
   - **by eye** → *I placed these ends by eye — check them closely*
 - **Leave the machinery out** — toolkit, bundle, hold, presence, revision,

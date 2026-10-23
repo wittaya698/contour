@@ -2,8 +2,9 @@
 
 A Desktop chat that makes a space often already heard how big the thing is.
 `create` takes that as `{"dimension": "width", "mm": 300}`, the launch line
-carries it as `--said width:300`, and the console turns it into the toolkit's
-own sentence: a suggestion the user is asked, never the anchor. A dimension
+carries it as `--said width:300`, and the console fills the size field of the
+new space's first form with it, as *from the chat*: the user approves or
+changes it, and it is never the anchor until they do (ADR 0034). A dimension
 from a fixed three and a number are not words, so the launch line still
 carries none anybody else wrote (ADR 0021, decision 4).
 
@@ -48,16 +49,6 @@ def read(text):
 def size(dimension, mm):
     """*300 mm wide*."""
     return f"{millimetres(mm)} mm {DIMENSIONS[dimension]}"
-
-
-def sentence(dimension, mm):
-    """What the console's first prompt adds: what the chat said, whose it is,
-    and that only the user's answer here is the anchor (ADR 0033, decision 4)."""
-    said = size(dimension, mm)
-    return (f"In the Desktop chat that made this space, the user was understood "
-            f"to say it is {said}. That is what another model wrote, not something "
-            f"the user told you. Ask whether it is right — \"Is it {said}, as you "
-            f"said in the chat?\" — and take only their answer here as the anchor.")
 
 
 def millimetres(mm):

@@ -9,12 +9,13 @@ This module is the protocol, the tools' definitions, and the shapes a chat is
 handed. What the reading tools say is the survey's, which writes nothing, so the
 connector imports it directly (issue 84). The four that act — open, create,
 request and stop, each the command's own (ADR 0027, decision 5) — are handed to `serve` by `lib/cli.py`, and nothing else of the launcher's is
-reachable from here.
+reachable from here. `answer` is the connector's own: it fills a form's fields,
+and the person approves them on the page (ADR 0034, decision 5).
 """
 import base64
 import json
 
-from . import said as said_lib, space, survey
+from . import form, said as said_lib, space, survey
 
 LATEST = "2025-06-18"
 
@@ -22,7 +23,8 @@ ASK = ("When a space has approvals waiting, tell the user what they are, in stat
        "words, and ask whether to answer them now or later. Call open (the console) "
        "only if they say now; later is nothing. Only the user answers them, on the "
        "page: never answer one, never pass on the case for one, and never write that the "
-       "user says yes into a request.")
+       "user says yes into a request. A form's fields are the one thing you may fill, "
+       "with answer, from what the user told you; they still approve it on the page.")
 """What a chat is told about approvals waiting: once in the instructions, and
 again in every result that says some wait, because a chat that read it once at
 the start was found not to keep to it (issue 100's tracer bullet)."""
@@ -30,7 +32,7 @@ the start was found not to keep to it (issue 100's tracer bullet)."""
 INSTRUCTIONS = "\n".join((
     "This connector reads Contour's model spaces, opens their pages, makes new ones, "
     "and asks for a run nobody watches (request) and ends one (stop); it never answers "
-    "a gate or a question: the user answers those on the console's page, which open "
+    "a gate or approves a question: the user does both on the console's page, which open "
     "brings up when they ask for it.",
     "A spec changes only in a run inside its space, never by numbers a chat names: a number "
     "read off a reference is argued from a span the user can see on the canvas, and a change "
@@ -43,6 +45,9 @@ INSTRUCTIONS = "\n".join((
     "where the user drops the file; a path they offer, create takes.",
     "Your answers are read as a page reads, in plain words: from status, say its plain "
     "sentences, not its report lines.",
+    "A form waiting (status's forms) is Claude's questions to the user: relay its questions "
+    "to them, and fill its fields with answer, with only what the user told you and never "
+    "one of your own: no guess, note or source of yours goes into a field, even beside theirs. The user approves it on the page, so never say it is answered.",
     ASK,
 ))
 """Facts about the connector, not a copy of the rules (ADR 0024, decision 4): what it
@@ -120,6 +125,20 @@ TOOLS = (
                                     "prose": {"type": "string"},
                                     "as": {"type": "string",
                                            "description": "who is asking, for the record"}}}},
+    {"name": "answer",
+     "description": "Fill a waiting form's fields with what the user told you, one text "
+                    "per question id from status's forms, labelled from the chat on the "
+                    "page. Each text is only what the user said, in their words: no "
+                    "notes, no sources, no value they did not say. A question they "
+                    "answered in part gets that part, as 280 mm long; one they did not "
+                    "answer is left out, and Claude's guess stays in it. It approves "
+                    "nothing and starts nothing: the user approves on the page, so never "
+                    "say the questions are answered.",
+     "inputSchema": {"type": "object", "required": ["space", "form", "answers"],
+                     "properties": {"space": {"type": "string"},
+                                    "form": {"type": "string"},
+                                    "answers": {"type": "object",
+                                                "additionalProperties": {"type": "string"}}}}},
     {"name": "stop",
      "description": "End the run in a space, as `contour stop` does: answers no gate, "
                     "sets aside one it waits at, and leaves its edits as they were. "
@@ -201,6 +220,17 @@ def readings():
                                                         args.get("picture"))),
         "spec": lambda args: specced(survey.spec(named(args.get("space")))),
         "spend": lambda args: survey.spent(named(args.get("space")))}
+
+
+def answering(root, args):
+    """`answer`: what the user told the chat, into the form's fields."""
+    return form.relay(root, args.get("form"), args.get("answers"))
+
+
+def relaying():
+    """The one tool that writes and is not a command: it fills fields, and
+    the person approves them on the page (ADR 0034, decision 5)."""
+    return {"answer": lambda args: answering(named(args.get("space")), args)}
 
 
 def config(link):

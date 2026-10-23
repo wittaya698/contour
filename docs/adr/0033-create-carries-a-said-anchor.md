@@ -1,6 +1,6 @@
 # 0033 — `create` carries what the chat said the anchor is, and the console asks it
 
-**Status:** Accepted · 2026-10-22 · **amends ADR 0024 decision 10 (`create` writes nothing else) and ADR 0021 decision 4 (a console is begun on a flow's name, never on words)** ([0024](0024-the-connector-desktop-reads-and-opens.md), [0021](0021-the-lobby.md))
+**Status:** Accepted, amended · 2026-10-22 · amended by [ADR 0034](0034-questions-are-a-form-the-chat-can-fill.md) (the said size fills the form's size field) · **amends ADR 0024 decision 10 (`create` writes nothing else) and ADR 0021 decision 4 (a console is begun on a flow's name, never on words)** ([0024](0024-the-connector-desktop-reads-and-opens.md), [0021](0021-the-lobby.md))
 
 > **Accepted as drafted, 2026-10-22** (issue 144).
 

@@ -399,6 +399,7 @@ def on_mcp(cmd, rest, held):
         return 2
     connector.serve(sys.stdin, sys.stdout, {
         **connector.readings(),
+        **connector.relaying(),
         "open": lambda args: opened(args.get("page"), args.get("space"),
                                     create=bool(args.get("create")), name=args.get("name")),
         "create": lambda args: created(args.get("name"), args.get("references") or [],

@@ -20,15 +20,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from test_console import STAND_IN, ConsoleCase    # noqa: E402
 
-from console.run import SPEC_TOOL, Run    # noqa: E402
+from console.run import ASK_TOOL, SPEC_TOOL, Run    # noqa: E402
 from lib import last_run    # noqa: E402
 
 SPEC_WRITE = (SPEC_TOOL, {"content": "revision: 2\ndepth: 640\n",
                           "case": "Span m4 reads 640 mm, so the depth is 640."})
 SAVE = ("Bash", {"command": "git add -A && git commit -q -m 'a longer beak'"})
-ASKED = ("AskUserQuestion", {"questions": [{"question": "How long should the beak be?",
-                                            "options": [{"label": "300 mm"},
-                                                        {"label": "340 mm"}]}]})
+ASKED = (ASK_TOOL, {"questions": [{"question": "How long should the beak be?",
+                                     "suggested": "300 mm", "basis": "as drawn"}]})
 WAIT_S = 15
 
 
@@ -235,16 +234,17 @@ class QuestionTest(AnsweredCase):
         self.set_aside(SPEC_WRITE, ASKED)
         shown = self.waiting(self.opened())
         self.assertEqual([a["category"] for a in shown], ["spec-write", "question"])
-        self.assertEqual(shown[1]["questions"], ASKED[1]["questions"])
+        self.assertEqual([(f["question"], f["text"], f["source"]) for f in shown[1]["fields"]],
+                         [("How long should the beak be?", "300 mm", "guess")])
 
     def test_answering_it_starts_an_attended_run_with_the_question_and_the_answer(self):
         self.set_aside(ASKED)
         url = self.opened()
-        said = self.answer(url, answers={"How long should the beak be?": "340 mm"})
+        said = self.answer(url, answers=["340 mm"])
         self.assertEqual(said["outcome"], "answered")
         record = self.until("finished")
         self.assertIn("How long should the beak be?", record["prompt"])
-        self.assertIn("340 mm", record["prompt"])
+        self.assertIn("340 mm (yours)", record["prompt"])
         self.assertIsNone(record["requester"])
         self.assertEqual(self.waiting(url), [])
 

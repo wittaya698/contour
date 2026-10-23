@@ -414,7 +414,7 @@ servers already there, and restart Desktop. The block names the `contour` link
 from Install, not the checkout, so moving the toolkit is still only a relink. If
 there is no link on `PATH`, the command says so and exits 1.
 
-Today the connector answers ten tools. `spaces` is the same reading as
+Today the connector answers eleven tools. `spaces` is the same reading as
 `contour spaces --json`; given a topic, it answers only the spaces labelled with
 it, by name and topics. `status` takes a space and gives its last check's
 verdict, in the console's plain sentences beside the report lines, and its open
@@ -436,18 +436,25 @@ file, so it is not taken as a reference: `open` brings up the lobby on its
 create form instead, the name filled in if you gave one, for the file to be
 dropped there. If you told the chat how big the thing is, `create` can pass
 that on as an anchor, one of height, width or depth in millimetres. It is
-written nowhere: the console opens by asking you whether it is right — *Is it
-300 mm wide, as you said in the chat?* — and only your answer there sets the
-size (ADR 0033). `request` and `stop` are `contour request` and `contour stop`,
+written nowhere: the console's first form has it in the size field, labelled
+*from the chat*, and only your Approve there sets the size (ADR 0033, ADR
+0034). `request` and `stop` are `contour request` and `contour stop`,
 with the same arguments and the same refusals: a chat can ask for a run nobody
 watches and end one, and that is all it can start in a space. It never answers
-a gate or a question. `stop` on a space whose console has no run going closes
+a gate or approves a question. `status` lists a waiting form's questions, and
+never Claude's guesses, so a chat can ask them of you; `answer` fills the
+fields with what you told it, labelled *from the chat*, and never over a field
+you edited. It approves nothing and starts nothing: you approve on the page
+(ADR 0034). `stop` on a space whose console has no run going closes
 that console, and gives the space back. A run it asked for does not stop at a gate: the act is
 set aside for you, and the run carries on. Its console shows what waits, oldest
 first, with the diff and Claude's case, whenever you open it: allow makes the
-call then, and deny is a veto. A question is set aside the same way, in its
-place in the order: your answer starts a new run in that console, with the
-question and the answer as its first message. Until they are answered, the
+call then, and deny is a veto. Claude's questions are a form, with every
+field already filled with its guess and the reason for it, each saying whether
+the text is *Claude's guess* or *yours*; you edit what is wrong and approve
+the form once (ADR 0034). A run you watch waits at it. One nobody watched sets
+it aside the same way, in its place in the order: approving it starts a new
+run in that console, with the questions and the answers as its first message. Until they are answered, the
 lobby's row and `status` say how many wait and for what, never why, and a
 request to that space is refused; the chat asks whether you want to answer
 them now, which is `open`, or later. Its answers are meant to read as the pages do, in plain words. Otherwise

@@ -17,8 +17,8 @@ from claude_agent_sdk import (AssistantMessage, ClaudeAgentOptions,
                              ResultMessage, SystemMessage, TextBlock,
                              ToolUseBlock, create_sdk_mcp_server, tool)
 
-from console.run import (QUESTION, SPEC_WRITER, TOPICS_TOOL, topics_proposer,
-                         spec_written, topics_proposed)
+from console.run import (ASK_TOOL, ASKER, SPEC_WRITER, TOPICS_TOOL, asked,
+                         topics_proposer, spec_written, topics_proposed)
 from lib import survey
 
 
@@ -70,19 +70,23 @@ async def session(prompt, options, gate, say, served=None):
 
 
 def tools(space):
-    """The console's spec write and topic proposal, as SDK tools: what they say
+    """The console's spec write, form and topic proposal, as SDK tools: what they say
     and do are `run.py`'s, and only reached once the gate has answered (ADR
-    0029, ADR 0030)."""
+    0029, ADR 0030, ADR 0034)."""
     @tool(SPEC_WRITER["name"], SPEC_WRITER["description"], SPEC_WRITER["schema"])
     async def spec_write(args):
         return {"content": [{"type": "text", "text": spec_written(space, args)}]}
+
+    @tool(ASKER["name"], ASKER["description"], ASKER["schema"])
+    async def ask(args):
+        return {"content": [{"type": "text", "text": asked(args)}]}
 
     proposer = topics_proposer(survey.vocabulary())
 
     @tool(proposer["name"], proposer["description"], proposer["schema"])
     async def topics_propose(args):
         return {"content": [{"type": "text", "text": topics_proposed(args)}]}
-    return [spec_write, topics_propose]
+    return [spec_write, ask, topics_propose]
 
 
 def result(tool, payload, allow, told):
@@ -90,13 +94,13 @@ def result(tool, payload, allow, told):
 
     The reason for a denial goes back as the call's result, which is the only
     place the agent will read it. No `updated_input` on a call: a gate cannot
-    edit one. A question is the exception that is not one — what the person
-    answered is the question's input filled in, which is how the SDK hands an
-    answer to the session that asked (ADR 0027, decision 12).
+    edit one. A form is the exception that is not one — what the person
+    approved is the question's input filled in, which is how the SDK hands an
+    answer to the session that asked (ADR 0034, decision 2).
     """
     if not allow:
         return PermissionResultDeny(message=told or "the user denied this call")
-    if tool == QUESTION and told is not None:
+    if tool == ASK_TOOL and told is not None:
         return PermissionResultAllow(updated_input={**payload, "answers": told})
     if tool == TOPICS_TOOL and told is not None:
         # The same exception, a second time: what the person kept is the

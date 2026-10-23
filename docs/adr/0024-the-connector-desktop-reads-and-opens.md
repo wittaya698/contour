@@ -1,6 +1,6 @@
 # 0024 — The connector: Desktop reads and opens, never drives
 
-**Status:** Accepted · 2026-10-04 · **amends [ADR 0019](0019-console-a-driven-agent-behind-a-gate.md) (its rejection of *a socket and any agent behind it*) and [ADR 0021](0021-the-lobby.md) (create carries references) · decision 10 amended by [ADR 0033](0033-create-carries-a-said-anchor.md)** (create may carry a said anchor)
+**Status:** Accepted · 2026-10-04 · **amends [ADR 0019](0019-console-a-driven-agent-behind-a-gate.md) (its rejection of *a socket and any agent behind it*) and [ADR 0021](0021-the-lobby.md) (create carries references) · decision 10 amended by [ADR 0033](0033-create-carries-a-said-anchor.md)** (create may carry a said anchor) · amended by [ADR 0034](0034-questions-are-a-form-the-chat-can-fill.md) (an eleventh tool, `answer`)
 
 > **Drafted Proposed, accepted the same day on the tracer bullet's result**
 > (issue 63). Claude Desktop, registered by hand from the block `contour mcp

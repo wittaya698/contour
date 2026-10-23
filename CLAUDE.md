@@ -40,9 +40,14 @@ Full Blender output goes to `.contour/last-build.log`. Read it **only on failure
    until the user has answered it. Never propose one while a check is red; fix
    `build.py` or report the failure. `contour check` fails if the spec moved
    and `revision:` did not (ADR 0016). A *new* spec may be drafted when the
-   user asks — scale needs an anchor they give you, every number you chose
-   flagged as yours, tolerances loudest, since a loose one at birth moves the
-   goalposts just as surely.
+   user asks — scale needs an anchor they give you or approve. A guessed
+   anchor is the user's only once approved, and is named *Claude's guess,
+   approved* wherever it is used. Every other number you chose is flagged as
+   yours, tolerances loudest, since a loose one at birth moves the goalposts
+   just as surely. **Never ask the user for a tolerance or a triangle
+   budget**, in a form or a closing: propose both yourself, from what it is
+   and where it will be seen, and say they are yours. They can judge a number
+   you put to them; asked for one, they can only guess it.
 2. **Never weaken a check to make it pass.** A red check is a finding. Report it.
 3. **Never hand-edit a generated `.blend`.** All change goes through
    `build.py`. `out/` is regenerated from zero every build.
