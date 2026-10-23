@@ -479,6 +479,10 @@ sliced work is.
 | [127](127-a-refresh-does-not-end-a-console.md) | A refresh does not end a console | AFK | — |
 | [143](143-a-reason-is-typed-without-stopping-the-page.md) | A reason is typed without stopping the page | AFK | — |
 | [151](151-a-new-space-asks-for-no-tolerance.md) | A new space asks for no tolerance | AFK | — |
+| [152](152-reading-a-reference-is-not-changing-it.md) | Reading a reference is not changing it | AFK | — |
+| [153](153-the-activity-line-names-the-picture.md) | The activity line names the picture | AFK | — |
+| [154](154-a-spans-note-is-in-the-users-words.md) | A span's note is in the user's words | AFK | — |
+| [155](155-a-new-spec-is-written-whole-the-first-time.md) | A new spec is written whole the first time | AFK | — |
 
 **27 came out of slice 17's own suite runs.** `contour-console` forwards `SIGINT`
 and not `SIGTERM`, so every console a test terminates leaves its server running —
@@ -516,3 +520,8 @@ which is why nothing caught it sooner.
 asked the user how far off each size may be, which the skill and the prompt
 both say to propose instead. It is filed apart from the batch because it is
 wrong with or without a form.
+
+**152–155 came out of the console run that checked 151.** A read of the
+photo was gated as a change to it, the activity line showed a shell variable,
+the canvas showed a span's reason written for the agent, and the first spec
+write was refused twice for what the prompt could have said.

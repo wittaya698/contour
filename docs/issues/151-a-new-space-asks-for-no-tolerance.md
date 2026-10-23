@@ -39,9 +39,9 @@ triangle budget, in a form or a closing, and to propose both. *Speaking to
 the user* gives each as a proposal, *I'd let it be 15 mm off*, never asked.
 `NEW_SPACE` step 3 and the skill point to rule 1 (`test_plain_voice.ProposedTest`).
 
-A space keeps the `CLAUDE.md` it was made with: `walkie-talkie` and every
-space made before this has the old rule 1 and asks the same way, until its
-`CLAUDE.md` is brought up to the template's by hand. Nothing refreshes it.
+A space keeps the `CLAUDE.md` it was made with until `contour update`
+brings it in step (ADR 0026): `walkie-talkie` and every space made before
+this has the old rule 1 and asks the same way until then.
 
 Looked at in a console on 2026-10-23, in a new space with the walkie-talkie
 photo: the form asked what it is, how big, where it is seen, its parts and
