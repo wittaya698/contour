@@ -1413,7 +1413,7 @@ function draw() {
     part.textContent = mark.part || '';     // marks made before parts existed
     const body = document.createElement('span');
     body.className = 'text';
-    body.textContent = mark.text || '';
+    body.textContent = spoken(mark.text || '');
     li.append(view, ' ', part);
     if (mark.author === 'agent') {
       const who = document.createElement('span');
@@ -1690,13 +1690,34 @@ function numbered(text) {
   if (oldWay(text))
     return { number: text.replace(/^span \S+: /, '').split('  ')[0],
              why: 'made the old way, by the foreground box: read again once this '
-                  + "picture's directions and anchor span are answered" };
+                  + "picture's directions and its span with a real size are answered" };
   const [number, why] = text.replace(/^span \S+: /, '').split('  ');
   // An anchor span's reading is its question, which the card asks above it.
   const asked = (number || '').match(/\? \((\d+ px)\)$/);
   if (asked) return { number: asked[1], why: '' };
   const waits = / px\b/.test(number || '') && /^\(.*\)$/.test(why || '');
-  return { number: number || '', why: waits ? why.slice(1, -1) : '' };
+  return { number: number || '', why: waits ? plainly(why.slice(1, -1)) : '' };
+}
+
+// A mark's text as the list shows it: a reading's reason in the card's words.
+function spoken(text) {
+  return /^span \S+: \d+ px\b/.test(text)
+    ? text.replace(/  \((.*?)\)(  |$)/, (all, why, after) => '  (' + plainly(why) + ')' + after)
+    : text;
+}
+
+// Why a span has no millimetres yet, in the words the person is spoken to
+// in (issue 154). The reading keeps the agent's reason, which names a file
+// and a flag to run; the card says what it waits on and nothing to type.
+function plainly(why) {
+  if (/^no anchor\b/.test(why))
+    return 'no size yet: this picture has no span with a real size to scale from';
+  const aslant = why.match(/^the anchor runs along none of (.+?), so/);
+  if (aslant)
+    return `the span with a real size runs along none of ${aslant[1]}, so it scales `
+         + 'no span: one along one of them, of a length you know, would';
+  return why.replace(/^waits on .+?'s directions:/, "waits on this picture's directions:")
+            .replace(/\bthe anchor( span)?\b/g, 'the span with a real size');
 }
 
 // A reading made the old way, at a flat scale the foreground box gave: *123

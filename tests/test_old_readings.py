@@ -124,7 +124,7 @@ class LabelTest(unittest.TestCase):
         return json.loads(out.stdout)
 
     def test_the_card_says_an_old_number_was_made_the_old_way(self):
-        said = self.run_page(["oldWay", "numbered"], "numbered(text)", text=OLD)
+        said = self.run_page(["oldWay", "plainly", "numbered"], "numbered(text)", text=OLD)
         self.assertEqual(said["number"], "123 mm \u00b11 mm")
         self.assertIn("made the old way, by the foreground box", said["why"])
 
