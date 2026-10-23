@@ -6,7 +6,10 @@ spans are unanswered parks the run, as a form does, until each is answered or
 skipped. A snapped span never parks it, a span is asked about once per run,
 and a run nobody is watching never parks.
 """
+import json
 import os
+import re
+import shutil
 import subprocess
 import sys
 import time
@@ -23,6 +26,7 @@ from console.run import Run    # noqa: E402
 from lib.canvas import PAGE    # noqa: E402
 from test_console import ConsoleCase    # noqa: E402
 from lib import marks, worksheet    # noqa: E402
+from test_found import function    # noqa: E402
 
 WAIT_S = 15
 WORKSHEET = {"command": "contour worksheet"}
@@ -79,7 +83,11 @@ class ParksTest(ParkCase):
         self.assertEqual(self.through(given), (True, None))
 
     def test_the_worksheet_parks_however_it_is_spelled(self):
-        for command in ("cd /s && ./contour worksheet", "contour run contour worksheet"):
+        # The first three as a live run wrote it, or near it: `;` and `|`
+        # against the word before them (a live console, 2026-10-24).
+        for command in ('contour worksheet; echo "---"; cat spec.yaml',
+                        "contour worksheet&& cat spec.yaml", "contour worksheet|head",
+                        "cd /s && ./contour worksheet", "contour run contour worksheet"):
             with self.subTest(command=command):
                 given = []
 
@@ -322,6 +330,56 @@ class PageTest(ConsoleCase):
         skip = page.split("on('.skip',", 1)[1].split("});", 1)[0]
         self.assertIn("ask('/skip', { id:", skip)
         self.assertIn("seeding", skip, "only a console has a run to skip in")
+
+
+# A document as the browser keeps one: an element is found by its id only
+# while it is on the page. A moved card in a line not yet appended is not.
+DOCUMENT = """
+const onPage = new Set(['panel', 'turns']);
+function el(name) {
+  return { name, parent: null, children: [], get parentNode() { return this.parent; },
+           append(...kids) { for (const k of kids) if (typeof k === 'object') {
+             k.parent = this; this.children.push(k); } },
+           before(k) { k.parent = this.parent; },
+           replaceWith(k) { k.parent = this.parent; this.parent = null; } };
+}
+const turns = el('turns'), panel = el('panel');
+const card = el('card');
+card.parent = panel;
+function attached(e) { for (; e; e = e.parent) if (onPage.has(e.name)) return true; return false; }
+const document = { createElement: el, createComment: () => el('comment'),
+                   getElementById: id => id === 'questions' && attached(card) ? card : null };
+let parkedOn = null, asked = [];
+function questions() {
+  if (!document.getElementById('questions')) throw new TypeError('the card is not on the page');
+  asked.push(parkedOn);
+}
+"""
+
+
+@unittest.skipUnless(shutil.which("node"), "no node to run the page's script")
+class ParkedCardTest(unittest.TestCase):
+    """The park asks its card once the card is on the page (a live console,
+    2026-10-24: asked while its line was still being made, the card was found
+    nowhere, the line was never added, and the card was lost with it)."""
+
+    def test_the_card_is_asked_once_its_line_is_in_the_transcript(self):
+        page = PAGE.read_text(encoding="utf-8")
+        home = re.search(r"^const home = .*$", page, re.M).group(0)
+        js = (DOCUMENT + home + "\n" + function(page, "park") + function(page, "unpark") + """
+            (async () => {
+              const line = park({ spans: ['m1', 'm3'], text: 'waits' });
+              turns.append(line);
+              await null;
+              const there = attached(card) && card.parent === line;
+              unpark({ text: 'answered' });
+              return { asked, there, back: card.parent === panel };
+            })().then(r => console.log(JSON.stringify(r)),
+                      e => { console.log(JSON.stringify({ threw: String(e) })); });""")
+        out = subprocess.run(["node", "-e", js], capture_output=True, text=True, timeout=30)
+        self.assertEqual(out.returncode, 0, out.stderr)
+        self.assertEqual(json.loads(out.stdout),
+                         {"asked": [["m1", "m3"], None], "there": True, "back": True})
 
 
 if __name__ == "__main__":

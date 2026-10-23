@@ -17,11 +17,11 @@ answered, as a form keeps its answers.
 
 ## Acceptance criteria
 
-- [ ] At the park, the transcript shows the card for the first span it waits on
-- [ ] Each answer there moves to the next span, and the panel shows it answered
-- [ ] An answer given in the panel moves the transcript's card on too
-- [ ] *Let me move it* drags the ends in the transcript's card
-- [ ] Looked at in a real console on a photo: the spans are answered without scrolling up
+- [x] At the park, the transcript shows the card for the first span it waits on
+- [x] Each answer there moves to the next span, and the panel shows it answered
+- [x] An answer given in the panel moves the transcript's card on too
+- [x] *Let me move it* drags the ends in the transcript's card
+- [x] Looked at in a real console on a photo: the spans are answered without scrolling up
 
 ## Blocked by
 

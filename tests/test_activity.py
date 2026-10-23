@@ -155,6 +155,20 @@ class TableTest(unittest.TestCase):
                                  "Measured a picture")
 
 
+    def test_a_line_of_several_commands_reads_as_its_contour_one(self):
+        """As a live run wrote them (2026-10-24): `;` against the verb, and a
+        redirect or a folder where a picture would be. The page said *Measured
+        the 2>&1 picture* and *Measured the refs picture*."""
+        from lib import activity
+        for spelled, said in (
+                ('contour worksheet; echo "---"; cat spec.yaml',
+                 "Drew the spans onto the references"),
+                ("contour measure 2>&1 | head", "Measured on a reference"),
+                ("cd /t && ./contour measure refs 2>&1 | head -5", "Measured on a reference"),
+                ("contour measure refs/side.png|head", "Measured the side picture")):
+            with self.subTest(spelled=spelled):
+                self.assertEqual(activity.line("Bash", {"command": spelled}), said)
+
 class PageTest(unittest.TestCase):
     """The page's source, as `test_always.PageTest` reads it."""
 

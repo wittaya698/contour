@@ -14,10 +14,10 @@ drawn after it, is still unanswered.
 
 ## Acceptance criteria
 
-- [ ] A spec gate with by-eye spans unanswered names each one
-- [ ] With none unanswered the line is not there
-- [ ] Snapped spans unanswered are not named
-- [ ] Allow and Deny work as they do without the line
+- [x] A spec gate with by-eye spans unanswered names each one
+- [x] With none unanswered the line is not there
+- [x] Snapped spans unanswered are not named
+- [x] Allow and Deny work as they do without the line
 
 ## Blocked by
 

@@ -89,12 +89,23 @@ def line(tool, call):
     return TOOLS.get(tool)
 
 
+def split(command):
+    """A shell line as its words, with `;`, `&&` and `|` words of their own
+    even against the word before them: `contour worksheet;` is the worksheet
+    (a live console, 2026-10-24). None for a line the shell could not read."""
+    try:
+        lexer = shlex.shlex(command, posix=True, punctuation_chars=True)
+        lexer.whitespace_split = True
+        return list(lexer)
+    except ValueError:
+        return None
+
+
 def contour(command):
     """A shell call that runs `contour`, however it is spelled — `./contour`,
     or after a `cd` into the space — as its act. None for anything else."""
-    try:
-        words = shlex.split(command)
-    except ValueError:
+    words = split(command)
+    if words is None:
         return None
     for at, word in enumerate(words[:-1]):
         if word.rsplit("/", 1)[-1] == "contour":
@@ -105,7 +116,9 @@ def contour(command):
                 picture = assigned(rest[0], words[:at])
                 if any(c in picture for c in "$`*?["):
                     return "Measured a picture"     # shell, never shown as itself
-                return f"Measured the {Path(picture).stem} picture"
+                if Path(picture).suffix:
+                    return f"Measured the {Path(picture).stem} picture"
+                # A redirect's `2`, or a folder: no picture named.
             return CONTOUR.get(verb)
     return None
 
@@ -113,9 +126,8 @@ def contour(command):
 def verb(command):
     """The `contour` command a shell call runs, through `contour run` too, or
     None for anything else: what the console waits before (ADR 0035)."""
-    try:
-        words = shlex.split(command)
-    except ValueError:
+    words = split(command)
+    if words is None:
         return None
     for at, word in enumerate(words[:-1]):
         if word.rsplit("/", 1)[-1] == "contour":

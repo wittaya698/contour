@@ -764,7 +764,9 @@ function park(event) {
   said.textContent = event.text || '';
   li.append(said, card);
   parkedOn = event.spans || [];
-  questions();
+  // Asked once the line is in the transcript: until then the card is on no
+  // page, and found by no id (a live console, 2026-10-24).
+  queueMicrotask(questions);
   return li;
 }
 
