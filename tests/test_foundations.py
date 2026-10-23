@@ -160,13 +160,13 @@ class CardTest(unittest.TestCase):
         self.assertEqual(said, {"id": "m1", "pixel": [10, 10], "to": [60, 10]})
 
     def number(self, text):
-        return self.run_page(["oldWay", "numbered"], "numbered(text)", text=text)
+        return self.run_page(["oldWay", "plainly", "numbered"], "numbered(text)", text=text)
 
     def test_a_span_asked_before_its_foundations_shows_pixels_and_why(self):
         said = self.number("span m5: 246 px \u00b12 px  (waits on m4, the anchor span, "
                            "being answered)  by eye: the bar covers the arithmetic")
         self.assertEqual(said, {"number": "246 px \u00b12 px",
-                                "why": "waits on m4, the anchor span, being answered"})
+                                "why": "waits on m4, the span with a real size, being answered"})
 
     def test_a_span_read_through_the_camera_shows_its_millimetres_alone(self):
         said = self.number("span m5: 196 mm \u00b119 mm  (through the camera, along y, "
@@ -178,8 +178,76 @@ class CardTest(unittest.TestCase):
                            "by eye: the bar covers the arithmetic")
         self.assertEqual(said, {"number": "155 px", "why": ""})
 
+    def test_a_span_on_a_picture_with_no_size_yet_says_so_in_the_users_words(self):
+        """Issue 154: the canvas showed the agent's reason as it was, with a
+        file name, a flag and *anchor* in it."""
+        said = self.number("span m1: 412 px ±2 px  (no anchor span on "
+                           "1-walkie-talkie.png: propose the span a size the spec "
+                           "states is the length of, with --claims)  by eye: x")
+        self.assertEqual(said, {"number": "412 px ±2 px",
+                                "why": "no size yet: this picture has no span with "
+                                       "a real size to scale from"})
+
+    def test_no_reason_a_span_is_given_reaches_the_page_as_the_agents(self):
+        """Every reason the reading can carry, made by the code that makes it:
+        none reaches the card with a flag, a file name or *anchor* in it."""
+        from lib import camera
+        from test_camera import SIZE, lines, picture
+        ends = ((10, 10), (60, 10))
+        seen = picture(eye=(150.0, 100.0, 1500.0))
+        directions = {"x": lines(seen, 0), "y": lines(seen, 1)}
+        anchor = {"ends": edge(seen, (0, 0, 1), (1, 0, 1)), "mm": BOX[0]}
+        aslant = {"ends": edge(seen, (0, 0, 1), (1, 1, 1)), "mm": BOX[0]}
+        readings = [
+            span.through([], "1-walkie-talkie.png", ends),
+            span.through([asked_anchor("m4", ref="1-walkie-talkie.png")],
+                         "1-walkie-talkie.png", ends),
+            span.through([dict(asked_anchor("m4", ref="1-walkie-talkie.png"),
+                               answer="adopted")], "1-walkie-talkie.png", ends),
+            span.unscaled(*ends),
+            "123 mm \u00b11 mm  (246 px at 0.500 mm/px)"]
+        for given, spans in ((anchor, {"it": {"ends": edge(seen, (0, 1, 0), (1, 1, 0))}}),
+                             (anchor, {"it": {"ends": edge(seen, (0, 0, 1), (1, 1, 1))}}),
+                             (aslant, {"it": {"ends": edge(seen, (1, 0, 1), (1, 1, 1))}})):
+            readings.append(span.unscaled(*ends, camera.read(SIZE, directions, given,
+                                                             spans)["it"]["why"]))
+        for reading in readings:
+            with self.subTest(reading=reading):
+                why = self.number(f"span m1: {reading}  by eye: x")["why"]
+                self.assertTrue(why, reading)
+                self.assertNotRegex(why, r"--|\.png\b|anchor")
+
+    def test_the_list_says_a_readings_reason_as_the_card_does(self):
+        """A reading is a mark, so it is a row in the list too, and the row
+        showed its text as it was stored."""
+        page = PAGE.read_text(encoding="utf-8")
+        self.assertTrue("body.textContent = spoken(mark.text || '')" in page,
+                        "the list shows a mark's text as it was stored")
+        reading = span.through([], "1-walkie-talkie.png", ((10, 10), (60, 10)))
+        said = self.run_page(["plainly", "spoken"], "spoken(text)",
+                             text=f"span m1: {reading}  by eye: the bar covers it")
+        self.assertEqual(said, "span m1: 50 px ±2 px  (no size yet: this picture has "
+                               "no span with a real size to scale from)  by eye: the bar covers it")
+
+    def test_the_agent_is_still_told_its_reason_as_it_is(self):
+        """The card's words are the page's; `contour measure` keeps the file
+        and the flag, which are what the agent acts on."""
+        said = span.through([], "1-walkie-talkie.png", ((10, 10), (60, 10)))
+        self.assertIn("no anchor span on 1-walkie-talkie.png", said)
+        self.assertIn("with --claims", said)
+
+    def test_a_span_asking_its_size_shows_no_reason_under_it(self):
+        """No size yet is what the span being asked will give, so the card
+        says nothing beside its question, whoever's number it asks about."""
+        for claims in ({"dimension": "height", "mm": 110.0, "source": "guess"},
+                       {"dimension": "height", "mm": 110.0}):
+            with self.subTest(claims=claims):
+                asked = span.asking(claims, (10, 10), (10, 422))
+                self.assertEqual(self.number(f"span m1: {asked}  by eye: x"),
+                                 {"number": "412 px", "why": ""})
+
     def test_a_direction_shows_how_many_lines_it_is(self):
-        said = self.run_page(["numberOf", "oldWay", "numbered"], "numberOf(marks[0], marks)",
+        said = self.run_page(["numberOf", "oldWay", "plainly", "numbered"], "numberOf(marks[0], marks)",
                              marks=[asked_direction("m2")])
         self.assertEqual(said, {"number": "2 lines", "why": ""})
 
@@ -190,10 +258,10 @@ class CardTest(unittest.TestCase):
                       "status": "open", "text": "span m1: 115 px \u00b12 px  (waits on m4, "
                                                 "the anchor span, being answered)"}]
         all_marks[0]["reading"] = "m5"
-        said = self.run_page(["named", "oldWay", "numbered", "numberOf"], "numberOf(marks[0], marks)",
+        said = self.run_page(["named", "oldWay", "plainly", "numbered", "numberOf"], "numberOf(marks[0], marks)",
                              marks=all_marks)
         self.assertEqual(said, {"number": "115 px \u00b12 px",
-                                "why": "waits on span 3, the anchor span, being answered"})
+                                "why": "waits on span 3, the span with a real size, being answered"})
 
 
 if __name__ == "__main__":
