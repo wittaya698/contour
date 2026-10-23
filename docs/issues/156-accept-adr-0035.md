@@ -11,8 +11,8 @@ amended, or sent back; 157–159 follow whatever it becomes.
 
 ## Acceptance criteria
 
-- [ ] ADR 0035's status says Accepted (or amended, with what changed)
-- [ ] ADR 0022's header names ADR 0022 decision 8 as amended by ADR 0035
+- [x] ADR 0035's status says Accepted (or amended, with what changed)
+- [x] ADR 0022's header names ADR 0022 decision 8 as amended by ADR 0035
 
 ## Blocked by
 

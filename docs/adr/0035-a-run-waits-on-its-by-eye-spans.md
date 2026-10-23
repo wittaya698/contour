@@ -1,6 +1,6 @@
 # 0035 — A run waits on its by-eye spans
 
-**Status:** Proposed · 2026-10-23 · **amends ADR 0022 decision 8 (the checkpoint waits for the user), and adds to ADR 0034 (a second place a run waits on the user's answers)** ([0022](0022-the-agent-reads-the-references-in-spans.md), [0034](0034-questions-are-a-form-the-chat-can-fill.md))
+**Status:** Accepted · 2026-10-23 · **amends ADR 0022 decision 8 (the checkpoint waits for the user), and adds to ADR 0034 (a second place a run waits on the user's answers)** ([0022](0022-the-agent-reads-the-references-in-spans.md), [0034](0034-questions-are-a-form-the-chat-can-fill.md))
 
 ## Context
 

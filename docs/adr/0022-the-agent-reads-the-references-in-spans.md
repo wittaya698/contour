@@ -1,6 +1,6 @@
 # 0022 — The agent reads the references in spans
 
-**Status:** Accepted · 2026-10-03 (proposed 2026-09-30) · **amends [ADR 0017](0017-scaffold-measured-from-references.md) and [ADR 0018](0018-marks-a-canvas-over-the-sheet.md)**
+**Status:** Accepted, amended · 2026-10-03 (proposed 2026-09-30) · decision 8 amended by [ADR 0035](0035-a-run-waits-on-its-by-eye-spans.md) (under an attended console, the checkpoint waits on the run's by-eye spans) · **amends [ADR 0017](0017-scaffold-measured-from-references.md) and [ADR 0018](0018-marks-a-canvas-over-the-sheet.md)**
 
 > **Accept on a tracer bullet:** agent-drawn **snapped** spans on `beaky`'s
 > references reproduce the three numbers ADR 0017 measured — width 888, depth 597,
