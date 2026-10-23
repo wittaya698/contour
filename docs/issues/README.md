@@ -507,6 +507,7 @@ sliced work is.
 | [153](153-the-activity-line-names-the-picture.md) | The activity line names the picture | AFK | — |
 | [154](154-a-spans-note-is-in-the-users-words.md) | A span's note is in the user's words | AFK | — |
 | [155](155-a-new-spec-is-written-whole-the-first-time.md) | A new spec is written whole the first time | AFK | — |
+| [160](160-a-script-that-reads-a-reference-runs.md) | A script that reads a reference runs | HITL | — |
 
 **27 came out of slice 17's own suite runs.** `contour-console` forwards `SIGINT`
 and not `SIGTERM`, so every console a test terminates leaves its server running —
@@ -549,3 +550,9 @@ wrong with or without a form.
 photo was gated as a change to it, the activity line showed a shell variable,
 the canvas showed a span's reason written for the agent, and the first spec
 write was refused twice for what the prompt could have said.
+
+**160 came out of the console run that checked 155.** Issue 152 left a
+script that names a reference gated, since its text cannot say whether it
+reads or writes; the run showed that is how the agent measures colour, so it
+is the warning raised most. Whether to check after instead of guessing
+before is the user's call.
