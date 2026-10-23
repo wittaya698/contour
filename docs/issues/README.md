@@ -7,8 +7,14 @@ through one of them. A finished slice is demoable or verifiable on its own.
 **HITL** needs the user: a decision, a wording, a review. **AFK** can be
 implemented and landed without one.
 
-Fourteen batches so far, and a last section for what the work itself turned up. Each
+Seventeen batches so far, and a last section for what the work itself turned up. Each
 file cites what it comes from; read that before arguing with a slice.
+
+**Issues and ADRs are filed on master**, in a docs-only commit, and a branch
+only implements them: ticking a box, or writing what it found into its own
+issue. The next number is then the one after the highest on master, whatever
+other branches are open. One found mid-work goes onto master too.
+`test_numbering` fails if two files share a number.
 
 ## Batch 1 — the console
 
