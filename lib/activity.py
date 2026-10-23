@@ -8,6 +8,7 @@ would be a second vocabulary.
 
 Stdlib, and Blender-free: the console imports this to draw its transcript.
 """
+import re
 import shlex
 from pathlib import Path
 
@@ -101,9 +102,25 @@ def contour(command):
             if verb == "run" and rest:
                 return contour(shlex.join(rest)) or CONTOUR["run"]
             if verb == "measure" and rest and not rest[0].startswith("-"):
-                return f"Measured the {Path(rest[0]).stem} picture"
+                picture = assigned(rest[0], words[:at])
+                if any(c in picture for c in "$`*?["):
+                    return "Measured a picture"     # shell, never shown as itself
+                return f"Measured the {Path(picture).stem} picture"
             return CONTOUR.get(verb)
     return None
+
+
+def assigned(word, before):
+    """What `$R` or `${R}` holds, from an `R=…` earlier in the same line, or
+    the word itself when it names no variable (issue 153)."""
+    found = re.fullmatch(r"\$\{?([A-Za-z_]\w*)\}?", word)
+    if found is None:
+        return word
+    for earlier in reversed(before):
+        name, eq, value = earlier.rstrip(";").partition("=")
+        if eq and name == found.group(1):
+            return value
+    return word
 
 
 def named(path):
