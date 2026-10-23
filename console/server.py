@@ -66,7 +66,11 @@ def new_space():
         "it is and where it will be seen, and say they are yours: never ask "
         "for them, as rule 1 says.\n"
         "4. Draft spec.yaml, and flag every number you chose rather than the "
-        "user, tolerances first. Ask the user before writing it (rule 1).")
+        "user, tolerances first. Ask the user before writing it (rule 1). "
+        "A spec write is the whole change, so a new spec is written whole, "
+        "with revision: 1 in it, and its case names every number the spec "
+        "sets, with why: the toolkit's usual ones too, such as the sheet's "
+        "resolution, since the spec sets them all the same.")
 
 
 NEW_SPACE = new_space()

@@ -9,6 +9,7 @@ import json
 import shutil
 import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -20,6 +21,30 @@ from lib import gate, marks    # noqa: E402
 from lib.canvas import PAGE    # noqa: E402
 from test_console import ConsoleCase    # noqa: E402
 from test_found import function    # noqa: E402
+
+
+class NamedAsWrittenTest(unittest.TestCase):
+    """A case names a number the way a person writes it (issue 155).
+
+    A new space's first spec write was refused for not naming 8000, in a case
+    that said *About 8,000 triangles*: the way *Speaking to the user* tells the
+    agent to say a triangle budget.
+    """
+
+    def unargued(self, case):
+        spec = Path(self.enterContext(tempfile.TemporaryDirectory())) / "spec.yaml"
+        call = {"file_path": str(spec),
+                "content": "revision: 1\ntopology:\n  tri_budget: 8000\n"}
+        return gate.unargued(spec, "Write", call, case)
+
+    def test_a_number_with_its_thousands_marked_is_that_number(self):
+        for case in ("About 8,000 triangles.", "8 000 triangles", "8000 triangles"):
+            with self.subTest(case=case):
+                self.assertEqual(self.unargued(case), [])
+
+    def test_a_list_of_numbers_is_still_each_number(self):
+        """*10, 000* is not ten thousand, and *1,024* is."""
+        self.assertEqual(self.unargued("sizes 80, 00 and 8,00"), ["8000"])
 
 
 class WordsTest(unittest.TestCase):
