@@ -312,8 +312,9 @@ class PageTest(ConsoleCase):
     def test_the_card_asks_what_the_run_waits_on_with_its_count(self):
         page = PAGE.read_text(encoding="utf-8")
         asks = page.split("function questions(", 1)[1].split("\n}\n", 1)[0]
-        self.assertIn("asking(marks, skipped, (moving && moving.mark) || rejecting, parkedOn)",
-                      asks)
+        # A span gone to from a spec gate follows the park (issue 159).
+        self.assertRegex(asks, r"asking\(marks, skipped, \(moving && moving\.mark\) "
+                               r"\|\| rejecting, parkedOn[,)]")
         self.assertIn("' \\u00b7 ' + of", asks)
 
     def test_the_skip_button_tells_the_console_under_one(self):

@@ -247,6 +247,10 @@
   #run .question .basis { margin: 2px 0 0; font-size: 12px; opacity: .8; }
   #turns .changes { margin: 0; padding-left: 18px; }
   #turns .changes:empty, #turns .spans:empty { display: none; }
+  /* Spans still unanswered, on a spec gate: each id goes to its card. */
+  #turns .unanswered { margin: 0; font-size: 13px; }
+  #turns .unanswered button { font: inherit; padding: 0; border: 0; background: none;
+                              color: inherit; text-decoration: underline; cursor: pointer; }
   #turns .raw summary { cursor: pointer; opacity: .6; font-size: 11px; }
   /* An activity line: what the call did, its call beside it and folded away. */
   #turns .did { display: flex; flex-wrap: wrap; gap: 0 10px; align-items: baseline; }
@@ -383,6 +387,7 @@
         <span class="act"></span>
         <ul class="changes"></ul>
         <span class="spans"></span>
+        <p class="unanswered" hidden></p>
         <details class="raw"><summary>the exact call</summary>
           <span class="call"></span></details>
         <input class="because" placeholder="why not (a sentence)" autocomplete="off">
@@ -742,6 +747,13 @@ function form(event) {
 // 3). Moved, not copied, so an answer in either place is the answer in both.
 // `home` keeps its place in the panel to go back to.
 let parkedOn = null;
+// A span the person went to from a spec gate's line, asked next (issue 159).
+let wanted = null;
+function toCard(id) {
+  wanted = id;
+  questions();
+  document.getElementById('questions').scrollIntoView({ block: 'nearest' });
+}
 const home = document.createComment('the questions card, while a run waits on its spans');
 function park(event) {
   const card = document.getElementById('questions');
@@ -910,6 +922,24 @@ function gate(event, send) {
   if (said.spans.length) {
     li.querySelector('.spans').textContent = 'measured on '
       + (said.spans.length === 1 ? 'span ' : 'spans ') + said.spans.join(', ');
+  }
+  // Claude's by-eye spans still unanswered, whose numbers the spec cannot
+  // carry: each id a way to its card. It does not stop Allow (ADR 0035,
+  // decision 7).
+  if (said.unanswered) {
+    const line = li.querySelector('.unanswered');
+    const [head, ...rest] = said.unanswered.text.split(/(\bm\d+\b)/);
+    line.append(head);
+    for (let i = 0; i < rest.length; i += 2) {
+      const id = rest[i];
+      if (!said.unanswered.spans.includes(id)) { line.append(id, rest[i + 1]); continue; }
+      const to = document.createElement('button');
+      to.type = 'button';
+      to.textContent = id;
+      to.addEventListener('click', () => toCard(id));
+      line.append(to, rest[i + 1]);
+    }
+    line.hidden = false;
   }
   li.querySelector('.call').textContent = called(event);
   li.querySelector('.allow').textContent = said.allow;
@@ -1386,7 +1416,7 @@ function draw() {
                                   ctx.drawImage(img, 0, 0); }
   list.replaceChildren();
   // Asked before drawing, so the picture can point at the card's span.
-  const now = asking(marks, skipped, (moving && moving.mark) || rejecting, parkedOn).mark;
+  const now = asking(marks, skipped, (moving && moving.mark) || rejecting, parkedOn, wanted).mark;
   marks.forEach((mark, i) => {
     const closed = mark.status === 'closed';
     const here = (mark.ref || null) === showing;
@@ -1640,7 +1670,7 @@ function follow(showing, asked, followed, busy) {
 //
 // `parked` is the spans a run waits on, or null: then they are the only
 // questions, counted *1 of 7* (ADR 0035, decision 3).
-function asking(marks, skipped, moving, parked) {
+function asking(marks, skipped, moving, parked, wanted) {
   let open = marks.filter(m => spanState(m) === 'unanswered' && m.status !== 'closed');
   let of = null;
   if (parked) {
@@ -1656,7 +1686,10 @@ function asking(marks, skipped, moving, parked) {
     const [x, y] = [turn(a), turn(b)];
     return x[0] - y[0] || x[1] - y[1] || x[2] - y[2];
   });
+  // `wanted`: a span the person went to from a spec gate, skipped or not
+  // (ADR 0035, decision 7). Answered since, the card goes on.
   const mark = open.find(m => moving && m.id === moving.id)
+               || open.find(m => wanted && m.id === wanted)
                || order.find(m => !skipped.has(m.id)) || null;
   return { mark, number: mark ? named(mark, marks) : '', open: open.length, of };
 }
@@ -1689,7 +1722,7 @@ function slipped(slip, marks) {
 
 function questions() {
   const card = document.getElementById('questions');
-  const { mark, number, open, of } = asking(marks, skipped, (moving && moving.mark) || rejecting, parkedOn);
+  const { mark, number, open, of } = asking(marks, skipped, (moving && moving.mark) || rejecting, parkedOn, wanted);
   card.hidden = !mark;
   asked = mark;
   const offer = slipped(slip, marks);
