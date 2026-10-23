@@ -451,8 +451,14 @@ set aside for you, and the run carries on. Its console shows what waits, oldest
 first, with the diff and Claude's case, whenever you open it: allow makes the
 call then, and deny is a veto. Claude's questions are a form, with every
 field already filled with its guess and the reason for it, each saying whether
-the text is *Claude's guess* or *yours*; you edit what is wrong and approve
-the form once (ADR 0034). A run you watch waits at it. One nobody watched sets
+the text is *Claude's guess*, *from the chat* or *yours*; you edit what is
+wrong and approve the form once (ADR 0034). It asks what the thing is, how big
+it is, where it will be seen and what parts it has, and never how far off a
+size may be or how much detail it can carry: Claude proposes those itself,
+when it drafts the spec, and says they are its own (rule 1). A size you
+approve as Claude guessed it is named *Claude's guess, approved* wherever it
+is used, and the span it scales from asks again: *is this the 110 mm height
+you approved from Claude's guess?* A run you watch waits at it. One nobody watched sets
 it aside the same way, in its place in the order: approving it starts a new
 run in that console, with the questions and the answers as its first message. Until they are answered, the
 lobby's row and `status` say how many wait and for what, never why, and a
@@ -594,7 +600,10 @@ agent's to adjust.
 When the agent argues a spec is wrong, the argument has to be a measurement,
 and a measurement off a reference has to be a span the proposal names (rule 1,
 ADR 0022). A number with no span behind it is not an argument, and a by-eye
-span argues nothing until you have answered it.
+span argues nothing until you have answered it. A number in a new spec comes
+from a span, from you, from *Claude's guess, approved*, or is *not
+measurable*; every one Claude chose is listed back as its own, tolerances
+first (ADR 0034).
 
 ## Decisions
 
