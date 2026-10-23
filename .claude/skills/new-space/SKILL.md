@@ -33,7 +33,8 @@ object, not the way the spec is laid out, and in the words the space's
 - Anything else that matters but cannot be measured.
 
 **Never ask the user for a tolerance or a triangle budget.** Propose both
-yourself, from what it is and where it will be seen, and say they are yours.
+yourself, from what it is and where it will be seen, and say they are yours:
+never ask for them, as rule 1 says, in the form or in a closing.
 If the user cannot answer anything else, propose a value and mark it clearly as
 your assumption. Do not invent silently — the spec is *their* intent (ADR 0002).
 

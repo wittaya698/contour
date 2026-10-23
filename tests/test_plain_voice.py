@@ -98,5 +98,43 @@ class InterviewTest(unittest.TestCase):
         self.assertIn("Never ask the user for a tolerance or a triangle budget", flat(intent))
 
 
+class ProposedTest(unittest.TestCase):
+    """A tolerance and a triangle budget are proposed, never asked (issue 151).
+
+    A run in a new space, begun on *Do you have questions?* and not on the
+    new-space flow, closed asking *How strict should it be?… About ±2 mm, or
+    something looser?*. The rule never to ask was only in the new-space skill
+    and its prompt; the run read the space's rules, which flagged tolerances
+    loudest and gave the word as *how far off it may be*, said as a question.
+    """
+
+    def rules(self):
+        return flat(RULES.read_text(encoding="utf-8"))
+
+    def test_every_run_in_a_space_reads_never_to_ask_for_them(self):
+        for rules in (self.rules(), flat((ROOT / "CLAUDE.md").read_text(encoding="utf-8"))):
+            self.assertIn("Never ask the user for a tolerance or a triangle budget", rules)
+            self.assertIn("propose both yourself, from what it is and where it will be seen",
+                          rules)
+
+    def test_the_words_for_them_are_said_as_a_proposal(self):
+        voice = section(RULES.read_text(encoding="utf-8"), "Speaking to the user")
+        for term, proposed in (("tolerance", "*I'd let it be 15 mm off*"),
+                               ("triangle budget", "*I'd give it")):
+            with self.subTest(term=term):
+                [line] = [flat(s) for s in voice.split("\n  - ") if s.startswith(f"**{term}**")]
+                self.assertIn(proposed, line)
+                self.assertIn("never asked", line)
+
+    def test_the_new_space_prompt_and_skill_point_to_rule_one(self):
+        """One rule, which every run reads, and the flow's words name it
+        rather than keep a second copy."""
+        intent = flat(section(SKILLS[0].read_text(encoding="utf-8"),
+                              "1. Get the intent first, in plain words"))
+        for said in (flat(NEW_SPACE), intent):
+            with self.subTest(said=said[:40]):
+                self.assertRegex(said, r"never ask for them, as rule 1 says")
+
+
 if __name__ == "__main__":
     unittest.main()

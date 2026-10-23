@@ -63,7 +63,8 @@ def new_space():
         "2. Any reference pictures the user gave are already in refs/. Measure "
         "them; never change them.\n"
         "3. Propose the tolerances and the triangle budget yourself, from what "
-        "it is and where it will be seen, and say they are yours.\n"
+        "it is and where it will be seen, and say they are yours: never ask "
+        "for them, as rule 1 says.\n"
         "4. Draft spec.yaml, and flag every number you chose rather than the "
         "user, tolerances first. Ask the user before writing it (rule 1).")
 
