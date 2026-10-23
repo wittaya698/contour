@@ -98,6 +98,29 @@ class InterviewTest(unittest.TestCase):
         self.assertIn("Never ask the user for a tolerance or a triangle budget", flat(intent))
 
 
+class FirstWriteTest(unittest.TestCase):
+    """A new spec is written whole the first time (issue 155).
+
+    A new-space run's first spec write was refused twice before the gate showed
+    it: for having no `revision:` line, then for a case that did not name four
+    of the numbers it set. Both refusals were right; the prompt could have said
+    what they said.
+    """
+
+    def step(self):
+        return flat(NEW_SPACE.split("\n4. ", 1)[1])
+
+    def test_a_new_spec_is_written_with_revision_one(self):
+        self.assertIn("revision: 1", self.step())
+
+    def test_its_case_names_every_number_it_sets_the_usual_ones_too(self):
+        """The refused case left out `10000, 0.01, 0.1, 1024`: the budget and
+        the toolkit's usual values, which the spec sets all the same."""
+        said = self.step()
+        self.assertIn("its case names every number the spec sets, with why", said)
+        self.assertIn("the toolkit's usual ones too", said)
+
+
 class ProposedTest(unittest.TestCase):
     """A tolerance and a triangle budget are proposed, never asked (issue 151).
 

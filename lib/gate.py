@@ -170,6 +170,10 @@ def partial(spec, tool, call):
     return REVISION not in fields or set(fields) == {REVISION}
 
 
+THOUSANDS = re.compile(r"(?<![\d.,])\d{1,3}(?:[,    ]\d{3})+(?:\.\d+)?(?![\d])")
+"""A number with its thousands marked by a comma or a space."""
+
+
 def unargued(spec, tool, call, proposal):
     """The numbers a spec write sets that `proposal`, the agent's text just
     before it, never names, as a person would write them: *644*, not *644.0*.
@@ -178,6 +182,10 @@ def unargued(spec, tool, call, proposal):
     # By size, so *640.0* is 640, and a sign is left to the prose: a minus is
     # as often typed `−` as `-`.
     named = {float(n) for n in re.findall(r"\d+(?:\.\d+)?", proposal or "")}
+    # And with its thousands marked, *8,000* or *8 000*, as the page's own
+    # words say a triangle budget (issue 155). Read beside the plain reading,
+    # never instead, so this lets more cases through and refuses none.
+    named |= {float(re.sub(r"[^\d.]", "", n)) for n in THOUSANDS.findall(proposal or "")}
     return [number(will) for path, (_, will) in (moved(spec, tool, call) or {}).items()
             if path != REVISION and isinstance(will, (int, float))
             and not isinstance(will, bool) and abs(will) not in named]
