@@ -461,6 +461,24 @@ not. **150 is the relay**, and the one that loosens ADR 0027 decision 12; it
 comes last so it is a small slice on a form already in use. A chat fills
 words, never a span and never a gate.
 
+## Batch 17 — a run waits on its by-eye spans
+
+From [ADR 0035](../adr/0035-a-run-waits-on-its-by-eye-spans.md), decided on
+2026-10-23 after the run that checked 151 proposed a spec with half its sizes
+held back, while the span questions that would have given them sat above the
+transcript. One HITL, three AFK.
+
+| # | Slice | Type | Blocked by |
+|---|---|---|---|
+| [156](156-accept-adr-0035.md) | Accept ADR 0035 | HITL | — |
+| [157](157-the-worksheet-waits-on-by-eye-spans.md) | The worksheet waits on by-eye spans | AFK | 156 |
+| [158](158-the-span-card-is-in-the-transcript.md) | The span card is in the transcript | AFK | 157 |
+| [159](159-a-spec-gate-names-spans-still-unanswered.md) | A spec gate names spans still unanswered | AFK | 156 |
+
+**157 is worth having alone**: the run waits, and the panel already answers.
+**158 is where the user stops scrolling.** **154 sits beside this batch**: the
+card shown in the transcript is the one whose note it fixes.
+
 ## Found in flight
 
 Not from either review — a defect the work turned up, filed where the rest of the
