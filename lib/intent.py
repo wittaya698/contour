@@ -35,6 +35,12 @@ WRITING = ("tee", "cp", "mv", "dd", "truncate", "install", "patch",
            "python", "python3", "perl", "ruby", "awk")
 
 
+# The `sips` flags that only read an image. Any other flag changes it, and
+# `sips` writes a change back over the file it read unless given `--out`.
+SIPS_READS = ("-g", "--getProperty", "-1", "--oneLine", "-h", "--help",
+              "-H", "--helpProperties", "-v", "--version", "--debug")
+
+
 # A path under the user's references, wherever in a call it sits. Read out of the
 # raw text and not the words: a path inside a heredoc or a quoted script is part
 # of a word rather than a word, and a heredoc is how an agent in auto mode edits
@@ -57,7 +63,16 @@ SHELLS = ("sh", "bash", "zsh", "dash", "ksh")
 GIT = {"commit": "commit", "push": "push"}
 
 
-# A heredoc's opening: `<<EOF`, `<<-EOF`, `<<'EOF'` or `<<"EOF"`.
+# A redirect that writes no file: onto another descriptor, or into nothing.
+NOWHERE = re.compile(r"(?<![\w>&])(?:&|\d*)>>?\s*/dev/null(?![\w/.])"
+                     r"|(?<![\w>&])\d*>&\s*(?:\d+|-)(?![\w/.])")
+
+
+# A redirect into a file, and the file: `> x`, `>> x`, `2> x`, `&> "x y"`.
+INTO = re.compile(r"(?<![\w>&<])(?:&|\d*)>>?\|?\s*(\"[^\"]*\"|'[^']*'|[^\s;&|<>()]+)")
+
+
+# A heredoc's opening:`<<EOF`, `<<-EOF`, `<<'EOF'` or `<<"EOF"`.
 HEREDOC = re.compile(r"<<(-?)\s*(['\"]?)([A-Za-z_]\w*)\2")
 
 
@@ -126,17 +141,46 @@ def categories():
     return CATEGORIES
 
 
+def quiet(call):
+    """The call with its redirects that write no file taken out: onto another
+    descriptor (`2>&1`, `>&2`) or into `/dev/null` (issue 152)."""
+    return NOWHERE.sub(" ", call)
+
+
 def writes(call, words):
     """Whether this shell call looks like it changes a file.
 
     A redirect is punctuation rather than a word, so the raw line is read for
     those and the words for the programs.
     """
-    if any(mark in call for mark in (">", "<<")):
+    if any(mark in quiet(call) for mark in (">", "<<")):
         return True
     if "sed" in [w.rsplit("/", 1)[-1] for w in words] and "-i" in words:
         return True
+    if any(resized(part) for part in commands_in(call)):
+        return True
     return any(w.rsplit("/", 1)[-1] in WRITING for w in words)
+
+
+def commands_in(call):
+    """The call's commands, one per `;`, `&&`, `||`, `|` or line."""
+    return re.split(r"&&|\|\||;|\||\n", call)
+
+
+def resized(command):
+    """Whether this command is a `sips` that changes an image, and so writes
+    one: into its `--out`, or in place over the file it was given."""
+    words = words_of(command)
+    if "sips" not in [w.rsplit("/", 1)[-1] for w in words]:
+        return False
+    return any(w.startswith("-") and w not in SIPS_READS for w in words)
+
+
+def resized_elsewhere(command):
+    """Whether this `sips` writes only into an `--out` that is not a reference."""
+    words = words_of(command)
+    out = after("--out", words) or after("-o", words)
+    return resized(command) and out is not None and not refs_in(out)
 
 
 def mentioned(call):
@@ -148,9 +192,29 @@ def mentioned(call):
     """
     if "spec.yaml" in call:
         return "spec-write"
-    if refs_in(call):
+    aimed = aimed_at_references(call)
+    if refs_in(aimed) and writes(aimed, words_of(aimed)):
         return "ref-write"
     return None
+
+
+def aimed_at_references(call):
+    """The call without the writes that plainly land outside `refs/`: a
+    redirect to a file that is not a reference, or a `sips` whose `--out` is
+    not one (issue 152). What is left still names every reference the call
+    could change, and nothing that only reads one becomes a write by sitting
+    beside a redirect to the scratchpad."""
+    call = INTO.sub(lambda m: m.group(0) if refs_in(m.group(1)) else " ", quiet(call))
+    return "\n".join(c for c in commands_in(call) if not resized_elsewhere(c))
+
+
+def words_of(call):
+    """The words of a call, or its whitespace-split ones if it will not split:
+    a quoting accident is no reason to read fewer programs."""
+    try:
+        return shlex.split(call)
+    except ValueError:
+        return call.split()
 
 
 def refs_in(text):

@@ -29,10 +29,34 @@ should still ask (rule 1); the fix is for the calls it can tell.
 
 ## Acceptance criteria
 
-- [ ] `2>&1` and `>/dev/null` in a call that names a reference no longer make it a `ref-write`
-- [ ] A call whose only output is a path outside `refs/` (`--out`, a redirect) is not a `ref-write`
-- [ ] `cp x refs/…`, `> refs/…`, `sips -z refs/…` with no `--out`, and `sed -i` on a reference still are
-- [ ] The guard (`tools/guards/spec.py`) and the console's gate agree on every case, as `refs_in` already makes them
+- [x] `2>&1` and `>/dev/null` in a call that names a reference no longer make it a `ref-write`
+- [x] A call whose only output is a path outside `refs/` (`--out`, a redirect) is not a `ref-write`
+- [x] `cp x refs/…`, `> refs/…`, `sips -z refs/…` with no `--out`, and `sed -i` on a reference still are
+- [x] The guard (`tools/guards/spec.py`) and the console's gate agree on every case, as `refs_in` already makes them
+
+## Found (2026-10-23)
+
+Three of the four warnings are gone. `writes` now takes out a redirect onto a
+descriptor or into `/dev/null` before it looks for `>`, so `2>&1` writes no
+file, for a spec as for a reference: `cat spec.yaml 2>&1` was a spec write
+too. `mentioned` judges a reference write on the call without the writes
+that plainly land elsewhere: a redirect into a file that is not a reference,
+and a `sips` whose `--out` is not one.
+
+The heredoc one stays. The script saved its copy to the scratchpad, but
+telling `Image.open('refs/…')` from `.save('refs/…')` in a script is
+guessing, and a gate that cannot tell still asks.
+
+It turned up a hole the other way. `sips` was never a writer, and with no
+`--out` it writes its change over the file it read: `sips -z 9 9
+refs/front.png` resized a tracked reference with no gate and no guard. It
+now writes whenever it is given a flag that is not one of its reading ones
+(`-g`, `--oneLine`, `--help` and the like), in place unless `--out` says
+elsewhere.
+
+The guard and the gate still share `intent.classify`, and
+`test_spec_guard` drives the hook through the same cases to keep them so.
+`test_intent.ReadingAReferenceTest` holds the cases either way.
 
 ## Blocked by
 

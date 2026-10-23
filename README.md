@@ -595,7 +595,10 @@ Two of those rules are enforced rather than trusted: `tools/hooks/pre-push`
 blocks model content leaving via git, and `tools/guards/spec.py` — which a space
 runs as `contour hook spec` — refuses writes to a spec or a reference image that
 git already tracks. A spec is the definition of correct, so it is not the
-agent's to adjust.
+agent's to adjust. Both it and the console's gate judge what a call writes, not
+what it names: measuring a reference, or saving a resized copy of it outside
+`refs/`, is reading it, while `sips` with no `--out` rewrites the picture it
+was given and is stopped (issue 152).
 
 When the agent argues a spec is wrong, the argument has to be a measurement,
 and a measurement off a reference has to be a span the proposal names (rule 1,
