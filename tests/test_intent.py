@@ -206,6 +206,54 @@ class CommitMessageTest(unittest.TestCase):
         self.assertEqual(self.classify(call), "spec-write")
 
 
+class ReadingAReferenceTest(unittest.TestCase):
+    """Reading a reference is not changing it (issue 152).
+
+    A new-space run was asked *Claude wants to change your reference pictures*
+    four times for calls that only read the photo: any `>` in the line was a
+    write, so `2>&1` and `>/dev/null` made a read a `ref-write`. A warning the
+    user learns to click through is worse than none, since the one that means
+    it reads the same. Only the cases that plainly write no reference are let
+    off; everything else keeps the floor.
+    """
+
+    def classify(self, call):
+        return intent.classify("Bash", {"command": call})
+
+    def test_a_redirect_onto_a_descriptor_or_nowhere_writes_no_file(self):
+        for call in ("contour measure refs/side.png --help 2>&1 | head -80; "
+                     "sips -g pixelWidth -g pixelHeight refs/*.png",
+                     "file refs/front.png >/dev/null",
+                     "identify refs/front.png 2>/dev/null >&2",
+                     "cat spec.yaml 2>&1"):
+            with self.subTest(call=call):
+                self.assertIsNone(self.classify(call))
+
+    def test_a_call_whose_output_lands_outside_the_references_writes_none(self):
+        for call in ("cat refs/front.png > $S/copy.png",
+                     "exiftool refs/front.png >> /tmp/notes.txt",
+                     "sips -z 1491 546 refs/side.png --out $S/big.png >/dev/null",
+                     "sips -Z 2000 refs/side.png -o /tmp/side.png"):
+            with self.subTest(call=call):
+                self.assertIsNone(self.classify(call))
+
+    def test_a_call_that_can_change_a_reference_still_does(self):
+        """The floor. `sips` with no `--out` resizes the file it was given in
+        place, and a script fed a heredoc can write anywhere: telling its
+        `Image.open` from its `.save` would be guessing, so it stays gated."""
+        for call in ("cp ~/Downloads/new.png refs/front.png",
+                     "cat sketch.png 2>/dev/null > refs/front.png",
+                     "echo x >> 'refs/notes.txt'",
+                     "sips -z 1491 546 refs/side.png",
+                     "sips -z 1491 546 refs/side.png >/dev/null 2>&1",
+                     "sips -Z 2000 big.png --out refs/side.png",
+                     "sed -i '' 's/a/b/' refs/notes.txt",
+                     "python3 - <<'EOF'\nfrom PIL import Image\n"
+                     "Image.open('refs/side.png').resize((2, 2)).save('/tmp/b.png')\nEOF"):
+            with self.subTest(call=call):
+                self.assertEqual(self.classify(call), "ref-write")
+
+
 class ReferencesTest(unittest.TestCase):
     """Which references a call names, beside what the call means.
 

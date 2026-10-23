@@ -117,6 +117,22 @@ class SpecGuardTest(unittest.TestCase):
                 r = self.guard("Bash", {"command": call})
                 self.assertEqual(r.returncode, 0, r.stderr)
 
+    def test_the_guard_and_the_gate_agree_on_reading_a_reference(self):
+        """Issue 152's cases, judged by the hook as the gate judges them: a
+        redirect that goes nowhere, or an output outside `refs/`, reads the
+        reference; `sips` with no `--out` rewrites it in place."""
+        self.commit("refs/front.png")
+        for call, code in (("file refs/front.png 2>&1 >/dev/null", 0),
+                           ("sips -z 9 9 refs/front.png --out /tmp/big.png >/dev/null", 0),
+                           ("cat refs/front.png > /tmp/copy.png", 0),
+                           ("sips -z 9 9 refs/front.png >/dev/null", DENY),
+                           ("cat a.png 2>&1 > refs/front.png", DENY)):
+            with self.subTest(call=call):
+                r = self.guard("Bash", {"command": call})
+                self.assertEqual(r.returncode, code, r.stderr)
+                gated = intent.classify("Bash", {"command": call}) == "ref-write"
+                self.assertEqual(gated, code == DENY)
+
     def test_a_reference_git_cannot_be_asked_about_is_denied(self):
         """An error is not an answer. The guard's whole policy is trackedness, so
         a guard that guessed *untracked* when it could not ask would allow the
