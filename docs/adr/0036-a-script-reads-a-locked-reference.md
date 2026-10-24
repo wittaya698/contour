@@ -1,6 +1,6 @@
 # 0036 — A script reads a locked reference
 
-**Status:** Accepted · 2026-10-24 · **adds to ADR 0012 (references share the spec's trust class), and replaces what issue 152 left gated** ([0012](0012-one-directory-per-model.md))
+**Status:** Accepted · 2026-10-24, amended the same day to lock untracked pictures too · **adds to ADR 0012 (references share the spec's trust class), and replaces what issue 152 left gated** ([0012](0012-one-directory-per-model.md))
 
 ## Context
 
@@ -24,13 +24,17 @@ lets the picture be changed while the script runs, which is short of rule 1's
 
 ## Decision
 
-**1. A reference git tracks is read-only on disk.** Whenever a call names a
-reference, the guard first takes the write permission off each one git tracks.
-It does this before judging the call, and does it again each time, so a
-picture tracked since the last call is covered. Git records only the
-executable bit, so the space shows no change. A reference git does not track
-yet is left writable, as the guard leaves it today (ADR 0012: saving a new one
-is how a space starts).
+**1. A reference is read-only on disk.** Whenever a call names a reference,
+the guard first takes the write permission off every picture in `refs/`,
+whether git tracks it or not. It does this before judging the call, and does
+it again each time, so a picture added since the last call is covered. Git
+records only the executable bit, so the space shows no change. The `refs/`
+folder itself stays writable, so a new picture can still be saved into it
+(ADR 0012: saving a new one is how a space starts). A new space's photo is
+usually not committed yet, and it is the picture the agent samples first
+(issue 160), so a lock on tracked pictures alone would miss the case this is
+for. Overwriting a picture git does not track, which the guard allows today,
+now fails too.
 
 **2. A script that names a locked reference runs, with no gate and no
 denial.** This covers `python`, `python3`, `perl` and `ruby` by name wherever
@@ -52,7 +56,9 @@ call that named a reference, a `PostToolUse` hook asks git whether a tracked
 reference differs from what git holds. If one does, it is restored from git at
 once, locked again, and the agent is told the write was refused, in the
 guard's words (rule 1, ADR 0012). This is a backstop for what the lock and the
-word list miss, and the same hook runs in a terminal and under a console.
+word list miss, and the same hook runs in a terminal and under a console. Git
+holds no copy of a picture it does not track, so for one of those there is no
+backstop: the lock and the word list are all there is.
 
 **5. Every other write is unchanged.** `cp x refs/…`, `mv`, `> refs/…`,
 `tee`, `dd`, `sips` without `--out`, and a `Write` or `Edit` of a reference
@@ -66,6 +72,11 @@ are still denied before they run, or gated, as they are today.
   gap is not new: a script that spells `refs` in pieces was never gated
   either. This decision stops mistakes, not an agent working against the
   rules.
+- **A new picture deleted and replaced by a route the word list misses.**
+  Git has no copy to put back (decision 4). In a terminal this is no weaker
+  than today, where the guard allows any write to such a picture. Under a
+  console it is: today the gate asks before every script that names one, and
+  now only a script the word list catches is asked about.
 - **Other programs that edit pictures.** Only the interpreters in decision 2
   are let through. `sips`, ImageMagick and the rest keep the rules they have.
 - **Changing a reference on purpose.** Rule 1 has no confirmed path to
@@ -94,6 +105,9 @@ are still denied before they run, or gated, as they are today.
 - **Keep it gated** (issue 152's answer). Safe, but every colour reading
   costs a click or a denial, and the warning loses its meaning when it is
   always a read.
+- **Lock only the pictures git tracks.** This keeps the guard's line between
+  tracked and untracked, but a new space's photo is untracked, and that is the
+  run issue 160 came from.
 - **Lock the `refs/` folder too.** It would close decision 3's gap, but adding
   a new reference, how every space starts, would need the folder unlocked
   first.
