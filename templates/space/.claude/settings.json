@@ -21,6 +21,17 @@
           }
         ]
       }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "contour hook spec"
+          }
+        ]
+      }
     ]
   }
 }

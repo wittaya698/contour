@@ -1,3 +1,6 @@
 # The console environment (ADR 0019, decision 2). `./contour` needs none of
 # this; `contour-console` is the reason the promise in README.md has a boundary.
 claude-agent-sdk
+# The agent samples a reference's colours with `from PIL import Image`
+# (ADR 0036); without it, it decodes the PNG by hand.
+Pillow

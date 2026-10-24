@@ -27,8 +27,8 @@ ask-list only asks (ADR 0019, decision 20).
 A model space never copies this file. Its settings.json runs `contour hook
 spec`, so the guard is always the installed version (ADR 0015).
 
-stdin: the PreToolUse or PostToolUse JSON. Exit 2 denies, or after the call
-says it was refused, and shows stderr to the agent.
+stdin: the PreToolUse, PostToolUse or PostToolUseFailure JSON. Exit 2 denies,
+or after the call says it was refused, and shows stderr to the agent.
 """
 import json
 import os
@@ -94,7 +94,9 @@ def main():
     tool = ev.get("tool_name") or ""
     root = Path(os.environ.get(intent.ROOT) or ev.get("cwd") or ".").resolve()
     named = intent.references(tool, payload)
-    if ev.get("hook_event_name") == "PostToolUse":
+    # A call that failed has an event of its own, and a script can change a
+    # picture before it fails.
+    if ev.get("hook_event_name") in ("PostToolUse", "PostToolUseFailure"):
         return backstop(root, ev.get("tool_use_id"), named)
     # Before the call is judged: a script let through reads a picture it cannot
     # write (ADR 0036, decision 1).
