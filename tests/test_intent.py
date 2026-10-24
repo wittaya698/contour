@@ -239,17 +239,15 @@ class ReadingAReferenceTest(unittest.TestCase):
 
     def test_a_call_that_can_change_a_reference_still_does(self):
         """The floor. `sips` with no `--out` resizes the file it was given in
-        place, and a script fed a heredoc can write anywhere: telling its
-        `Image.open` from its `.save` would be guessing, so it stays gated."""
+        place. A script that only reads one runs since ADR 0036, against a
+        locked picture; `test_locked_refs` has it."""
         for call in ("cp ~/Downloads/new.png refs/front.png",
                      "cat sketch.png 2>/dev/null > refs/front.png",
                      "echo x >> 'refs/notes.txt'",
                      "sips -z 1491 546 refs/side.png",
                      "sips -z 1491 546 refs/side.png >/dev/null 2>&1",
                      "sips -Z 2000 big.png --out refs/side.png",
-                     "sed -i '' 's/a/b/' refs/notes.txt",
-                     "python3 - <<'EOF'\nfrom PIL import Image\n"
-                     "Image.open('refs/side.png').resize((2, 2)).save('/tmp/b.png')\nEOF"):
+                     "sed -i '' 's/a/b/' refs/notes.txt"):
             with self.subTest(call=call):
                 self.assertEqual(self.classify(call), "ref-write")
 

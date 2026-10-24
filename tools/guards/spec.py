@@ -6,6 +6,11 @@
                                      rewriting one.
     a reference it does not -> allow. Saving new references is how a space starts.
 
+Before judging, it locks every picture in each `refs/` folder the call names,
+tracked or not, so a script that only reads one is not a write and runs; one
+that writes fails on the lock (ADR 0036). Run again as the PostToolUse hook,
+it puts back from git a tracked picture the call changed anyway.
+
 Anything else is none of this guard's business and is allowed without asking git
 anything. It once covered `spec.yaml` too; ADR 0016 sanctioned a confirmed spec
 write and moved that half to detection, in `contour check`.
@@ -22,7 +27,8 @@ ask-list only asks (ADR 0019, decision 20).
 A model space never copies this file. Its settings.json runs `contour hook
 spec`, so the guard is always the installed version (ADR 0015).
 
-stdin: the PreToolUse JSON. Exit 2 denies and shows stderr to the agent.
+stdin: the PreToolUse or PostToolUse JSON. Exit 2 denies, or after the call
+says it was refused, and shows stderr to the agent.
 """
 import json
 import os
@@ -32,7 +38,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
-from lib import intent
+from lib import intent, locked
 
 
 def tracked(root, rel):
@@ -60,6 +66,25 @@ def inside(root, named):
         return None
 
 
+def backstop(root, call_id, named):
+    """After the call: a tracked picture it changed anyway, by a way round the
+    lock that the text did not show, is put back from git (ADR 0036,
+    decision 4). Exit 2 after a call shows stderr to the agent."""
+    back, restored = locked.put_back(root, call_id, named) if named else ([], True)
+    if not back:
+        return 0
+    one = len(back) == 1
+    them = "it" if one else "them"
+    which = "this picture is" if one else "these pictures are"
+    done = (f"Put back as git has {them} and locked again." if restored else
+            f"Git could not put {them} back: stop, and tell the user {which} changed.")
+    print(f"refused: {', '.join(back)} {'is' if one else 'are'} the user's reference "
+          f"{'image' if one else 'images'}, and this call changed {them}\n"
+          f"  (rule 1, ADR 0012). {done}\n"
+          f"  Measure a reference; never rewrite one.", file=sys.stderr)
+    return 2
+
+
 def main():
     try:
         ev = json.load(sys.stdin)
@@ -67,6 +92,15 @@ def main():
         return 0
     payload = ev.get("tool_input") or {}
     tool = ev.get("tool_name") or ""
+    root = Path(os.environ.get(intent.ROOT) or ev.get("cwd") or ".").resolve()
+    named = intent.references(tool, payload)
+    if ev.get("hook_event_name") == "PostToolUse":
+        return backstop(root, ev.get("tool_use_id"), named)
+    # Before the call is judged: a script let through reads a picture it cannot
+    # write (ADR 0036, decision 1).
+    locked.lock(root, named)
+    if named:
+        locked.before(root, ev.get("tool_use_id"), named)
     try:
         category = intent.classify(tool, payload)
     except ValueError:
@@ -79,7 +113,6 @@ def main():
         category = "ref-write"
     if category != "ref-write":
         return 0
-    root = Path(os.environ.get(intent.ROOT) or ev.get("cwd") or ".").resolve()
     for named in intent.references(tool, payload):
         rel = inside(root, named)
         if rel is None or not tracked(root, rel):

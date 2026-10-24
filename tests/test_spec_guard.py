@@ -80,9 +80,10 @@ class SpecGuardTest(unittest.TestCase):
         enforced. The path is named because *which* reference decides what the
         agent does next — measure that one and propose a revision."""
         self.commit("refs/front.png")
+        # A script that writes one runs since ADR 0036, and fails on the lock:
+        # `test_locked_refs` has it.
         for call in ("cat sketch.png > refs/front.png",
-                     "cp ~/Downloads/new.png refs/front.png",
-                     "python3 -c \"open('refs/front.png','wb').write(b'')\""):
+                     "cp ~/Downloads/new.png refs/front.png"):
             with self.subTest(call=call):
                 r = self.guard("Bash", {"command": call})
                 self.assertEqual(r.returncode, DENY, r.stdout + r.stderr)

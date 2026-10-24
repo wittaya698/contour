@@ -14,8 +14,8 @@ import time
 from pathlib import Path
 
 from console import approvals, last_run, launcher, seed, spend, vetoes
-from lib import (activity, form, gate as gate_words, intent, lock, marks, policy, prose,
-                 survey, topics, worksheet)
+from lib import (activity, form, gate as gate_words, intent, lock, locked, marks, policy,
+                 prose, survey, topics, worksheet)
 from lib.last_run import ENDED
 
 
@@ -489,6 +489,9 @@ class Run:
         if tool == TOPICS_TOOL:
             case = payload.get("case") or ""
             payload = topics_shown(self.space, payload)
+        # Here as well as in the guard: a script let through reads a picture it
+        # cannot write, whether or not the space's hook ran first (ADR 0036).
+        locked.lock(self.space, intent.references(tool, payload))
         category = TOPICS if tool == TOPICS_TOOL else intent.classify(tool, payload)
         if category is None:
             return True, None
