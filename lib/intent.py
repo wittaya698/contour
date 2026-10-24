@@ -35,6 +35,19 @@ WRITING = ("tee", "cp", "mv", "dd", "truncate", "install", "patch",
            "python", "python3", "perl", "ruby", "awk")
 
 
+# The interpreters a script naming a reference is let off for, by the flag
+# that hands each one its script on the command line (ADR 0036, decision 2).
+SCRIPTS = {"python": "-c", "python3": "-c", "perl": "-e", "ruby": "-e"}
+
+
+# The ways round a locked reference a script can name: unlock it, delete or
+# replace it, since the folder stays writable, or run another program that
+# does (ADR 0036, decision 3). Blunt on purpose, as WRITING is, and grown
+# when a new way round turns up.
+AROUND = re.compile(r"chmod|chflags|remove|unlink|rename|replace|delete|rmtree|shutil"
+                    r"|system|exec|spawn|subprocess|Popen|`")
+
+
 # The `sips` flags that only read an image. Any other flag changes it, and
 # `sips` writes a change back over the file it read unless given `--out`.
 SIPS_READS = ("-g", "--getProperty", "-1", "--oneLine", "-h", "--help",
@@ -192,10 +205,49 @@ def mentioned(call):
     """
     if "spec.yaml" in call:
         return "spec-write"
-    aimed = aimed_at_references(call)
+    aimed = aimed_at_references(unscripted(call))
     if refs_in(aimed) and writes(aimed, words_of(aimed)):
         return "ref-write"
     return None
+
+
+def unscripted(call):
+    """The call without the scripts it hands an interpreter, where a script
+    names no way round a locked reference (ADR 0036, decisions 2 and 3).
+
+    A reference is read-only on disk by the time a script runs, so a script
+    that writes one fails before anything changes, and which of its calls
+    write is no longer this module's to guess. A script that names a way to
+    unlock, delete or replace a file, or to run another program, is left in,
+    to be read as a write as before. So is one that cannot be found again in
+    the call's text, rather than taking out something else.
+    """
+    at = 0
+    while True:
+        found = HEREDOC.search(call, at)
+        if found is None:
+            break
+        start = call.rfind("\n", 0, found.start()) + 1
+        command = re.split(r"&&|\|\||;|\|", call[start:found.start()])[-1]
+        body = call.find("\n", found.end())
+        end = closing(call, body, found.group(3), found.group(1)) if body != -1 else None
+        if end is None or not interpreted(command) or AROUND.search(call[body:end]):
+            at = found.end()
+            continue
+        call = call[:found.start()] + call[found.end():body] + "\n" + call[end:]
+        at = found.start()
+    words = words_of(call)
+    for at, word in enumerate(words):
+        flag = SCRIPTS.get(word.rsplit("/", 1)[-1])
+        script = flag and after(flag, words[at + 1:])
+        if script and not AROUND.search(script) and script in call:
+            call = call.replace(script, "", 1)
+    return call
+
+
+def interpreted(command):
+    """Whether this command runs one of the interpreters a script is let off for."""
+    return any(w.rsplit("/", 1)[-1] in SCRIPTS for w in words_of(command))
 
 
 def aimed_at_references(call):
