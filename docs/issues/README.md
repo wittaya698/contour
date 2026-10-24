@@ -508,6 +508,8 @@ sliced work is.
 | [154](154-a-spans-note-is-in-the-users-words.md) | A span's note is in the user's words | AFK | — |
 | [155](155-a-new-spec-is-written-whole-the-first-time.md) | A new spec is written whole the first time | AFK | — |
 | [160](160-a-script-that-reads-a-reference-runs.md) | A script that reads a reference runs | HITL | — |
+| [161](161-measure-says-what-colour-is-there.md) | `measure` says what colour is there | AFK | — |
+| [162](162-measure-help-shows-its-options.md) | `measure --help` shows its options | AFK | — |
 
 **27 came out of slice 17's own suite runs.** `contour-console` forwards `SIGINT`
 and not `SIGTERM`, so every console a test terminates leaves its server running —
@@ -556,3 +558,8 @@ script that names a reference gated, since its text cannot say whether it
 reads or writes; the run showed that is how the agent measures colour, so it
 is the warning raised most. Whether to check after instead of guessing
 before is the user's call.
+
+**161 and 162 came out of the console runs that checked 158–160.** Asked for
+a photo's colours, a run wrote its own PNG decoder, since nothing in `measure`
+says what colour is at a place. Earlier, a run read the toolkit's source to
+find `--claims`, since `measure --help` never shows `measure`'s options.
