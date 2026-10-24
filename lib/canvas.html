@@ -247,6 +247,10 @@
   #run .question .basis { margin: 2px 0 0; font-size: 12px; opacity: .8; }
   #turns .changes { margin: 0; padding-left: 18px; }
   #turns .changes:empty, #turns .spans:empty { display: none; }
+  /* Spans still unanswered, on a spec gate: each id goes to its card. */
+  #turns .unanswered { margin: 0; font-size: 13px; }
+  #turns .unanswered button { font: inherit; padding: 0; border: 0; background: none;
+                              color: inherit; text-decoration: underline; cursor: pointer; }
   #turns .raw summary { cursor: pointer; opacity: .6; font-size: 11px; }
   /* An activity line: what the call did, its call beside it and folded away. */
   #turns .did { display: flex; flex-wrap: wrap; gap: 0 10px; align-items: baseline; }
@@ -383,6 +387,7 @@
         <span class="act"></span>
         <ul class="changes"></ul>
         <span class="spans"></span>
+        <p class="unanswered" hidden></p>
         <details class="raw"><summary>the exact call</summary>
           <span class="call"></span></details>
         <input class="because" placeholder="why not (a sentence)" autocomplete="off">
@@ -737,6 +742,48 @@ function form(event) {
 }
 
 // One line of the transcript.
+// The run waits on its by-eye spans: the panel's own card comes to the
+// transcript, where the person is, and asks only those (ADR 0035, decision
+// 3). Moved, not copied, so an answer in either place is the answer in both.
+// `home` keeps its place in the panel to go back to.
+let parkedOn = null;
+// A span the person went to from a spec gate's line, asked next (issue 159).
+let wanted = null;
+function toCard(id) {
+  wanted = id;
+  questions();
+  document.getElementById('questions').scrollIntoView({ block: 'nearest' });
+}
+const home = document.createComment('the questions card, while a run waits on its spans');
+function park(event) {
+  const card = document.getElementById('questions');
+  if (!home.parentNode) card.before(home);
+  const li = document.createElement('li');
+  li.className = 'spans';
+  const said = document.createElement('p');
+  said.textContent = event.text || '';
+  li.append(said, card);
+  parkedOn = event.spans || [];
+  // Asked once the line is in the transcript: until then the card is on no
+  // page, and found by no id (a live console, 2026-10-24).
+  queueMicrotask(questions);
+  return li;
+}
+
+// The park is over: the card goes back to the panel, and the transcript keeps
+// what was answered, as a form keeps its answers (issue 158).
+function unpark(event) {
+  const card = document.getElementById('questions');
+  if (home.parentNode) home.replaceWith(card);
+  parkedOn = null;
+  questions();
+  if (!event.text) return null;
+  const li = document.createElement('li');
+  li.className = 'spans-answered';
+  li.textContent = event.text;
+  return li;
+}
+
 function turn(event) {
   if (event.kind === 'gate' && event.category === 'question') return form(event);
   if (event.kind === 'filled') {
@@ -748,6 +795,9 @@ function turn(event) {
   if (event.kind === 'gate') return gate(event);
   if (event.kind === 'verdict') return closeGate(event);
   if (event.kind === 'call') return activity(event);
+  if (event.kind === 'spans') return park(event);
+  if (event.kind === 'spans-answered') return unpark(event);
+  if (event.kind === 'ended') unpark({});   // a run ended while waiting gives the card back
   const li = document.createElement('li');
   li.className = event.kind;
   if (event.blocks) li.append(...words(event.blocks));
@@ -874,6 +924,24 @@ function gate(event, send) {
   if (said.spans.length) {
     li.querySelector('.spans').textContent = 'measured on '
       + (said.spans.length === 1 ? 'span ' : 'spans ') + said.spans.join(', ');
+  }
+  // Claude's by-eye spans still unanswered, whose numbers the spec cannot
+  // carry: each id a way to its card. It does not stop Allow (ADR 0035,
+  // decision 7).
+  if (said.unanswered) {
+    const line = li.querySelector('.unanswered');
+    const [head, ...rest] = said.unanswered.text.split(/(\bm\d+\b)/);
+    line.append(head);
+    for (let i = 0; i < rest.length; i += 2) {
+      const id = rest[i];
+      if (!said.unanswered.spans.includes(id)) { line.append(id, rest[i + 1]); continue; }
+      const to = document.createElement('button');
+      to.type = 'button';
+      to.textContent = id;
+      to.addEventListener('click', () => toCard(id));
+      line.append(to, rest[i + 1]);
+    }
+    line.hidden = false;
   }
   li.querySelector('.call').textContent = called(event);
   li.querySelector('.allow').textContent = said.allow;
@@ -1350,7 +1418,7 @@ function draw() {
                                   ctx.drawImage(img, 0, 0); }
   list.replaceChildren();
   // Asked before drawing, so the picture can point at the card's span.
-  const now = asking(marks, skipped, (moving && moving.mark) || rejecting).mark;
+  const now = asking(marks, skipped, (moving && moving.mark) || rejecting, parkedOn, wanted).mark;
   marks.forEach((mark, i) => {
     const closed = mark.status === 'closed';
     const here = (mark.ref || null) === showing;
@@ -1575,8 +1643,9 @@ function foundation(mark) {
 }
 
 // Claude's questions, asked one at a time (issue 75). The ids put off with
-// *skip for now*, for this tab only: skipping answers nothing, so nothing is
-// written and a reload asks them again.
+// *skip for now*, for this tab only: skipping answers nothing, so no mark is
+// written and a reload asks them again. A console's run is told, so it stops
+// waiting on the span (ADR 0035, decision 4).
 const skipped = new Set();
 let asked = null;                            // the span the card is asking about
 let slip = null;                             // the last answer, to undo: { id, did }
@@ -1600,8 +1669,17 @@ function follow(showing, asked, followed, busy) {
 // different spans (issue 131). A span being moved is the question until it is
 // saved or cancelled, skipped or not: its Save and Cancel are on the card
 // (issue 132).
-function asking(marks, skipped, moving) {
-  const open = marks.filter(m => spanState(m) === 'unanswered' && m.status !== 'closed');
+//
+// `parked` is the spans a run waits on, or null: then they are the only
+// questions, counted *1 of 7* (ADR 0035, decision 3).
+function asking(marks, skipped, moving, parked, wanted) {
+  let open = marks.filter(m => spanState(m) === 'unanswered' && m.status !== 'closed');
+  let of = null;
+  if (parked) {
+    open = open.filter(m => parked.includes(m.id));
+    const left = open.filter(m => !skipped.has(m.id)).length;
+    of = left ? (parked.length - left + 1) + ' of ' + parked.length : null;
+  }
   // One reference at a time, in the order the list first reaches each, and
   // on each its foundations before its spans (issue 141).
   const refs = [...new Set(open.map(m => m.ref))];
@@ -1610,9 +1688,12 @@ function asking(marks, skipped, moving) {
     const [x, y] = [turn(a), turn(b)];
     return x[0] - y[0] || x[1] - y[1] || x[2] - y[2];
   });
+  // `wanted`: a span the person went to from a spec gate, skipped or not
+  // (ADR 0035, decision 7). Answered since, the card goes on.
   const mark = open.find(m => moving && m.id === moving.id)
+               || open.find(m => wanted && m.id === wanted)
                || order.find(m => !skipped.has(m.id)) || null;
-  return { mark, number: mark ? named(mark, marks) : '', open: open.length };
+  return { mark, number: mark ? named(mark, marks) : '', open: open.length, of };
 }
 
 // A question by the number on its badge, and by what it is.
@@ -1643,7 +1724,7 @@ function slipped(slip, marks) {
 
 function questions() {
   const card = document.getElementById('questions');
-  const { mark, number, open } = asking(marks, skipped, (moving && moving.mark) || rejecting);
+  const { mark, number, open, of } = asking(marks, skipped, (moving && moving.mark) || rejecting, parkedOn, wanted);
   card.hidden = !mark;
   asked = mark;
   const offer = slipped(slip, marks);
@@ -1653,8 +1734,9 @@ function questions() {
   followed = step.followed;
   if (step.show) { show(step.show); return; }   // its load redraws, and asks again
   if (!mark) return;
-  card.querySelector('.count').textContent = 'Claude has ' + open
-    + (open === 1 ? ' question' : ' questions') + ' about your pictures';
+  card.querySelector('.count').textContent = of
+    ? 'Claude has questions about your pictures' + ' \u00b7 ' + of
+    : 'Claude has ' + open + (open === 1 ? ' question' : ' questions') + ' about your pictures';
   card.querySelector('.which').textContent = number;
   // The number the span gave, from the reading it is linked to: *span m4: 640
   // mm ±3 mm  (through the camera, …)* is shown as *640 mm ±3 mm*, and
@@ -1839,7 +1921,8 @@ function zoom(mark) {
 
 // The card's answers are the list's: adopt, correct and reject, by the same
 // functions, so an answer given here is recorded exactly as one given there.
-// Skip writes nothing and asks the next.
+// Skip answers nothing, tells a run waiting on the span (ADR 0035), and asks
+// the next.
 function askedAnswers() {
   const card = document.getElementById('questions');
   const on = (cls, act) => card.querySelector(cls).addEventListener('click', () => {
@@ -1848,7 +1931,7 @@ function askedAnswers() {
   on('.yes', () => adoptSpan(asked));
   on('.move', () => correctSpan(asked));
   on('.wrong', () => rejectSpan(asked));
-  on('.skip', () => { skipped.add(asked.id); slip = null; questions(); });
+  on('.skip', () => { skipped.add(asked.id); slip = null; if (seeding) ask('/skip', { id: asked.id }); questions(); });
   on('.save', () => answered('/correct', correction(moving.mark, moving.ends)));
   on('.undo', () => undo());
   on('.cancel', () => {

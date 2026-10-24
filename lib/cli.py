@@ -301,6 +301,11 @@ def on_worksheet(cmd, rest, held):
     rep = stage(["worksheet"])
     if rep["ok"]:
         worksheet.record(HERE.dot, HERE.marks)
+    # What the user answered, off the marks alone and whatever the drawing
+    # did: under a console the run waited for these (ADR 0035, decision 4).
+    # The run is the console's, which names itself to the agent's shell.
+    rep["lines"] += worksheet.answers(
+        marks.load(HERE.marks), worksheet.skipped(HERE.dot, os.environ.get("CONTOUR_RUN")))
     return emit(rep)
 
 

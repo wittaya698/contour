@@ -79,12 +79,15 @@ class PageTest(unittest.TestCase):
                              (".wrong", "rejectSpan(asked)")):
             self.assertIn(f"'{button}', () => {act}", wired)
 
-    def test_skip_moves_on_and_sends_nothing(self):
+    def test_skip_moves_on_and_answers_nothing(self):
+        """It writes no answer. Under a console it tells the run, which may be
+        waiting on the span (ADR 0035, decision 4), and nothing else."""
         wired = self.script("askedAnswers")
         skip = wired.split("'.skip'", 1)[1].split("\n", 1)[0]
         self.assertIn("skipped.add(asked.id)", skip)
         self.assertIn("questions()", skip)
-        self.assertNotIn("ask(", skip)
+        self.assertEqual(re.findall(r"ask\('([^']+)'", skip), ["/skip"])
+        self.assertIn("if (seeding) ask('/skip'", skip)
         self.assertNotIn("answered(", skip)
 
     def test_the_reference_is_zoomed_on_the_span(self):

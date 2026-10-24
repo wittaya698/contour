@@ -68,6 +68,7 @@ def say(category, space, tool, call, proposal=""):
     if category == "spec-write":
         said["changes"] = changes(Path(space) / "spec.yaml", tool, call)
         said["spans"] = spans(Path(space) / marks.NAME, proposal)
+        said["unanswered"] = unanswered(Path(space) / marks.NAME)
     if category == "topics":
         # Each its own toggle: the person keeps or strikes word by word
         # (ADR 0030, decision 2).
@@ -83,6 +84,22 @@ def spans(held, proposal):
     are = {m["id"] for m in marks.load(held) if marks.span_end(m)}
     named = re.findall(rf"\b{marks.PREFIX}\d+\b", proposal or "")
     return [n for n in dict.fromkeys(named) if n in are]
+
+
+def unanswered(held):
+    """Claude's by-eye spans the user has not answered, as the spec gate names
+    them, or None: their numbers cannot be in the spec it shows. Skipped at a
+    park, or drawn since, a span is still one (ADR 0035, decision 7)."""
+    open_ = marks.by_eye(marks.load(held))
+    if not open_:
+        return None
+    n = len(open_)
+    named = ", ".join(f"{marks.text(m)} ({m['id']})" for m in open_)
+    return {"spans": [m["id"] for m in open_],
+            "text": (f"{n} of Claude's spans {'are' if n != 1 else 'is'} still "
+                     f"unanswered: {named}. "
+                     + ("Their numbers are" if n != 1 else "Its number is")
+                     + " not in this spec")}
 
 
 def changes(spec, tool, call):

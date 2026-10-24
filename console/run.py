@@ -14,7 +14,8 @@ import time
 from pathlib import Path
 
 from console import approvals, last_run, launcher, seed, spend, vetoes
-from lib import activity, form, gate as gate_words, intent, lock, marks, policy, prose, survey, topics
+from lib import (activity, form, gate as gate_words, intent, lock, marks, policy, prose,
+                 survey, topics, worksheet)
 from lib.last_run import ENDED
 
 
@@ -50,6 +51,15 @@ theirs only in their thinking, where no gate or person reads it (ADR 0029)."""
 TOPICS_TOOL = "mcp__contour__topics_propose"
 """The console's topic proposal: words for the person to keep or strike one by
 one (ADR 0030, decision 2)."""
+
+SPANS = "spans"
+"""A run waiting on the person's answers to its by-eye spans (ADR 0035)."""
+
+SPANS_ACT = "Claude has questions about your pictures"
+"""What that wait is, in the words the canvas's card says them."""
+
+ANSWERED = {"adopted": "adopted", "corrected": "moved", "rejected": "rejected"}
+"""A span's answer, as the transcript says it once the park ends."""
 
 ASK_TOOL = "mcp__contour__ask"
 """The console's question: each with a suggested answer and its basis, shown
@@ -270,6 +280,8 @@ class Run:
         self.ceiling = None                   # the weighted spend it stops at
         self.requester = None                 # who asked, if nobody is watching
         self.chat_size = None                 # the size a chat said, for the first form
+        self.asked_spans = set()              # by-eye spans this run has parked on
+        self.skipped = set()                  # those the person put off for now
         self._lock = threading.Lock()
         self._thread = None
 
@@ -300,6 +312,8 @@ class Run:
         self.ceiling = ceiling
         self.requester = requester
         self.chat_size = chat_size
+        # Asked once per run, and a new run asks again (ADR 0035, decision 5).
+        self.asked_spans, self.skipped = set(), set()
         self.record = lock.take(self.space, "console run")
         # A first green said to nobody is said to this run, and spent only
         # once the run has the space (issue 121).
@@ -391,7 +405,8 @@ class Run:
         waiting = self.pending
         if aside and waiting is not None and waiting["category"] == approvals.QUESTION:
             self.asked(waiting["call"], waiting["said"]["fields"])
-        elif aside and waiting is not None:
+        elif aside and waiting is not None and waiting["category"] != SPANS:
+            # A span is not set aside: it already waits in `marks.json`.
             self.aside(waiting["category"], waiting["tool"], waiting["call"],
                        waiting["case"])
         self.stopped = True
@@ -464,6 +479,8 @@ class Run:
                    "question with your suggested answer and its basis")
             self.say("refused", text=why)
             return False, why
+        if tool == "Bash" and activity.verb(payload.get("command") or "") == "worksheet":
+            self.spans()
         case = None
         if tool == SPEC_TOOL:
             # The case comes with it rather than from what was said (ADR 0029).
@@ -564,6 +581,62 @@ class Run:
         # agent nothing to have made.
         self.gates += 1
         return waiting
+
+    def spans(self):
+        """Before the worksheet, wait for the person's answers to the run's
+        by-eye spans (ADR 0035, decision 1): their numbers cannot be proposed
+        until then, and the worksheet is where the agent believes its reading
+        is finished. Ends when each is answered on the canvas, or skipped."""
+        if self.requester is not None:
+            # Nobody to answer, and a span already waits in `marks.json`: the
+            # worksheet says which are unanswered (ADR 0035, decision 6).
+            return
+        held = self.space / marks.NAME
+        waiting_on = [m["id"] for m in marks.by_eye(marks.load(held))
+                      if m["id"] not in self.asked_spans]
+        if not waiting_on:
+            return
+        self.asked_spans.update(waiting_on)
+        park = {"id": secrets.token_hex(8), "answered": threading.Event(),
+                "category": SPANS, "spans": waiting_on}
+        self.pending = park
+        n = len(waiting_on)
+        self.say("spans", id=park["id"], spans=waiting_on,
+                 text=f"{SPANS_ACT}: {n} span{'s' if n != 1 else ''} it placed by eye. "
+                      f"Answer {'them' if n != 1 else 'it'}, or skip for now, and "
+                      f"the run goes on")
+        self.parked(SPANS_ACT)
+        while not park["answered"].wait(RELAY_S):
+            still = {m["id"] for m in marks.by_eye(marks.load(held))} - self.skipped
+            if not still & set(waiting_on):
+                break
+        if self.stopped:
+            raise Stopped()
+        self.pending = None
+        # What was answered, kept in the transcript as a form keeps its
+        # answers; the page closes the card on it (issue 158).
+        self.say("spans-answered", id=park["id"], text=self.answered_spans(waiting_on))
+        self.now("running")
+        self.gates += 1
+
+    def answered_spans(self, ids):
+        """The park's spans as answered, by what each measures."""
+        kept = {m["id"]: m for m in marks.load(self.space / marks.NAME)}
+        said = [f"{marks.text(kept[i])} {ANSWERED.get(kept[i].get('answer'), 'skipped for now')}"
+                for i in ids if i in kept]
+        return "You answered Claude's spans: " + ", ".join(said)
+
+    def skip(self, mark_id):
+        """*skip for now*, on a span the run waits on: answered nothing, so it
+        stays unanswered and its number still cannot be proposed, but the park
+        no longer waits on it (ADR 0035, decision 4)."""
+        park = self.pending
+        if park is None or park["category"] != SPANS or mark_id not in park["spans"]:
+            return {"refused": f"the run is not waiting on {mark_id}"}
+        self.skipped.add(mark_id)
+        # Where the worksheet this run is about to call can read it.
+        worksheet.skip(self.space / ".contour", self.record["run"], self.skipped)
+        return {"skipped": mark_id}
 
     def form(self, payload):
         """The agent's questions, as a form already filled (ADR 0034). Watched,
@@ -728,7 +801,8 @@ class Run:
         two builds differ (ADR 0019, decision 13).
         """
         waiting = self.pending
-        if waiting is None or waiting["id"] != at:
+        if waiting is None or waiting["id"] != at or waiting["category"] == SPANS:
+            # A wait on spans is answered span by span, on the canvas.
             return None
         waiting["allow"], waiting["reason"] = bool(allow), reason
         self.pending = None
@@ -848,6 +922,8 @@ class Run:
                        if e["kind"] in ("prompt", "ended")), None)
         if not self.live or latest == "ended":
             return {"state": "idle", "said": "no run"}
+        if self.pending is not None and self.pending["category"] == SPANS:
+            return {"state": "waiting", "said": f"Waiting for you: {SPANS_ACT}"}
         if self.pending is not None:
             return {"state": "waiting", "said": "Waiting for you: answer above"}
         return {"state": "working", "said": working(time.monotonic() - self.heard)}

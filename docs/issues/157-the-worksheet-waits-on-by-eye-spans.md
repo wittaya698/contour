@@ -28,12 +28,12 @@ to the transcript.
 
 ## Acceptance criteria
 
-- [ ] An attended run's `contour worksheet` with a by-eye span unanswered waits until it is answered
-- [ ] With only snapped spans unanswered it does not wait
-- [ ] Answered or skipped, the worksheet runs and its output gives each answer
-- [ ] A skipped span does not park a later worksheet in the same run; a new span does
-- [ ] An unattended run's worksheet never waits
-- [ ] Ending the run while it waits ends the park, as it ends any gate
+- [x] An attended run's `contour worksheet` with a by-eye span unanswered waits until it is answered
+- [x] With only snapped spans unanswered it does not wait
+- [x] Answered or skipped, the worksheet runs and its output gives each answer
+- [x] A skipped span does not park a later worksheet in the same run; a new span does
+- [x] An unattended run's worksheet never waits
+- [x] Ending the run while it waits ends the park, as it ends any gate
 
 ## Blocked by
 

@@ -65,6 +65,26 @@ class AskedTest(unittest.TestCase):
         self.assertIsNone(self.asking([span("m1", answer="adopted"), note("m2")])["mark"])
         self.assertIsNone(self.asking([span("m1")], skipped=["m1"])["mark"])
 
+    def parked(self, marks, parked, skipped=()):
+        return self.run_page(["spanState", "foundation", "named", "asking"],
+                             "asking(marks, new Set(skipped), null, parked)",
+                             marks=marks, skipped=list(skipped), parked=parked)
+
+    def test_at_a_park_the_card_asks_only_what_the_run_waits_on_and_counts_it(self):
+        """*1 of 2*: the spans the run waits on, and no other question
+        (ADR 0035, decision 3; issue 158)."""
+        marks = [span("m1", placed="snapped"), span("m2", placed="by eye"),
+                 span("m3", placed="by eye")]
+        said = self.parked(marks, ["m2", "m3"])
+        self.assertEqual((said["mark"]["id"], said["of"]), ("m2", "1 of 2"))
+        marks[1]["answer"] = "adopted"
+        said = self.parked(marks, ["m2", "m3"])
+        self.assertEqual((said["mark"]["id"], said["of"]), ("m3", "2 of 2"))
+        self.assertIsNone(self.parked(marks, ["m2", "m3"], skipped=["m3"])["mark"])
+
+    def test_with_no_park_there_is_no_count(self):
+        self.assertIsNone(self.asking([span("m1")])["of"])
+
     def stroke(self, mark, asked):
         return self.run_page(["stroke"], "stroke(mark, asked)", mark=mark, asked=asked)
 
