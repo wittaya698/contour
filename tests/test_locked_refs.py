@@ -92,7 +92,13 @@ class ReadTest(GuardCase):
                      "a=np.asarray(Image.open('refs/walkie.png').convert('RGB')); "
                      "print(a[40:60, 10:30].mean(axis=(0, 1)))\" 2>&1 | head -40",
                      "python3 - <<'EOF'\nfrom PIL import Image\n"
-                     "im = Image.open('refs/walkie.png')\nprint(im.size)\nEOF"):
+                     "im = Image.open('refs/walkie.png')\nprint(im.size)\nEOF",
+                     # The first call of the live try, gated: the `ls` named the
+                     # folder, and the interpreter left behind read as a write.
+                     "ls refs/ && python3 -c \"from PIL import Image; "
+                     "im=Image.open('refs/walkie.png'); print(im.size, im.mode)\"",
+                     "ls -la refs/ && python3 - <<'EOF'\nfrom PIL import Image\n"
+                     "print(Image.open('refs/walkie.png').size)\nEOF"):
             with self.subTest(call=call):
                 r = self.guard(call)
                 self.assertEqual(r.returncode, 0, r.stderr)
@@ -174,7 +180,13 @@ class AroundTest(GuardCase):
 
     def test_a_script_from_a_file_cannot_be_read_and_is_still_denied(self):
         self.picture("refs/side.png")
-        self.assertEqual(self.guard("python3 tools/sample.py refs/side.png").returncode, DENY)
+        for call in ("python3 tools/sample.py refs/side.png",
+                     # Taking out the second's interpreter must not let the first by.
+                     "python3 tools/sample.py refs/side.png && python3 -c 'print(1)'",
+                     "python3 tools/sample.py refs/side.png && python3 - <<'EOF'\n"
+                     "print(1)\nEOF"):
+            with self.subTest(call=call):
+                self.assertEqual(self.guard(call).returncode, DENY)
 
 
 class BackstopTest(GuardCase):
@@ -201,6 +213,17 @@ class BackstopTest(GuardCase):
         self.assertEqual(side.read_bytes(), b"png")
         self.assertFalse(writable(side))
 
+    def test_a_call_that_fails_is_checked_after_as_well(self):
+        """Claude Code sends a failed call a hook event of its own, and a
+        script can change a picture and then fail (found on the live try)."""
+        side = self.picture("refs/side.png")
+        call = self.HIDDEN + " && false"
+        self.assertEqual(self.guard(call).returncode, 0)
+        subprocess.run(call, shell=True, cwd=self.space, capture_output=True)
+        after = self.guard(call, event="PostToolUseFailure")
+        self.assertEqual(after.returncode, DENY)
+        self.assertEqual(side.read_bytes(), b"png")
+
     def test_a_read_says_nothing_after(self):
         self.picture("refs/side.png")
         after = self.ran(SAMPLE)
@@ -217,13 +240,15 @@ class BackstopTest(GuardCase):
 
 
     def test_a_space_runs_the_guard_after_every_shell_call(self):
-        """The backstop is only as good as the hook that hands it the call."""
+        """The backstop is only as good as the hook that hands it the call,
+        and a failed call is handed to a hook of its own."""
         settings = json.loads((ROOT / "templates" / "space" / ".claude"
                                / "settings.json").read_text())
-        after = [e for e in settings["hooks"].get("PostToolUse", [])
-                 if any("hook spec" in h.get("command", "") for h in e["hooks"])]
-        self.assertEqual(len(after), 1)
-        self.assertIn("Bash", after[0]["matcher"].split("|"))
+        for event in ("PostToolUse", "PostToolUseFailure"):
+            after = [e for e in settings["hooks"].get(event, [])
+                     if any("hook spec" in h.get("command", "") for h in e["hooks"])]
+            self.assertEqual(len(after), 1, event)
+            self.assertIn("Bash", after[0]["matcher"].split("|"), event)
 
 
 class ConsoleTest(RecordCase):

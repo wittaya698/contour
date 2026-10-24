@@ -234,15 +234,26 @@ def unscripted(call):
         if end is None or not interpreted(command) or AROUND.search(call[body:end]):
             at = found.end()
             continue
-        call = call[:found.start()] + call[found.end():body] + "\n" + call[end:]
-        at = found.start()
+        opener = uninterpreted(call[start:found.start()])
+        call = call[:start] + opener + call[found.end():body] + "\n" + call[end:]
+        at = start + len(opener)
     words = words_of(call)
     for at, word in enumerate(words):
         flag = SCRIPTS.get(word.rsplit("/", 1)[-1])
         script = flag and after(flag, words[at + 1:])
         if script and not AROUND.search(script) and script in call:
-            call = call.replace(script, "", 1)
+            # The interpreter goes with its script: left behind, it reads as
+            # a write to whatever else the call names, as `ls refs/` did.
+            call = call.replace(script, "", 1).replace(word, "", 1)
     return call
+
+
+def uninterpreted(command):
+    """The command without the interpreter it runs."""
+    for word in words_of(command):
+        if word.rsplit("/", 1)[-1] in SCRIPTS:
+            return command.replace(word, "", 1)
+    return command
 
 
 def interpreted(command):
