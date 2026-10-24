@@ -510,6 +510,9 @@ sliced work is.
 | [160](160-a-script-that-reads-a-reference-runs.md) | A script that reads a reference runs | HITL | — |
 | [161](161-measure-says-what-colour-is-there.md) | `measure` says what colour is there | AFK | — |
 | [162](162-measure-help-shows-its-options.md) | `measure --help` shows its options | AFK | — |
+| [163](163-export-asks-the-gltf-validator.md) | `export` asks the glTF validator | AFK | — |
+| [164](164-ruff-reads-the-toolkit.md) | ruff reads the toolkit | AFK | — |
+| [165](165-the-suite-is-measured-before-it-runs-in-parallel.md) | The suite is measured before it runs in parallel | AFK | — |
 
 **27 came out of slice 17's own suite runs.** `contour-console` forwards `SIGINT`
 and not `SIGTERM`, so every console a test terminates leaves its server running —
@@ -563,3 +566,8 @@ before is the user's call.
 a photo's colours, a run wrote its own PNG decoder, since nothing in `measure`
 says what colour is at a place. Earlier, a run read the toolkit's source to
 find `--claims`, since `measure --help` never shows `measure`'s options.
+
+**163–165 came out of a scan of the toolkit for tools and libraries.** The
+launcher keeps its stdlib-only promise, so each is optional or for whoever works
+on the toolkit: the glTF validator when it is installed, ruff as a lint, and a
+parallel runner only if measuring the suite says it would help.
