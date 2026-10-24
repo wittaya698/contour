@@ -35,7 +35,8 @@ Questions this needs answered before it is built:
 
 ## Acceptance criteria
 
-- [ ] The user has decided whether a script naming a reference runs and is checked after, and the answer is written into an ADR or this issue
+- [x] The user has decided whether a script naming a reference runs and is checked after, and the answer is written into an ADR or this issue
+  (2026-10-24: a script runs against a locked reference, [ADR 0036](../adr/0036-a-script-reads-a-locked-reference.md))
 - [ ] If yes: `python3 -c "…Image.open('refs/x.png')…"` raises no gate, and one that rewrites a tracked `refs/x.png` leaves it as git has it and tells the agent it was refused
 - [ ] `cp x refs/…` and `> refs/…` on a tracked reference are still denied before they run
 
